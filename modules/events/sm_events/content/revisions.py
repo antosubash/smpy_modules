@@ -77,7 +77,11 @@ def snapshot(
 async def record(
     db: Any, event: Event, *, action: str, actor: str | None, note: str | None = None
 ) -> Revision:
-    """Write the history row for the event's current revision and prune the old."""
+    """Write the history row for the event's current revision and prune the old.
+
+    ``action`` must be one of ``REVISION_ACTIONS``; another is a programming error."""
+    if action not in constants.REVISION_ACTIONS:
+        raise ValueError(f"unknown revision action: {action!r}")
     texts = (await texts_of(db, [event.id]))[event.id]
     overrides = (
         (

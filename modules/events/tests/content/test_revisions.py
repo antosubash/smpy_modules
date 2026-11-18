@@ -77,6 +77,15 @@ async def test_snapshot_preserves_extra(db):
     assert row.actor is None and row.number == 1
 
 
+async def test_an_unknown_action_is_a_programming_error(db):
+    event = await an_event(db)
+    with pytest.raises(ValueError, match="unknown revision action"):
+        await record(db, event, action="renamed", actor=None)
+    assert {"created", "trashed", "restored", "published_scheduled"} <= set(
+        constants.REVISION_ACTIONS
+    )
+
+
 async def test_prune_keeps_100(db):
     event = await an_event(db)
     for number in range(1, 106):

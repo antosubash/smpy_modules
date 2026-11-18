@@ -20,6 +20,7 @@ from simple_module_db.listeners import current_tenant_id
 
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters, OccurrencePage
 from sm_events.calendar.sources import SOURCES, TRUNCATED, SourceContext, sort_key
+from sm_events.calendar.times import supported_instant
 from sm_events.core import constants
 from sm_events.core.errors import InvalidRange
 
@@ -65,9 +66,11 @@ async def occurrences(
 
     ``start`` and ``end`` are aware. ``tenant_id`` must be the tenant bound for
     this call. Raises :class:`InvalidRange` for ``end <= start`` and for more than
-    366 days."""
+    366 days, and :class:`ValueError` for an instant outside the supported years."""
     _aware(start, "start")
     _aware(end, "end")
+    supported_instant(start)
+    supported_instant(end)
     if end <= start:
         raise InvalidRange
     if end - start > timedelta(days=constants.MAX_RANGE_DAYS):

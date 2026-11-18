@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi import FastAPI
 from sm_events import contracts
@@ -83,3 +85,17 @@ def test_mounted():
 
 def test_contract_surface():
     assert contract.__all__ == ["Occurrence", "OccurrencePage", "occurrences"]
+
+
+@pytest.mark.parametrize(
+    "start, end",
+    [
+        (utc(2026, 6, 1), datetime(9999, 12, 31, 23, 59, 59, tzinfo=timezone(-timedelta(hours=5)))),
+        (datetime(1, 1, 1, tzinfo=timezone(timedelta(hours=5))), utc(2026, 6, 1)),
+        (utc(9000, 1, 1), utc(9000, 1, 2)),
+        (utc(1899, 12, 31), utc(1900, 1, 2)),
+    ],
+)
+async def test_an_instant_outside_a_sane_range_is_a_value_error_before_any_query(db, start, end):
+    with pytest.raises(ValueError, match="supported years"):
+        await contract.occurrences(db, tenant_id="default", viewer=OWNER, start=start, end=end)

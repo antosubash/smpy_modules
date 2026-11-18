@@ -20,7 +20,6 @@ is 409 ``invalid_transition`` and changes nothing. Every action takes
 
 from __future__ import annotations
 
-import re
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
@@ -29,12 +28,11 @@ from zoneinfo import ZoneInfo
 
 from simple_module_core.resources import ResourcePrincipal
 
-from sm_events.calendar.times import is_nonexistent, localize
+from sm_events.calendar.times import localize, parse_local
 from sm_events.content import bus, notices, revisions
 from sm_events.content.guard import claim
-from sm_events.core import constants
 from sm_events.core.access.events import load_event, require
-from sm_events.core.errors import InvalidTimes, InvalidTransition
+from sm_events.core.errors import InvalidTransition
 from sm_events.models import Event
 from sm_events.models.enums import EventStatus
 
@@ -59,27 +57,13 @@ _RECORDED = {
     "unpublish": "unpublished",
 }
 """The history action each action records; ``approve`` decides its own."""
-_LOCAL = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
 
 
 def _publish_at(local: str, timezone: str) -> datetime:
     """A wall-clock instant on the event's clock, as UTC. A time inside a DST gap
     is refused, because a person typed something that does not exist."""
     tz = ZoneInfo(timezone)
-    bad = InvalidTimes(
-        constants.INVALID_LOCAL_TIME_DETAIL,
-        code=constants.INVALID_LOCAL_TIME_CODE,
-        field="publish_at_local",
-    )
-    if not _LOCAL.match(local):
-        raise bad
-    try:
-        naive = datetime.fromisoformat(local)
-    except ValueError:
-        raise bad from None
-    if is_nonexistent(naive, tz):
-        raise bad
-    return localize(naive, tz)
+    return localize(parse_local(local, tz, "publish_at_local"), tz)
 
 
 def _check_state(action: str, event: Event) -> None:

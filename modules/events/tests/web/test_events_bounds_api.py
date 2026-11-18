@@ -80,3 +80,43 @@ async def test_a_preview_after_outside_a_sane_range_is_422(client):
         headers=OWNER,
     )
     assert got.status_code == 422, got.text
+
+
+FAR = [
+    "9999-12-31T23:59:59-05:00",  # in range as a wall time, out of range in UTC
+    "0001-01-01T00:00:00+05:00",  # before year 1 in UTC
+    "9000-01-01T00:00:00Z",
+    "1899-12-31T23:59:59Z",
+]
+
+
+@pytest.mark.parametrize("instant", FAR)
+@pytest.mark.parametrize("name", ["from", "to"])
+async def test_an_instant_outside_a_sane_range_in_the_list_is_422_naming_the_field(
+    client, name, instant
+):
+    got = await client.get(EV, params={name: instant}, headers=OWNER)
+    assert got.status_code == 422, got.text
+    assert got.json()["detail"][0]["loc"] == ["query", name]
+
+
+@pytest.mark.parametrize("instant", FAR)
+@pytest.mark.parametrize("name", ["start", "end"])
+async def test_an_instant_outside_a_sane_range_in_occurrences_is_422_naming_the_field(
+    client, name, instant
+):
+    other = "start" if name == "end" else "end"
+    got = await client.get(
+        "/api/events/occurrences",
+        params={name: instant, other: "2026-07-01T00:00:00Z"},
+        headers=OWNER,
+    )
+    assert got.status_code == 422, got.text
+    assert any(e["loc"] == ["query", name] for e in got.json()["detail"])
+
+
+async def test_the_edges_of_the_range_are_still_served(client):
+    got = await client.get(
+        EV, params={"from": "1900-01-01T00:00:00Z", "to": "8999-12-31T23:59:59Z"}, headers=OWNER
+    )
+    assert got.status_code == 200, got.text

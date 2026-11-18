@@ -6,14 +6,17 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from sm_events.core import constants
 from sm_events.web.schemas._fields import MultiLine, SingleLine, TextSlug
 
 Title = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300), SingleLine
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=constants.TITLE_MAX),
+    SingleLine,
 ]
-Summary = Annotated[str, Field(max_length=1000), MultiLine]
-SeoTitle = Annotated[str, Field(max_length=300), SingleLine]
-SeoDescription = Annotated[str, Field(max_length=500), MultiLine]
+Summary = Annotated[str, Field(max_length=constants.SUMMARY_MAX), MultiLine]
+SeoTitle = Annotated[str, Field(max_length=constants.SEO_TITLE_MAX), SingleLine]
+SeoDescription = Annotated[str, Field(max_length=constants.SEO_DESCRIPTION_MAX), MultiLine]
 
 
 class TextIn(BaseModel):

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from sm_events.calendar.times import Span, to_local
+from sm_events.calendar.times import Span, supported_instant, to_local
 from sm_events.core import constants
 from sm_events.models import OccurrenceOverride
 from sm_events.models.enums import OVERRIDE_KINDS, OverrideKind
@@ -16,18 +16,7 @@ from sm_events.web.schemas._fields import MultiLine
 from sm_events.web.schemas.events_in import Revision, RuleText, TimesIn
 
 Note = Annotated[str, Field(max_length=constants.NOTE_MAX), MultiLine]
-Wall = Annotated[str, Field(max_length=40)]
-
-
-def in_range(value: datetime) -> datetime:
-    """An instant between the years a calendar means; ``ValueError`` (a 422) beyond."""
-    try:
-        year = value.astimezone(UTC).year
-    except OverflowError:
-        year = 0
-    if not constants.ORIGINAL_START_MIN_YEAR <= year < constants.ORIGINAL_START_MAX_YEAR:
-        raise ValueError("outside the supported years")
-    return value
+Wall = Annotated[str, Field(max_length=constants.TIMES_FIELD_MAX)]
 
 
 class OverrideIn(BaseModel):
@@ -49,7 +38,7 @@ class OverrideIn(BaseModel):
     @field_validator("original_start")
     @classmethod
     def _sane_year(cls, value: datetime) -> datetime:
-        return in_range(value)
+        return supported_instant(value)
 
     @model_validator(mode="after")
     def _times_iff_moved(self) -> OverrideIn:
@@ -114,7 +103,7 @@ class PreviewIn(BaseModel):
     @field_validator("after")
     @classmethod
     def _sane_year(cls, value: datetime | None) -> datetime | None:
-        return value if value is None else in_range(value)
+        return value if value is None else supported_instant(value)
 
 
 class PreviewOccurrence(BaseModel):

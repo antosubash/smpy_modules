@@ -12,7 +12,7 @@ from sm_events.web.schemas.events_in import Expected, Revision
 
 __all__ = ["ApproveIn", "Expected", "RejectIn"]
 
-Wall = Annotated[str, Field(max_length=40)]
+Wall = Annotated[str, Field(max_length=constants.TIMES_FIELD_MAX)]
 RejectNote = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=constants.NOTE_MAX),

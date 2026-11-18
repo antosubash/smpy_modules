@@ -27,6 +27,8 @@ __all__ = [
     "day_exists",
     "is_nonexistent",
     "localize",
+    "parse_local",
+    "supported_instant",
     "to_local",
     "to_span",
 ]
@@ -75,7 +77,7 @@ def _parse_date(text: str, field: str) -> date:
         raise _bad(constants.INVALID_LOCAL_TIME_DETAIL, field=field) from None
 
 
-def _parse_local(text: str, tz: ZoneInfo, field: str) -> datetime:
+def parse_local(text: str, tz: ZoneInfo, field: str) -> datetime:
     """Naive wall clock; an offset, a ``Z`` or a nonexistent time is refused, naming ``field``."""
     if not isinstance(text, str) or not _DATETIME.match(text):
         raise _bad(constants.INVALID_LOCAL_TIME_DETAIL, field=field)
@@ -86,6 +88,19 @@ def _parse_local(text: str, tz: ZoneInfo, field: str) -> datetime:
     if is_nonexistent(naive, tz):
         raise _bad(constants.INVALID_LOCAL_TIME_DETAIL, field=field)
     return naive
+
+
+def supported_instant(value: datetime) -> datetime:
+    """``value`` if its UTC instant lies in the years a calendar means; ``ValueError`` (a 422
+    in a request) beyond. The offset is applied first: ``9999-12-31T23:59:59-05:00`` is
+    year 10000 in UTC, which no column or zone arithmetic below can hold."""
+    try:
+        year = value.astimezone(UTC).year
+    except OverflowError:
+        year = 0
+    if not constants.ORIGINAL_START_MIN_YEAR <= year < constants.ORIGINAL_START_MAX_YEAR:
+        raise ValueError("outside the supported years")
+    return value
 
 
 def _midnight(day: date, tz: ZoneInfo) -> datetime:
@@ -114,7 +129,7 @@ def to_span(
         if (last - first).days + 1 > limit:
             raise too_long
         return Span(_midnight(first, tz), _midnight(last + _ONE_DAY, tz))
-    begin, finish = _parse_local(start, tz, fields[0]), _parse_local(end, tz, fields[1])
+    begin, finish = parse_local(start, tz, fields[0]), parse_local(end, tz, fields[1])
     span = Span(localize(begin, tz), localize(finish, tz))
     if span.ends_at <= span.starts_at:
         raise before

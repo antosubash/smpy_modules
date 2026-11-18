@@ -4,13 +4,16 @@ import unicodedata
 from typing import Annotated, Any
 from urllib.parse import urlsplit
 
-from pydantic import AfterValidator, BeforeValidator, Field
+from pydantic import AfterValidator, AwareDatetime, BeforeValidator, Field
 
+from sm_events.calendar.times import supported_instant
 from sm_events.core import constants, timezones
 
 Slug = Annotated[str, Field(max_length=constants.SLUG_MAX, pattern=constants.SLUG_PATTERN)]
 TextSlug = Annotated[str, Field(max_length=constants.TEXT_SLUG_MAX, pattern=constants.SLUG_PATTERN)]
 Color = Annotated[str, Field(pattern=constants.COLOR_PATTERN)]
+SupportedInstant = Annotated[AwareDatetime, AfterValidator(supported_instant)]
+"""A query-string instant with an offset, in the years a calendar means (else a 422)."""
 
 _CONTROL = "Cc"
 """Unicode category of the C0 and C1 controls, NUL, tab, newline and DEL."""

@@ -12,24 +12,24 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, Query
-from pydantic import AwareDatetime
 
 from sm_events.calendar.occurrence import OccurrenceFilters
 from sm_events.core import constants
+from sm_events.web.schemas._fields import SupportedInstant
 
 __all__ = ["OccurrenceParams", "OccurrenceQuery", "occurrence_query"]
 
 
 @dataclass(frozen=True)
 class OccurrenceQuery:
-    start: AwareDatetime
-    end: AwareDatetime
+    start: SupportedInstant
+    end: SupportedInstant
     filters: OccurrenceFilters
 
 
 def occurrence_query(
-    start: Annotated[AwareDatetime, Query()],
-    end: Annotated[AwareDatetime, Query()],
+    start: Annotated[SupportedInstant, Query()],
+    end: Annotated[SupportedInstant, Query()],
     calendar: Annotated[list[uuid.UUID] | None, Query(max_length=constants.CALENDARS_MAX)] = None,
     category: Annotated[list[uuid.UUID] | None, Query(max_length=constants.CATEGORIES_MAX)] = None,
     types: Annotated[list[str] | None, Query(alias="type", max_length=20)] = None,

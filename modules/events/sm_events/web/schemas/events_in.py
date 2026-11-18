@@ -27,8 +27,10 @@ Address = Annotated[str, Field(max_length=constants.ADDRESS_MAX), MultiLine]
 Latitude = Annotated[float, Field(ge=-90, le=90, allow_inf_nan=False)]
 Longitude = Annotated[float, Field(ge=-180, le=180, allow_inf_nan=False)]
 Revision = Annotated[int, Field(ge=1, le=2**31 - 1)]
+# Looser than RRULE_MAX_LEN (500): a rule of 501 to 1000 characters reaches the parser, which
+# refuses it with its own `invalid_rrule`; only beyond this is it a bare schema 422.
 RuleText = Annotated[str, Field(max_length=constants.RRULE_INPUT_MAX)]
-TypeName = Annotated[str, Field(min_length=1, max_length=64)]
+TypeName = Annotated[str, Field(min_length=1, max_length=constants.TYPE_NAME_MAX)]
 
 
 class Expected(BaseModel):
@@ -40,8 +42,8 @@ class Expected(BaseModel):
 class TimesIn(BaseModel):
     all_day: bool = False
     timezone: TimezoneName
-    start: Annotated[str, Field(max_length=40)]
-    end: Annotated[str, Field(max_length=40)]
+    start: Annotated[str, Field(max_length=constants.TIMES_FIELD_MAX)]
+    end: Annotated[str, Field(max_length=constants.TIMES_FIELD_MAX)]
 
 
 class _Fields(BaseModel):

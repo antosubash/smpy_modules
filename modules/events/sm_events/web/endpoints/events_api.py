@@ -16,7 +16,6 @@ import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from pydantic import AwareDatetime
 
 from sm_events.content import bus, listing
 from sm_events.content.events_trash import restore_event, trash_event
@@ -25,6 +24,7 @@ from sm_events.core import constants
 from sm_events.core.access.events import load_event
 from sm_events.models.enums import EVENT_STATUSES
 from sm_events.web.endpoints.deps import Principal, content_locales, event_db, require_view
+from sm_events.web.schemas._fields import SupportedInstant
 from sm_events.web.schemas.events_in import EventCreate, EventPatch, Expected, Revision
 from sm_events.web.schemas.events_out import EventOut, EventPage
 from sm_events.web.services.events_out import render, render_items
@@ -44,8 +44,8 @@ async def list_events(
     calendar: Annotated[list[uuid.UUID] | None, Query(max_length=constants.CALENDARS_MAX)] = None,
     status: ListStatus | None = None,
     category: uuid.UUID | None = None,
-    from_: Annotated[AwareDatetime | None, Query(alias="from")] = None,
-    to: AwareDatetime | None = None,
+    from_: Annotated[SupportedInstant | None, Query(alias="from")] = None,
+    to: SupportedInstant | None = None,
     q: Annotated[str | None, Query(max_length=constants.QUERY_MAX)] = None,
     trashed: bool = False,
     locale: LocaleQuery = None,
