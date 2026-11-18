@@ -61,6 +61,7 @@ def as_user(user_id: str, *perms: str, tenant: str | None = None) -> dict[str, s
 
 ROLE_MAP = {
     "viewer": ["events.view"],
+    "editor": ["events.view", "events.edit"],
     "manager": ["events.view", "events.manage"],
     "admin": ["*"],
 }

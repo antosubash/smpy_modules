@@ -100,12 +100,13 @@ async def _categories(db: Any, events: Sequence[Event]) -> dict[uuid.UUID, Categ
     return {c.id: c for c in (await db.execute(stmt)).scalars()}
 
 
-async def _parent_uids(db: Any, events: Iterable[Event]) -> dict[uuid.UUID, str]:
-    """The UID of each parent that is itself public; a hidden parent is simply absent."""
+async def _parent_uids(db: Any, events: Iterable[Event], visible: Any) -> dict[uuid.UUID, str]:
+    """The UID of each parent that is itself in ``visible`` (the select the feed reads from);
+    a hidden parent is simply absent."""
     ids = {e.parent_id for e in events if e.parent_id}
     if not ids:
         return {}
-    stmt = public_events().with_only_columns(Event.id, Event.uid).where(col(Event.id).in_(ids))
+    stmt = visible.with_only_columns(Event.id, Event.uid).where(col(Event.id).in_(ids))
     return {row[0]: row[1] for row in (await db.execute(stmt)).all()}
 
 
@@ -123,6 +124,7 @@ async def _items(
     default_locale: str,
     url_for: UrlFor,
     drop_cut: bool,
+    visible: Any,
 ) -> tuple[list[FeedEvent], bool]:
     """The items, and whether the override bound cut something. In a calendar feed a series
     whose overrides were cut is dropped (``drop_cut``); a single event's file keeps what was read
@@ -135,7 +137,7 @@ async def _items(
         # would resurrect skipped occurrences. Its row and every later one (by id) are dropped.
         events = [e for e in events if not e.rrule or e.id < cut_at]
     categories = await _categories(db, events)
-    parents = await _parent_uids(db, events)
+    parents = await _parent_uids(db, events, visible)
     items: list[FeedEvent] = []
     for event in events:
         if not texts[event.id]:  # an event always has its default text; skip a broken one
@@ -169,11 +171,18 @@ async def feed_events(
     default_locale: str,
     now: datetime,
     url_for: UrlFor,
+    events: Any = None,
 ) -> FeedRead:
-    """The public feed's items for ``calendar_id`` (every public calendar when ``None``)."""
+    """The feed's items for ``calendar_id`` (every calendar ``events`` reaches when ``None``).
+
+    ``events`` is the ``SELECT Event`` the feed reads from: the public gate's by default, or a
+    caller's own narrower select (a private feed passes what its owner may see). It is always
+    held to the bound tenant here as well, so a select built without that predicate cannot
+    cross tenants."""
     lo = now - timedelta(days=constants.FEED_DAYS_BACK)
     hi = now + timedelta(days=constants.FEED_DAYS_AHEAD)
-    stmt = public_events().where(_in_window(lo, hi))
+    visible = public_events() if events is None else events.where(Event.tenant_id == bound_tenant())
+    stmt = visible.where(_in_window(lo, hi))
     if calendar_id is not None:
         stmt = stmt.where(Event.calendar_id == calendar_id)
     stmt = stmt.order_by(col(Event.starts_at), col(Event.id)).limit(constants.FEED_MAX_EVENTS + 1)
@@ -186,6 +195,7 @@ async def feed_events(
         default_locale=default_locale,
         url_for=url_for,
         drop_cut=True,
+        visible=visible,
     )
     truncated = truncated or cut
     kept: list[FeedEvent] = []
@@ -211,5 +221,6 @@ async def single_event(
         default_locale=default_locale,
         url_for=url_for,
         drop_cut=False,
+        visible=public_events(),
     )
     return FeedRead(items=items, truncated=cut)
