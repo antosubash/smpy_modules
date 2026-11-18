@@ -38,7 +38,7 @@ name the module they affect.
   the event's own wall clock and never rewrites a rule. The reusable `Calendar`
   component (`@simple-module-py/events`) takes a fetcher, calendars, optional
   `editing` and render slots. **New dependency:** FullCalendar 7 (MIT, `^7.1.5`; the lockfile holds the resolved version)
-  and `temporal-polyfill`; the grid is a lazy chunk of about 80 kB gzipped. No
+  and `temporal-polyfill`; the grid is a lazy chunk of about 294 kB (81 kB gzipped) plus 17 kB (4 kB gzipped) of CSS. No
   migration.
 
 ### Security

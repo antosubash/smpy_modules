@@ -185,7 +185,7 @@ cleaned by both sanitisers and never inserted as markup otherwise. The API takes
 a local wall clock plus an IANA timezone, never UTC (an instant is stored UTC).
 **`/admin/events/` is the calendar (FullCalendar 7).** Import FullCalendar only under
 `sm_events/ui/calendar/adapter/` and add only the MIT packages on the allow-list
-(`boundaries.test.ts`); the adapter must load the interaction plugin or nothing
+(`boundaries.test.ts`, which checks the lockfile's licences too); the adapter must load the interaction plugin or nothing
 drags. A grid change (an instant in the grid's zone) is converted into the
 **event's** wall clock through `ui/calendar/time/zones.ts`, never UTC or the grid's
 zone, and a drag never rewrites a rule (a series "all" shifts the master). The

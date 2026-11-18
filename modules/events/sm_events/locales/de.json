@@ -487,7 +487,7 @@
       "calendar": "Kalender",
       "status": "Status",
       "read_only": "Sie können diesen Kalender nur ansehen",
-      "needs_publish": "Veröffentlicht: nur wer veröffentlichen darf, kann sie ändern",
+      "needs_publish": "Veröffentlicht: Nur wer veröffentlichen darf, kann diese Veranstaltung ändern.",
       "external": "Dieser Eintrag stammt aus einer anderen Quelle und kann hier nicht geändert werden",
       "lang_fallback": "Angezeigt auf {language}"
     },
