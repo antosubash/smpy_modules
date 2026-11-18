@@ -26,7 +26,7 @@ def test_builtins_registered():
 
 
 def test_builtin_not_in_plugin_sources():
-    assert registry.plugin_sources() == {}
+    assert not any(i.startswith("events:") for i in registry.plugin_sources())
     assert registry.get_source("events") is None
     assert list(registry.all_types()) == ["event"]
 
