@@ -60,7 +60,8 @@ sync-module-deps:
 # started by `dev`: they need dev-services' Redis (SM_REDIS_URL) and are
 # optional while SM_BG_TASKS_TASK_ALWAYS_EAGER=true runs tasks inline. `worker`
 # also serves the `newsletter` queue (the hourly suppression reconcile) and the
-# `events` queue (`events.publish_due`, scheduled publishing every minute). Run
+# `events` queue (`events.publish_due`, scheduled publishing every minute; `events.run_import`, a
+# slice of an `.ics` import; `events.janitor`, hourly cleanup of imports and revoked links). Run
 # from the repo root; PYTHONPATH=host makes host/worker.py importable as
 # `worker`, and the root .env stays the single source of settings. One queue
 # set per target, so the heavy and GPU work can run on other machines.
