@@ -36,7 +36,9 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "loading": "Wird geladen…",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "copy_link": "Link kopieren",
+    "link_copied": "Link kopiert"
   },
   "visibility": {
     "private": "Privat",
@@ -579,9 +581,7 @@
       "title": "Abonnieren",
       "hint": "Fügen Sie diese Veranstaltungen Ihrem eigenen Kalender hinzu. Er aktualisiert sich selbst.",
       "feed": "Kalenderlink (https)",
-      "webcal": "In der Kalender-App öffnen",
-      "copy": "Link kopieren",
-      "copied": "Link kopiert"
+      "webcal": "In der Kalender-App öffnen"
     },
     "grid": {
       "loading": "Kalender wird geladen…"
@@ -632,8 +632,6 @@
     "created_warning": "Du siehst diesen Link nicht noch einmal. Wer ihn hat, sieht, was du in diesem Kalender sehen darfst.",
     "link": "Privater Kalenderlink",
     "webcal": "In deiner Kalender-App öffnen",
-    "copy": "Link kopieren",
-    "copied": "Link kopiert",
     "done": "Ich habe ihn kopiert",
     "mine": "Deine Links",
     "everyone": "Links aller",

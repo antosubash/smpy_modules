@@ -3,7 +3,7 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { type FormEvent, useState } from 'react';
-import { formatBytes } from '../../utils/api-import';
+import { formatBytes } from '../../utils/format';
 import { keys, useT } from '../../utils/i18n';
 
 export type TargetCalendar = { id: string; name: string; color: string; default_timezone: string };

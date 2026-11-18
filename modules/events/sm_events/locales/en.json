@@ -36,7 +36,9 @@
     "cancel": "Cancel",
     "close": "Close",
     "loading": "Loading…",
-    "retry": "Retry"
+    "retry": "Retry",
+    "copy_link": "Copy link",
+    "link_copied": "Link copied"
   },
   "visibility": {
     "private": "Private",
@@ -579,9 +581,7 @@
       "title": "Subscribe",
       "hint": "Add these events to your own calendar. It updates itself.",
       "feed": "Calendar link (https)",
-      "webcal": "Open in your calendar app",
-      "copy": "Copy link",
-      "copied": "Link copied"
+      "webcal": "Open in your calendar app"
     },
     "grid": {
       "loading": "Loading the calendar…"
@@ -632,8 +632,6 @@
     "created_warning": "You will not see this link again. Anyone who has it sees what you can see in this calendar.",
     "link": "Private calendar link",
     "webcal": "Open in your calendar app",
-    "copy": "Copy link",
-    "copied": "Link copied",
     "done": "I have copied it",
     "mine": "Your links",
     "everyone": "Everyone’s links",

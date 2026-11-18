@@ -118,13 +118,6 @@ export function droppedText(name: string): string {
   return t(lookup(keys.events.import.dropped, name) ?? keys.events.import.dropped.other);
 }
 
-export function formatBytes(bytes: number): string {
-  const mb = bytes / (1024 * 1024);
-  return mb >= 1
-    ? `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB`
-    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
 const BASE = '/api/events/imports';
 const query = (params: Record<string, string | number | undefined>) => {
   const qs = new URLSearchParams();

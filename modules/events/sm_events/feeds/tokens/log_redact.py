@@ -6,7 +6,8 @@ carries it. A :class:`Filter` on each of those loggers rewrites ``/feed/<anythin
 ``/feed/<redacted>`` in the rendered message (its arguments are rendered into it), in every
 string attribute of the record (the ``extra`` ``path`` among them) and in a traceback, and
 scrubs anything shaped like a token wherever it appears, which covers an exception message that
-quotes the address.
+quotes the address. A SHA-256 digest (what the token lookup binds) is scrubbed only from the two
+database loggers' records.
 
 Not covered: a proxy or load balancer in front of the process logs paths itself; the operations
 doc tells operators to redact ``/feed/`` there too.
@@ -41,31 +42,36 @@ REDACTED: Final = "<redacted>"
 _SEGMENT: Final = re.compile(rf'(/{constants.FEED_PATH_SEGMENT}/)[^/?#\s"\']+')
 _SHAPE: Final = re.compile(rf"{re.escape(constants.TOKEN_PREFIX)}[A-Za-z0-9_-]{{20,}}")
 _DIGEST: Final = re.compile(rf"(?<![0-9a-f])[0-9a-f]{{{constants.TOKEN_HASH_LENGTH}}}(?![0-9a-f])")
-"""A SHA-256 hex digest: what the hash lookup binds. Any such string is scrubbed (a digest of
-something else loses nothing a log needs)."""
+"""A SHA-256 hex digest: what the hash lookup binds. Scrubbed only from the two database loggers'
+records (where a statement's parameters print); another module's 64-hex checksum in its own log
+line is left alone."""
 _STANDARD: Final = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
     "message",
     "asctime",
 }
 
 
-def redact(text: str) -> str:
-    """``text`` with the segment after ``/feed/``, any token-shaped string and any SHA-256
-    digest replaced."""
+_DIGEST_LOGGERS: Final = ("aiosqlite", "sqlalchemy.engine")
+
+
+def redact(text: str, *, digests: bool = True) -> str:
+    """``text`` with the segment after ``/feed/`` and any token-shaped string replaced, and, with
+    ``digests``, any SHA-256 digest too (only for the database loggers: see :class:`Filter`)."""
     text = _SEGMENT.sub(rf"\1{REDACTED}", text)
-    return _DIGEST.sub(REDACTED, _SHAPE.sub(REDACTED, text))
+    text = _SHAPE.sub(REDACTED, text)
+    return _DIGEST.sub(REDACTED, text) if digests else text
 
 
-def _clean(value: Any) -> Any:
+def _clean(value: Any, digests: bool) -> Any:
     """``value`` with every string in it redacted; other types are left as they are."""
     if isinstance(value, str):
-        return redact(value)
+        return redact(value, digests=digests)
     if isinstance(value, tuple):
-        return tuple(_clean(v) for v in value)
+        return tuple(_clean(v, digests) for v in value)
     if isinstance(value, list):
-        return [_clean(v) for v in value]
+        return [_clean(v, digests) for v in value]
     if isinstance(value, dict):
-        return {k: _clean(v) for k, v in value.items()}
+        return {k: _clean(v, digests) for k, v in value.items()}
     return value
 
 
@@ -73,7 +79,7 @@ class Filter(logging.Filter):
     """Redacts the message, its arguments, the record's string attributes and its traceback."""
 
     @staticmethod
-    def _message(record: logging.LogRecord) -> None:
+    def _message(record: logging.LogRecord, digests: bool) -> None:
         """Redact the *rendered* message, never the template: rewriting ``/feed/%s.ics`` would
         eat its placeholder and break formatting. A message that holds nothing to hide is left
         exactly as it was; one that does becomes its redacted text with no arguments."""
@@ -81,22 +87,25 @@ class Filter(logging.Filter):
             rendered = record.getMessage()
         except Exception:  # a malformed record: the handler will report it, not leak it
             rendered = str(record.msg)
-        cleaned = redact(rendered)
-        if cleaned != rendered or redact(str(record.msg)) != str(record.msg):
+        cleaned = redact(rendered, digests=digests)
+        if cleaned != rendered or redact(str(record.msg), digests=digests) != str(record.msg):
             record.msg, record.args = cleaned, ()
 
     def filter(self, record: logging.LogRecord) -> bool:
-        self._message(record)
+        digests = record.name.startswith(_DIGEST_LOGGERS)
+        self._message(record, digests)
         for key, value in list(record.__dict__.items()):
             if key not in _STANDARD:
-                setattr(record, key, _clean(value))
+                setattr(record, key, _clean(value, digests))
         if record.exc_info and not record.exc_text:
             # The handler would render this later from the live exception, message and all.
-            record.exc_text = redact("".join(traceback.format_exception(*record.exc_info)).rstrip())
+            record.exc_text = redact(
+                "".join(traceback.format_exception(*record.exc_info)).rstrip(), digests=digests
+            )
         elif record.exc_text:
-            record.exc_text = redact(record.exc_text)
+            record.exc_text = redact(record.exc_text, digests=digests)
         if record.stack_info:
-            record.stack_info = redact(record.stack_info)
+            record.stack_info = redact(record.stack_info, digests=digests)
         return True
 
 

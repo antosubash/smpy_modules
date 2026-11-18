@@ -108,6 +108,7 @@ def test_a_digest_is_scrubbed():
 
     digest = hash_token(TOKEN)
     record = _record("SELECT ... WHERE token_hash = ?", (), params=(digest,), note=f"x{digest}y")
+    record.name = "sqlalchemy.engine.Engine"
     record.msg = f"executing {record.msg!r} with {(digest,)!r}"
     log_redact.Filter().filter(record)
     assert digest not in record.getMessage() and digest not in str(record.__dict__)
@@ -163,3 +164,16 @@ def test_a_handler_added_after_install_is_covered_by_the_next_install(root_handl
         assert any(isinstance(f, log_redact.Filter) for f in late.filters)
     finally:
         logging.getLogger().removeHandler(late)
+
+
+def test_another_modules_checksum_is_left_alone():
+    """The digest scrub is for the database loggers: a 64-hex checksum elsewhere is not ours."""
+    checksum = "ab" * 32
+    record = _record("artifact sha256=%s", (checksum,))
+    record.name = "some_module.images"
+    log_redact.Filter().filter(record)
+    assert checksum in record.getMessage()
+    leaked = _record("GET /events/feed/%s.ics", (checksum,))
+    leaked.name = "some_module.images"
+    log_redact.Filter().filter(leaked)
+    assert checksum not in leaked.getMessage()  # a path after /feed/ is still redacted
