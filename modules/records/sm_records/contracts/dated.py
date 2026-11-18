@@ -51,6 +51,7 @@ __all__ = [
     "DatedPage",
     "DatedQueryError",
     "DatedTypeInfo",
+    "dated_field_kind",
     "dated_records",
     "dated_types",
 ]
@@ -224,6 +225,21 @@ def _lt() -> Any:
     from sm_records.records.index._predicates import FilterOp
 
     return FilterOp.LT
+
+
+async def dated_field_kind(
+    session: AsyncSession, *, tenant_id: str, type_key: str, field: str, caller: DatedCaller | None
+) -> Kind | None:
+    """``"date"`` or ``"datetime"`` for an indexed date field of a type ``caller`` may read, else
+    ``None`` (an unknown type, one they may not read and a field that is not such a date are the
+    same answer). For choosing the window a source asks for."""
+    tenant = _tenant(tenant_id)
+    with tenant_scope(tenant):
+        rtype = await _type(session, tenant, type_key)
+        if rtype is None or not may_read(rtype, caller):
+            return None
+        found = indexed_map(list(rtype.fields or [])).get(field)
+        return _KINDS.get(found.kind) if found else None  # type: ignore[return-value]
 
 
 async def dated_types(

@@ -12,6 +12,7 @@ from sm_records.contracts.dated import (
     MAX_DATED_BATCH,
     DatedCaller,
     DatedQueryError,
+    dated_field_kind,
     dated_records,
     dated_types,
 )
@@ -301,8 +302,33 @@ def test_contract_surface():
             "DatedPage",
             "DatedQueryError",
             "DatedTypeInfo",
+            "dated_field_kind",
             "dated_records",
             "dated_types",
         ]
     )
     assert MAX_DATED_BATCH == 1000
+
+
+async def test_dated_field_kind(db):
+    await make_type(db, "private_t")
+    await make_type(db, "public_t", is_public=True)
+    ask = {"tenant_id": "default", "field": "due"}
+    assert await dated_field_kind(db, type_key="private_t", caller=caller(), **ask) == "date"
+    assert (
+        await dated_field_kind(
+            db, type_key="private_t", caller=caller(), tenant_id="default", field="at"
+        )
+        == "datetime"
+    )
+    # no such type, one the caller may not read, no such or non-date field: nothing is said
+    assert await dated_field_kind(db, type_key="nope", caller=caller(), **ask) is None
+    assert await dated_field_kind(db, type_key="private_t", caller=None, **ask) is None
+    assert await dated_field_kind(db, type_key="public_t", caller=None, **ask) == "date"
+    assert await dated_field_kind(db, type_key="private_t", caller=caller(perms=()), **ask) is None
+    assert (
+        await dated_field_kind(
+            db, type_key="private_t", caller=caller(), tenant_id="default", field="title"
+        )
+        is None
+    )
