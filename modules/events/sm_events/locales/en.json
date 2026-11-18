@@ -490,6 +490,20 @@
       "needs_publish": "Published: only a publisher can change it",
       "external": "This entry comes from another source and cannot be changed here",
       "lang_fallback": "Shown in {language}"
+    },
+    "writes": {
+      "moved": "Moved",
+      "resized": "Resized",
+      "stale": "This event changed since it was loaded. The calendar has been refreshed; try again.",
+      "repeated_local_time": "That time happens twice in {zone} on that day; choose another time.",
+      "not_in_rule": "Moving the whole series to another weekday changes its rule; open the editor.",
+      "open_editor": "Open the editor"
+    },
+    "scope": {
+      "title": "Change a repeating event",
+      "description": "{name} repeats. Apply the change to:",
+      "one": "Only this occurrence",
+      "all": "All occurrences"
     }
   }
 }
