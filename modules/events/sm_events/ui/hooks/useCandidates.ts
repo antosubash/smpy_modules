@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ApiError, errorText, isGone } from '../utils/api';
+import { ApiError, isGone, searchErrorText } from '../utils/api';
 import { shareCandidates } from '../utils/api-shares';
 import { keys } from '../utils/i18n';
 import type { ShareCandidate } from '../utils/types';
@@ -49,7 +49,7 @@ export function useCandidates(
           setResult({
             term,
             candidates: [],
-            error: errorText(e, keys.events.errors.calendar_gone),
+            error: searchErrorText(e, keys.events.errors.calendar_gone),
             limited: e instanceof ApiError && e.status === 429,
           });
           if (isGone(e)) gone();

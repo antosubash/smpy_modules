@@ -109,6 +109,16 @@ all-day event is stored from local midnight of its first day to local midnight
 after its last. A timed event lasts up to 366 days, a recurring event or a moved
 occurrence up to 31.
 
+A refusal that belongs to one input carries its dotted request path as `field`
+beside `detail` and `code`: `times.start` or `times.end` for `invalid_local_time`
+(an override's own are `start` and `end`), `times.end` for `end_before_start` and
+`duration_too_long`, `publish_at_local` for an approve time in a gap,
+`texts.<locale>.slug` for `slug_taken` and `texts.<locale>.description` for
+`description_too_long`. Every other refusal keeps exactly `detail` and `code`.
+The console shows the message at that input; the list's date filters are the
+console user's days in their own time zone, sent as instants, and a new event
+starts on today's date on its calendar's clock.
+
 ## Recurrence
 
 The rule is an RRULE string, stored normalised. Allowed: `FREQ` of `DAILY`,
@@ -121,8 +131,9 @@ keep their wall-clock time across daylight-saving changes; an instance in a gap
 moves forward by the gap. Expansion is lazy and always bounded by an `until`:
 never expand a rule without one. The editor covers daily, weekly (weekdays),
 monthly (day of month, or the nth or last weekday) and yearly, ending never,
-after N times or on a date; any other stored rule is a raw text field the server
-validates.
+after N times or on a date. Any other stored rule (including an interval or count
+outside those limits) is shown read-only as text and sent back unchanged unless
+the user edits it as text or replaces it with a repeat from the form.
 
 ## Overrides
 
@@ -162,8 +173,10 @@ Every transition is a `POST` with `expected_revision`; a state it cannot leave i
 *Scheduled* is a draft or event in review with `publish_at`. A published or
 scheduled event is **locked**: changing, trashing, restoring or overriding it
 needs write and publish (403 `publish_required` otherwise). A caller who cannot
-see an event gets 404. The editor offers only the actions the API's flags
-allow, and shows a read-only reason instead of a form for a locked event.
+see an event gets 404. The editor mirrors that rule (`workflowActions`): an
+action is offered only when the caller can write the event and, for every action
+but submit and withdraw, also publish. It shows a read-only reason instead of a
+form for a locked event.
 
 ## Revisions and conflicts
 

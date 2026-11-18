@@ -91,7 +91,7 @@ describe('error states', () => {
     });
     const view = await mount(<EventEditor {...edit} />);
     await flush();
-    expect(view.find('[role="alert"]')?.textContent).toContain('Too many searches. Try again in 9');
+    expect(view.find('[role="alert"]')?.textContent).toContain('Too many requests. Try again in 9');
     expect(view.find('form')).toBeNull();
     await view.unmount();
   });

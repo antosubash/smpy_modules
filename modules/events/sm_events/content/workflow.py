@@ -66,7 +66,11 @@ def _publish_at(local: str, timezone: str) -> datetime:
     """A wall-clock instant on the event's clock, as UTC. A time inside a DST gap
     is refused, because a person typed something that does not exist."""
     tz = ZoneInfo(timezone)
-    bad = InvalidTimes(constants.INVALID_LOCAL_TIME_DETAIL, code=constants.INVALID_LOCAL_TIME_CODE)
+    bad = InvalidTimes(
+        constants.INVALID_LOCAL_TIME_DETAIL,
+        code=constants.INVALID_LOCAL_TIME_CODE,
+        field="publish_at_local",
+    )
     if not _LOCAL.match(local):
         raise bad
     try:

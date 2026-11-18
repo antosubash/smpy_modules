@@ -2,9 +2,9 @@ import { Checkbox } from '@simple-module-py/ui/components/ui/checkbox';
 import { FieldError } from '@simple-module-py/ui/components/ui/field';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { utcOffset } from '../../utils/datetime';
-import { type FormState, withAllDay } from '../../utils/event-form';
+import { clockOf, type FormState, type TimedClock, withAllDay } from '../../utils/event-form';
 import { fieldErrorId, invalidProps } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 
@@ -29,6 +29,8 @@ export function TimesFields({
   const { t } = useT();
   const copy = keys.events.editor;
   const zoneList = useId();
+  // The clock times before "all day" was ticked, for ticking it off again.
+  const remembered = useRef<TimedClock | undefined>(undefined);
   const [zones] = useState(() => new Set(['UTC', ...Intl.supportedValuesOf('timeZone')]));
   const type = form.all_day ? 'date' : 'datetime-local';
   const offset = utcOffset(form.start, form.timezone.trim());
@@ -58,7 +60,10 @@ export function TimesFields({
         <Checkbox
           id="event-all-day"
           checked={form.all_day}
-          onCheckedChange={(on) => onChange(withAllDay(form, on === true))}
+          onCheckedChange={(on) => {
+            remembered.current = clockOf(form) ?? remembered.current;
+            onChange(withAllDay(form, on === true, remembered.current));
+          }}
         />
         <Label htmlFor="event-all-day">{t(copy.all_day)}</Label>
       </div>

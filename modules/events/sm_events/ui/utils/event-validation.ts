@@ -17,7 +17,14 @@ export const FIELDS = [
   'organiser',
   'address',
 ];
-export const TEXT_FIELDS = ['title', 'slug', 'summary', 'seo_title', 'seo_description'];
+export const TEXT_FIELDS = [
+  'title',
+  'slug',
+  'summary',
+  'description',
+  'seo_title',
+  'seo_description',
+];
 export const TEXT_PATH = /^texts\.([^.]+)\./;
 
 export function validate(

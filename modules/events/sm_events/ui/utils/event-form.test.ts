@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { blankText, changesSchedule, emptyForm, toCreate, toPatch, withAllDay } from './event-form';
+import {
+  blankText,
+  changesSchedule,
+  clockOf,
+  emptyForm,
+  toCreate,
+  today,
+  toPatch,
+  withAllDay,
+} from './event-form';
 
 const base = () => {
   const form = emptyForm('Europe/Vienna', ['en', 'de']);
@@ -51,5 +60,28 @@ describe('event form', () => {
     expect(changesSchedule(before, after)).toBe(false);
     expect(changesSchedule(before, { ...after, rrule: 'FREQ=DAILY' })).toBe(true);
     expect(changesSchedule(before, { ...after, timezone: 'UTC' })).toBe(true);
+  });
+
+  it("restores the clock times from before 'all day' was ticked", () => {
+    const form = base();
+    form.start = '2026-07-01T14:30';
+    form.end = '2026-07-01T16:45';
+    const remembered = clockOf(form);
+    expect(remembered).toEqual({ start: '14:30', end: '16:45' });
+    const allDay = withAllDay(form, true);
+    expect(clockOf(allDay)).toBeUndefined();
+    const timed = withAllDay(allDay, false, remembered);
+    expect([timed.start, timed.end]).toEqual(['2026-07-01T14:30', '2026-07-01T16:45']);
+    expect(withAllDay(allDay, false).start).toBe('2026-07-01T09:00');
+  });
+
+  it("takes today's date on the calendar's clock, not the browser's", () => {
+    const instant = new Date('2026-07-01T23:30:00Z');
+    expect(today('Europe/Vienna', instant)).toBe('2026-07-02');
+    expect(today('America/Los_Angeles', instant)).toBe('2026-07-01');
+    expect(today('Pacific/Auckland', instant)).toBe('2026-07-02');
+    const form = emptyForm('Pacific/Kiritimati', ['en'], instant);
+    expect([form.start, form.end]).toEqual(['2026-07-02T09:00', '2026-07-02T10:00']);
+    expect(emptyForm('Not/AZone', ['en'], instant).start).toMatch(/^\d{4}-\d{2}-\d{2}T09:00$/);
   });
 });

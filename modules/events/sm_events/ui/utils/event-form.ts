@@ -52,14 +52,26 @@ export const blankText = (present = false): TextForm => ({
   noindex: false,
 });
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const today = (): string => {
-  const now = new Date();
+/** Today's date on the clock of `timezone` (the calendar's own, not the browser's);
+ *  the browser's day for a zone it does not know. */
+export function today(timezone?: string, now: Date = new Date()): string {
+  try {
+    const found = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || undefined,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(found)) return found;
+  } catch {
+    // an unknown zone: fall through to the browser's day
+  }
+  const pad = (n: number) => String(n).padStart(2, '0');
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
+}
 
-export function emptyForm(timezone: string, locales: readonly string[]): FormState {
-  const day = today();
+export function emptyForm(timezone: string, locales: readonly string[], now?: Date): FormState {
+  const day = today(timezone, now);
   return {
     all_day: false,
     timezone,
@@ -122,15 +134,33 @@ export function toForm(event: EventDetail, locales: readonly string[]): FormStat
   };
 }
 
+/** The clock times of a timed event, kept while it is switched to all-day. */
+export type TimedClock = { start: string; end: string };
+
 /** Switch between timed and all-day, keeping the dates: an all-day end is the
- *  inclusive last day, a timed end is a clock time on the start's day. */
-export function withAllDay(form: FormState, allDay: boolean): FormState {
+ *  inclusive last day, a timed end is a clock time on the start's day. Going back
+ *  to timed restores the clock times `remembered` from before it was switched to
+ *  all-day; an event that never had any gets 09:00 to 10:00. */
+export function withAllDay(form: FormState, allDay: boolean, remembered?: TimedClock): FormState {
   if (allDay === form.all_day) return form;
-  const [startDay = today()] = form.start.split('T');
+  const [startDay = today(form.timezone)] = form.start.split('T');
   const [endDay = startDay] = form.end.split('T');
   return allDay
     ? { ...form, all_day: true, start: startDay, end: [startDay, endDay].sort()[1] ?? startDay }
-    : { ...form, all_day: false, start: `${startDay}T09:00`, end: `${endDay}T10:00` };
+    : {
+        ...form,
+        all_day: false,
+        start: `${startDay}T${remembered?.start ?? '09:00'}`,
+        end: `${endDay}T${remembered?.end ?? '10:00'}`,
+      };
+}
+
+/** The clock times of a timed form (`HH:MM`), or `undefined` for an all-day one. */
+export function clockOf(form: FormState): TimedClock | undefined {
+  if (form.all_day) return undefined;
+  const clock = (wall: string) => /T(\d{2}:\d{2})/.exec(wall)?.[1];
+  const [start, end] = [clock(form.start), clock(form.end)];
+  return start && end ? { start, end } : undefined;
 }
 
 const text = (value: string): string | null => (value.trim() === '' ? null : value);

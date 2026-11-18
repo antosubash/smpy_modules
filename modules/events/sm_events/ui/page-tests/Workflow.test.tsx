@@ -49,6 +49,37 @@ describe('workflow actions', () => {
   });
 });
 
+describe('workflow actions for every combination of rights', () => {
+  // [status, scheduled] -> actions for (write, publish) = (no, no), (no, yes), (yes, no), (yes, yes)
+  const table: [string, boolean, string[][]][] = [
+    ['draft', false, [[], [], ['submit'], ['submit', 'approve']]],
+    ['in_review', false, [[], [], ['withdraw'], ['withdraw', 'approve', 'reject']]],
+    ['published', false, [[], [], [], ['unpublish']]],
+    ['draft', true, [[], [], [], ['unschedule']]],
+    ['in_review', true, [[], [], [], ['unschedule']]],
+  ];
+  const rights: [boolean, boolean][] = [
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ];
+  for (const [status, scheduled, expected] of table) {
+    rights.forEach(([write, publish], index) => {
+      it(`${status}${scheduled ? ' (scheduled)' : ''}, write ${write}, publish ${publish}`, () => {
+        expect(
+          workflowActions({
+            status: status as 'draft',
+            scheduled,
+            can_write: write,
+            can_publish: publish,
+          }),
+        ).toEqual(expected[index]);
+      });
+    });
+  }
+});
+
 const open = async (extra = {}, routes: Record<string, unknown> = {}) => {
   const calls = stubFetch({
     [`GET ${API}/e1`]: () => eventDetail({ revision: 4, can_publish: true, ...extra }),

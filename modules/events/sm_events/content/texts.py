@@ -28,7 +28,12 @@ from sm_events.calendar.slugs import free_text_slug, slug_write, slugify, text_s
 from sm_events.content.redirects import record_rename, release_slug
 from sm_events.content.richtext import clean
 from sm_events.core import constants
-from sm_events.core.errors import DefaultLocaleRequired, SlugTaken, UnknownLocale
+from sm_events.core.errors import (
+    DefaultLocaleRequired,
+    DescriptionTooLong,
+    SlugTaken,
+    UnknownLocale,
+)
 from sm_events.models import Event, EventText
 from sm_events.models.event_text import TEXT_SLUG_CONSTRAINT
 from sm_events.web.schemas.texts import TextIn
@@ -71,7 +76,7 @@ async def _slug_for(
         if (held is None or held.slug != data.slug) and await text_slug_taken(
             db, locale, data.slug, except_event=event.id
         ):
-            raise SlugTaken
+            raise SlugTaken(field=f"texts.{locale}.slug")
         return data.slug
     if held is not None:
         return held.slug  # a title change alone never moves the address
@@ -79,12 +84,20 @@ async def _slug_for(
     return await free_text_slug(db, locale, base, except_event=event.id)
 
 
-def _values(data: TextIn, slug: str) -> dict[str, Any]:
+def _description(data: TextIn, locale: str) -> str:
+    try:
+        return clean(data.description)
+    except DescriptionTooLong as exc:
+        exc.field = f"texts.{locale}.description"
+        raise
+
+
+def _values(data: TextIn, slug: str, locale: str) -> dict[str, Any]:
     return {
         "slug": slug,
         "title": data.title,
         "summary": data.summary,
-        "description": clean(data.description),
+        "description": _description(data, locale),
         "seo_title": data.seo_title,
         "seo_description": data.seo_description,
         "noindex": data.noindex,
@@ -108,7 +121,7 @@ async def apply_texts(
             plan.append((locale, None, None))
             continue
         slug = await _slug_for(db, event, locale, data, held.get(locale))
-        plan.append((locale, data, _values(data, slug)))
+        plan.append((locale, data, _values(data, slug, locale)))
     changed: list[str] = []
     async with slug_write(db, TEXT_SLUG_CONSTRAINT):
         for locale, data, values in plan:

@@ -99,6 +99,7 @@ async def _write(
                 start=data.start or "",
                 end=data.end or "",
                 recurring=True,
+                fields=("start", "end"),
             )
             if moved
             else None

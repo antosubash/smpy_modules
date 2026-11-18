@@ -27,7 +27,7 @@ const AT: Record<string, string> = {
   end_before_start: 'end',
   duration_too_long: 'end',
 };
-const codeField = (e: unknown) => (e instanceof ApiError ? AT[e.code] : undefined);
+const codeField = (e: unknown) => (e instanceof ApiError ? (e.field ?? AT[e.code]) : undefined);
 
 type SetOverride = (
   input: Omit<OverrideInput, 'expected_revision'>,

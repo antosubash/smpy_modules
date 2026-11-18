@@ -34,6 +34,7 @@ const TEXT_MESSAGES: Record<string, string> = {
   title: E.title_invalid,
   slug: E.slug_invalid,
   summary: E.summary_invalid,
+  description: E.description_too_long,
   seo_title: E.seo_invalid,
   seo_description: E.seo_invalid,
 };
@@ -82,8 +83,12 @@ const AT: Record<string, string> = {
 /** The input a coded refusal belongs to (`undefined`: none, say it in general). */
 export function codeFieldPath(error: unknown, ctx: FormContext): string | undefined {
   if (!(error instanceof ApiError)) return undefined;
-  if (error.code === CODE.slugTaken && ctx.slugLocales[0])
-    return `texts.${ctx.slugLocales[0]}.slug`;
+  // The server names the input when it knows (which end, which language).
+  if (error.field) return error.field;
+  // Otherwise a slug conflict is placed only when one language's slug was changed.
+  if (error.code === CODE.slugTaken) {
+    return ctx.slugLocales.length === 1 ? `texts.${ctx.slugLocales[0]}.slug` : undefined;
+  }
   if (error.code === CODE.defaultLocaleRequired) return `texts.${ctx.defaultLocale}.title`;
   return AT[error.code];
 }

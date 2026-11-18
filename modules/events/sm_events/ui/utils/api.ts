@@ -11,6 +11,8 @@ export class ApiError extends Error {
     public readonly fields: string[] = [],
     /** Seconds the server asked to wait (429), when it said. */
     public readonly retryAfter: number | null = null,
+    /** The input the server says the refusal belongs to (`times.end`, `texts.de.slug`). */
+    public readonly field: string | null = null,
   ) {
     super(code);
   }
@@ -84,11 +86,24 @@ export function errorText(error: unknown, gone?: string): string {
 
 function rateLimitText(seconds: number | null): string {
   return seconds === null
-    ? t(keys.events.errors.rate_limited_soon)
-    : t(keys.events.errors.rate_limited, { count: seconds });
+    ? t(keys.events.errors.requests_limited_soon)
+    : t(keys.events.errors.requests_limited, { count: seconds });
 }
 
-type ErrorBody = { code?: unknown; retry_after?: unknown; detail?: unknown } | null;
+/** The message for a failed people search: a 429 says "searches", anything else is `errorText`. */
+export function searchErrorText(error: unknown, gone?: string): string {
+  if (!(error instanceof ApiError) || error.status !== 429) return errorText(error, gone);
+  return error.retryAfter === null
+    ? t(keys.events.errors.rate_limited_soon)
+    : t(keys.events.errors.rate_limited, { count: error.retryAfter });
+}
+
+type ErrorBody = {
+  code?: unknown;
+  retry_after?: unknown;
+  detail?: unknown;
+  field?: unknown;
+} | null;
 
 function fieldsOf(body: ErrorBody): string[] {
   if (!Array.isArray(body?.detail)) return [];
@@ -109,6 +124,7 @@ export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> 
     typeof body?.code === 'string' ? body.code : '',
     result.status === 422 ? fieldsOf(body) : [],
     result.status === 429 && Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : null,
+    typeof body?.field === 'string' ? body.field : null,
   );
 }
 

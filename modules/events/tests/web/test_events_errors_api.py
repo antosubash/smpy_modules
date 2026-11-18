@@ -21,9 +21,11 @@ SECOND = "2026-07-08T08:00:00Z"
 NOT_ONE = "2026-07-09T08:00:00Z"
 
 
-def check(got, status: int, code: str) -> None:
+def check(got, status: int, code: str, field: str | None = None) -> None:
+    """``field`` is the input a refusal names; without one the body has no such key."""
     assert (got.status_code, got.json().get("code")) == (status, code), got.text
-    assert set(got.json()) == {"detail", "code"} and got.json()["detail"]
+    assert set(got.json()) == {"detail", "code"} | ({"field"} if field else set())
+    assert got.json()["detail"] and got.json().get("field") == field
 
 
 async def test_error_envelope_on_every_new_code(locales_client):
@@ -72,7 +74,12 @@ async def test_error_envelope_on_every_new_code(locales_client):
         ),
         409, "overrides_orphaned",
     )  # fmt: skip
-    check(await post(texts={"en": {"title": "x", "slug": "concert"}}), 409, "slug_taken")
+    check(
+        await post(texts={"en": {"title": "x", "slug": "concert"}}),
+        409,
+        "slug_taken",
+        "texts.en.slug",
+    )
     # 403
     check(
         await client.patch(
@@ -89,11 +96,11 @@ async def test_error_envelope_on_every_new_code(locales_client):
     check(await post(rrule="FREQ=HOURLY"), 422, "rrule_frequency_refused")
     check(await post(rrule="FREQ=WEEKLY;BYDAY=TH"), 422, "start_not_in_rule")
     gap = {"timezone": "Europe/Vienna", "start": "2026-03-29T02:30", "end": "2026-03-29T04:00"}
-    check(await post(times=gap), 422, "invalid_local_time")
+    check(await post(times=gap), 422, "invalid_local_time", "times.start")
     back = {"timezone": "Europe/Vienna", "start": "2026-07-01T10:00", "end": "2026-07-01T09:00"}
-    check(await post(times=back), 422, "end_before_start")
+    check(await post(times=back), 422, "end_before_start", "times.end")
     long_ = {"timezone": "Europe/Vienna", "start": "2026-07-01T10:00", "end": "2028-07-01T09:00"}
-    check(await post(times=long_), 422, "duration_too_long")
+    check(await post(times=long_), 422, "duration_too_long", "times.end")
     check(
         await client.get(
             f"{OCC}?start=2026-07-01T00:00:00Z&end=2026-07-01T00:00:00Z", headers=OWNER
@@ -138,7 +145,7 @@ async def test_error_envelope_on_every_new_code(locales_client):
     )  # fmt: skip
     check(
         await post(texts={"en": {"title": "x", "description": "x" * 200_001}}),
-        422, "description_too_long",
+        422, "description_too_long", "texts.en.description",
     )  # fmt: skip
 
 

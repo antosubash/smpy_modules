@@ -2,8 +2,8 @@
 
 Services never import FastAPI, so they raise these and the app-level handler
 installed by :func:`install_exception_handlers` renders them. The body is
-``{"detail": ..., "code": ...}``; FastAPI's own request-validation 422 keeps its
-standard shape.
+``{"detail": ..., "code": ...}``, plus ``"field"`` when the refusal belongs to one
+input; FastAPI's own request-validation 422 keeps its standard shape.
 """
 
 from __future__ import annotations
@@ -22,12 +22,19 @@ class EventsError(Exception):
     detail: str = "Events error"
     headers: dict[str, str] | None = None
     """Extra response headers; the body is always exactly ``detail`` and ``code``."""
+    field: str | None = None
+    """The request input the refusal belongs to (a dotted path such as ``times.end`` or
+    ``texts.de.slug``), when the server knows. It is the body's only extra key."""
 
-    def __init__(self, detail: str | None = None, code: str | None = None) -> None:
+    def __init__(
+        self, detail: str | None = None, code: str | None = None, field: str | None = None
+    ) -> None:
         if detail is not None:
             self.detail = detail
         if code is not None:  # else the class default stands
             self.code = code
+        if field is not None:
+            self.field = field
         super().__init__(self.detail)
 
 
@@ -191,6 +198,10 @@ def install_exception_handlers(app: FastAPI) -> None:
     async def _events_error(_request: Request, exc: EventsError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
-            content={"detail": exc.detail, "code": exc.code},
+            content={
+                "detail": exc.detail,
+                "code": exc.code,
+                **({"field": exc.field} if exc.field else {}),
+            },
             headers=exc.headers,
         )

@@ -3,6 +3,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import type { ReactNode } from 'react';
 import type { Filters } from '../../hooks/useEvents';
+import { browserZone } from '../../utils/datetime';
 import { keys, useT } from '../../utils/i18n';
 import type { Category } from '../../utils/types';
 import type { ListStatus } from '../../utils/types-events';
@@ -111,7 +112,9 @@ export function EventFilters({
           onChange={(e) => onChange({ q: e.target.value })}
         />
       </Field>
-      <p className="basis-full text-xs text-muted-foreground">{t(copy.dates_hint)}</p>
+      <p className="basis-full text-xs text-muted-foreground">
+        {t(copy.dates_hint, { zone: browserZone() })}
+      </p>
     </fieldset>
   );
 }

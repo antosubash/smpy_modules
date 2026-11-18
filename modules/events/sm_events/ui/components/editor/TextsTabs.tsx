@@ -145,7 +145,7 @@ export function TextsTabs({
                   readOnly={disabled}
                   lang={code}
                   error={errors[at('description')]}
-                  onChange={(html) => set({ description: html })}
+                  onChange={(html) => set({ description: html }, 'description')}
                 />
                 <details className="grid gap-3" open={seoError ? true : undefined}>
                   <summary className="cursor-pointer text-sm font-medium">{t(copy.seo)}</summary>

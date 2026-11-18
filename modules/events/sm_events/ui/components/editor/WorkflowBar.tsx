@@ -10,22 +10,18 @@ import { ScheduleDialog } from './ScheduleDialog';
 type Rights = Pick<EventDetail, 'status' | 'scheduled' | 'can_write' | 'can_publish'>;
 
 /** The actions the API will accept for this event and caller, and no others
- *  (`sm_events/content/workflow.py`, `TRANSITIONS`): a scheduled event can only
- *  be unscheduled, and everything but submit and withdraw needs the publish right. */
+ *  (`sm_events/content/workflow.py`: every action needs the write right on the
+ *  calendar, `TRANSITIONS` marks the ones that also need `events.publish`). A
+ *  scheduled event can only be unscheduled. So `can_publish` alone offers nothing. */
 export function workflowActions(e: Rights): WorkflowAction[] {
-  const out: WorkflowAction[] = [];
-  if (e.scheduled) {
-    if (e.can_publish) out.push('unschedule');
-  } else if (e.status === 'draft') {
-    if (e.can_write) out.push('submit');
-    if (e.can_publish) out.push('approve');
-  } else if (e.status === 'in_review') {
-    if (e.can_write) out.push('withdraw');
-    if (e.can_publish) out.push('approve', 'reject');
-  } else if (e.can_publish) {
-    out.push('unpublish');
+  if (!e.can_write) return [];
+  const publish = e.can_publish;
+  if (e.scheduled) return publish ? ['unschedule'] : [];
+  if (e.status === 'draft') return publish ? ['submit', 'approve'] : ['submit'];
+  if (e.status === 'in_review') {
+    return publish ? ['withdraw', 'approve', 'reject'] : ['withdraw'];
   }
-  return out;
+  return publish ? ['unpublish'] : [];
 }
 
 type Run = (
