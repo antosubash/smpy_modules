@@ -3,7 +3,11 @@ import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { usePermissions } from '@simple-module-py/ui/hooks/use-permissions';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useCallback, useMemo } from 'react';
-import { ConsoleCalendar } from '../ui/calendar/console/ConsoleCalendar';
+import {
+  ConsoleCalendar,
+  type SourceOption,
+  type TypeOption,
+} from '../ui/calendar/console/ConsoleCalendar';
 import { readState, writeState } from '../ui/calendar/console/urlState';
 import type { CalendarInfo, CalendarState } from '../ui/calendar/types';
 import { keys, useT } from '../ui/utils/i18n';
@@ -15,6 +19,8 @@ type Props = {
   default_timezone: string;
   content_locales: string[];
   editor_url: string;
+  types?: TypeOption[];
+  sources?: SourceOption[];
 };
 
 /** The URL's state, minus anything naming a calendar the viewer does not have. */
@@ -31,6 +37,8 @@ export default function CalendarPage({
   default_timezone,
   content_locales,
   editor_url,
+  types,
+  sources,
 }: Props) {
   const { t } = useT();
   const { can } = usePermissions();
@@ -59,6 +67,8 @@ export default function CalendarPage({
           defaultTimezone={default_timezone}
           contentLocales={content_locales}
           editorUrl={editor_url}
+          types={types}
+          sources={sources}
           calendarsUrl={can('events.edit') ? '/admin/events/calendars' : undefined}
           initialState={initialState}
           onStateChange={mirror}

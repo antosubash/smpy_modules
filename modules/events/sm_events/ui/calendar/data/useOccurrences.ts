@@ -2,6 +2,7 @@
  *  the cached range, answers for an older range dropped, and the page kept for the next
  *  navigation inside it. */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SourceStatus } from '../../extensions/types';
 import { useRequestScope } from '../../hooks/useRequestScope';
 import type { Occurrence } from '../../utils/types-events';
 import { paddedRange, type Range } from '../time/range';
@@ -14,8 +15,14 @@ type Args = {
   filters: FilterQuery;
   refreshToken: number;
 };
-type State = { items: Occurrence[]; truncated: boolean; loading: boolean; error: unknown | null };
-const EMPTY: State = { items: [], truncated: false, loading: false, error: null };
+type State = {
+  items: Occurrence[];
+  truncated: boolean;
+  sources: SourceStatus[];
+  loading: boolean;
+  error: unknown | null;
+};
+const EMPTY: State = { items: [], truncated: false, sources: [], loading: false, error: null };
 
 export function useOccurrences({ fetcher, visible, filters, refreshToken }: Args) {
   const begin = useRequestScope(true);
@@ -53,7 +60,13 @@ export function useOccurrences({ fetcher, visible, filters, refreshToken }: Args
     const range = { start, end };
     const hit = cache.find(range, key);
     if (hit) {
-      setState({ items: hit.items, truncated: hit.truncated, loading: false, error: null });
+      setState({
+        items: hit.items,
+        truncated: hit.truncated,
+        sources: hit.sources ?? [],
+        loading: false,
+        error: null,
+      });
       return;
     }
     const mine = new AbortController();
@@ -70,7 +83,13 @@ export function useOccurrences({ fetcher, visible, filters, refreshToken }: Args
         // A 200 that is not an occurrence page is a failure, not an empty range.
         if (!Array.isArray(page?.items)) throw new TypeError('malformed occurrence page');
         cache.put(padded, key, page);
-        setState({ items: page.items, truncated: page.truncated, loading: false, error: null });
+        setState({
+          items: page.items,
+          truncated: page.truncated,
+          sources: page.sources ?? [],
+          loading: false,
+          error: null,
+        });
       })
       .catch((error: unknown) => {
         if (!live()) return;

@@ -9,6 +9,7 @@ type Props = {
   calendars: CalendarInfo[];
   categories: FilterOption[];
   types: FilterOption[];
+  sources?: FilterOption[];
   onChange: (patch: Partial<CalendarState>) => void;
 };
 
@@ -45,7 +46,7 @@ function Check(props: {
   );
 }
 
-export function Filters({ state, calendars, categories, types, onChange }: Props) {
+export function Filters({ state, calendars, categories, types, sources = [], onChange }: Props) {
   const { t } = useT();
   const copy = keys.events.calendar.filters;
   return (
@@ -91,6 +92,21 @@ export function Filters({ state, calendars, categories, types, onChange }: Props
               onChange={() => onChange({ types: toggle(state.types, type.id) })}
             >
               {type.label}
+            </Check>
+          ))}
+        </fieldset>
+      ) : null}
+      {sources.length ? (
+        <fieldset className="space-y-1">
+          <legend className="text-sm font-medium">{t(copy.sources)}</legend>
+          {sources.map((entry) => (
+            <Check
+              key={entry.id}
+              color={entry.color}
+              checked={state.sources.includes(entry.id)}
+              onChange={() => onChange({ sources: toggle(state.sources, entry.id) })}
+            >
+              <Name>{entry.label}</Name>
             </Check>
           ))}
         </fieldset>

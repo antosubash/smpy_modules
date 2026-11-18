@@ -2,6 +2,9 @@
  *  titles are asked in, the filter options and the write layer (drag, resize, dialogs). */
 import { Link } from '@inertiajs/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { extensionFailures, useEventExtensions } from '../../extensions/load';
+import { buildSlots } from '../../extensions/slots';
+import { translateKey } from '../../extensions/translateKey';
 import { listOccurrences } from '../../utils/api-events';
 import { keys, useT } from '../../utils/i18n';
 import type { Category } from '../../utils/types';
@@ -20,6 +23,9 @@ import { MoveDialog } from './MoveDialog';
 import { QuickCreateDialog } from './QuickCreateDialog';
 import { useCalendarWrites } from './useCalendarWrites';
 
+export type TypeOption = { id: string; label_key: string; icon?: string | null };
+export type SourceOption = { id: string; label_key: string; color: string | null };
+
 type Props = {
   calendars: CalendarInfo[];
   categories: Category[];
@@ -28,6 +34,10 @@ type Props = {
   editorUrl: string;
   /** The Calendars screen, for someone who may create one; absent otherwise. */
   calendarsUrl?: string;
+  /** The installed event types (the server's), for the type filter. */
+  types?: TypeOption[];
+  /** The installed plugin sources enabled on a shown calendar. */
+  sources?: SourceOption[];
   initialState?: Partial<CalendarState>;
   onStateChange?: (state: CalendarState) => void;
 };
@@ -45,6 +55,8 @@ export function ConsoleCalendar({
   contentLocales,
   editorUrl,
   calendarsUrl,
+  types: typeOptions,
+  sources: sourceOptions,
   initialState,
   onStateChange,
 }: Props) {
@@ -59,6 +71,7 @@ export function ConsoleCalendar({
           calendar: q.calendars,
           category: q.categories,
           type: q.types,
+          source: q.sources,
           locale: requested,
         },
         signal,
@@ -74,7 +87,26 @@ export function ConsoleCalendar({
       })),
     [categories, requested],
   );
-  const types = useMemo(() => [{ id: 'event', label: t(keys.events.calendar.type_event) }], [t]);
+  const types = useMemo(
+    () =>
+      typeOptions?.length
+        ? typeOptions.map((o) => ({ id: o.id, label: translateKey(t, o.label_key, o.id) }))
+        : [{ id: 'event', label: t(keys.events.calendar.type_event) }],
+    [t, typeOptions],
+  );
+  const sources = useMemo(
+    () =>
+      (sourceOptions ?? []).map((o) => ({
+        id: o.id,
+        color: o.color,
+        label: translateKey(t, o.label_key, o.id),
+      })),
+    [t, sourceOptions],
+  );
+  const ready = useEventExtensions();
+  // Rebuilt when the plugins have registered; until then the defaults render.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `ready` is the registry's version
+  const slots = useMemo(() => buildSlots('console'), [ready]);
   // A write refetches the range it changed.
   const [refresh, setRefresh] = useState(0);
   const invalidate = useCallback(() => setRefresh((n) => n + 1), []);
@@ -116,6 +148,8 @@ export function ConsoleCalendar({
         calendars={calendars}
         categories={options}
         types={types}
+        sources={sources}
+        slots={slots}
         defaultTimezone={defaultTimezone}
         initialState={initialState}
         onStateChange={(state) => {
@@ -132,6 +166,15 @@ export function ConsoleCalendar({
           ) : null
         }
       />
+      {ready && extensionFailures().length > 0 ? (
+        <p
+          role="status"
+          className="mt-2 text-xs text-muted-foreground"
+          data-testid="extension-failed"
+        >
+          {t(keys.events.extensions.load_failed)}
+        </p>
+      ) : null}
       {writes.dialogs}
       <MoveDialog
         occurrence={moving?.occurrence ?? null}

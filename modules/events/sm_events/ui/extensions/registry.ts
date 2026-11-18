@@ -2,6 +2,7 @@
  *  arrive as loaders and are wrapped in `React.lazy` once, so a lookup returns the same object
  *  every time (a new one per render would remount the plugin). */
 import { type ComponentType, type LazyExoticComponent, lazy } from 'react';
+import type { ToolbarSlotProps } from '../calendar/types';
 import type {
   EventTypeRegistration,
   LazyComponent,
@@ -16,7 +17,9 @@ type Wrapped<R> = {
 };
 export type ResolvedType = Wrapped<EventTypeRegistration>;
 export type ResolvedSource = Wrapped<SourceRegistration>;
-export type ResolvedToolbarItem = Wrapped<ToolbarItemRegistration>;
+export type ResolvedToolbarItem = Omit<ToolbarItemRegistration, 'Component'> & {
+  Component: Lazy<ToolbarSlotProps>;
+};
 
 const types = new Map<string, ResolvedType>();
 const sources = new Map<string, ResolvedSource>();
@@ -46,7 +49,7 @@ export function registerSource(registration: SourceRegistration): void {
   put(sources, 'source', registration.id, wrap(registration));
 }
 export function registerToolbarItem(registration: ToolbarItemRegistration): void {
-  put(toolbar, 'toolbar item', registration.id, wrap(registration));
+  put(toolbar, 'toolbar item', registration.id, wrap(registration) as ResolvedToolbarItem);
 }
 
 export const eventType = (id: string): ResolvedType | undefined => types.get(id);

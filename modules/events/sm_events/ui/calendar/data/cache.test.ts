@@ -6,7 +6,7 @@ const page = (n: number): OccurrencePage => ({ items: [], truncated: n % 2 === 1
 const r = (start: string, end: string) => ({ start, end });
 const padded = r('2026-02-22T00:00:00Z', '2026-04-19T00:00:00Z');
 const inside = r('2026-03-01T00:00:00Z', '2026-04-12T00:00:00Z');
-const f = { calendars: ['a'], categories: [], types: [], locale: 'en' };
+const f = { calendars: ['a'], categories: [], types: [], sources: [], locale: 'en' };
 
 describe('RangeCache', () => {
   it('hits for a visible range inside a padded one with the same filters', () => {

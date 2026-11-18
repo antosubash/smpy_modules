@@ -468,7 +468,8 @@
       "label": "Kalender filtern",
       "calendars": "Kalender",
       "categories": "Kategorien",
-      "types": "Arten"
+      "types": "Arten",
+      "sources": "Quellen"
     },
     "type_event": "Veranstaltungen",
     "status": {
@@ -647,5 +648,16 @@
     "revoke_title": "{name} widerrufen?",
     "revoke_description": "Kalender-Apps, die diesen Link verwenden, erhalten keine Termine mehr.",
     "revoked": "Link widerrufen"
+  },
+  "extensions": {
+    "load_failed": "Einige Erweiterungen konnten nicht geladen werden. Der Kalender funktioniert auch ohne sie.",
+    "status": {
+      "heading": "Einige Quellen haben nicht geantwortet",
+      "failed": "{name} konnte nicht geladen werden.",
+      "timeout": "{name} hat zu lange für die Antwort gebraucht.",
+      "skipped": "{name} wurde übersprungen.",
+      "truncated": "{name} zeigt nur einen Teil seiner Einträge.",
+      "not_installed": "{name} ist auf diesem Server nicht installiert."
+    }
   }
 }

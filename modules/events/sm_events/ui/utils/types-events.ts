@@ -1,3 +1,5 @@
+import type { SourceStatus } from '../extensions/types';
+
 /** The events API's shapes, as `sm_events/web/schemas/events_*.py` returns them. */
 
 export const EVENT_STATUSES = ['draft', 'in_review', 'published'] as const;
@@ -202,13 +204,19 @@ export type Occurrence = {
   original_start: string | null;
   event_status: string | null;
 };
-export type OccurrencePage = { items: Occurrence[]; truncated: boolean };
+export type OccurrencePage = {
+  items: Occurrence[];
+  truncated: boolean;
+  /** How each plugin source answered (a console read only; the public API omits it). */
+  sources?: SourceStatus[];
+};
 export type OccurrenceQuery = {
   start: string;
   end: string;
   calendar?: string[];
   category?: string[];
   type?: string[];
+  source?: string[];
   locale?: string;
   include_unpublished?: boolean;
 };

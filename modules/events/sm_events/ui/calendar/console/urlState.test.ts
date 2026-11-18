@@ -13,10 +13,11 @@ describe('urlState', () => {
       calendars: ['c1', 'c3'],
       categories: ['k1', 'k2'],
       types: ['event'],
+      sources: ['records:dates'],
     };
     const search = writeState(state, ALL);
     expect(search).toBe(
-      '?view=week&date=2026-03-30&tz=mine&calendar=c1&calendar=c3&category=k1&category=k2&type=event',
+      '?view=week&date=2026-03-30&tz=mine&calendar=c1&calendar=c3&category=k1&category=k2&type=event&source=records%3Adates',
     );
     expect(readState(search)).toEqual(state);
   });
@@ -30,6 +31,7 @@ describe('urlState', () => {
         calendars: ALL,
         categories: [],
         types: [],
+        sources: [],
       },
       ALL,
     );

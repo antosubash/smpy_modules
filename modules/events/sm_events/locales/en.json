@@ -468,7 +468,8 @@
       "label": "Filter the calendar",
       "calendars": "Calendars",
       "categories": "Categories",
-      "types": "Types"
+      "types": "Types",
+      "sources": "Sources"
     },
     "type_event": "Events",
     "status": {
@@ -647,5 +648,16 @@
     "revoke_title": "Revoke {name}?",
     "revoke_description": "Calendar apps that use this link will stop receiving events.",
     "revoked": "Link revoked"
+  },
+  "extensions": {
+    "load_failed": "Some extensions could not be loaded. The calendar works without them.",
+    "status": {
+      "heading": "Some sources did not answer",
+      "failed": "{name} could not be loaded.",
+      "timeout": "{name} took too long to answer.",
+      "skipped": "{name} was skipped.",
+      "truncated": "{name} shows only part of its entries.",
+      "not_installed": "{name} is not installed on this server."
+    }
   }
 }

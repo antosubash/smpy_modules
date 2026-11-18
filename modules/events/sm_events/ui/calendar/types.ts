@@ -29,6 +29,8 @@ export type OccurrenceQuery = {
   calendars: string[];
   categories: string[];
   types: string[];
+  /** Plugin source ids; empty is every source. */
+  sources: string[];
   locale: string;
 };
 export type FilterQuery = Omit<OccurrenceQuery, 'start' | 'end'>;
@@ -45,6 +47,7 @@ export type CalendarState = {
   calendars: string[];
   categories: string[];
   types: string[];
+  sources: string[];
 };
 
 /** Instants for a timed slot; dates with an exclusive end for an all-day one. */
@@ -112,6 +115,9 @@ export type CalendarProps = {
   categories?: FilterOption[];
   /** The type filter shows only with two or more types. */
   types?: FilterOption[];
+  /** The plugin sources enabled on a shown calendar: the "Sources" filter and the labels of the
+   *  status notice. Empty: no filter and no labels (a notice then names the source's id). */
+  sources?: FilterOption[];
   /** The tenant's zone, for "calendar time" over several calendars. */
   defaultTimezone: string;
   /** Offer "calendar time" beside "my time" (default). The public grid drops it when its

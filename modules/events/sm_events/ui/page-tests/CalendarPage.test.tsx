@@ -110,3 +110,46 @@ it('sends the server-side filters under the API names', async () => {
   expect(url.searchParams.getAll('type')).toEqual(['event']);
   await view.unmount();
 });
+
+it('says in the console, once and in words, when a plugin file failed to load', async () => {
+  const { resetLoader, loadEventExtensions, extensionFailures } = await import(
+    '../extensions/load'
+  );
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  resetLoader();
+  await loadEventExtensions({
+    '../../../../x/y/events-extensions.ts': async () => {
+      throw new Error('boom');
+    },
+  });
+  expect(extensionFailures()).toHaveLength(1);
+  const { view } = await open();
+  const notice = document.querySelector('[data-testid="extension-failed"]');
+  expect(notice?.textContent).toMatch(/extensions could not be loaded/i);
+  expect(notice?.textContent).not.toContain('boom');
+  await view.unmount();
+  resetLoader();
+});
+
+it('offers the installed types and sources the server named, labelled by key with the id as fallback', async () => {
+  const calls = stubFetch({ [`GET ${OCCURRENCES}`]: { items: [], truncated: false } });
+  const view = await mount(
+    <CalendarPage
+      {...props}
+      types={[
+        { id: 'event', label_key: 'events.types.event' },
+        { id: 'acme:talk', label_key: 'acme.types.talk' }, // no catalogue: the id shows
+      ]}
+      sources={[{ id: 'records:dates', label_key: 'records.events.source.label', color: '#a00' }]}
+    />,
+  );
+  await flush();
+  await act(async () => fakeGrid.emitRange(MARCH, 'March 2026'));
+  await flush();
+  const text = document.body.textContent ?? '';
+  expect(text).toContain('Event');
+  expect(text).toContain('acme:talk');
+  expect(text).toContain('records:dates');
+  expect(calls.length).toBeGreaterThan(0);
+  await view.unmount();
+});
