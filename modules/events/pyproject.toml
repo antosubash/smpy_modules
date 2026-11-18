@@ -52,6 +52,7 @@ exclude = [
     "**/*-test-support.ts",
     "**/*-test-support.tsx",
     "**/page-tests/**",
+    "**/test-support/**",
 ]
 artifacts = ["sm_events/static/dist/**"]
 
