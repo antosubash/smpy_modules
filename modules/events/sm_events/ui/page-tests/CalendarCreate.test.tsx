@@ -81,3 +81,20 @@ it('starts on the first writable calendar when several are shown', async () => {
   expect((field('quick-calendar') as HTMLSelectElement).value).toBe('c1');
   await view.unmount();
 });
+
+it('offers no create when the only shown calendars are read-only (K7)', async () => {
+  const readOnly = calendarInfo({ id: 'c3', name: 'Board', can_write_events: false });
+  const { view } = await open([TEAM, readOnly], { calendars: ['c3'] });
+  expect(fakeGrid.last?.editing?.canCreate).toBe(false);
+  await view.unmount();
+});
+
+it('never starts a draft on a hidden calendar (K7)', async () => {
+  const readOnly = calendarInfo({ id: 'c3', name: 'Board', can_write_events: false });
+  const { view } = await open([TEAM, BOARD, readOnly], { calendars: ['c2', 'c3'] });
+  expect(fakeGrid.last?.editing?.canCreate).toBe(true);
+  await act(async () => fakeGrid.select(slot));
+  const options = [...(field('quick-calendar') as HTMLSelectElement).options].map((o) => o.value);
+  expect(options).toEqual(['c2']);
+  await view.unmount();
+});

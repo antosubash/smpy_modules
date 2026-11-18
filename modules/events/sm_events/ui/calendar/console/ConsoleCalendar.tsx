@@ -79,11 +79,15 @@ export function ConsoleCalendar({
     occurrence: Occurrence;
     element: HTMLElement | null;
   } | null>(null);
-  // The calendar a new event starts on: the one shown, when exactly one is.
-  const [shown, setShown] = useState(initialState?.calendars ?? []);
-  const known = shown.filter((id) => calendars.some((c) => c.id === id));
-  const preferred = known.length === 1 ? (known[0] ?? null) : null;
-  const canCreate = calendars.some((c) => c.can_write_events);
+  // A new event goes to a calendar the filter shows (a draft on a hidden one would never
+  // appear), and starts on the shown one when exactly one is.
+  const [shown, setShown] = useState(initialState?.calendars ?? calendars.map((c) => c.id));
+  const shownCalendars = useMemo(
+    () => calendars.filter((c) => shown.includes(c.id)),
+    [calendars, shown],
+  );
+  const preferred = shownCalendars.length === 1 ? (shownCalendars[0]?.id ?? null) : null;
+  const canCreate = shownCalendars.some((c) => c.can_write_events);
   const editing = useMemo<CalendarEditing>(
     () => ({
       canCreate,
@@ -120,7 +124,7 @@ export function ConsoleCalendar({
       />
       <QuickCreateDialog
         slot={slot}
-        calendars={calendars}
+        calendars={shownCalendars}
         preferred={preferred}
         defaultLocale={contentLocales[0] ?? 'en'}
         editorUrl={editorUrl}
