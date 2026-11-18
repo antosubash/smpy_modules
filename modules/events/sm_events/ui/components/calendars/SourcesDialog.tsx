@@ -1,9 +1,3 @@
-/** Which plugin sources a calendar shows, and their settings. Opened by whoever may change the
- *  calendar's visibility (the server enforces it too). Every installed source can be enabled; its
- *  module's own settings section is used when it registered one, a JSON editor otherwise. An entry
- *  no module on this server provides is listed as "not installed", kept on save, and removable
- *  after a confirmation. Settings are never secret: the server refuses secret-typed fields. */
-import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import {
   Dialog,
@@ -15,11 +9,8 @@ import {
 } from '@simple-module-py/ui/components/ui/dialog';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useEventExtensions } from '../../extensions/load';
-import { PluginBoundary } from '../../extensions/PluginBoundary';
-import { source as registered } from '../../extensions/registry';
-import { translateKey } from '../../extensions/translateKey';
 import { useGoneOnce, useRequestScope } from '../../hooks/useRequestScope';
-import { ApiError, errorText, isGone, isStale } from '../../utils/api';
+import { errorText, isGone, isStale } from '../../utils/api';
 import {
   listSources,
   putCalendarSources,
@@ -27,44 +18,12 @@ import {
   type SourceInfo,
 } from '../../utils/api-extensions';
 import { keys, useT } from '../../utils/i18n';
-import { Name, withName } from '../../utils/isolate';
+import { withName } from '../../utils/isolate';
 import type { Calendar, CalendarSource } from '../../utils/types';
-import { ConfirmDialog } from '../ConfirmDialog';
-import { JsonSettings } from './JsonSettings';
+import { KeptSourceRow, SourceRow } from './SourceRow';
+import { type Errors, groupErrors, storedProblems } from './sourceProblems';
 
 type Settings = Record<string, unknown>;
-type Errors = Record<string, Record<string, string>>;
-type Problems = { errors: Errors; codes: Errors };
-
-/** `sources.<i>.settings.<path>` messages and codes, grouped by the source sent at index `i`. */
-function groupErrors(error: unknown, sent: readonly SourceEntryInput[]): Problems {
-  const out: Problems = { errors: {}, codes: {} };
-  if (!(error instanceof ApiError) || error.status !== 422) return out;
-  for (const [path, message] of Object.entries(error.messages)) {
-    const [head, index, settings, ...rest] = path.split('.');
-    const id = head === 'sources' && settings === 'settings' ? sent[Number(index)]?.id : undefined;
-    if (!id) continue;
-    const name = rest.join('.');
-    out.errors[id] = { ...out.errors[id], [name]: message };
-    const code = error.codes[path];
-    if (code) out.codes[id] = { ...out.codes[id], [name]: code };
-  }
-  return out;
-}
-
-/** What the server says is wrong with the stored settings, as the same shape a failed save has. */
-function storedProblems(sources: readonly CalendarSource[]): Problems {
-  const out: Problems = { errors: {}, codes: {} };
-  for (const source of sources) {
-    for (const problem of source.problems ?? []) {
-      const name = problem.loc.join('.');
-      out.errors[source.id] = { ...out.errors[source.id], [name]: problem.message };
-      out.codes[source.id] = { ...out.codes[source.id], [name]: problem.code };
-    }
-  }
-  return out;
-}
-
 export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSaved: () => void }) {
   const { t } = useT();
   const copy = keys.events.sources;
@@ -198,108 +157,24 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
           {available === null && !error ? <p role="status">{t(copy.loading)}</p> : null}
           {available?.length === 0 && kept.length === 0 ? <p>{t(copy.none)}</p> : null}
           <ul className="grid gap-4">
-            {(available ?? []).map((info) => {
-              const label = translateKey(t, info.label_key, info.id);
-              const on = info.id in enabled;
-              const Section = registered(info.id)?.SettingsSection;
-              return (
-                <li key={info.id} className="grid gap-2 rounded-md border p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {on && Object.keys(enabled[info.id] ?? {}).length > 0 ? (
-                      <ConfirmDialog
-                        trigger={
-                          <input
-                            id={`source-${info.id}`}
-                            type="checkbox"
-                            className="size-4 accent-primary"
-                            checked
-                            readOnly
-                          />
-                        }
-                        title={withName(t, copy.turn_off_title, label)}
-                        description={t(copy.turn_off_description)}
-                        confirmLabel={t(copy.turn_off)}
-                        onConfirm={async () => toggleSource(info.id)}
-                      />
-                    ) : (
-                      <input
-                        id={`source-${info.id}`}
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={on}
-                        onChange={() => toggleSource(info.id)}
-                      />
-                    )}
-                    <label htmlFor={`source-${info.id}`} className="font-medium">
-                      <Name>{label}</Name>
-                    </label>
-                    {info.public ? (
-                      <>
-                        <Badge variant="outline" data-testid="source-public">
-                          {t(copy.public)}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">{t(copy.public_hint)}</span>
-                      </>
-                    ) : null}
-                  </div>
-                  {on && info.has_settings ? (
-                    Section ? (
-                      <PluginBoundary
-                        name={`${info.id}/settings`}
-                        fallback={
-                          <JsonSettings
-                            id={`json-${info.id}`}
-                            settings={enabled[info.id] ?? {}}
-                            errors={errors[info.id] ?? {}}
-                            onChange={(next) => setSettings(info.id, next)}
-                          />
-                        }
-                      >
-                        <Section
-                          settings={enabled[info.id] ?? {}}
-                          onChange={(next) => setSettings(info.id, next)}
-                          errors={errors[info.id] ?? {}}
-                          codes={codes[info.id] ?? {}}
-                          calendar={{
-                            id: calendar.id,
-                            name: calendar.name,
-                            default_timezone: calendar.default_timezone,
-                          }}
-                        />
-                      </PluginBoundary>
-                    ) : (
-                      <JsonSettings
-                        id={`json-${info.id}`}
-                        settings={enabled[info.id] ?? {}}
-                        errors={errors[info.id] ?? {}}
-                        onChange={(next) => setSettings(info.id, next)}
-                      />
-                    )
-                  ) : null}
-                </li>
-              );
-            })}
+            {(available ?? []).map((info) => (
+              <SourceRow
+                key={info.id}
+                info={info}
+                settings={info.id in enabled ? (enabled[info.id] ?? {}) : null}
+                errors={errors[info.id] ?? {}}
+                codes={codes[info.id] ?? {}}
+                calendar={calendar}
+                onToggle={() => toggleSource(info.id)}
+                onSettings={(next) => setSettings(info.id, next)}
+              />
+            ))}
             {kept.map((entry) => (
-              <li key={entry.id} className="grid gap-2 rounded-md border border-dashed p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">
-                    <Name>{entry.id}</Name>
-                  </span>
-                  <Badge variant="outline">{t(copy.not_installed)}</Badge>
-                  <ConfirmDialog
-                    trigger={
-                      <Button type="button" variant="outline" size="sm">
-                        {t(copy.remove)}
-                      </Button>
-                    }
-                    title={withName(t, copy.remove_title, entry.id)}
-                    description={t(copy.remove_description)}
-                    confirmLabel={t(copy.remove)}
-                    onConfirm={async () => setKept((now) => now.filter((k) => k.id !== entry.id))}
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">{t(copy.not_installed_hint)}</p>
-              </li>
+              <KeptSourceRow
+                key={entry.id}
+                id={entry.id}
+                onRemove={() => setKept((now) => now.filter((k) => k.id !== entry.id))}
+              />
             ))}
           </ul>
           {error ? (
