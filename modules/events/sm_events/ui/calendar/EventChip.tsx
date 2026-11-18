@@ -22,6 +22,23 @@ export function EventChip({ occurrence: o, view, timeText, pending, lockReason }
   // A block under 45 minutes is too short for two lines: it keeps one.
   const long = Date.parse(o.end) - Date.parse(o.start) >= 45 * 60_000;
   const stacked = !o.all_day && (view === 'week' || view === 'day') && long;
+  // A short timed block keeps one line with the title first: the time is on the grid's axis
+  // and in the accessible name, so it is the first thing to be cut off, not the title.
+  const short = !o.all_day && (view === 'week' || view === 'day') && !long;
+  const time =
+    timeText && !o.all_day ? (
+      <span
+        className={
+          stacked
+            ? 'font-medium tabular-nums'
+            : short
+              ? 'min-w-0 shrink-[4] truncate tabular-nums opacity-80'
+              : 'shrink-0 tabular-nums'
+        }
+      >
+        {timeText}
+      </span>
+    ) : null;
   return (
     <span
       className={
@@ -31,14 +48,11 @@ export function EventChip({ occurrence: o, view, timeText, pending, lockReason }
       }
       aria-busy={pending ? true : undefined}
     >
-      {timeText && !o.all_day ? (
-        <span className={stacked ? 'font-medium tabular-nums' : 'shrink-0 tabular-nums'}>
-          {timeText}
-        </span>
-      ) : null}
-      <span data-ev-title className={stacked ? 'line-clamp-3 break-words' : 'truncate'}>
+      {short ? null : time}
+      <span data-ev-title className={stacked ? 'line-clamp-3 break-words' : 'min-w-0 truncate'}>
         <bdi>{o.title}</bdi>
       </span>
+      {short ? time : null}
       {word ? (
         <span className={view === 'month' ? 'sr-only' : 'shrink-0 font-medium'}>{word}</span>
       ) : null}

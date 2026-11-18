@@ -49,8 +49,8 @@ describe('chipFor on the repeated hour', () => {
   };
   it('replaces the library text that reads backwards', () => {
     const shown = chipFor(fold, '2:30 – 2:00AM', (_o, text) => text, 'Europe/Vienna', 'en');
-    expect(shown).toMatch(/GMT\+2/);
-    expect(shown).toMatch(/GMT\+1/);
+    expect(shown).toMatch(/2:30\s?AM GMT\+2/);
+    expect(shown).not.toContain('–');
   });
   it('keeps the library text elsewhere', () => {
     const plain = {
