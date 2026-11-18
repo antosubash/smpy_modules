@@ -21,6 +21,7 @@ import { SubscribeDialog } from '../feeds/SubscribeDialog';
 import { ShareDialog } from '../share/ShareDialog';
 import { CalendarDialog } from './CalendarDialog';
 import { OwnerDialog } from './OwnerDialog';
+import { SourcesDialog } from './SourcesDialog';
 import { VisibilityMenu } from './VisibilityMenu';
 
 /** Where a calendar is now, after a request found it missing: in the active
@@ -166,6 +167,7 @@ export function CalendarRow({
               {calendar.can_own && (
                 <>
                   <VisibilityMenu calendar={calendar} onSaved={onSaved} />
+                  <SourcesDialog calendar={calendar} onSaved={onSaved} />
                   {can('sharing.share') && (
                     <ShareDialog
                       calendarId={calendar.id}

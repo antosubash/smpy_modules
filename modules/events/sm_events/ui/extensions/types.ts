@@ -33,7 +33,8 @@ export type SourceSettingsProps = Readonly<{
  *  fields, never the whole `extra`. */
 export type PublicDetailProps = Readonly<{
   occurrence: Occurrence | null;
-  event: Readonly<{ id: string; type: string; title: string }> | null;
+  /** The event's own identity is withheld on the public site: its type and title only. */
+  event: Readonly<{ type: string; title: string }> | null;
   publicExtra: ExtraValues;
   locale: string;
 }>;

@@ -664,5 +664,27 @@
       "truncated": "{name} zeigt nur einen Teil seiner Einträge.",
       "not_installed": "{name} ist auf diesem Server nicht installiert."
     }
+  },
+  "sources": {
+    "trigger": "Quellen",
+    "trigger_for": "Quellen von {name}",
+    "title": "Quellen von {name}",
+    "description": "Fügen Sie diesem Kalender Termine aus anderen Modulen hinzu. Was eine Quelle zeigt, bestimmen die Zugriffsregeln des jeweiligen Moduls.",
+    "loading": "Quellen werden geladen…",
+    "none": "Auf diesem Server sind keine Quellen installiert.",
+    "enable": "In diesem Kalender anzeigen",
+    "public": "Öffentlich",
+    "public_hint": "Kann auch auf der öffentlichen Website erscheinen",
+    "not_installed": "Nicht installiert",
+    "not_installed_hint": "Kein Modul auf diesem Server stellt diese Quelle bereit. Sie bleibt unverändert, bis Sie sie entfernen.",
+    "remove": "Entfernen",
+    "remove_title": "{name} entfernen?",
+    "remove_description": "Die Quelle erscheint nicht mehr in diesem Kalender, und ihre Einstellungen werden beim Speichern gelöscht.",
+    "settings_json": "Einstellungen (JSON)",
+    "invalid_json": "Diese Einstellungen sind kein gültiges JSON.",
+    "save": "Quellen speichern",
+    "saving": "Wird gespeichert…",
+    "stale": "Die Quellen dieses Kalenders wurden seit dem Öffnen von jemand anderem geändert. Schließen Sie dieses Fenster und versuchen Sie es erneut.",
+    "settings_for": "Einstellungen von {name}"
   }
 }
