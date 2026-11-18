@@ -15,6 +15,7 @@ import type {
   Occurrence,
   OccurrenceFetcher,
 } from '../types';
+import { useFocusReturn } from './focusReturn';
 import { MoveDialog } from './MoveDialog';
 import { QuickCreateDialog } from './QuickCreateDialog';
 import { useCalendarWrites } from './useCalendarWrites';
@@ -107,24 +108,7 @@ export function ConsoleCalendar({
     }),
     [canCreate, slot, writes.onChange, writes.pendingKeys],
   );
-  /** After the Move dialog: the chip it came from, the same occurrence's chip when that one was
-   *  rebuilt, else the toolbar title (the grid may have moved to another range). */
-  const restoreFocus = useCallback((o: Occurrence, element: HTMLElement | null) => {
-    const place = () => {
-      if (element?.isConnected) return element.focus();
-      if (focusRef.current?.(o.key)) return;
-      document.querySelector<HTMLElement>('[data-testid="calendar-title"]')?.focus();
-    };
-    place();
-    // A write refetches the range and the grid rebuilds the chip, which drops the focus the
-    // chip had: take it back for as long as the rebuild can take.
-    let ticks = 0;
-    const timer = window.setInterval(() => {
-      const lost = document.activeElement === document.body || document.activeElement === null;
-      if (lost) place();
-      if (++ticks >= 15) window.clearInterval(timer);
-    }, 100);
-  }, []);
+  const restoreFocus = useFocusReturn(focusRef);
   return (
     <>
       <Calendar
