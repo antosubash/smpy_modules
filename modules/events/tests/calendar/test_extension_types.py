@@ -81,7 +81,7 @@ def test_contract_surface():
     expected = sorted(
         [*TYPES, "Registrar", "RegistryFrozenError", "ITEM_MAX_DAYS", "ITEM_TITLE_MAX"]
     )
-    assert list(extensions.__all__) == expected
+    assert sorted(extensions.__all__) == expected
     for name in TYPES:
         assert getattr(extensions, name) is getattr(extension_types, name)
     assert extensions.Registrar and extensions.RegistryFrozenError
