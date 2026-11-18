@@ -17,8 +17,8 @@ import importlib.util
 import logging
 from collections.abc import Callable
 
-from sm_events.calendar import registry
-from sm_events.calendar.extension_types import EventType, Source
+from sm_events.calendar.plugins import registry
+from sm_events.calendar.plugins.extension_types import EventType, Source
 from sm_events.core import constants
 
 __all__ = ["Registrar", "load_extensions"]

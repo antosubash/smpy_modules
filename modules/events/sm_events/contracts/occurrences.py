@@ -23,8 +23,8 @@ from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_events.calendar import occurrences as _read
-from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters, OccurrencePage
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.core.tenancy import tenant_scope
 
 __all__ = ["Occurrence", "OccurrencePage", "occurrences"]

@@ -1,11 +1,11 @@
 """Call plugin sources for one read: isolated, bounded and reported on.
 
 Each ``(calendar, source)`` pair is one call, run **sequentially** (they share the
-request's session) through :func:`~sm_events.calendar.plugin_isolation.run_isolated`: a
+request's session) through :func:`~sm_events.calendar.plugins.plugin_isolation.run_isolated`: a
 savepoint that is rolled back, a wall-clock timeout, and a check that the plugin did not
 write. All calls of one read share a phase budget, at most ``SOURCE_CALLS_MAX`` pairs are
 called, and one answer is at most ``SOURCE_CALL_MAX_ITEMS`` items. What comes back is
-validated (:mod:`~sm_events.calendar.plugin_validate`) or the whole answer is refused.
+validated (:mod:`~sm_events.calendar.plugins.plugin_validate`) or the whole answer is refused.
 
 A failing, slow or misbehaving plugin degrades to a :class:`SourceStatus` the UI can
 show; it never raises, hangs or poisons the transaction. Exceptions are logged with the
@@ -23,8 +23,9 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from sm_events.calendar import source_entries
-from sm_events.calendar.extension_types import (
+from sm_events.calendar.occurrence import Occurrence
+from sm_events.calendar.plugins import source_entries
+from sm_events.calendar.plugins.extension_types import (
     Source,
     SourceCalendar,
     SourceContext,
@@ -32,9 +33,8 @@ from sm_events.calendar.extension_types import (
     SourceStatus,
     SourceViewer,
 )
-from sm_events.calendar.occurrence import Occurrence
-from sm_events.calendar.plugin_isolation import PluginWrote, SessionBroken, run_isolated
-from sm_events.calendar.plugin_validate import InvalidPluginItem, to_occurrences
+from sm_events.calendar.plugins.plugin_isolation import PluginWrote, SessionBroken, run_isolated
+from sm_events.calendar.plugins.plugin_validate import InvalidPluginItem, to_occurrences
 from sm_events.calendar.sources import sort_key
 from sm_events.core import constants
 

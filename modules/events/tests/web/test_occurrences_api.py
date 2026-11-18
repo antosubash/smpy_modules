@@ -119,7 +119,7 @@ async def test_anonymous_is_refused(client):
 
 
 async def test_api_200_with_failing_source(client, monkeypatch):
-    from sm_events.calendar import registry
+    from sm_events.calendar.plugins import registry
 
     from tests.support.sources import FakeSource, install, raises
 
@@ -140,7 +140,7 @@ async def test_api_200_with_failing_source(client, monkeypatch):
 
 
 async def test_source_param(client, monkeypatch):
-    from sm_events.calendar import registry
+    from sm_events.calendar.plugins import registry
 
     from tests.support.sources import FakeSource, install, item, ok
 
@@ -179,7 +179,7 @@ async def _enable(client, calendar_id, source_ids):
 
 
 async def test_type_filter_over_http(client, monkeypatch):
-    from sm_events.calendar import registry
+    from sm_events.calendar.plugins import registry
 
     from tests.support.sources import FakeSource, install, item, ok
 

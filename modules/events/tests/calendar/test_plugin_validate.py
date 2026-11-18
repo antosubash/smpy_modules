@@ -6,8 +6,8 @@ import uuid
 from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
-from sm_events.calendar.extension_types import SourceCalendar, SourceOccurrence
-from sm_events.calendar.plugin_validate import InvalidPluginItem, to_occurrences
+from sm_events.calendar.plugins.extension_types import SourceCalendar, SourceOccurrence
+from sm_events.calendar.plugins.plugin_validate import InvalidPluginItem, to_occurrences
 
 CAL = SourceCalendar(
     id=uuid.uuid4(),

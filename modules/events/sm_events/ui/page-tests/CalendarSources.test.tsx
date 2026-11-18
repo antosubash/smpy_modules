@@ -96,3 +96,37 @@ it('no sources group when none is enabled', async () => {
   expect(document.body.textContent).not.toContain('Sources');
   await view.unmount();
 });
+
+it('words the reason for a failure it knows, and says nothing for a plugin-only code', async () => {
+  const { view } = await openCalendar({
+    sources: sourceOptions,
+    fetchOccurrences: fetcherOf(
+      page([
+        status('records:dates', 'failed', 'field_missing'),
+        status('acme:other', 'failed', 'my_own_code'),
+      ]),
+    ),
+  });
+  const lines = [...document.querySelectorAll('[data-testid="source-status"] li')].map(
+    (li) => li.textContent ?? '',
+  );
+  expect(lines[0]).toContain('A field it reads was deleted');
+  expect(lines[1]).not.toContain('my_own_code');
+  expect(lines[1]?.trim().endsWith('could not be loaded.')).toBe(true);
+  await view.unmount();
+});
+
+it("a source's own cap is worded per source, not as the whole answer's 2,000", async () => {
+  const { view } = await openCalendar({
+    sources: sourceOptions,
+    fetchOccurrences: fetcherOf({
+      items: [occurrence()],
+      truncated: true,
+      sources: [status('records:dates', 'truncated')],
+    }),
+  });
+  const text = document.body.textContent ?? '';
+  expect(text).toContain('Showing the first 500 entries from Deadlines.');
+  expect(text).not.toContain('first 2,000 items');
+  await view.unmount();
+});

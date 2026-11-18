@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-from sm_events.calendar import source_entries
+from sm_events.calendar.plugins import source_entries
 from sm_events.core import constants
 from sm_events.models import Visibility
 from sm_events.web.schemas._fields import (

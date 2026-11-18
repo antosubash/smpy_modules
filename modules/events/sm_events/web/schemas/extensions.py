@@ -22,6 +22,12 @@ class SourcesIn(BaseModel):
     sources: Annotated[list[CalendarSourceIn], Field(max_length=constants.SOURCES_IN_MAX)]
 
 
+class SettingsProblemOut(BaseModel):
+    loc: list[str | int]
+    code: str
+    message: str
+
+
 class CalendarSourceOut(BaseModel):
     """A source enabled on a calendar. ``settings`` is empty unless the caller can manage
     the calendar; ``installed`` is false for an id no plugin on this host provides."""
@@ -30,6 +36,8 @@ class CalendarSourceOut(BaseModel):
     settings: dict[str, Any]
     installed: bool
     label_key: str | None = None
+    problems: list[SettingsProblemOut] = []
+    """What is wrong with the stored settings that this reader may be told (managers only)."""
 
 
 class SourceOut(BaseModel):

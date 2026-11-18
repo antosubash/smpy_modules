@@ -15,6 +15,7 @@ import type { FieldDef, TypeRead } from '../utils/types';
 const MAX_MAPPINGS = 5;
 const DATE_KINDS = ['date', 'datetime'];
 
+type Hidden = { hidden: true; token: string };
 type Mapping = {
   type_key: string;
   field: string;
@@ -26,12 +27,30 @@ type Mapping = {
 const dateFields = (type: TypeRead | undefined): FieldDef[] =>
   (type?.fields ?? []).filter((f) => f.indexed && DATE_KINDS.includes(f.type));
 
-const mappingsOf = (settings: SourceSettingsProps['settings']): Mapping[] => {
+const isHidden = (m: Mapping | Hidden): m is Hidden => 'hidden' in m && m.hidden === true;
+
+const mappingsOf = (settings: SourceSettingsProps['settings']): (Mapping | Hidden)[] => {
   const raw = settings.mappings;
-  return Array.isArray(raw) && raw.length > 0 ? (raw as Mapping[]) : [{ type_key: '', field: '' }];
+  return Array.isArray(raw) && raw.length > 0
+    ? (raw as (Mapping | Hidden)[])
+    : [{ type_key: '', field: '' }];
 };
 
-export default function RecordDatesSettings({ settings, onChange, errors }: SourceSettingsProps) {
+/** The server's short code for a problem, as a sentence in the reader's language. */
+const CODE_KEYS = {
+  field_missing: 'error_field_missing',
+  field_not_date: 'error_field_not_date',
+  type_unavailable: 'error_type_unavailable',
+  end_same: 'error_end_same',
+  end_kind: 'error_end_kind',
+} as const;
+
+export default function RecordDatesSettings({
+  settings,
+  onChange,
+  errors,
+  codes,
+}: SourceSettingsProps) {
   const { t } = useT();
   const copy = keys.records.events.settings;
   const [types, setTypes] = useState<TypeRead[] | null>(null);
@@ -39,7 +58,7 @@ export default function RecordDatesSettings({ settings, onChange, errors }: Sour
   useEffect(() => {
     let alive = true;
     listTypes()
-      .then(({ items }) => alive && setTypes(items.filter((type) => dateFields(type).length > 0)))
+      .then(({ items }) => alive && setTypes(items))
       .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
@@ -50,7 +69,7 @@ export default function RecordDatesSettings({ settings, onChange, errors }: Sour
   const update = (index: number, patch: Partial<Mapping>) =>
     onChange({
       ...settings,
-      mappings: mappings.map((m, i) => (i === index ? { ...m, ...patch } : m)),
+      mappings: mappings.map((m, i) => (i === index && !isHidden(m) ? { ...m, ...patch } : m)),
     });
   const remove = (index: number) =>
     onChange({ ...settings, mappings: mappings.filter((_, i) => i !== index) });
@@ -66,11 +85,37 @@ export default function RecordDatesSettings({ settings, onChange, errors }: Sour
       ) : null}
       {mappings.map((mapping, index) => {
         const id = `records-dates-${index}`;
+        if (isHidden(mapping)) {
+          return (
+            <fieldset
+              key={`${id}-${mapping.token}`}
+              className="grid gap-2 rounded-md border border-dashed p-3"
+              data-testid="records-mapping-hidden"
+            >
+              <legend className="px-1 text-sm font-medium">
+                {t(copy.mapping, { n: index + 1 })}
+              </legend>
+              <p className="text-sm text-muted-foreground">{t(copy.hidden)}</p>
+            </fieldset>
+          );
+        }
         const type = types?.find((candidate) => candidate.key === mapping.type_key);
         const fields = dateFields(type);
         const start = fields.find((f) => f.key === mapping.field);
         const ends = fields.filter((f) => f.key !== mapping.field && f.type === start?.type);
-        const error = (name: string) => errors[`mappings.${index}.${name}`];
+        const error = (name: string) => {
+          const path = `mappings.${index}.${name}`;
+          const known = CODE_KEYS[codes?.[path] as keyof typeof CODE_KEYS];
+          return known ? t(copy[known]) : errors[path];
+        };
+        // A stored value the type no longer offers stays visible (and fixable), never blank.
+        const withStale = (
+          choices: { value: string; label: string }[],
+          value: string | null | undefined,
+        ) =>
+          value && !choices.some((c) => c.value === value)
+            ? [{ value, label: t(copy.field_gone, { field: value }) }, ...choices]
+            : choices;
         const select = (
           name: 'type_key' | 'field' | 'end_field',
           suffix: string,
@@ -113,7 +158,15 @@ export default function RecordDatesSettings({ settings, onChange, errors }: Sour
               'type',
               t(copy.type),
               mapping.type_key,
-              (types ?? []).map((candidate) => ({ value: candidate.key, label: candidate.label })),
+              withStale(
+                (types ?? [])
+                  .filter(
+                    (candidate) =>
+                      dateFields(candidate).length > 0 || candidate.key === mapping.type_key,
+                  )
+                  .map((candidate) => ({ value: candidate.key, label: candidate.label })),
+                types === null ? null : mapping.type_key,
+              ),
               t(copy.choose),
               (value) => ({ type_key: value, field: '', end_field: null }),
             )}
@@ -122,7 +175,10 @@ export default function RecordDatesSettings({ settings, onChange, errors }: Sour
               'field',
               t(copy.field),
               mapping.field,
-              fields.map((f) => ({ value: f.key, label: f.label })),
+              withStale(
+                fields.map((f) => ({ value: f.key, label: f.label })),
+                types === null ? null : mapping.field,
+              ),
               t(copy.choose),
               (value) => ({ field: value, end_field: null }),
             )}
@@ -131,7 +187,10 @@ export default function RecordDatesSettings({ settings, onChange, errors }: Sour
               'end',
               t(copy.end),
               mapping.end_field ?? '',
-              ends.map((f) => ({ value: f.key, label: f.label })),
+              withStale(
+                ends.map((f) => ({ value: f.key, label: f.label })),
+                types === null ? null : mapping.end_field,
+              ),
               t(copy.none),
               (value) => ({ end_field: value || null }),
             )}

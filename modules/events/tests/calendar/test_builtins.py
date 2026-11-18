@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.calendar import registry
-from sm_events.calendar.extension_types import NoExtra
+from sm_events.calendar.plugins import registry
+from sm_events.calendar.plugins.extension_types import NoExtra
 from sm_events.calendar.sources import EVENTS_SOURCE
 
 from tests.calendar.test_occurrences import OWNER, read, utc

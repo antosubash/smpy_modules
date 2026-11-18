@@ -34,18 +34,33 @@ import { JsonSettings } from './JsonSettings';
 
 type Settings = Record<string, unknown>;
 type Errors = Record<string, Record<string, string>>;
+type Problems = { errors: Errors; codes: Errors };
 
-/** `sources.<i>.settings.<path>` messages, grouped by the source sent at index `i`. */
-function groupErrors(error: unknown, sent: readonly SourceEntryInput[]): Errors {
-  const out: Errors = {};
+/** `sources.<i>.settings.<path>` messages and codes, grouped by the source sent at index `i`. */
+function groupErrors(error: unknown, sent: readonly SourceEntryInput[]): Problems {
+  const out: Problems = { errors: {}, codes: {} };
   if (!(error instanceof ApiError) || error.status !== 422) return out;
   for (const [path, message] of Object.entries(error.messages)) {
     const [head, index, settings, ...rest] = path.split('.');
     const id = head === 'sources' && settings === 'settings' ? sent[Number(index)]?.id : undefined;
     if (!id) continue;
-    const mine = out[id] ?? {};
-    mine[rest.join('.')] = message;
-    out[id] = mine;
+    const name = rest.join('.');
+    out.errors[id] = { ...out.errors[id], [name]: message };
+    const code = error.codes[path];
+    if (code) out.codes[id] = { ...out.codes[id], [name]: code };
+  }
+  return out;
+}
+
+/** What the server says is wrong with the stored settings, as the same shape a failed save has. */
+function storedProblems(sources: readonly CalendarSource[]): Problems {
+  const out: Problems = { errors: {}, codes: {} };
+  for (const source of sources) {
+    for (const problem of source.problems ?? []) {
+      const name = problem.loc.join('.');
+      out.errors[source.id] = { ...out.errors[source.id], [name]: problem.message };
+      out.codes[source.id] = { ...out.codes[source.id], [name]: problem.code };
+    }
   }
   return out;
 }
@@ -58,6 +73,7 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
   const [enabled, setEnabled] = useState<Record<string, Settings>>({});
   const [kept, setKept] = useState<CalendarSource[]>([]);
   const [errors, setErrors] = useState<Errors>({});
+  const [codes, setCodes] = useState<Errors>({});
   const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -75,7 +91,9 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
       Object.fromEntries(stored.filter((s) => s.installed).map((s) => [s.id, s.settings])),
     );
     setKept(stored.filter((s) => !s.installed));
-    setErrors({});
+    const known = storedProblems(stored);
+    setErrors(known.errors);
+    setCodes(known.codes);
     setInvalid(new Set());
     setError(null);
   }, []);
@@ -104,6 +122,7 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
     setPending(true);
     setError(null);
     setErrors({});
+    setCodes({});
     try {
       await putCalendarSources(calendar.id, entries, calendar.sources_version);
       if (!request.alive()) return;
@@ -116,9 +135,12 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
         onSaved();
       } else {
         const grouped = groupErrors(e, entries);
-        setErrors(grouped);
+        setErrors(grouped.errors);
+        setCodes(grouped.codes);
         setError(
-          Object.keys(grouped).length ? null : errorText(e, keys.events.errors.calendar_gone),
+          Object.keys(grouped.errors).length
+            ? null
+            : errorText(e, keys.events.errors.calendar_gone),
         );
       }
       if (isGone(e)) gone();
@@ -126,6 +148,15 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
       if (request.alive()) setPending(false);
     }
   }
+
+  const toggleSource = (id: string) =>
+    setEnabled((now) => {
+      if (id in now) {
+        const { [id]: _off, ...rest } = now;
+        return rest;
+      }
+      return { ...now, [id]: {} };
+    });
 
   const setSettings = (id: string, next: Settings | null) => {
     setInvalid((now) => {
@@ -149,7 +180,16 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
           {t(copy.trigger)}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={false}>
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        showCloseButton={false}
+        // The sources load after the dialog opens, so the first tabbable thing at that moment is
+        // Cancel: start on the dialog itself and the first Tab reaches the first source.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{withName(t, copy.title, calendar.name)}</DialogTitle>
           <DialogDescription>{t(copy.description)}</DialogDescription>
@@ -165,32 +205,41 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
               return (
                 <li key={info.id} className="grid gap-2 rounded-md border p-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      id={`source-${info.id}`}
-                      type="checkbox"
-                      className="size-4 accent-primary"
-                      checked={on}
-                      onChange={() =>
-                        setEnabled((now) => {
-                          if (info.id in now) {
-                            const { [info.id]: _off, ...rest } = now;
-                            return rest;
-                          }
-                          return { ...now, [info.id]: {} };
-                        })
-                      }
-                    />
+                    {on && Object.keys(enabled[info.id] ?? {}).length > 0 ? (
+                      <ConfirmDialog
+                        trigger={
+                          <input
+                            id={`source-${info.id}`}
+                            type="checkbox"
+                            className="size-4 accent-primary"
+                            checked
+                            readOnly
+                          />
+                        }
+                        title={withName(t, copy.turn_off_title, label)}
+                        description={t(copy.turn_off_description)}
+                        confirmLabel={t(copy.turn_off)}
+                        onConfirm={async () => toggleSource(info.id)}
+                      />
+                    ) : (
+                      <input
+                        id={`source-${info.id}`}
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={on}
+                        onChange={() => toggleSource(info.id)}
+                      />
+                    )}
                     <label htmlFor={`source-${info.id}`} className="font-medium">
                       <Name>{label}</Name>
                     </label>
                     {info.public ? (
-                      <Badge
-                        variant="outline"
-                        data-testid="source-public"
-                        title={t(copy.public_hint)}
-                      >
-                        {t(copy.public)}
-                      </Badge>
+                      <>
+                        <Badge variant="outline" data-testid="source-public">
+                          {t(copy.public)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{t(copy.public_hint)}</span>
+                      </>
                     ) : null}
                   </div>
                   {on && info.has_settings ? (
@@ -210,6 +259,7 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
                           settings={enabled[info.id] ?? {}}
                           onChange={(next) => setSettings(info.id, next)}
                           errors={errors[info.id] ?? {}}
+                          codes={codes[info.id] ?? {}}
                           calendar={{
                             id: calendar.id,
                             name: calendar.name,

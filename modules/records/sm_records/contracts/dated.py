@@ -6,9 +6,10 @@ crosses the boundary is plain frozen data (:class:`DatedHit`).
 **Access is records' own, never wider.** A person (:class:`DatedCaller`) needs ``records.view``
 and must pass the type's ``allowed_roles`` (widened by a ``records.type.<key>`` grant; the admin
 wildcard widens nothing), as for the list API. ``caller=None`` is the public: only a type that is
-``is_public``. A type the caller may not read, an unknown type and an unknown field are all an
-**empty page**, so nothing can be probed. Only **published**, untrashed records are returned,
-never a draft, to anyone.
+``is_public``. A type the caller may not read and an unknown type are an **empty page**, so
+nothing can be probed; a field a type they may read does not declare is
+:class:`DatedQueryError` ``field_missing`` (they may see the type's fields anyway). Only
+**published**, untrashed records are returned, never a draft, to anyone.
 
 **Tenant.** The caller names it; it is validated, bound with records' ``tenant_scope`` and pinned
 again as a predicate on every statement.
@@ -61,7 +62,7 @@ __all__ = [
 MAX_DATED_WINDOW_DAYS: Final = 800
 _SETTINGS: Final = RecordsSettings(max_page_size=MAX_DATED_BATCH + 1)
 Kind = Literal["date", "datetime"]
-Reason = Literal["not_a_date", "not_indexed", "reindexing", "kind_mismatch"]
+Reason = Literal["not_a_date", "not_indexed", "reindexing", "kind_mismatch", "field_missing"]
 _KINDS: Final = {IndexKind.DATE: "date", IndexKind.DATETIME: "datetime"}
 
 
@@ -111,7 +112,7 @@ def _bound_ok(kind: str, value: object) -> bool:
 def _kind_of(rtype: RecordType, name: str) -> str:
     """The kind of a field that must be an indexed date or datetime."""
     if name not in declared_keys(list(rtype.fields or [])):
-        raise DatedQueryError("not_indexed")
+        raise DatedQueryError("field_missing")
     indexed = indexed_map(list(rtype.fields or []))
     if name not in indexed:
         raise DatedQueryError("not_indexed")
@@ -154,8 +155,6 @@ async def dated_records(
     with tenant_scope(tenant):
         rtype = await _type(session, tenant, type_key)
         if rtype is None or not may_read(rtype, caller):
-            return DatedPage([], False)
-        if field not in declared_keys(list(rtype.fields or [])):
             return DatedPage([], False)
         kind = _kind_of(rtype, field)
         if end_field is not None and _kind_of(rtype, end_field) != kind:

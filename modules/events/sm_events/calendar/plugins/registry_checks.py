@@ -1,7 +1,7 @@
 """What registration checks about a source, an event type and an id (see :mod:`.registry`).
 
 Kept apart from the store so the registry stays small; the exception classes live here and
-are re-exported by :mod:`sm_events.calendar.registry`, their public home.
+are re-exported by :mod:`sm_events.calendar.plugins.registry`, their public home.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import Any, get_args
 
 from pydantic import BaseModel, SecretBytes, SecretStr
 
-from sm_events.calendar.extension_types import EventType
+from sm_events.calendar.plugins.extension_types import EventType
 from sm_events.core import constants
 
 _ID = re.compile(constants.PLUGIN_ID_PATTERN)

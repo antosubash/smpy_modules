@@ -16,8 +16,8 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from pydantic_core import to_jsonable_python
 
-from sm_events.calendar import registry
-from sm_events.calendar.extension_types import EventType
+from sm_events.calendar.plugins import registry
+from sm_events.calendar.plugins.extension_types import EventType
 from sm_events.core import constants
 from sm_events.core.errors import UnknownType
 from sm_events.core.errors_extensions import ExtraTooLarge

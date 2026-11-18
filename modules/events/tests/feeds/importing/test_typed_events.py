@@ -6,7 +6,7 @@ import json
 from datetime import UTC, datetime
 
 import pytest
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.core.tenancy import tenant_scope
 from sm_events.feeds import ics_calendar
 from sm_events.feeds.select import feed_events

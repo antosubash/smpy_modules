@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import Request
 from simple_module_core.resources import ResourcePrincipal
 
-from sm_events.calendar.extension_types import SourceViewer
+from sm_events.calendar.plugins.extension_types import SourceViewer
 
 __all__ = ["source_viewer_from"]
 

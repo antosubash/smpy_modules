@@ -53,10 +53,12 @@ type Settings = Record<string, unknown>;
 function Host({
   initial,
   errors,
+  codes = {},
   onChange,
 }: {
   initial: Settings;
   errors: Record<string, string>;
+  codes?: Record<string, string>;
   onChange: (next: Settings) => void;
 }) {
   const [settings, setSettings] = useState(initial);
@@ -64,6 +66,7 @@ function Host({
     <RecordDatesSettings
       settings={settings}
       errors={errors}
+      codes={codes}
       calendar={calendar}
       onChange={(next) => {
         setSettings(next);
@@ -72,9 +75,15 @@ function Host({
     />
   );
 }
-async function open(settings: Settings = {}, errors: Record<string, string> = {}) {
+async function open(
+  settings: Settings = {},
+  errors: Record<string, string> = {},
+  codes: Record<string, string> = {},
+) {
   const onChange = vi.fn<(next: Settings) => void>();
-  const view = await mount(<Host initial={settings} errors={errors} onChange={onChange} />);
+  const view = await mount(
+    <Host initial={settings} errors={errors} codes={codes} onChange={onChange} />,
+  );
   await act(async () => new Promise((r) => setTimeout(r, 10)));
   return { view, onChange };
 }
@@ -149,6 +158,41 @@ it("shows the server's errors under mappings.<i>.<name> next to their input", as
   expect(document.getElementById('records-dates-0-field')?.getAttribute('aria-invalid')).toBe(
     'true',
   );
+  await view.unmount();
+});
+
+it('shows a mapping the reader cannot view as a sentence, with nothing to edit or remove', async () => {
+  const { view, onChange } = await open({
+    mappings: [
+      { type_key: 'deadlines', field: 'due' },
+      { hidden: true, token: 'h1' },
+    ],
+  });
+  const hidden = document.querySelector('[data-testid="records-mapping-hidden"]');
+  expect(hidden?.textContent).toContain('A mapping you cannot view');
+  expect(hidden?.querySelector('select, input, button')).toBeNull();
+  expect(document.body.textContent).not.toContain('h1');
+  expect(onChange).not.toHaveBeenCalled();
+  await view.unmount();
+});
+
+it('keeps a field the type no longer offers visible and fixable, with a translated reason', async () => {
+  const { view, onChange } = await open(
+    { mappings: [{ type_key: 'nodates', field: 'due' }] },
+    { 'mappings.0.field': 'English fallback' },
+    { 'mappings.0.field': 'field_not_date' },
+  );
+  const type = document.getElementById('records-dates-0-type') as HTMLSelectElement;
+  expect(type.value).toBe('nodates'); // the stored type stays selected though it has no dates
+  const field = document.getElementById('records-dates-0-field') as HTMLSelectElement;
+  expect(field.value).toBe('due');
+  expect(field.selectedOptions[0]?.textContent).toBe('due (no longer available)');
+  expect(document.body.textContent).toContain('no longer an indexed date');
+  expect(document.body.textContent).not.toContain('English fallback');
+  await setValue(type, 'deadlines');
+  expect(onChange).toHaveBeenLastCalledWith({
+    mappings: [{ type_key: 'deadlines', field: '', end_field: null }],
+  });
   await view.unmount();
 });
 

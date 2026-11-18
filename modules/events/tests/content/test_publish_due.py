@@ -238,7 +238,7 @@ async def test_eager_task_runs(db_state, tmp_path, monkeypatch):
 async def test_publish_due_keeps_unknown_extra(db_state):
     """A worker image without the plugin: the event of its type is published and its ``extra``
     is exactly what was stored."""
-    from sm_events.calendar import registry
+    from sm_events.calendar.plugins import registry
 
     registry.reset_registry()  # the registry holds the built-ins only: no ``gone:thing``
     raw = {"b": 1, "a": [1, 2], "n": {"z": None}}

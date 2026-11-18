@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.models import Event
 from sqlalchemy import select
 
@@ -80,7 +80,7 @@ async def test_jsonld_carries_no_extra(public_locales_client, fx):
 
 async def test_uninstalled_type_public_extra_empty(public_locales_client, fx):
     registry.reset_registry()
-    from sm_events.calendar import extensions
+    from sm_events.calendar.plugins import extensions
 
     extensions._BUILTIN_LOADERS[:] = extensions._BUILTIN_LOADERS[:1]
     got = await public_locales_client.get(page_url(fx), headers=INERTIA)

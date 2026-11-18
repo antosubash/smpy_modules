@@ -591,10 +591,7 @@
     "subscribe": {
       "title": "Subscribe",
       "hint": "Add these events to your own calendar. It updates itself.",
-      "feed": "Calendar link (https)",
-      "webcal": "Open in your calendar app",
-      "copy": "Copy link",
-      "copied": "Link copied"
+      "feed": "Calendar link (https)"
     },
     "grid": {
       "loading": "Loading the calendar…"
@@ -645,8 +642,6 @@
     "created_warning": "You will not see this link again. Anyone who has it sees what you can see in this calendar.",
     "link": "Private calendar link",
     "webcal": "Open in your calendar app",
-    "copy": "Copy link",
-    "copied": "Link copied",
     "done": "I have copied it",
     "mine": "Your links",
     "everyone": "Everyone’s links",
@@ -671,7 +666,22 @@
       "timeout": "{name} took too long to answer.",
       "skipped": "{name} was skipped.",
       "truncated": "{name} shows only part of its entries.",
-      "not_installed": "{name} is not installed on this server."
+      "not_installed": "{name} is not installed on this server.",
+      "truncated_source": "Showing the first {count} entries from {name}.",
+      "reason": {
+        "wrote": "It tried to change data, which a source may not do.",
+        "invalid_item": "It returned an entry that is not valid.",
+        "duplicate_key": "It returned the same entry twice.",
+        "invalid_answer": "Its answer had the wrong shape.",
+        "too_many_items": "It returned far too many entries.",
+        "invalid_settings": "Its settings no longer fit: open Sources to fix them.",
+        "field_missing": "A field it reads was deleted: open Sources to fix the mapping.",
+        "field_changed": "A field it reads is no longer a date: open Sources to fix the mapping.",
+        "reindexing": "A field it reads is being re-indexed. Try again in a moment.",
+        "session": "An earlier source left the connection unusable.",
+        "budget": "The calendar ran out of time before reaching it.",
+        "too_many_calls": "More sources are enabled than can be asked at once."
+      }
     }
   },
   "sources": {
@@ -681,7 +691,6 @@
     "description": "Add dates from other modules to this calendar. What a source shows is decided by that module's own access rules.",
     "loading": "Loading sources…",
     "none": "No sources are installed on this server.",
-    "enable": "Show on this calendar",
     "public": "Public",
     "public_hint": "May also appear on the public site",
     "not_installed": "Not installed",
@@ -694,7 +703,10 @@
     "save": "Save sources",
     "saving": "Saving…",
     "stale": "The sources of this calendar were changed by someone else since you opened this. Close this window and try again.",
-    "settings_for": "Settings of {name}"
+    "settings_for": "Settings of {name}",
+    "turn_off": "Turn off",
+    "turn_off_title": "Turn off {name}?",
+    "turn_off_description": "Its settings are discarded when you save."
   },
   "import": {
     "title": "Import events",

@@ -85,6 +85,8 @@ include = [
     "modules/news/news/integrations/bundle",
     "modules/news/news/integrations/locales.py",
     "modules/events/sm_events/integrations/pagebuilder.py",
+    "modules/records/sm_records/events_extensions.py",
+    "modules/records/sm_records/integrations/events",
     "modules/news/news/integrations/pagebuilder.py",
     "modules/newsletter/sm_newsletter/campaigns/access.py",
     "modules/newsletter/sm_newsletter/campaigns/audience.py",

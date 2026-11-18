@@ -15,8 +15,8 @@ from typing import Final
 
 from sm_events.content.richtext import clean
 from sm_events.core import constants
+from sm_events.core.text_safety import strip_unsafe
 from sm_events.web.schemas._fields import http_url as validate_url
-from sm_events.web.schemas._fields import strip_unsafe
 
 __all__ = ["clean_title", "description_html", "http_url", "unescape", "venue"]
 

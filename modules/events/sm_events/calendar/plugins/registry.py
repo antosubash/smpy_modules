@@ -1,6 +1,6 @@
 """The source and event-type registry (process-global, frozen once).
 
-Registration normally goes through :func:`sm_events.calendar.extensions.load_extensions`,
+Registration normally goes through :func:`sm_events.calendar.plugins.extensions.load_extensions`,
 which registers the built-ins, then every installed package's ``events_extensions``,
 then freezes. The registry is the trust boundary for plugins: an id must be
 ``<entry-point name>:<name>`` and match the namespace its :class:`Registrar` was built
@@ -15,8 +15,8 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from sm_events.calendar.extension_types import EventType, Source
-from sm_events.calendar.registry_checks import (
+from sm_events.calendar.plugins.extension_types import EventType, Source
+from sm_events.calendar.plugins.registry_checks import (
     DuplicateExtension,
     InvalidExtension,
     InvalidExtensionId,
@@ -121,7 +121,7 @@ def ensure_loaded() -> None:
     with lock:
         if _frozen or _loading:
             return
-        from sm_events.calendar import extensions
+        from sm_events.calendar.plugins import extensions
 
         extensions.load_extensions()
 

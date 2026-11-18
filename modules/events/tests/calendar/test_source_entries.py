@@ -6,8 +6,8 @@ import logging
 
 import pytest
 from fastapi.exceptions import RequestValidationError
-from sm_events.calendar import registry, source_entries
-from sm_events.calendar.extension_types import SourceViewer
+from sm_events.calendar.plugins import registry, source_entries
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.core import errors_extensions as err
 from sm_events.models import Calendar
 

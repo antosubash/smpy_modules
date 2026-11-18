@@ -31,10 +31,12 @@ export function DefaultDetail({ occurrence: o, gridTimeZone, actions, lockReason
         <Name>{o.title}</Name>
         {o.lang && locale && o.lang !== locale.split('-')[0] ? (
           <span
-            className="rounded border px-1 text-xs uppercase"
+            className="rounded border px-1 text-xs"
             title={t(copy.lang_fallback, { language: languageName(o.lang, locale) })}
           >
-            {o.lang}
+            <span className="uppercase" aria-hidden="true">
+              {o.lang}
+            </span>
             <span className="sr-only">
               {t(copy.lang_fallback, { language: languageName(o.lang, locale) })}
             </span>

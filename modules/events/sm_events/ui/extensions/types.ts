@@ -26,6 +26,9 @@ export type SourceSettingsProps = Readonly<{
   settings: ExtraValues;
   onChange: (next: Record<string, unknown>) => void;
   errors: Readonly<Record<string, string>>;
+  /** The plugin's own short code per path, when it gave one (a section words it in the
+   *  reader's language instead of showing the English `errors` message). */
+  codes: Readonly<Record<string, string>>;
   calendar: Readonly<{ id: string; name: string; default_timezone: string }>;
 }>;
 

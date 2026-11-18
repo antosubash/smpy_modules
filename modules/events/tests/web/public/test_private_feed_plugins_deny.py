@@ -4,7 +4,7 @@ failing plugin changes neither a valid link's answer nor a refusal."""
 from __future__ import annotations
 
 import pytest
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.core import constants
 
 from tests.support.private_feed import (

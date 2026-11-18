@@ -23,6 +23,7 @@ name the module they affect.
   creates drafts, idempotently by `UID`. Hosts run the `events` migration `6dedd89ae3a8`
   and add `events.run_import` and `events.janitor` to the worker's tasks. Imported
   repeating UTC events keep UTC.
+  An import publishes nothing on the bus, in process or durable (documented in the plugin guide).
 
 - **events: a new module** (`simple_module_events`, #400): calendars with private,
   internal and public visibility, shared through the sharing module, the

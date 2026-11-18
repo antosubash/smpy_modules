@@ -13,10 +13,12 @@ up by events and never imported by a path:
 A package is a plugin when it is a module (it has the `simple_module` entry point) and
 ships the file. Records ships both, as `records:dates` (see the end).
 
-Everything a plugin imports from events is in one place: `sm_events.contracts.extensions`
-on the Python side and `@simple-module-py/events` on the TypeScript side. Nothing else
-is public, and `scripts/check_sibling_contracts.py` and `scripts/check_ts_imports.py`
-refuse anything else.
+A plugin imports from events through three public paths and nothing else:
+`sm_events.contracts.extensions` (sources, types, their value types and limits),
+`sm_events.contracts.events` (the bus events, see below) and `@simple-module-py/events` on the
+TypeScript side. The value types in `extensions` are frozen; the bus events are plain,
+non-frozen dataclasses (the framework's event base), so treat a received one as read-only. `scripts/check_sibling_contracts.py` and
+`scripts/check_ts_imports.py` refuse anything else.
 
 ## Registration, and why a file and not `on_startup`
 
@@ -83,7 +85,33 @@ exclusive), a `key` unique within the answer, a plain-text `title`, and optional
 calendar. An optional `async check_settings(sctx, settings)` raises
 `SourceSettingsError(loc, message)` for a settings value the model cannot judge; it runs
 when an admin saves. `SourceError("some_code")` from `occurrences` becomes that code in the
-source's status instead of the generic `raised`.
+source's status instead of the generic `raised`. A reader who may see why gets a code (`field_missing`, `field_changed`, `reindexing`
+in records); nobody else is told, so a source stays quiet for what the viewer may not know exists.
+
+### Settings a manager may not fully see
+
+Whoever manages a calendar sees and saves its source settings, but may not be allowed to read
+everything they name (records: a mapping to a record type they cannot read would tell them the
+type exists). Two optional hooks let a source keep that to itself; both run on a connection of
+their own and a failure shows `{}` (nothing the plugin cannot vouch for is shown):
+
+* `async view_settings(sctx, settings) -> SettingsView(settings, problems)`: the settings as
+  `sctx.viewer` may see them (a redacted copy; the stored ones are untouched) and the
+  `SettingsProblem(loc, code, message)`s they may be told about. The calendar API returns both
+  to managers only; a source without the hook shows its settings as stored.
+* `async restore_settings(sctx, submitted, stored) -> RestoredSettings(settings, preserved)`:
+  before a save is validated, put back from `stored` what `view_settings` hid (the client sent a
+  placeholder; it never learns or alters the content). Raise `SourceSettingsError` for a forged
+  placeholder, with the message and code of an unknown value so it is no oracle.
+  `preserved` lists the paths put back; `check_settings` receives them as `sctx.preserved` and
+  must not judge them again.
+
+`SourceSettingsError(loc, message, code)` takes an optional short `code`; the 422 carries it as
+`type: "value_error.<code>"` and the Sources dialog hands it to your settings section as `codes`
+so it words the reason in the reader's language. An entry whose plugin is not installed shows no
+settings, and saving it with `{}` keeps what is stored. Records is the worked example: a hidden
+mapping is `{"hidden": true, "token": "h<index>"}`, kept on save, and a mapping to a missing
+type looks exactly like one to an unreadable type.
 
 ### What the runner does around your call
 
@@ -99,10 +127,18 @@ source's status instead of the generic `raised`.
   refused unread.
 * **Limits you must know.** A plugin that blocks the event loop with synchronous CPU work,
   or swallows `CancelledError`, cannot be pre-empted: it delays the answer past its
-  timeout. On SQLite a running query finishes before its connection can be closed.
+  timeout. On SQLite a running query finishes before its connection can be closed (a 30-million-row
+  query returned after 8.6 s against a 0.5 s timeout) and a write waits on the host's write lock for
+  the 5 s busy timeout; Postgres stops the statement at the budget. SQLite is the development default:
+  run Postgres in production.
+* **Committed data only.** Your session is not the request's: it does not see the request's
+  uncommitted rows, so a source never sees an event created earlier in the same request.
+  Only an engine that shares one connection between sessions (the in-memory test engine)
+  runs your call on a savepoint of the request's session instead; a file or Postgres engine never does.
 * **Validation.** Any one invalid item rejects the whole answer (`invalid_item`,
   `duplicate_key`): aware `start < end`, an all-day `start_date < end_date`, at most 366
-  days, a known timezone, the title stripped of control and direction characters (kept as
+  days (`ITEM_MAX_DAYS`; clip a longer one yourself), a known timezone, the title (at most
+  `ITEM_TITLE_MAX` characters) stripped of control and direction characters (kept as
   text; every renderer escapes it), a `url` that is a same-origin path or an `http(s)` URL
   without credentials, a `#rrggbb` colour. Every item is validated again, so
   `model_construct` buys nothing. An item outside the window is dropped, not an error.
@@ -177,7 +213,10 @@ registerEventType({
 ```
 
 Only that import is static (types may be `import type`); every component is a lazy
-loader (a repo test checks this). Events loads the files through a lazy glob, one at a time:
+loader (a repo test checks this). Events loads the files through a lazy glob, one at a time, and
+only from packages that sit beside events itself: `modules/<dist>/<package>/` in the workspace,
+`site-packages/<package>/` in a wheel install and `@simple-module-py/<package>/<dir>/` under
+`node_modules` (never another scope or an unrelated npm package; a test builds all three layouts):
 a file that fails to load, or throws while registering, is logged once by path and skipped;
 the console shows a small notice, public pages nothing. Each component runs inside an error
 boundary, so one that throws shows the default (or nothing). Slots: `Chip`, `Detail`
@@ -200,6 +239,11 @@ durable subscribers. Subscribe with `bus.subscribe_durable(Type, handler, name="
 `register_event_handlers`, before any `if app is None: return`. Payloads are identifiers,
 instants and field names: never a title, personal data or `extra`.
 
+**An import is silent.** Events created or changed by an `.ics` import (new events, updates and
+override changes alike) publish nothing: no in-process event and no outbox row, so 5,000
+imported events are not 5,000 notifications. A plugin that must know about imported events
+re-reads the calendar instead of waiting for a bus event.
+
 ## Versioning and testing
 
 Depend on events with a `>=` range, as an optional extra, with a `# floor:` comment naming
@@ -217,4 +261,8 @@ Records' optional `events` extra registers `records:dates` from `sm_records/even
 tenant and applies records' own access rules: published, untrashed records of a type the viewer
 may read (`records.view` and the type's `allowed_roles`, widened by a `records.type.<key>` grant,
 never by the admin wildcard); for the public, only an `is_public` type. A type the viewer may not
-read is indistinguishable from one that does not exist.
+read is indistinguishable from one that does not exist. The item's title is the record type's display field (there is no title setting), and for a
+Public type that field is shown to everyone on a public calendar: do not make an email address
+or another personal field the display field of a Public type. A mapping to a type the calendar's
+manager cannot read is shown to them as "a mapping you cannot view", whatever the reason (the
+type is gone, or it is not theirs).

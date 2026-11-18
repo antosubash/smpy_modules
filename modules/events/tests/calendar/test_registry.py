@@ -7,7 +7,7 @@ from typing import Annotated
 
 import pytest
 from pydantic import BaseModel, ConfigDict, SecretBytes, SecretStr
-from sm_events.calendar import extensions, registry
+from sm_events.calendar.plugins import extensions, registry
 from sm_events.contracts.extensions import EventType, NoExtra
 
 

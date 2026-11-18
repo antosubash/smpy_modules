@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from sm_events.calendar import extensions, registry
+from sm_events.calendar.plugins import extensions, registry
 
 FIXTURES = str(Path(__file__).parent.parent / "fixtures")
 

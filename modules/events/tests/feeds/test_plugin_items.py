@@ -114,3 +114,18 @@ def test_the_uid_is_capped_like_a_native_one():
 
 def test_updated_at_never_serialised():
     assert "updated_at" not in occ(updated_at=datetime(2026, 5, 1, tzinfo=UTC)).model_dump()
+
+
+def test_long_keys_sharing_a_prefix_keep_distinct_uids():
+    """A UID cut at the cap used to collide for two long keys with one long prefix, and the
+    second item was dropped: the cut keeps a digest of the whole value."""
+    source = "p" * 120 + ":s"
+    first = occ("k" * 199 + "1", "One", source=source)
+    second = occ("k" * 199 + "2", "Two", source=source)
+    again = occ("k" * 199 + "1", "One", source=source)
+    one, two = parse(render(first, second))
+    assert str(one["UID"]) != str(two["UID"])
+    assert len(str(one["UID"])) <= 255 and len(str(two["UID"])) <= 255
+    assert str(parse(render(again))[0]["UID"]) == str(one["UID"])  # stable across requests
+    short = parse(render(occ("short")))[0]
+    assert str(short["UID"]) == f"acme:s:{CAL}:short"  # a short UID is untouched

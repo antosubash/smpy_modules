@@ -11,7 +11,7 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field
 from sm_events.contracts.extensions import SettingsContext, SourceSettingsError, SourceViewer
 
-from sm_records.contracts.dated import DatedCaller, dated_types
+from sm_records.contracts.dated import DatedCaller
 from sm_records.core import constants
 
 __all__ = ["RecordDateMapping", "RecordDatesSettings", "caller_of", "check_settings"]
@@ -45,31 +45,46 @@ def caller_of(viewer: SourceViewer | None) -> DatedCaller | None:
 
 
 async def check_settings(sctx: SettingsContext, settings: RecordDatesSettings) -> None:
-    """Every mapping must name a type the admin may read and indexed date fields of one kind.
-    A type that does not exist and one the admin may not read give the same message."""
-    types = {
-        t.key: t
-        for t in await dated_types(sctx.db, tenant_id=sctx.tenant_id, caller=_required(sctx.viewer))
-    }
+    """Every mapping must name a type the caller may read and indexed date fields of one kind.
+    A type that does not exist and one the caller may not read give the same message. A mapping
+    ``restore_settings`` put back from what is stored (``sctx.preserved``) is not judged: the
+    caller could not see it."""
+    from sm_records.integrations.events.visibility import UNAVAILABLE, readable_types
+
+    types = await readable_types(sctx.db, sctx.tenant_id, _required(sctx.viewer))
     for index, mapping in enumerate(settings.mappings):
         where = ("mappings", index)
+        if where in sctx.preserved:
+            continue
         found = types.get(mapping.type_key)
         if found is None:
-            raise SourceSettingsError(
-                (*where, "type_key"), "That record type does not exist, or you may not read it"
-            )
-        kinds = {key: kind for key, _label, kind in found.fields}
-        if mapping.field not in kinds:
-            raise SourceSettingsError(
-                (*where, "field"), "Choose an indexed date or date-time field of this type"
-            )
+            raise SourceSettingsError((*where, "type_key"), UNAVAILABLE, "type_unavailable")
+        declared, dated = found
+        for name in ("field", "end_field"):
+            value = getattr(mapping, name)
+            if value is None:
+                continue
+            if value not in declared:
+                raise SourceSettingsError(
+                    (*where, name), "This field no longer exists on this type", "field_missing"
+                )
+            if value not in dated:
+                raise SourceSettingsError(
+                    (*where, name),
+                    "Choose an indexed date or date-time field of this type",
+                    "field_not_date",
+                )
         if mapping.end_field is None:
             continue
         if mapping.end_field == mapping.field:
-            raise SourceSettingsError((*where, "end_field"), "The end must be another field")
-        if kinds.get(mapping.end_field) != kinds[mapping.field]:
             raise SourceSettingsError(
-                (*where, "end_field"), "The end must be an indexed field of the same kind"
+                (*where, "end_field"), "The end must be another field", "end_same"
+            )
+        if dated[mapping.end_field] != dated[mapping.field]:
+            raise SourceSettingsError(
+                (*where, "end_field"),
+                "The end must be an indexed field of the same kind",
+                "end_kind",
             )
 
 

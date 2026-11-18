@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.exceptions import RequestValidationError
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.content import revisions
 from sm_events.content.events_trash import restore_event, trash_event
 from sm_events.content.events_write import update_event

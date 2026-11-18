@@ -419,22 +419,20 @@ without it settles the plugin's steps as `not_installed`. Docs:
 `modules/images/docs/`.
 
 **A plugin registers events sources and types from `events_extensions.py`, never from
-`on_startup`.** Same reasons and same loader shape as images: a package with a `simple_module`
-entry point ships `events_extensions.py` with `def register(registry)`;
-`sm_events.calendar.extensions.load_extensions()` imports it in the web process (events'
-`on_startup`) and on a worker's first registry read, then freezes the registry
-(`RegistryFrozenError`). Ids are `<entry-point name>:<name>`; install the plugin identically in the
-web image and every worker image. UI registers lazily from `events-extensions.ts` (loaders only; the
-file imports only `@simple-module-py/events`). A plugin call never uses the host's session: it gets
-a session of its own (own connection, read-only, rolled back and closed in a cancellation-shielded
-`finally`, Postgres `statement_timeout`), a time and item budget and validated output; visibility is
-decided by the calendar **and** the source (`public = True` only for data that is public in its own
-module, called with `viewer=None`), and settings are never secret (a secret-typed field is refused).
-The `extra` of an event whose type is not installed is never validated, rewritten or dropped, by any
-path. A sibling reaches events only through `contracts.extensions`; records' optional `events` extra
-registers `records:dates` from `sm_records/events_extensions.py`, reads through
-`sm_records.contracts.dated` and imports `sm_events` nowhere else. Docs:
-`modules/events/docs/extensions.md`.
+`on_startup`.** Same loader shape as images: `sm_events.calendar.plugins.extensions.load_extensions()`
+imports the file in the web process and on a worker's first registry read, then freezes the registry
+(`RegistryFrozenError`); ids are `<entry-point name>:<name>`; install the plugin identically in the
+web image and every worker image. UI registers lazily from `events-extensions.ts` (loaders only; it
+imports only `@simple-module-py/events`). A plugin call never uses the host's session: it gets a
+read-only session of its own (own connection, cancellation-shielded cleanup, Postgres
+`statement_timeout`), a time and item budget and validated output. Visibility is decided by the
+calendar **and** the source (`public = True` only for data that is public in its own module, called
+with `viewer=None`). **Plugin settings are never secret**: they are stored in the clear and shown to
+whoever manages the calendar, so a settings model with a secret field is refused at registration.
+The `extra` of an event whose type is not installed is never validated, rewritten or dropped. A
+sibling reaches events only through `contracts.extensions`; records' optional `events` extra
+registers `records:dates` from `sm_records/events_extensions.py` and imports `sm_events` nowhere
+else. Docs: `modules/events/docs/extensions.md`.
 
 **Host settings come from the environment first, then the database.**
 `host/main.py` builds its settings with the framework's

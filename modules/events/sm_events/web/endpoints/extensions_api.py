@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from simple_module_db.deps import get_db
 
-from sm_events.calendar import registry, source_entries
+from sm_events.calendar.plugins import registry, source_entries
 from sm_events.content.types import type_info
 from sm_events.core import constants
 from sm_events.core.access import CalendarOwner

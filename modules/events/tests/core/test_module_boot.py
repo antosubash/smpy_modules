@@ -71,7 +71,7 @@ async def test_on_startup_installs_the_token_log_filter():
 async def test_startup_freezes_registry():
     from types import SimpleNamespace
 
-    from sm_events.calendar import registry
+    from sm_events.calendar.plugins import registry
 
     registry.reset_registry()
     try:

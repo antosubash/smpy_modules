@@ -15,10 +15,13 @@ See ``docs/extensions.md``.
 
 from __future__ import annotations
 
-from sm_events.calendar.extension_types import (
+from sm_events.calendar.plugins.extension_types import (
     EventType,
     NoExtra,
+    RestoredSettings,
     SettingsContext,
+    SettingsProblem,
+    SettingsView,
     Source,
     SourceCalendar,
     SourceContext,
@@ -28,15 +31,26 @@ from sm_events.calendar.extension_types import (
     SourceStatus,
     SourceViewer,
 )
-from sm_events.calendar.extensions import Registrar
-from sm_events.calendar.registry import RegistryFrozenError
+from sm_events.calendar.plugins.extensions import Registrar
+from sm_events.calendar.plugins.registry import RegistryFrozenError
+from sm_events.core import constants
+
+ITEM_MAX_DAYS = constants.MAX_EVENT_DAYS
+"""The longest an item may run, in days: a longer one is refused, so clip it."""
+ITEM_TITLE_MAX = constants.SOURCE_TITLE_MAX
+"""The longest an item title, in characters."""
 
 __all__ = [
+    "ITEM_MAX_DAYS",
+    "ITEM_TITLE_MAX",
     "EventType",
     "NoExtra",
     "Registrar",
     "RegistryFrozenError",
+    "RestoredSettings",
     "SettingsContext",
+    "SettingsProblem",
+    "SettingsView",
     "Source",
     "SourceCalendar",
     "SourceContext",

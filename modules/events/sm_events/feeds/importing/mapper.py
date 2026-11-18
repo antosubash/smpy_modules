@@ -26,6 +26,7 @@ from datetime import datetime
 from sm_events.calendar.times import to_span
 from sm_events.core import constants
 from sm_events.core.errors import ImportFailure
+from sm_events.core.text_safety import strip_unsafe
 from sm_events.feeds.importing.mapper_props import (
     PRIVATE,
     category_of,
@@ -47,7 +48,6 @@ from sm_events.feeds.importing.text import (
     venue,
 )
 from sm_events.feeds.importing.values import ItemSkip, read_when
-from sm_events.web.schemas._fields import strip_unsafe
 
 __all__ = ["Mapped", "MappedItem", "map_calendar"]
 

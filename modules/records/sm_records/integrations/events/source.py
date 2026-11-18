@@ -14,6 +14,8 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sm_events.contracts.extensions import (
+    ITEM_MAX_DAYS,
+    ITEM_TITLE_MAX,
     SettingsContext,
     SourceContext,
     SourceError,
@@ -35,15 +37,12 @@ from sm_records.integrations.events.settings import (
     caller_of,
     check_settings,
 )
+from sm_records.integrations.events.visibility import restore_settings, view_settings
 
 __all__ = ["RecordDatesSource"]
 
 LOOKBACK_DAYS = 31
 """A multi-day record that started earlier still shows while it runs."""
-SPAN_MAX_DAYS = 366
-"""What events accepts for one item; a longer record is clipped, never refused."""
-TITLE_MAX = 300
-_REASON_CODES = {"reindexing": "reindexing"}
 _ONE_DAY = timedelta(days=1)
 
 
@@ -61,8 +60,16 @@ def _window(
     return first.date() - back, max(hi, first.date() + _ONE_DAY)
 
 
+def _code(exc: DatedQueryError) -> str:
+    """The status code for a field that cannot be asked for: only someone who may read the type
+    gets here (the contract answers an empty page for anyone else), so they may be told."""
+    if exc.reason in ("reindexing", "field_missing"):
+        return exc.reason
+    return "field_changed"
+
+
 def _title(hit: DatedHit) -> str:
-    return (hit.display_title.strip() or hit.type_key)[:TITLE_MAX]
+    return (hit.display_title.strip() or hit.type_key)[:ITEM_TITLE_MAX]
 
 
 def _item(hit: DatedHit, mapping: RecordDateMapping, ctx: SourceContext) -> SourceOccurrence:
@@ -77,13 +84,13 @@ def _item(hit: DatedHit, mapping: RecordDateMapping, ctx: SourceContext) -> Sour
     if not isinstance(hit.start, datetime):
         first = hit.start
         last = hit.end if isinstance(hit.end, date) and hit.end >= first else first
-        last = min(last, first + timedelta(days=SPAN_MAX_DAYS - 1))
+        last = min(last, first + timedelta(days=ITEM_MAX_DAYS - 1))
         return SourceOccurrence(all_day=True, start_date=first, end_date=last + _ONE_DAY, **common)
     begin = hit.start.astimezone(UTC)
     finish = hit.end.astimezone(UTC) if isinstance(hit.end, datetime) else None
     if finish is None or finish <= begin:
         finish = begin + timedelta(minutes=mapping.duration_minutes)
-    finish = min(finish, begin + timedelta(days=SPAN_MAX_DAYS))
+    finish = min(finish, begin + timedelta(days=ITEM_MAX_DAYS))
     return SourceOccurrence(start=begin, end=finish, **common)
 
 
@@ -97,6 +104,14 @@ class RecordDatesSource:
 
     async def check_settings(self, sctx: SettingsContext, settings: RecordDatesSettings) -> None:
         await check_settings(sctx, settings)
+
+    async def view_settings(self, sctx: SettingsContext, settings: dict[str, Any]):
+        return await view_settings(sctx, settings)
+
+    async def restore_settings(
+        self, sctx: SettingsContext, submitted: dict[str, Any], stored: dict[str, Any]
+    ):
+        return await restore_settings(sctx, submitted, stored)
 
     async def occurrences(
         self, ctx: SourceContext, start: datetime, end: datetime
@@ -136,7 +151,7 @@ class RecordDatesSource:
                     limit=min(wanted - len(items), MAX_DATED_BATCH),
                 )
             except DatedQueryError as exc:
-                raise SourceError(_REASON_CODES.get(exc.reason, "field_changed")) from None
+                raise SourceError(_code(exc)) from None
             items.extend(_item(hit, mapping, ctx) for hit in page.hits)
         return items
 
@@ -159,5 +174,5 @@ class RecordDatesSource:
                 locale=ctx.locale,
                 limit=1,
             )
-        except DatedQueryError:
-            raise SourceError("field_changed") from None
+        except DatedQueryError as exc:
+            raise SourceError(_code(exc)) from None

@@ -15,6 +15,7 @@ against ``FEED_MAX_COMPONENTS`` *after* this module's own events, so a cut drops
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -24,10 +25,10 @@ from typing import Any
 import icalendar
 from simple_module_core.resources import ResourcePrincipal
 
-from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters
-from sm_events.calendar.plugin_runner import run_sources
-from sm_events.calendar.plugin_scope import plugin_calls
+from sm_events.calendar.plugins.extension_types import SourceViewer
+from sm_events.calendar.plugins.plugin_runner import run_sources
+from sm_events.calendar.plugins.plugin_scope import plugin_calls
 from sm_events.core import constants
 from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.sanitize import single_line
@@ -48,6 +49,16 @@ def _stamp(item: Occurrence) -> datetime:
     return (stamped or item.start).astimezone(UTC)
 
 
+def _uid(item: Occurrence) -> str:
+    """``<source>:<calendar id>:<key>``; past the cap, a prefix and a digest of the whole value, so
+    two long keys that share a long prefix stay distinct (and the same item keeps its UID)."""
+    whole = single_line(f"{item.source}:{item.key}")
+    if len(whole) <= constants.UID_MAX:
+        return whole
+    digest = hashlib.sha256(whole.encode()).hexdigest()[:16]
+    return f"{whole[: constants.UID_MAX - len(digest) - 1]}~{digest}"
+
+
 def plugin_vevents(
     items: Sequence[Occurrence], *, absolute: Callable[[str], str]
 ) -> list[icalendar.Event]:
@@ -55,9 +66,7 @@ def plugin_vevents(
     out: list[icalendar.Event] = []
     seen: set[str] = set()
     for item in items:
-        uid = single_line(f"{item.source}:{item.key}")[
-            : constants.UID_MAX
-        ]  # key: calendar id first
+        uid = _uid(item)
         if uid in seen:
             continue
         seen.add(uid)

@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sm_events.calendar import registry
-from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import OccurrenceFilters
 from sm_events.calendar.occurrences import occurrences
+from sm_events.calendar.plugins import registry
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.core import constants
 
 from tests.support.access import seed_calendars

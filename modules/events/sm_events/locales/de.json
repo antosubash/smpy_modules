@@ -591,10 +591,7 @@
     "subscribe": {
       "title": "Abonnieren",
       "hint": "Fügen Sie diese Veranstaltungen Ihrem eigenen Kalender hinzu. Er aktualisiert sich selbst.",
-      "feed": "Kalenderlink (https)",
-      "webcal": "In der Kalender-App öffnen",
-      "copy": "Link kopieren",
-      "copied": "Link kopiert"
+      "feed": "Kalenderlink (https)"
     },
     "grid": {
       "loading": "Kalender wird geladen…"
@@ -645,8 +642,6 @@
     "created_warning": "Du siehst diesen Link nicht noch einmal. Wer ihn hat, sieht, was du in diesem Kalender sehen darfst.",
     "link": "Privater Kalenderlink",
     "webcal": "In deiner Kalender-App öffnen",
-    "copy": "Link kopieren",
-    "copied": "Link kopiert",
     "done": "Ich habe ihn kopiert",
     "mine": "Deine Links",
     "everyone": "Links aller",
@@ -671,7 +666,22 @@
       "timeout": "{name} hat zu lange für die Antwort gebraucht.",
       "skipped": "{name} wurde übersprungen.",
       "truncated": "{name} zeigt nur einen Teil seiner Einträge.",
-      "not_installed": "{name} ist auf diesem Server nicht installiert."
+      "not_installed": "{name} ist auf diesem Server nicht installiert.",
+      "truncated_source": "Es werden die ersten {count} Einträge von {name} angezeigt.",
+      "reason": {
+        "wrote": "Sie wollte Daten ändern, was eine Quelle nicht darf.",
+        "invalid_item": "Sie hat einen ungültigen Eintrag geliefert.",
+        "duplicate_key": "Sie hat denselben Eintrag zweimal geliefert.",
+        "invalid_answer": "Ihre Antwort hatte die falsche Form.",
+        "too_many_items": "Sie hat viel zu viele Einträge geliefert.",
+        "invalid_settings": "Ihre Einstellungen passen nicht mehr: Öffnen Sie Quellen, um sie zu korrigieren.",
+        "field_missing": "Ein Feld, das sie liest, wurde gelöscht: Öffnen Sie Quellen, um die Zuordnung zu korrigieren.",
+        "field_changed": "Ein Feld, das sie liest, ist kein Datum mehr: Öffnen Sie Quellen, um die Zuordnung zu korrigieren.",
+        "reindexing": "Ein Feld, das sie liest, wird neu indiziert. Versuchen Sie es gleich noch einmal.",
+        "session": "Eine frühere Quelle hat die Verbindung unbrauchbar gemacht.",
+        "budget": "Dem Kalender ging die Zeit aus, bevor er sie erreichte.",
+        "too_many_calls": "Es sind mehr Quellen aktiviert, als auf einmal gefragt werden können."
+      }
     }
   },
   "sources": {
@@ -681,7 +691,6 @@
     "description": "Fügen Sie diesem Kalender Termine aus anderen Modulen hinzu. Was eine Quelle zeigt, bestimmen die Zugriffsregeln des jeweiligen Moduls.",
     "loading": "Quellen werden geladen…",
     "none": "Auf diesem Server sind keine Quellen installiert.",
-    "enable": "In diesem Kalender anzeigen",
     "public": "Öffentlich",
     "public_hint": "Kann auch auf der öffentlichen Website erscheinen",
     "not_installed": "Nicht installiert",
@@ -694,7 +703,10 @@
     "save": "Quellen speichern",
     "saving": "Wird gespeichert…",
     "stale": "Die Quellen dieses Kalenders wurden seit dem Öffnen von jemand anderem geändert. Schließen Sie dieses Fenster und versuchen Sie es erneut.",
-    "settings_for": "Einstellungen von {name}"
+    "settings_for": "Einstellungen von {name}",
+    "turn_off": "Ausschalten",
+    "turn_off_title": "{name} ausschalten?",
+    "turn_off_description": "Die Einstellungen gehen verloren, sobald Sie speichern."
   },
   "import": {
     "title": "Termine importieren",

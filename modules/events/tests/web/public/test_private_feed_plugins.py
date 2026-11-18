@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import icalendar
 import pytest
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.core import constants
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Calendar

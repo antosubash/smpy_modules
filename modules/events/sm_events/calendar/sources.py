@@ -1,7 +1,7 @@
 """Occurrence sources. The module's own events are the built-in source ``events``.
 
 A source is one object behind :class:`Source`; the read merges every source in
-the registry (:func:`sm_events.calendar.registry.builtin_source`, plus the plugin
+the registry (:func:`sm_events.calendar.plugins.registry.builtin_source`, plus the plugin
 sources the plugin runner calls). A source yields its
 occurrences ascending by ``(start, end, key)`` and never more than it needs: the
 caller stops pulling at the cap.
@@ -254,8 +254,8 @@ EVENTS_SOURCE = EventsSource()
 
 def register_builtins() -> None:
     """The built-in source and type, through the same registry a plugin uses."""
-    from sm_events.calendar import registry
-    from sm_events.calendar.extension_types import EventType, NoExtra
+    from sm_events.calendar.plugins import registry
+    from sm_events.calendar.plugins.extension_types import EventType, NoExtra
 
     registry.register_builtin_source(EVENTS_SOURCE)
     registry.register_builtin_type(

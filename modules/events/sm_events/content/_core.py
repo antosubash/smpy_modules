@@ -14,7 +14,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
 
-from sm_events.calendar import registry
+from sm_events.calendar.plugins import registry
 from sm_events.content import bus, notices, revisions, schedule
 from sm_events.content.fields import check_category, check_parent, has_live_children
 from sm_events.content.guard import Unchanged, claim

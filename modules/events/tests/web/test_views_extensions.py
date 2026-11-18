@@ -20,7 +20,7 @@ def _inertia():
 
 
 async def test_calendar_page_lists_the_sources_enabled_on_shown_calendars(client, monkeypatch):
-    from sm_events.calendar import registry
+    from sm_events.calendar.plugins import registry
 
     from tests.support.sources import FakeSource, install
 

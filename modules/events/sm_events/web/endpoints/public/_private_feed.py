@@ -38,7 +38,7 @@ import time
 from fastapi import APIRouter, Request, Response
 from simple_module_db import no_tenant
 
-from sm_events.calendar.extension_types import SourceViewer
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.core import constants, locales, timezones
 from sm_events.core.access.offline import feed_viewer
 from sm_events.core.tenancy import tenant_scope, valid_tenant
