@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorText, isGone } from '../utils/api';
 import { getEvent } from '../utils/api-events';
 import { emptyForm, type FormState, type TextForm, toForm } from '../utils/event-form';
@@ -79,6 +79,10 @@ export function useEvent({
   }, [begin, fetchEvent, adopt]);
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(base), [form, base]);
+  /** What the form and its base are right now, for a completion that must not
+   *  trust what it captured when its request started. */
+  const latest = useRef({ form, base });
+  latest.current = { form, base };
   const setFields = useCallback(
     (patch: Partial<FormState>) => setForm((now) => ({ ...now, ...patch })),
     [],
@@ -100,6 +104,7 @@ export function useEvent({
     form,
     base,
     dirty,
+    latest,
     tab,
     setTab,
     setForm,

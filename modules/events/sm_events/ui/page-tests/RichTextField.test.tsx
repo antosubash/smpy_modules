@@ -120,4 +120,21 @@ describe('RichTextField', () => {
     expect(view.find('#desc-error')?.textContent).toBe('Too long');
     await view.unmount();
   });
+
+  it('focusing and leaving a description with non-breaking spaces is not an edit', async () => {
+    const onChange = vi.fn();
+    const stored = `<p>Doors\u00a0at\u00a0nine \u2013 it's <a href="https://x.test/?a=1&amp;b=2">here</a></p>`;
+    const view = await mount(field(stored, onChange));
+    const el = editable(view);
+    await act(async () => {
+      el?.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      el?.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      el?.dispatchEvent(new Event('blur'));
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    await type(el, `${el?.innerHTML}<p>more</p>`);
+    expect(onChange).toHaveBeenLastCalledWith(expect.stringContaining('Doors at nine'));
+    expect(onChange.mock.calls.at(-1)?.[0]).not.toContain('&nbsp;');
+    await view.unmount();
+  });
 });

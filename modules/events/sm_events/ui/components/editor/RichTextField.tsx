@@ -5,7 +5,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { type ClipboardEvent, useLayoutEffect, useRef, useState } from 'react';
 import { fieldErrorId, invalidProps } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
-import { cleanFragment, cleanHtml, safeHref } from '../../utils/richtext';
+import { cleanFragment, cleanHtml, normalHtml, safeHref } from '../../utils/richtext';
 
 const BOX =
   'min-h-40 rounded-md border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring ' +
@@ -56,6 +56,8 @@ export function RichTextField({
   const copy = keys.events.richtext;
   const editor = useRef<HTMLDivElement>(null);
   const shown = useRef<string | null>(null);
+  /** What the parent last held, in the normal form: the baseline an unedited blur matches. */
+  const sent = useRef(normalHtml(value));
   const saved = useRef<Range | null>(null);
   const [linking, setLinking] = useState(false);
   const [href, setHref] = useState('');
@@ -72,13 +74,18 @@ export function RichTextField({
     if (shown.current === value) return;
     el.replaceChildren(cleanFragment(value));
     shown.current = value;
+    sent.current = normalHtml(value);
   }, [value, readOnly]);
 
   function emit() {
     const el = editor.current;
     if (!el) return;
-    const html = cleanHtml(el.innerHTML);
+    const html = normalHtml(el.innerHTML);
     shown.current = html;
+    // Focusing and leaving without an edit serialises the same content a
+    // different way: that is not a change.
+    if (html === sent.current) return;
+    sent.current = html;
     onChange(html);
   }
   function run(command: string, argument?: string) {

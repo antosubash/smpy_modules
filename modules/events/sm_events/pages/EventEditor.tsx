@@ -5,6 +5,7 @@ import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedL
 import { useState } from 'react';
 import { ConflictPanel } from '../ui/components/editor/ConflictPanel';
 import { EventForm } from '../ui/components/editor/EventForm';
+import { LeaveDialog } from '../ui/components/editor/LeaveDialog';
 import { OccurrencesPreview } from '../ui/components/editor/OccurrencesPreview';
 import { OrphanDialog } from '../ui/components/editor/OrphanDialog';
 import { RecurrenceEditor } from '../ui/components/editor/RecurrenceEditor';
@@ -15,6 +16,7 @@ import { WorkflowBar } from '../ui/components/editor/WorkflowBar';
 import { categoryName } from '../ui/components/events/EventFilters';
 import { useEvent } from '../ui/hooks/useEvent';
 import { useEventActions } from '../ui/hooks/useEventActions';
+import { useLeaveGuard } from '../ui/hooks/useLeaveGuard';
 import { usePreview } from '../ui/hooks/usePreview';
 import { diffForms } from '../ui/utils/event-diff';
 import { times } from '../ui/utils/event-form';
@@ -38,8 +40,10 @@ export default function EventEditor(props: Props) {
   const ev = useEvent({ eventId: props.event_id, locales, timezone: props.default_timezone });
   const parentId = props.event_id ? null : new URLSearchParams(location.search).get('parent');
   const [incomplete, setIncomplete] = useState(false);
+  const guard = useLeaveGuard(ev.dirty);
   const actions = useEventActions(ev, {
     incomplete,
+    allowLeave: guard.allow,
     calendarId: calendar.id,
     parentId,
     defaultLocale: locales[0] ?? 'en',
@@ -191,7 +195,10 @@ export default function EventEditor(props: Props) {
           )}
           {!readOnly && (
             <div>
-              <Button disabled={actions.saving || Boolean(event && !ev.dirty)}>
+              <Button
+                disabled={actions.saving || actions.conflict || Boolean(event && !ev.dirty)}
+                aria-describedby={actions.conflict ? 'event-save-blocked' : undefined}
+              >
                 {t(
                   actions.saving
                     ? keys.events.common.saving
@@ -200,6 +207,11 @@ export default function EventEditor(props: Props) {
                       : copy.create,
                 )}
               </Button>
+              {actions.conflict && (
+                <p id="event-save-blocked" className="mt-2 text-sm text-muted-foreground">
+                  {t(keys.events.conflict.save_blocked)}
+                </p>
+              )}
             </div>
           )}
         </form>
@@ -212,6 +224,7 @@ export default function EventEditor(props: Props) {
             canAdd={!readOnly && !event.rrule && !event.parent_id}
           />
         )}
+        <LeaveDialog open={guard.pending} onStay={guard.stay} onLeave={guard.leave} />
         <OrphanDialog
           orphans={actions.orphans}
           timezone={form.timezone}

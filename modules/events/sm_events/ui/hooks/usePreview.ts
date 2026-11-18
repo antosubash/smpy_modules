@@ -62,7 +62,10 @@ export function usePreview({
           if (request.alive()) setLoading(false);
         });
     }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      begin(); // an ask still in flight is for the schedule before this edit
+    };
   }, [key, ready, begin]);
   return { occurrences, loading, error, enabled: ready };
 }

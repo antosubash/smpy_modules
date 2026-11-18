@@ -127,3 +127,13 @@ export function cleanHtml(html: string): string {
   holder.appendChild(cleanFragment(html));
   return holder.textContent?.trim() ? holder.innerHTML : '';
 }
+
+/** One spelling for the same content: `innerHTML` writes a non-breaking space as
+ *  `&nbsp;` and leaves an apostrophe bare, while the server keeps the character
+ *  and writes `&#x27;` inside an attribute. Comparing or emitting only this form
+ *  means leaving a field without an edit never looks like a change. */
+export function normalHtml(html: string): string {
+  return cleanHtml(html)
+    .replaceAll('&nbsp;', ' ')
+    .replaceAll(/&#(?:x27|39);/gi, "'");
+}

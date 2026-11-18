@@ -133,7 +133,8 @@
     "coordinate_invalid": "Geben Sie eine gültige Koordinate ein.",
     "text_invalid": "Dieser Text ist zu lang oder enthält Steuerzeichen.",
     "note_invalid": "Geben Sie eine Notiz mit 1 bis 1000 Zeichen ein.",
-    "stale_reloaded": "Jemand anderes hat diese Veranstaltung geändert. Die neue Version ist jetzt geladen; prüfen Sie sie und versuchen Sie es erneut."
+    "stale_reloaded": "Jemand anderes hat diese Veranstaltung geändert. Die neue Version ist jetzt geladen; prüfen Sie sie und versuchen Sie es erneut.",
+    "edited_meanwhile": "Die Aktion wurde ausgeführt. Ihre zwischenzeitlichen Änderungen bleiben erhalten und sind noch nicht gespeichert."
   },
   "categories": {
     "title": "Kategorien",
@@ -288,6 +289,10 @@
     "calendar": "Kalender: {name}",
     "create": "Veranstaltung anlegen",
     "saved": "Veranstaltung gespeichert.",
+    "leave_title": "Ohne Speichern verlassen?",
+    "leave_description": "Diese Veranstaltung hat nicht gespeicherte Änderungen. Wenn Sie jetzt gehen, gehen sie verloren.",
+    "leave_stay": "Bleiben und weiterbearbeiten",
+    "leave_confirm": "Verlassen und Änderungen verwerfen",
     "readonly_view": "Sie können diese Veranstaltung ansehen, aber nicht ändern.",
     "locked_published": "Veröffentlicht: Nur wer veröffentlichen darf, kann sie ändern.",
     "locked_scheduled": "Geplant: Nur wer veröffentlichen darf, kann sie ändern.",
@@ -427,6 +432,7 @@
     "empty": "(leer)",
     "yes": "Ja",
     "no": "Nein",
+    "save_blocked": "Wählen Sie oben „Andere Version laden“ oder „Meine Version darüber speichern“, bevor Sie speichern.",
     "language_changed": "{language}: Text hinzugefügt oder entfernt"
   }
 }

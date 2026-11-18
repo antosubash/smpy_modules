@@ -133,7 +133,8 @@
     "coordinate_invalid": "Enter a valid coordinate.",
     "text_invalid": "This text is too long or has control characters.",
     "note_invalid": "Enter a note of 1 to 1000 characters.",
-    "stale_reloaded": "Someone else changed this event. Their version is loaded now; check it and try again."
+    "stale_reloaded": "Someone else changed this event. Their version is loaded now; check it and try again.",
+    "edited_meanwhile": "The action went through. Your edits made meanwhile are kept and are still unsaved."
   },
   "categories": {
     "title": "Categories",
@@ -288,6 +289,10 @@
     "calendar": "Calendar: {name}",
     "create": "Create event",
     "saved": "Event saved.",
+    "leave_title": "Leave without saving?",
+    "leave_description": "This event has changes that are not saved. If you leave now they are lost.",
+    "leave_stay": "Stay and keep editing",
+    "leave_confirm": "Leave and discard changes",
     "readonly_view": "You can view this event but not change it.",
     "locked_published": "Published: only a publisher can change it.",
     "locked_scheduled": "Scheduled: only a publisher can change it.",
@@ -427,6 +432,7 @@
     "empty": "(empty)",
     "yes": "Yes",
     "no": "No",
+    "save_blocked": "Choose Load their version or Save mine over theirs above before saving.",
     "language_changed": "{language}: text added or removed"
   }
 }

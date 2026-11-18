@@ -10,8 +10,9 @@ import {
   transition,
   updateEvent,
 } from '../utils/api-events';
-import { changesSchedule, type FormState, times, toCreate, toPatch } from '../utils/event-form';
-import { codeFieldPath, requiredText } from '../utils/field-errors';
+import { changesSchedule, times, toCreate, toPatch } from '../utils/event-form';
+import { FIELDS, TEXT_FIELDS, TEXT_PATH, validate } from '../utils/event-validation';
+import { codeFieldPath } from '../utils/field-errors';
 import { keys, translate as t } from '../utils/i18n';
 import type {
   EventDetail,
@@ -27,42 +28,6 @@ import { type ScopedRequest, useRequestScope } from './useRequestScope';
 /** `ok` and `handled` (a conflict or a missing event, already on screen) close a
  *  dialog; `failed` leaves it open with its own message. */
 export type Outcome = 'ok' | 'failed' | 'handled';
-const FIELDS = [
-  'times.start',
-  'times.end',
-  'times.timezone',
-  'rrule',
-  'category_id',
-  'online_url',
-  'registration_url',
-  'image',
-  'latitude',
-  'longitude',
-  'venue_name',
-  'organiser',
-  'address',
-];
-const TEXT_FIELDS = ['title', 'slug', 'summary', 'seo_title', 'seo_description'];
-const TEXT_PATH = /^texts\.([^.]+)\./;
-
-function validate(
-  form: FormState,
-  defaultLocale: string,
-  incomplete: boolean,
-): Record<string, string> {
-  const found: Record<string, string> = {};
-  for (const [locale, text] of Object.entries(form.texts)) {
-    if ((text.present || locale === defaultLocale) && !text.title.trim()) {
-      found[`texts.${locale}.title`] = requiredText();
-    }
-  }
-  if (!form.start) found['times.start'] = requiredText();
-  if (!form.end) found['times.end'] = requiredText();
-  if (!form.timezone.trim()) found['times.timezone'] = requiredText();
-  if (incomplete) found['rrule.until'] = requiredText();
-  return found;
-}
-
 /** Everything the editor does to the server: save (create or update, with the
  *  conflict and orphaned-override paths), workflow and override calls. Every
  *  write quotes the event's revision; a stale one loads the newer event and
@@ -74,7 +39,15 @@ export function useEventActions(
     parentId,
     defaultLocale,
     incomplete = false,
-  }: { calendarId: string; parentId: string | null; defaultLocale: string; incomplete?: boolean },
+    allowLeave,
+  }: {
+    calendarId: string;
+    parentId: string | null;
+    defaultLocale: string;
+    incomplete?: boolean;
+    /** Called before the page moves on after a create, so the unsaved-changes guard stays quiet. */
+    allowLeave?: () => void;
+  },
 ) {
   const locales = useMemo(() => Object.keys(ev.form.texts), [ev.form.texts]);
   const [saving, setSaving] = useState(false);
@@ -133,11 +106,12 @@ export function useEventActions(
     const next = await updateEvent(event.id, patch);
     if (!request.alive()) return;
     ev.adopt(next);
+    setConflict(false);
     toast.success(t(keys.events.editor.saved));
   }
 
-  async function save(drop = false) {
-    if (saving) return;
+  async function save(drop = false, resolving = false) {
+    if (saving || (conflict && !drop && !resolving)) return;
     errors.reset();
     setNotice(null);
     const found = validate(ev.form, defaultLocale, incomplete);
@@ -158,7 +132,10 @@ export function useEventActions(
           ...(parentId ? { parent_id: parentId } : {}),
         };
         const created = await createEvent(body);
-        if (request.alive()) router.visit(`/admin/events/edit/${created.id}`);
+        if (request.alive()) {
+          allowLeave?.();
+          router.visit(`/admin/events/edit/${created.id}`);
+        }
       }
     } catch (e) {
       if (!request.alive()) return;
@@ -195,13 +172,29 @@ export function useEventActions(
     const event = ev.event;
     if (!event || busy) return 'handled';
     const request = begin();
+    const started = JSON.stringify(ev.latest.current.form);
+    /** Their answer replaces the form only while the form is still what the
+     *  action started from; otherwise the edits typed meanwhile are kept and
+     *  only the server-owned parts (status, revision, publish times) move. */
+    const take = (next: EventDetail, stale = false) => {
+      const now = ev.latest.current;
+      const untouched =
+        JSON.stringify(now.form) === started && JSON.stringify(now.base) === started;
+      if (untouched) {
+        ev.adopt(next);
+        if (stale) setNotice(t(keys.events.errors.stale_reloaded));
+      } else {
+        ev.rebase(next);
+        setNotice(t(keys.events.errors.edited_meanwhile));
+      }
+    };
     setBusy(true);
     setNotice(null);
     try {
       const result = await call(event.revision);
       if (!request.alive()) return 'handled';
-      if (result) ev.adopt(result);
-      else await ev.reload();
+      take(result ?? (await ev.fetchEvent(request)));
+      if (!request.alive()) return 'handled';
       return 'ok';
     } catch (e) {
       if (!request.alive()) return 'handled';
@@ -212,10 +205,7 @@ export function useEventActions(
       if (isStale(e)) {
         try {
           const theirs = await ev.fetchEvent(request);
-          if (request.alive()) {
-            ev.adopt(theirs);
-            setNotice(t(keys.events.errors.stale_reloaded));
-          }
+          if (request.alive()) take(theirs, true);
         } catch (inner) {
           if (request.alive()) setNotice(errorText(inner));
         }
@@ -236,6 +226,7 @@ export function useEventActions(
     notice,
     conflict,
     orphans,
+    /** Refused while the conflict panel is open: the user chooses to load theirs or save mine. */
     save: () => save(false),
     confirmOrphans: () => {
       setOrphans(null);
@@ -246,10 +237,7 @@ export function useEventActions(
       setConflict(false);
       if (ev.event) ev.adopt(ev.event);
     },
-    saveMine: () => {
-      setConflict(false);
-      return save(false);
-    },
+    saveMine: () => save(false, true),
     transition: (
       action: WorkflowAction,
       body: Omit<WorkflowBody, 'expected_revision'> = {},
