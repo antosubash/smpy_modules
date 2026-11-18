@@ -150,6 +150,12 @@ tests/
 A new test goes in the folder of the feature it exercises; a test of an
 area's top-level code sits at the top of that area's folder.
 
+**Lease-and-slice runners stay parallel.** events' `feeds/importing/` (`fence.py`, `janitor.py`,
+`launch.py`, `runner.py`) follows newsletter's `imports/` design (a lease claim, leased slices,
+a janitor that relaunches lost work) with the same file names. They are not a parity family
+(each differs in states and rights), so a change to the lease or slice rules in one is made in the
+other in the same PR, or the difference is written down in that module's docs.
+
 **Parity exceptions.** `tests/pg_support.py`, the tenancy helpers and the worker
 runtime (`core/worker.py`, events and newsletter) are
 copies kept identical across modules by `scripts/tests/test_helper_parity.py`
