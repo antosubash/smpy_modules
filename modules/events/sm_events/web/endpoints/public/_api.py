@@ -35,7 +35,7 @@ from sm_events.web.endpoints.public._errors import PublicApiRoute
 from sm_events.web.endpoints.public._respond import machine_response
 from sm_events.web.schemas.public import PublicOccurrenceParams
 
-__all__ = ["api_router", "occurrence_day", "public_page", "public_read"]
+__all__ = ["api_router", "occurrence_day", "occurrences_response", "public_page", "public_read"]
 
 _log = logging.getLogger("sm_events.public")
 _EVENTS_ONLY = frozenset({constants.SOURCE_EVENTS})
@@ -131,6 +131,32 @@ async def public_page(db: Any, **query: Any) -> OccurrencePage:
     return OccurrencePage(items=shown, truncated=page.truncated, sources=page.sources)
 
 
+async def occurrences_response(
+    request: Request, query: Any, db: Any, settings: EventsSettings
+) -> Response:
+    """The public occurrences read for a parsed query, as a cacheable JSON answer (the body of
+    ``/api/occurrences`` and of the blocks' ``/api/events/public/occurrences``)."""
+    page = await public_page(
+        db,
+        tenant=bound_tenant(),
+        start=query.start,
+        end=query.end,
+        calendar_ids=query.calendar_ids,
+        category_ids=query.category_ids,
+        locale=query.locale,
+        sources=None,
+    )
+    return machine_response(
+        request,
+        settings,
+        # A public answer may be cached: it never carries a plugin's health.
+        page.model_dump_json(exclude={"sources"}).encode(),
+        media_type=constants.JSON_MEDIA_TYPE,
+        kind="api",
+        degraded=any(st.status not in ("ok", "truncated") for st in page.sources),
+    )
+
+
 def api_router() -> APIRouter:
     router = APIRouter(route_class=PublicApiRoute)
 
@@ -143,24 +169,6 @@ def api_router() -> APIRouter:
         db: AsyncSession = Depends(get_db),
         settings: EventsSettings = Depends(get_settings),
     ) -> Response:
-        page = await public_page(
-            db,
-            tenant=bound_tenant(),
-            start=query.start,
-            end=query.end,
-            calendar_ids=query.calendar_ids,
-            category_ids=query.category_ids,
-            locale=query.locale,
-            sources=None,
-        )
-        return machine_response(
-            request,
-            settings,
-            # A public answer may be cached: it never carries a plugin's health.
-            page.model_dump_json(exclude={"sources"}).encode(),
-            media_type=constants.JSON_MEDIA_TYPE,
-            kind="api",
-            degraded=any(st.status not in ("ok", "truncated") for st in page.sources),
-        )
+        return await occurrences_response(request, query, db, settings)
 
     return router

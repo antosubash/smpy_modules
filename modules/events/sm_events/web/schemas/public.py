@@ -13,13 +13,16 @@ from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from sm_events.core import constants, locales
 from sm_events.web.schemas._fields import SupportedInstant
 
 __all__ = [
     "AlternateOut",
+    "BlockCalendarOut",
+    "BlockCalendarsOut",
+    "BlockQuery",
     "CategoryRef",
     "MonthGroup",
     "PublicCalendarOut",
@@ -29,6 +32,8 @@ __all__ = [
     "PublicListItem",
     "PublicOccurrenceParams",
     "PublicOccurrenceQuery",
+    "UpcomingOut",
+    "block_query",
     "public_occurrence_query",
 ]
 
@@ -103,6 +108,8 @@ class PublicListItem(BaseModel):
     venue_name: str | None
     attendance_mode: str
     summary: str | None
+    image: str | None = None
+    """An absolute http(s) address as stored, else ``None``."""
 
 
 class MonthGroup(BaseModel):
@@ -148,3 +155,57 @@ class PublicIndexProps(BaseModel):
     default_timezone: str
     api_url: str
     alternates: list[AlternateOut]
+
+
+# --- the pagebuilder blocks' routes (``/api/events/public/*``) ------------------------------
+
+
+@dataclass(frozen=True)
+class BlockQuery:
+    """What a block asks for. Calendars and the category are slugs, resolved on every request;
+    ``locale`` is the page's language (an unknown one is the default)."""
+
+    calendars: tuple[str, ...]
+    category: str | None
+    count: int
+    locale: str
+
+
+Slugs = Annotated[
+    list[Annotated[str, Field(max_length=constants.SLUG_MAX)]] | None,
+    Query(max_length=constants.BLOCK_CALENDARS_MAX),
+]
+
+
+def block_query(
+    calendar: Slugs = None,
+    category: Annotated[str | None, Query(max_length=constants.SLUG_MAX)] = None,
+    count: Annotated[
+        int, Query(ge=1, le=constants.UPCOMING_BLOCK_MAX)
+    ] = constants.UPCOMING_BLOCK_DEFAULT,
+    locale: Annotated[str | None, Query(max_length=constants.LOCALE_MAX)] = None,
+) -> BlockQuery:
+    return BlockQuery(
+        calendars=tuple(dict.fromkeys(calendar or ())),
+        category=category or None,
+        count=count,
+        locale=locale if locale in locales.supported() else locales.default(),  # type: ignore[arg-type]
+    )
+
+
+class BlockCalendarOut(BaseModel):
+    id: str
+    slug: str
+    name: str
+    color: str
+    default_timezone: str
+
+
+class BlockCalendarsOut(BaseModel):
+    calendars: list[BlockCalendarOut]
+    categories: list[PublicCategoryOut]
+    default_timezone: str
+
+
+class UpcomingOut(BaseModel):
+    items: list[PublicListItem]

@@ -36,7 +36,7 @@ async def _suggestions(db: Any, *, locale: str) -> list[dict[str, Any]]:
         locale=locale,
         default_locale=locales.default(),
         now=_clock.now(),
-        calendar_id=None,
+        calendar_ids=None,
         category_id=None,
         window_days=constants.NOT_FOUND_WINDOW_DAYS,
         limit=constants.NOT_FOUND_SUGGESTIONS,

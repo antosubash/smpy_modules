@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -30,6 +31,7 @@ from sm_events.content.public_read import (
 from sm_events.core import constants
 from sm_events.core.access.public import public_calendars, public_events
 from sm_events.core.tenancy import bound_tenant
+from sm_events.core.web_urls import is_web_url
 from sm_events.models import Calendar, Category, Event, EventText
 from sm_events.web.endpoints.public import _urls
 from sm_events.web.endpoints.public._api import occurrence_day, public_read
@@ -125,6 +127,7 @@ def make_item(
         venue_name=event.venue_name,
         attendance_mode=event.attendance_mode,
         summary=text.summary,
+        image=event.image if event.image and is_web_url(event.image) else None,
     )
 
 
@@ -134,7 +137,7 @@ async def upcoming(
     locale: str,
     default_locale: str,
     now: datetime,
-    calendar_id: uuid.UUID | None,
+    calendar_ids: Sequence[uuid.UUID] | None,
     category_id: uuid.UUID | None,
     window_days: int = constants.MAX_RANGE_DAYS,
     limit: int | None = None,
@@ -146,7 +149,7 @@ async def upcoming(
         tenant=bound_tenant(),
         start=now,
         end=now + timedelta(days=window_days),
-        calendar_ids=frozenset({calendar_id}) if calendar_id else None,
+        calendar_ids=frozenset(calendar_ids) if calendar_ids is not None else None,
         category_ids=frozenset({category_id}) if category_id else None,
         locale=locale,
     )

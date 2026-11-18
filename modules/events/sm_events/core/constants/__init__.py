@@ -13,6 +13,7 @@ from sm_events.core.constants.public import (
     _PAGE_PUBLIC_EVENT,
     _PAGE_PUBLIC_INDEX,
     _PAGE_PUBLIC_NOT_FOUND,
+    BLOCK_CALENDARS_MAX,
     DEFAULT_PUBLIC_PREFIX,
     FEED_DAYS_AHEAD,
     FEED_DAYS_BACK,
@@ -49,6 +50,8 @@ from sm_events.core.constants.public import (
     SLUG_RESERVED_CODE,
     SLUG_RESERVED_DETAIL,
     SUB_EVENTS_MAX,
+    UPCOMING_BLOCK_DEFAULT,
+    UPCOMING_BLOCK_MAX,
     XML_MEDIA_TYPE,
 )  # isort: skip
 
@@ -60,6 +63,9 @@ LOCALE_NAMESPACE = "events"
 BASE_NAME = "events"
 
 ROUTE_PREFIX_API = "/api/events"
+PUBLIC_BLOCKS_API = f"{ROUTE_PREFIX_API}/public"
+"""Where the pagebuilder blocks read: three anonymous, fixed-path routes (a block cannot learn
+the configurable public prefix)."""
 VIEW_PREFIX = "/admin/events"
 
 PERM_GROUP = MODULE_NAME
