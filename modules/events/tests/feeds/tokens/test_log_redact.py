@@ -108,6 +108,7 @@ def test_a_digest_is_scrubbed():
 
     digest = hash_token(TOKEN)
     record = _record("SELECT ... WHERE token_hash = ?", (), params=(digest,), note=f"x{digest}y")
+    record.name = "sqlalchemy.engine.Engine"
     record.msg = f"executing {record.msg!r} with {(digest,)!r}"
     log_redact.Filter().filter(record)
     assert digest not in record.getMessage() and digest not in str(record.__dict__)
@@ -163,3 +164,32 @@ def test_a_handler_added_after_install_is_covered_by_the_next_install(root_handl
         assert any(isinstance(f, log_redact.Filter) for f in late.filters)
     finally:
         logging.getLogger().removeHandler(late)
+
+
+def test_another_modules_checksum_is_left_alone():
+    """The digest scrub is for the database loggers: a 64-hex checksum elsewhere is not ours."""
+    checksum = "ab" * 32
+    record = _record("artifact sha256=%s", (checksum,))
+    record.name = "some_module.images"
+    log_redact.Filter().filter(record)
+    assert checksum in record.getMessage()
+    leaked = _record("GET /events/feed/%s.ics", (checksum,))
+    leaked.name = "some_module.images"
+    log_redact.Filter().filter(leaked)
+    assert checksum not in leaked.getMessage()  # a path after /feed/ is still redacted
+
+
+def test_a_five_argument_access_line_keeps_its_shape_for_uvicorns_formatter():
+    """uvicorn's access formatter unpacks exactly five arguments; collapsing them made it fail
+    and lose the line."""
+    from uvicorn.logging import AccessFormatter
+
+    record = _record(
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:1", "GET", "/events/feed/evf_abcdefghijklmnopqrstuvwxyz0123.ics", "1.1", 200),
+    )
+    record.name = "uvicorn.access"
+    log_redact.Filter().filter(record)
+    assert len(record.args) == 5  # type: ignore[arg-type]
+    line = AccessFormatter("%(message)s", use_colors=False).format(record)
+    assert "/events/feed/<redacted>" in line and "evf_" not in line

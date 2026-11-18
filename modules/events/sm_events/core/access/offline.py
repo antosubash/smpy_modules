@@ -1,4 +1,4 @@
-"""A user's rights with no request of theirs: the principal a private feed is read as.
+"""A user's rights with no request of theirs: the principal a private feed or an import acts as.
 
 The framework resolves permissions only for the principal of the request in hand. A private
 feed is fetched by a calendar client that sends no session, yet must show exactly what the
@@ -15,7 +15,8 @@ over the owner's *current* account:
 **Fails closed**: every doubt answers ``None``, and the feed route answers that as it answers
 any refusal.
 
-**A known gap** (upstream issue): the membership role the tenants resolver adds to a live
+**A known gap** (upstream simple_module_python #1005: no principal outside a request): the
+membership role the tenants resolver adds to a live
 request (``tenant:<role>``, see :func:`simple_module_core.tenancy.tenant_role`) has no public
 read, so it is left out here. That can only *narrow* what a feed serves: a user whose
 permissions come only from their membership role gets an empty feed, never one they should not
@@ -37,7 +38,7 @@ from simple_module_hosting.permissions import resolve_principal_permissions
 from sm_events.calendar.extension_types import SourceViewer
 from sm_events.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, request_mode
 
-__all__ = ["OfflineUser", "feed_principal", "feed_viewer"]
+__all__ = ["OfflineUser", "feed_viewer", "offline_principal"]
 
 
 @dataclass(frozen=True)
@@ -84,7 +85,7 @@ async def _resolve(
     app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
 ) -> tuple[ResourcePrincipal, tuple[str, ...], Any] | None:
     """The principal, the roles the directory reported and the permission registry, or ``None``
-    for every doubt (see :func:`feed_principal`)."""
+    for every doubt (see :func:`offline_principal`)."""
     found = (await get_user_directory(app).get_many(db, [user_id], with_roles=True)).get(user_id)
     if found is None or not found.is_active or found.roles is None:
         return None
@@ -103,7 +104,7 @@ async def _resolve(
     return ResourcePrincipal(user_id=user_id, permissions=frozenset(held)), roles, registry
 
 
-async def feed_principal(
+async def offline_principal(
     app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
 ) -> ResourcePrincipal | None:
     """The principal ``user_id`` is in ``tenant_id`` right now, or ``None``.
@@ -120,7 +121,7 @@ async def feed_principal(
 async def feed_viewer(
     app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
 ) -> SourceViewer | None:
-    """The same person as :func:`feed_principal`, as a plugin source sees a viewer: roles from
+    """The same person as :func:`offline_principal`, as a plugin source sees a viewer: roles from
     the directory (a source may narrow by role), the permissions the principal holds, and the
     role map. ``None`` under every doubt, and the feed then calls no plugin source for them."""
     got = await _resolve(app, db, user_id=user_id, tenant_id=tenant_id, request=request)

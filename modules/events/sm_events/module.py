@@ -7,6 +7,7 @@ import importlib.resources
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from simple_module_core.body_limits import BodyLimitRegistry
 from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
@@ -110,6 +111,16 @@ class EventsModule(ModuleBase):
         from sm_events.feeds.tokens import cleanup
 
         cleanup.subscribe(bus, app)
+
+    def register_body_limits(self, registry: BodyLimitRegistry) -> None:
+        """The import upload's body ceiling: the largest file an operator may allow plus 1 MiB of
+        multipart framing. It runs before settings hydrate, so it cannot read ``import_max_bytes``;
+        the handler enforces the stored cap (clamped) while it reads."""
+        registry.add_regex(
+            rf"^{constants.ROUTE_PREFIX_API}/imports/?$",
+            constants.IMPORT_BODY_CEILING + constants.IMPORT_MIB,
+            methods={"POST"},
+        )
 
     def register_middleware(self, app: FastAPI) -> None:
         """Remember the current request for the ``events.calendar`` loader, which

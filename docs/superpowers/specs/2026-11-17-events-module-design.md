@@ -460,6 +460,15 @@ feed `VTIMEZONE`s list transitions for 20 years ahead, not rules; the all-calend
 index are named by the `public_title` setting; the public prefix is checked against other
 modules' configured prefixes.
 
+## Amendments (PR 5)
+
+Private feeds are the third documented token-bound public route; every refusal is one padded
+`404`, and tokens are never logged. `scan.py` is the only `.ics` parser and no library parses an
+upload. An import creates drafts and is idempotent by `UID`. On an eager host every slice re-checks the
+importer; a real worker cannot (no app, upstream gap) and relies on the rights captured at apply,
+valid one hour (`rights_expired` after), plus per-item share, owner, trash and lock checks. A
+repeating series written in UTC keeps zone UTC (`kept_utc`). Stored URLs never carry credentials.
+
 ## Amendments (PR 6)
 
 The approved PR 6 rulings refine the design above. A plugin id is `<entry-point name>:<name>`, and plugins

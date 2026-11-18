@@ -1,5 +1,5 @@
-import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useEffect, useState } from 'react';
+import { CopyButton } from '../components/CopyButton';
 import { keys, useT } from '../utils/i18n';
 
 /** The feed's `https` address, a `webcal:` link that opens the calendar app, and a copy button.
@@ -8,7 +8,6 @@ export function SubscribeBox({ feedUrl }: { feedUrl: string }) {
   const { t } = useT();
   const copy = keys.events.public.subscribe;
   const [origin, setOrigin] = useState('');
-  const [copied, setCopied] = useState(false);
   useEffect(() => setOrigin(window.location.origin), []);
   const https = `${origin}${feedUrl}`;
   const webcal = https.replace(/^https?:/, 'webcal:');
@@ -30,17 +29,7 @@ export function SubscribeBox({ feedUrl }: { feedUrl: string }) {
           value={https}
           className="w-full min-w-0 rounded border px-2 py-1"
         />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={async () => {
-            await navigator.clipboard?.writeText(https);
-            setCopied(true);
-          }}
-        >
-          {copied ? t(copy.copied) : t(copy.copy)}
-        </Button>
+        <CopyButton text={https} />
       </p>
     </section>
   );

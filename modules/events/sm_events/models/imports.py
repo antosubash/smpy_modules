@@ -40,6 +40,14 @@ class EventImport(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported
     publish: bool = flag()
     may_publish: bool = flag()
     """The applier's ``events.publish`` when they applied: the worker has no session to ask."""
+    grants: list[str] = json_col(list)
+    """The importer's ``events.*`` permissions when they uploaded and again when they applied. A
+    worker builds no app (no directory, no grant sources), so this is what it can check the
+    calendar's policy with: share, ownership and trash are read fresh for every item, the
+    permissions are as of the launch."""
+    rights_until: datetime | None = dt_col()
+    """When ``grants`` stop being valid (set at apply; ``NULL`` is expired): a worker cannot
+    re-check the importer, so the window is bounded here."""
     total: int = counter()
     counts: dict[str, Any] = json_col(dict)
     reasons: dict[str, Any] = json_col(dict)
@@ -50,6 +58,8 @@ class EventImport(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported
     skipped: int = counter()
     failed: int = counter()
     processed: int = counter()
+    attempts: int = counter()
+    """Claims of an unfinished parse: a parse that keeps dying is failed, not retried for ever."""
     error_code: str | None = Field(default=None, max_length=_CODE_LEN)
     lease_owner: str | None = Field(default=None, max_length=36)
     lease_until: datetime | None = dt_col()

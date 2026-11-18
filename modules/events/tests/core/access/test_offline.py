@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from simple_module_core.resources import ResourcePrincipal
-from sm_events.core.access.offline import OfflineUser, feed_principal
+from sm_events.core.access.offline import OfflineUser, offline_principal
 from sm_events.core.tenancy import tenant_scope
 from starlette.requests import Request
 
@@ -44,7 +44,7 @@ async def single():
 
 async def _ask(app, state, user_id, tenant_id="default", **kw):
     async with state.session_factory() as db:
-        return await feed_principal(
+        return await offline_principal(
             app, db, user_id=user_id, tenant_id=tenant_id, request=_request(app), **kw
         )
 
@@ -128,7 +128,7 @@ async def test_single_tenant_skips_membership_only_when_nothing_upstream_differs
             request = _request(app)
             if upstream is not None:
                 request.state.tenant_id = upstream
-            got = await feed_principal(
+            got = await offline_principal(
                 app, db, user_id="viewer", tenant_id="default", request=request
             )
             assert (got is not None) is expected, upstream
@@ -163,7 +163,7 @@ async def test_a_mounted_child_with_no_framework_answer_is_not_single(single, mo
     async with state.session_factory() as db:
 
         async def ask():
-            return await feed_principal(
+            return await offline_principal(
                 app, db, user_id="viewer", tenant_id="default", request=mounted
             )
 
@@ -184,10 +184,12 @@ async def test_no_request_only_a_stored_single_mode_skips_membership(single):
     app, state = single
     async with state.session_factory() as db:
         assert (
-            await feed_principal(app, db, user_id="viewer", tenant_id="default", request=None)
+            await offline_principal(app, db, user_id="viewer", tenant_id="default", request=None)
             is not None
         )
-        assert await feed_principal(app, db, user_id="viewer", tenant_id="a", request=None) is None
+        assert (
+            await offline_principal(app, db, user_id="viewer", tenant_id="a", request=None) is None
+        )
 
 
 async def test_single_tenant_host_refuses_another_tenant(single):

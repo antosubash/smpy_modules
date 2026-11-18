@@ -5,6 +5,7 @@ import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
 import { type FormEvent, useState } from 'react';
 import { errorText } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
+import { ownLanguageName } from '../../utils/language';
 
 /** Name a new private link and choose its language. Submitting is the whole interaction: the
  *  link comes back through `onCreate` and is shown by the parent, not here. */
@@ -59,7 +60,7 @@ export function CreateLinkForm({
           >
             {locales.map((code) => (
               <option key={code} value={code}>
-                {code}
+                {ownLanguageName(code)}
               </option>
             ))}
           </NativeSelect>

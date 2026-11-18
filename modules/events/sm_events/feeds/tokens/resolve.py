@@ -27,7 +27,7 @@ from sqlalchemy import or_, select, update
 from sm_events.core import constants
 from sm_events.core.access import visible_calendars
 from sm_events.core.access.events import visible_events
-from sm_events.core.access.offline import feed_principal
+from sm_events.core.access.offline import offline_principal
 from sm_events.core.access.public import ANONYMOUS
 from sm_events.core.tenancy import all_tenants, tenant_scope
 from sm_events.feeds.tokens.codec import hash_token
@@ -107,7 +107,7 @@ async def resolve(
     passed."""
     if row is None:
         return None
-    who = await feed_principal(
+    who = await offline_principal(
         app, db, user_id=row.user_id, tenant_id=row.tenant_id, request=request
     )
     # Asked even without a principal (as the anonymous one, who sees public calendars only),

@@ -80,3 +80,16 @@ async def test_startup_freezes_registry():
         assert registry.builtin_source() is not None
     finally:
         registry.reset_registry()
+
+
+def test_import_upload_body_limit_is_registered():
+    from simple_module_core.body_limits import BodyLimitRegistry
+
+    registry = BodyLimitRegistry()
+    EventsModule().register_body_limits(registry)
+    ceiling = 21 * 1024 * 1024
+    for path in ("/api/events/imports", "/api/events/imports/"):
+        assert registry.limit_for("POST", path) == ceiling
+    assert registry.limit_for("GET", "/api/events/imports") is None
+    assert registry.limit_for("POST", "/api/events/imports/1/apply") is None
+    assert registry.limit_for("POST", "/api/events/calendars") is None

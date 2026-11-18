@@ -193,7 +193,12 @@ describe('SubscribeDialog', () => {
       },
       { contentLocales: ['en', 'de'] },
     );
-    await setValue(document.getElementById('events-feed-locale') as HTMLSelectElement, 'de');
+    const select = document.getElementById('events-feed-locale') as HTMLSelectElement;
+    expect([...select.options].map((o) => [o.value, o.textContent])).toEqual([
+      ['en', 'English'],
+      ['de', 'Deutsch'],
+    ]);
+    await setValue(select, 'de');
     await create();
     expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ label: 'Laptop', locale: 'de' });
     await view.unmount();
@@ -217,6 +222,7 @@ describe('SubscribeDialog', () => {
     expect(text()).toContain('Theirs');
     expect(text()).toContain('Unknown user');
     expect(text()).not.toContain('u9');
+    expect(text()).toContain('Theirs · English · Created 1 Nov 2026'); // not "en", not US dates
     await view.unmount();
   });
 

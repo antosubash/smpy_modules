@@ -17,6 +17,7 @@ from sm_events.core import constants, tenancy, timezones
 from sm_events.core.access.events import load_event
 from sm_events.core.access.rights import calendar_rights, calendar_rights_many
 from sm_events.core.errors import NotFound
+from sm_events.feeds.importing import staging
 from sm_events.models import Calendar
 from sm_events.web.endpoints.deps import (
     Principal,
@@ -44,6 +45,44 @@ async def calendars_page(request: Request, inertia: InertiaDep) -> InertiaRespon
             "user_id": str(request.state.user.id),
             "content_locales": list(get_settings(request).content_locales),
             "public_prefix": _urls.prefix(),
+        },
+    )
+
+
+def _import_id(raw: str | None) -> int | None:
+    """``?id=`` as an import id (an integer a column holds), else ``None``: a reload resumes it,
+    and the API (which checks the caller against the import) decides whether it is theirs."""
+    if (
+        raw is None
+        or not raw.isascii()
+        or not raw.isdigit()
+        or len(raw) > constants.PAGE_DIGITS_MAX
+    ):
+        return None
+    return int(raw)
+
+
+@router.get("/import", response_model=None, dependencies=[require_view, require_manage])
+async def import_page(
+    request: Request,
+    inertia: InertiaDep,
+    who: Principal,
+    db=Depends(get_db),
+    id: str | None = None,
+) -> InertiaResponse:
+    calendars = [
+        {k: c[k] for k in ("id", "name", "color", "default_timezone")}
+        for c in await _viewer_calendars(db, who, request)
+        if c["can_write_events"]
+    ]
+    return await inertia.render(
+        constants._PAGE_IMPORT,
+        {
+            **tenancy.view_props(request),
+            "calendars": calendars,
+            "can_publish": who.has(constants.PERM_PUBLISH),
+            "max_bytes": staging.effective_max_bytes(get_settings(request)),
+            "import_id": _import_id(id),
         },
     )
 

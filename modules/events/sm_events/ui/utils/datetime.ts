@@ -98,3 +98,11 @@ export function daySpan(first: string, last: string | null, locale: string): str
   const a = dateOf(first, locale);
   return last && last > first ? `${a} – ${dateOf(last, locale)}` : a;
 }
+
+/** A moment's day in the viewer's own zone and the console's language ("18 Nov 2026",
+ *  "18.11.2026"): for server instants such as a link's creation time. */
+export function formatDay(iso: string, locale?: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  return new Intl.DateTimeFormat(dateLocale(locale), { dateStyle: 'medium' }).format(at);
+}

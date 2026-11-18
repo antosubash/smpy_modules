@@ -61,7 +61,19 @@ def test_calendar_is_the_first_entry_of_the_events_group():
     from sm_events.web.endpoints.menu import menu_items
 
     items = sorted(menu_items(), key=lambda item: item.order)
-    assert [item.label for item in items] == ["Calendar", "Events", "Calendars", "Event categories"]
+    assert [item.label for item in items] == [
+        "Calendar",
+        "Events",
+        "Calendars",
+        "Event categories",
+        "Import events",
+    ]
+    assert (items[-1].url, items[-1].icon, items[-1].order) == (
+        "/admin/events/import",
+        "upload",
+        420,
+    )
+    assert items[-1].permissions == ["events.view", "events.manage"]
     assert items[0].url == "/admin/events/"
     assert items[0].permissions == ["events.view"]
     assert items[0].label_key == "events.menu.calendar"
@@ -284,3 +296,41 @@ async def test_calendar_and_editor_props_list_types(client, monkeypatch):
     )
     assert editor.status_code == 200, editor.text
     assert editor.json()["props"]["types"] == expected
+
+
+async def test_import_page_needs_manage(client):
+    cals = await cast(client)
+    assert (
+        await client.get("/admin/events/import", headers=headers("events.view", "events.edit"))
+    ).status_code == 403
+    got = await client.get("/admin/events/import", headers=headers("events.view", "events.manage"))
+    assert got.status_code == 200, got.text
+    body = got.json()
+    assert body["component"] == "Events/Import"
+    props = body["props"]
+    assert props["can_publish"] is False and props["import_id"] is None
+    assert props["max_bytes"] == 5 * 1024 * 1024
+    assert {c["id"] for c in props["calendars"]} == set(cals.values())
+    assert set(props["calendars"][0]) == {"id", "name", "color", "default_timezone"}
+    publisher = await client.get(
+        "/admin/events/import?id=7",
+        headers=headers("events.view", "events.manage", "events.publish"),
+    )
+    assert publisher.json()["props"]["can_publish"] is True
+    assert publisher.json()["props"]["import_id"] == 7
+    for bad in ("x", "-1", "9" * 30, ""):
+        got = await client.get(
+            f"/admin/events/import?id={bad}", headers=headers("events.view", "events.manage")
+        )
+        assert got.json()["props"]["import_id"] is None, bad
+
+
+async def test_import_page_lists_only_calendars_the_caller_can_write(client):
+    from sm_events.models import Calendar, Visibility
+
+    async with client.db_state.session_factory() as db:
+        db.add(Calendar(slug="theirs", name="Theirs", owner_id="x", visibility=Visibility.PRIVATE))
+        await db.commit()
+    # A manager writes everywhere; the page is for managers only, so ask as one who owns just one.
+    got = await client.get("/admin/events/import", headers=headers("events.view", "events.manage"))
+    assert "Theirs" in {c["name"] for c in got.json()["props"]["calendars"]}

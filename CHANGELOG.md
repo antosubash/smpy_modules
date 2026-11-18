@@ -7,6 +7,14 @@ name the module they affect.
 
 ### Added
 
+- **events: private feed links and `.ics` import** (PR 5 of the events module). A signed-in user
+  gets a private subscription link for any calendar they may view (`/events/feed/<token>.ics`,
+  token stored only as a SHA-256, shown once, revocable, one `404` for every refusal), and the
+  Import events screen reads an `.ics` file through a bounded parser, shows a preview and
+  creates drafts, idempotently by `UID`. Hosts run the `events` migration `6dedd89ae3a8`
+  and add `events.run_import` and `events.janitor` to the worker's tasks. Imported
+  repeating UTC events keep UTC.
+
 - **events: a new module** (`simple_module_events`, #400): calendars with private,
   internal and public visibility, shared through the sharing module, the
   Calendars and Categories screens and their API. Hosts add the dependency

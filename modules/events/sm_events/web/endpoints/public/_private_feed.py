@@ -203,7 +203,6 @@ async def _serve(request: Request, token: str) -> tuple[Response, TokenRow] | No
             row = await lookup(db, token)
         if row is None or not valid_tenant(row.tenant_id):
             return None
-        THROTTLE.promote(token)  # a real link: its window leaves the pool junk can flood
         with tenant_scope(row.tenant_id):
             async with factory() as db:
                 try:
@@ -217,6 +216,10 @@ async def _serve(request: Request, token: str) -> tuple[Response, TokenRow] | No
                 if access is None:
                     return None
                 body, truncated = await _body(request, access, db)
+        # Only a link that is *served* earns the pool junk cannot flood: a refused one (revoked,
+        # lost access, ...) keeps its window with the invented tokens', so no sequence of requests
+        # tells "a row exists but is refused" from "no such token".
+        THROTTLE.promote(token)
     extra = {TRUNCATED_HEADER: "1"} if truncated else {}
     headers = _headers(constants.PRIVATE_FEED_CACHE_CONTROL, **extra)
     return _answer(request, body, 200, constants.ICS_MEDIA_TYPE, headers), row

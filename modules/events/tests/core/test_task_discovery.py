@@ -17,13 +17,13 @@ from background_tasks.worker.task_routing import (
     load_task_configs,
     select_packages,
 )
-from sm_events.task_config import BEAT_SCHEDULE, PUBLISH_DUE, TASK_ROUTES
+from sm_events.task_config import BEAT_SCHEDULE, JANITOR, PUBLISH_DUE, RUN_IMPORT, TASK_ROUTES
 
 
 def test_the_task_module_sits_where_autodiscovery_imports_it():
     mod = importlib.import_module("sm_events.tasks")
     names = {getattr(obj, "name", None) for obj in vars(mod).values()}
-    assert PUBLISH_DUE in names
+    assert {PUBLISH_DUE, RUN_IMPORT, JANITOR} <= names
 
 
 def test_the_framework_loads_routes_and_beat_from_the_package():
@@ -38,14 +38,27 @@ def test_publish_due_runs_every_minute_on_the_events_queue():
     """``expires`` below the interval: a tick a stopped beat queued up is dropped
     rather than run late on top of the next one."""
     assert PUBLISH_DUE == "events.publish_due"
-    assert BEAT_SCHEDULE == {
-        "events-publish-due": {
-            "task": PUBLISH_DUE,
-            "schedule": 60.0,
-            "options": {"queue": "events", "expires": 55},
-        }
+    assert BEAT_SCHEDULE["events-publish-due"] == {
+        "task": PUBLISH_DUE,
+        "schedule": 60.0,
+        "options": {"queue": "events", "expires": 55},
     }
-    assert TASK_ROUTES == {PUBLISH_DUE: {"queue": "events"}}
+    assert TASK_ROUTES[PUBLISH_DUE] == {"queue": "events"}
+
+
+def test_import_tasks_and_the_hourly_janitor():
+    assert (RUN_IMPORT, JANITOR) == ("events.run_import", "events.janitor")
+    assert TASK_ROUTES == {
+        PUBLISH_DUE: {"queue": "events"},
+        RUN_IMPORT: {"queue": "events"},
+        JANITOR: {"queue": "events"},
+    }
+    assert BEAT_SCHEDULE["events-janitor"] == {
+        "task": JANITOR,
+        "schedule": 3600.0,
+        "options": {"queue": "events", "expires": 3500},
+    }
+    assert set(BEAT_SCHEDULE) == {"events-publish-due", "events-janitor"}
 
 
 def test_a_worker_scoped_to_the_events_queue_imports_the_events_tasks():

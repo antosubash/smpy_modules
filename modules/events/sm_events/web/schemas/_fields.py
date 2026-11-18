@@ -2,12 +2,12 @@
 
 import unicodedata
 from typing import Annotated, Any
-from urllib.parse import urlsplit
 
 from pydantic import AfterValidator, AwareDatetime, BeforeValidator, Field
 
 from sm_events.calendar.times import supported_instant
 from sm_events.core import constants, timezones
+from sm_events.core.web_urls import is_web_url
 
 Slug = Annotated[str, Field(max_length=constants.SLUG_MAX, pattern=constants.SLUG_PATTERN)]
 TextSlug = Annotated[str, Field(max_length=constants.TEXT_SLUG_MAX, pattern=constants.SLUG_PATTERN)]
@@ -48,6 +48,20 @@ def single_line(value: Any) -> Any:
     return _reject_controls(value, frozenset(), _BIDI | _LINE_SEPARATORS | _INVISIBLE)
 
 
+def strip_unsafe(value: str, *, newlines: bool = False) -> str:
+    """``value`` without what :func:`single_line` would refuse (``newlines``: what
+    :func:`multi_line` would refuse), for text taken from somewhere that is not a person typing
+    it (an imported file), where refusing the whole value would lose an event over one stray
+    control character."""
+    allowed = _MULTILINE_OK if newlines else frozenset()
+    extra = _BIDI if newlines else _BIDI | _LINE_SEPARATORS | _INVISIBLE
+    return "".join(
+        ch
+        for ch in value
+        if not ((unicodedata.category(ch) == _CONTROL and ch not in allowed) or ch in extra)
+    )
+
+
 def multi_line(value: Any) -> Any:
     """Free text: newlines, tabs and the Unicode line separators are fine; NUL,
     the other controls and the direction controls are not."""
@@ -68,22 +82,16 @@ TimezoneName = Annotated[
     str, Field(min_length=1, max_length=constants.TZ_MAX), AfterValidator(known_timezone)
 ]
 
-_HTTP_SCHEMES = frozenset({"http", "https"})
 _URL_BAD = frozenset({"Cc", "Cf", "Zs", "Zl", "Zp"})
 
 
 def http_url(value: str) -> str:
-    """An absolute ``http`` or ``https`` URL with no whitespace or control
-    character in it; anything else (``javascript:``, ``data:``, a relative path)
-    is refused."""
+    """An absolute ``http`` or ``https`` URL with no whitespace, control character, user name
+    or password in it; anything else (``javascript:``, ``data:``, a relative path) is refused."""
     if any(unicodedata.category(ch) in _URL_BAD for ch in value):
         raise ValueError("not a valid http(s) URL")
-    try:
-        parts = urlsplit(value)
-    except ValueError:
-        raise ValueError("not a valid http(s) URL") from None
-    if parts.scheme.lower() not in _HTTP_SCHEMES or not parts.hostname:
-        raise ValueError("only http and https URLs are allowed")
+    if not is_web_url(value):  # the one rule: http(s), a host, no userinfo
+        raise ValueError("only http and https URLs without a user name or password are allowed")
     return value
 
 

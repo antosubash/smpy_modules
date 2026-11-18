@@ -20,6 +20,6 @@ def is_web_url(value: str) -> bool:
         return False
     return (
         parts.scheme.lower() in constants.PLUGIN_URL_SCHEMES
-        and bool(parts.netloc)
+        and bool(parts.hostname)
         and not has_credentials
     )

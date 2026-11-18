@@ -3,7 +3,7 @@
 Rights here are the **owner's**, asked of the same policy every other read uses
 (:func:`~sm_events.core.access.visible_calendars`): a link is offered only for a calendar the
 caller may view, and only when their rights can be worked out without a session at all
-(:func:`~sm_events.core.access.offline.feed_principal`), so nobody is handed a link that could
+(:func:`~sm_events.core.access.offline.offline_principal`), so nobody is handed a link that could
 never serve anything. A person lists and revokes their own links; ``events.manage`` lists and
 revokes anyone's. A link someone else holds, and one that does not exist, are the same
 ``NotFound``. Nothing here commits: the caller's request session does.
@@ -24,7 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from sm_events.calendar.slugs import is_slug_conflict
 from sm_events.core import constants
 from sm_events.core.access import visible_calendars
-from sm_events.core.access.offline import feed_principal
+from sm_events.core.access.offline import offline_principal
 from sm_events.core.errors import (
     Forbidden,
     NotFound,
@@ -97,7 +97,9 @@ async def create_token(
     await _viewable(db, who, calendar_id, lock=True)
     tenant, user_id = bound_tenant(), who.user_id
     assert user_id is not None  # _viewable refused an anonymous principal
-    own = await feed_principal(request.app, db, user_id=user_id, tenant_id=tenant, request=request)
+    own = await offline_principal(
+        request.app, db, user_id=user_id, tenant_id=tenant, request=request
+    )
     if own is None:
         raise PrivateFeedsUnavailable
     chosen = _locale(request, locale)
