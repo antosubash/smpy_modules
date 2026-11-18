@@ -137,7 +137,8 @@
     "text_invalid": "Dieser Text ist zu lang oder enthält Steuerzeichen.",
     "note_invalid": "Geben Sie eine Notiz mit 1 bis 1000 Zeichen ein.",
     "stale_reloaded": "Jemand anderes hat diese Veranstaltung geändert. Die neue Version ist jetzt geladen; prüfen Sie sie und versuchen Sie es erneut.",
-    "edited_meanwhile": "Die Aktion wurde ausgeführt. Ihre zwischenzeitlichen Änderungen bleiben erhalten und sind noch nicht gespeichert."
+    "edited_meanwhile": "Die Aktion wurde ausgeführt. Ihre zwischenzeitlichen Änderungen bleiben erhalten und sind noch nicht gespeichert.",
+    "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt."
   },
   "categories": {
     "title": "Kategorien",

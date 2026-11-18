@@ -68,7 +68,7 @@ describe('EventEditor: create', () => {
     expect(body.texts.de).toMatchObject({ title: 'Konzert', slug: 'konzert-live' });
     expect(body.texts.en.slug).toBeNull();
     expect(body.rrule).toBeNull();
-    expect(router.visit).toHaveBeenCalledWith('/admin/events/edit/new1');
+    expect(router.visit).toHaveBeenCalledWith('/admin/events/edit/new1', { replace: true });
     await view.unmount();
   });
 

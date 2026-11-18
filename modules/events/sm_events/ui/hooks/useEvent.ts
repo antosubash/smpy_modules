@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { errorText, isGone } from '../utils/api';
 import { getEvent } from '../utils/api-events';
 import { emptyForm, type FormState, type TextForm, toForm } from '../utils/event-form';
+import { mergeOnto } from '../utils/form-merge';
 import type { EventDetail } from '../utils/types-events';
 import { useLatestRequest } from './useLatestRequest';
 import type { ScopedRequest } from './useRequestScope';
@@ -27,6 +28,10 @@ export function useEvent({
   const [base, setBase] = useState<FormState>(form);
   const [tab, setTab] = useState(locales[0] ?? 'en');
   const begin = useLatestRequest();
+  /** What the form and its base are right now, for a completion that must not
+   *  trust what it captured when its request started. */
+  const latest = useRef({ form, base });
+  latest.current = { form, base };
 
   const adopt = useCallback(
     (next: EventDetail) => {
@@ -38,11 +43,19 @@ export function useEvent({
     },
     [locales],
   );
-  /** Their version becomes the base the form is saved against; the form stays. */
+  /** Their version becomes the base the form is saved against; the form stays.
+   *  Given the form the user started from, the form becomes their version with
+   *  only the user's own edits on top, and the answer is whether any remain. */
   const rebase = useCallback(
-    (theirs: EventDetail) => {
+    (theirs: EventDetail, started?: FormState) => {
+      const loaded = toForm(theirs, locales);
       setEvent(theirs);
-      setBase(toForm(theirs, locales));
+      setBase(loaded);
+      if (!started) return true;
+      const merged = mergeOnto(started, latest.current.form, loaded);
+      latest.current = { form: merged, base: loaded };
+      setForm(merged);
+      return JSON.stringify(merged) !== JSON.stringify(loaded);
     },
     [locales],
   );
@@ -79,10 +92,6 @@ export function useEvent({
   }, [begin, fetchEvent, adopt]);
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(base), [form, base]);
-  /** What the form and its base are right now, for a completion that must not
-   *  trust what it captured when its request started. */
-  const latest = useRef({ form, base });
-  latest.current = { form, base };
   const setFields = useCallback(
     (patch: Partial<FormState>) => setForm((now) => ({ ...now, ...patch })),
     [],

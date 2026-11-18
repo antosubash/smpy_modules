@@ -45,8 +45,9 @@ export function useEventActions(
     parentId: string | null;
     defaultLocale: string;
     incomplete?: boolean;
-    /** Called before the page moves on after a create, so the unsaved-changes guard stays quiet. */
-    allowLeave?: () => void;
+    /** Called before the page moves on after a create, so the unsaved-changes guard stays quiet;
+     *  answers whether the visit replaces the guard's history entry. */
+    allowLeave?: () => boolean;
   },
 ) {
   const locales = useMemo(() => Object.keys(ev.form.texts), [ev.form.texts]);
@@ -133,8 +134,9 @@ export function useEventActions(
         };
         const created = await createEvent(body);
         if (request.alive()) {
-          allowLeave?.();
-          router.visit(`/admin/events/edit/${created.id}`);
+          const url = `/admin/events/edit/${created.id}`;
+          if (allowLeave?.()) router.visit(url, { replace: true });
+          else router.visit(url);
         }
       }
     } catch (e) {
@@ -172,20 +174,29 @@ export function useEventActions(
     const event = ev.event;
     if (!event || busy) return 'handled';
     const request = begin();
-    const started = JSON.stringify(ev.latest.current.form);
+    const started = ev.latest.current.form;
+    const startedJson = JSON.stringify(started);
     /** Their answer replaces the form only while the form is still what the
-     *  action started from; otherwise the edits typed meanwhile are kept and
-     *  only the server-owned parts (status, revision, publish times) move. */
+     *  action started from. Edits typed meanwhile are kept: after an action that
+     *  went through only the server-owned parts (status, revision, publish times)
+     *  move; after a refused (stale) one the conflict panel opens, with the
+     *  newer version as the base and the typed edits laid on top of it. */
     const take = (next: EventDetail, stale = false) => {
       const now = ev.latest.current;
       const untouched =
-        JSON.stringify(now.form) === started && JSON.stringify(now.base) === started;
+        JSON.stringify(now.form) === startedJson && JSON.stringify(now.base) === startedJson;
       if (untouched) {
         ev.adopt(next);
         if (stale) setNotice(t(keys.events.errors.stale_reloaded));
-      } else {
+      } else if (!stale) {
         ev.rebase(next);
         setNotice(t(keys.events.errors.edited_meanwhile));
+      } else if (ev.rebase(next, started)) {
+        setConflict(true);
+        setNotice(t(keys.events.errors.action_stale));
+      } else {
+        ev.adopt(next);
+        setNotice(t(keys.events.errors.stale_reloaded));
       }
     };
     setBusy(true);

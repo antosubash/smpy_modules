@@ -137,7 +137,8 @@
     "text_invalid": "This text is too long or has control characters.",
     "note_invalid": "Enter a note of 1 to 1000 characters.",
     "stale_reloaded": "Someone else changed this event. Their version is loaded now; check it and try again.",
-    "edited_meanwhile": "The action went through. Your edits made meanwhile are kept and are still unsaved."
+    "edited_meanwhile": "The action went through. Your edits made meanwhile are kept and are still unsaved.",
+    "action_stale": "Someone else changed this event. Your action was not applied."
   },
   "categories": {
     "title": "Categories",
