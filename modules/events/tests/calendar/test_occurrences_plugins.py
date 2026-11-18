@@ -161,3 +161,12 @@ async def test_viewer_reaches_the_source(db, fake):
     ((ctx, start, end),) = fake.calls
     assert ctx.viewer == SV and (start, end) == (START, END)
     assert ctx.locale == "en"
+
+
+async def test_category_filter_excludes_plugins_console_read(db, fake):
+    import uuid
+
+    await setup(db, None)
+    fake._behave = ok(at(7, 9, "a"))
+    page = await read(db, OccurrenceFilters(category_ids=frozenset({uuid.uuid4()})))
+    assert page.items == [] and page.sources == [] and fake.calls == []

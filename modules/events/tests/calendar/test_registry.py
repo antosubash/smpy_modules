@@ -182,9 +182,7 @@ def _sealed_like():
 
 
 def _model(**annotations):
-    return type(
-        "M", (BaseModel,), {"__annotations__": annotations, **dict.fromkeys(annotations)}
-    )
+    return type("M", (BaseModel,), {"__annotations__": annotations, **dict.fromkeys(annotations)})
 
 
 @pytest.mark.parametrize(

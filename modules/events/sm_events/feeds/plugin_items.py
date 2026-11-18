@@ -6,8 +6,9 @@ accepts any window up to ``SOURCE_WINDOW_MAX_DAYS``. The public feeds call publi
 no viewer; the private feed calls every enabled source for the link's owner, or none when that
 person cannot be built (the feed is still served).
 
-Each item is one instance, never a rule: ``UID <source>:<key>`` (a repeated UID keeps the
-first), ``DTSTAMP`` the source's own ``updated_at`` or else the item's start (so the body, and
+Each item is one instance, never a rule: ``UID <source>:<calendar id>:<key>``, so one source on
+two calendars gives two distinct items (a repeated UID keeps the first), ``DTSTAMP`` the source's
+own ``updated_at`` or else the item's start (so the body, and
 the public feed's ``ETag``, stays deterministic), ``SEQUENCE 0``. Plugin components count
 against ``FEED_MAX_COMPONENTS`` *after* this module's own events, so a cut drops them first.
 """
@@ -52,7 +53,7 @@ def plugin_vevents(
     out: list[icalendar.Event] = []
     seen: set[str] = set()
     for item in items:
-        uid = f"{item.source}:{item.key}"
+        uid = single_line(f"{item.source}:{item.calendar_id}:{item.key}")[: constants.UID_MAX]
         if uid in seen:
             continue
         seen.add(uid)

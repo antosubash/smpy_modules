@@ -59,7 +59,9 @@ async def test_private_feed_calls_sources_with_owner_viewer(private_source):
         await enable_on_p(world, ["acme:priv"])
         got = await http.get(world.path)
         assert got.status_code == 200, got.text
-        assert "acme:priv:p0" in uids(got)  # a non-public source: the owner is signed in
+        assert f"acme:priv:{world.cals['P'].id}:p0" in uids(
+            got
+        )  # a non-public source: the owner is signed in
         ((ctx, start, end),) = private_source.calls
         assert ctx.viewer.user_id == "sv" and ctx.viewer.roles == ("viewer",)
         assert "events.view" in ctx.viewer.permissions

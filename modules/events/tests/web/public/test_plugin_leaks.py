@@ -106,7 +106,7 @@ async def test_public_source_items_reach_the_grid_and_the_feeds(public_locales_c
     for name in ("calendar_ics", "cal_ics"):
         got = await public_locales_client.get(surfaces(fx)[name])
         uids = {str(e["UID"]) for e in icalendar.Calendar.from_ical(got.content).walk("VEVENT")}
-        assert "acme:pub:q1" in uids, name
+        assert f"acme:pub:{fx.pub.id}:q1" in uids, name
 
 
 async def test_public_api_has_no_sources_field(public_locales_client, spies, caplog):
@@ -184,7 +184,7 @@ async def test_keys_and_urls_are_namespaced_and_http_only(public_locales_client,
     assert len({i["key"] for i in body}) == len(body)  # unique across sources
     ics = await public_locales_client.get(surfaces(fx)["cal_ics"])
     uids = [str(e["UID"]) for e in icalendar.Calendar.from_ical(ics.content).walk("VEVENT")]
-    assert uids.count(f"acme:pub:{clash}") == 1  # native series repeat a UID by design
+    assert uids.count(f"acme:pub:{fx.pub.id}:{clash}") == 1  # native series repeat UIDs
     assert not any(u.endswith("@simple-module-events") and u.startswith("acme") for u in uids)
 
 
@@ -238,3 +238,42 @@ async def test_an_item_for_another_calendar_is_refused(db):
         default_locale="en",
     )
     assert result.items == [] and result.statuses[0].code == "invalid_item"
+
+
+async def test_one_source_on_two_public_calendars_gives_two_distinct_uids(
+    public_locales_client, spies
+):
+    fx = await seed_public(public_locales_client)
+    from sm_events.core.tenancy import tenant_scope as scope
+
+    with scope("default"):
+        async with public_locales_client.db_state.session_factory() as db:
+            second = Calendar(slug="second", name="Second", owner_id="o", visibility="public")
+            db.add(second)
+            await db.commit()
+            second_id = second.id
+    await enable(public_locales_client, fx, pub=["acme:pub"])
+    async with public_locales_client.db_state.session_factory() as db:
+        with scope("default"):
+            row = (await db.execute(select(Calendar).where(Calendar.id == second_id))).scalar_one()
+            row.sources = [{"id": "acme:pub", "settings": {}}]
+            await db.commit()
+    got = await public_locales_client.get(surfaces(fx)["calendar_ics"])
+    uids = [str(e["UID"]) for e in icalendar.Calendar.from_ical(got.content).walk("VEVENT")]
+    mine = sorted(u for u in uids if u.startswith("acme:pub:"))
+    assert mine == sorted([f"acme:pub:{fx.pub.id}:q1", f"acme:pub:{second_id}:q1"])
+
+
+async def test_a_category_filter_excludes_plugin_items(public_locales_client, spies):
+    fx = await seed_public(public_locales_client)
+    await enable(public_locales_client, fx, pub=["acme:pub"])
+    _, public = spies
+    base = surfaces(fx)["api"]
+    assert any(
+        i["source"] == "acme:pub" for i in (await public_locales_client.get(base)).json()["items"]
+    )
+    public.calls.clear()
+    filtered = await public_locales_client.get(f"{base}&category={fx.public_cat.id}")
+    assert filtered.status_code == 200
+    assert all(i["source"] == "events" for i in filtered.json()["items"])
+    assert public.calls == []  # not even called

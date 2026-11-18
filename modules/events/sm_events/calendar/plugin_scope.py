@@ -9,6 +9,7 @@ sees public calendars only), only sources enabled on them, and:
   that gives none (another module going through the contract without one) gets every
   pair ``skipped`` with code ``no_viewer``: failing safe, since a source narrows by who
   is asking;
+* a category filter excludes every plugin source (their items have no category);
 * ``filters.sources`` narrows to the named sources; a calendar id the viewer cannot see
   is dropped silently, so existence cannot be probed.
 
@@ -52,6 +53,8 @@ async def plugin_calls(
     wanted = _wanted(filters)
     if wanted is not None and not wanted:
         return [], []  # only the built-in source was asked for
+    if filters.category_ids is not None:
+        return [], []  # a filter narrows: a plugin's item has no category
     stmt = visible_calendars(viewer)
     if filters.calendar_ids is not None:
         stmt = stmt.where(col(Calendar.id).in_(filters.calendar_ids))

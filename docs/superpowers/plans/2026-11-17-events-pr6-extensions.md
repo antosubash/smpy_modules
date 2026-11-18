@@ -110,6 +110,11 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
       - `SEQUENCE:0`.
     - Plugin VEVENTs count against `FEED_MAX_COMPONENTS` after this module's own events, so a cut drops plugin items first.
 
+**Amendments (decided during implementation)**
+- **14a. A category filter narrows.** When `OccurrenceFilters.category_ids` is set, plugin sources are not called and add no items or statuses (their items have no category), on the console read, the public read and both APIs alike; with no category filter they appear as before. Same principle as `types`.
+- **16a. A plugin item's ICS UID is `<source id>:<calendar id>:<key>`**, passed through the same single-line sanitiser and the `UID_MAX` cap as native UIDs, so one source on two calendars gives two distinct items. A repeat inside one source and calendar answer is already refused (`duplicate_key`); a repeated UID in the file keeps the first. `SourceOccurrence.updated_at` reaches `DTSTAMP` through `PluginOccurrence` (excluded from every response).
+- **12a. Source settings are never secret.** They are stored in the clear and shown only to those who can manage the calendar; registration refuses a `settings_model` with a `SecretStr`/`SecretBytes` or sealed-secret field.
+
 **Event types**
 17. **`EventType`** (spec: an id, a label key and a pydantic model that validates `extra`). It is a frozen dataclass with:
     - `id`;

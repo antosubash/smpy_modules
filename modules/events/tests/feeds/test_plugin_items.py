@@ -54,7 +54,7 @@ def test_uid_and_dates():
     )
     raw = render(timed, day)
     a, b = parse(raw)
-    assert (str(a["UID"]), str(b["UID"])) == ("acme:s:t", "acme:s:d")
+    assert (str(a["UID"]), str(b["UID"])) == (f"acme:s:{CAL}:t", f"acme:s:{CAL}:d")
     assert b"DTSTART:20260702T100000Z" in raw and b"DTEND:20260702T110000Z" in raw
     assert b"DTSTART;VALUE=DATE:20260702" in raw
     assert b"DTEND;VALUE=DATE:20260704" in raw  # exclusive
@@ -93,9 +93,22 @@ def test_title_escaped():
     assert raw.count(b"\r\nSUMMARY") == 1  # a newline in a title cannot start a property
 
 
+def test_the_uid_is_per_source_calendar_and_key():
+    other = uuid.uuid4()
+    events = parse(render(occ("same", "One"), occ("same", "Two", calendar_id=other)))
+    assert [str(e["UID"]) for e in events] == [f"acme:s:{CAL}:same", f"acme:s:{other}:same"]
+
+
 def test_a_repeated_uid_keeps_the_first():
     events = parse(render(occ("same", "First"), occ("same", "Second")))
     assert [str(e["SUMMARY"]) for e in events] == ["First"]
+
+
+def test_the_uid_is_capped_like_a_native_one():
+    from sm_events.core import constants
+
+    (event,) = parse(render(occ("k" * 200, source="acme:" + "s" * 40)))
+    assert len(str(event["UID"])) <= constants.UID_MAX
 
 
 def test_updated_at_never_serialised():

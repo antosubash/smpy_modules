@@ -102,3 +102,12 @@ async def test_malformed_entries_are_ignored(db, plugins):
     await db.flush()
     calls, _ = await plugin_calls(db, OWNER, SV, OccurrenceFilters())
     assert pairs(calls) == [("internal", "acme:pub")]
+
+
+async def test_a_category_filter_excludes_every_plugin_source(db, plugins):
+    import uuid
+
+    await enable(db, I=["acme:pub", "acme:priv"])
+    filtered = OccurrenceFilters(category_ids=frozenset({uuid.uuid4()}))
+    assert await plugin_calls(db, OWNER, SV, filtered) == ([], [])
+    assert await plugin_calls(db, ANONYMOUS, None, filtered) == ([], [])
