@@ -223,6 +223,7 @@ from sm_events.core.constants.public import (  # noqa: E402
     JSON_MEDIA_TYPE,
     NEXT_OCCURRENCES,
     NOT_FOUND_SUGGESTIONS,
+    PAGE_DIGITS_MAX,
     PAGE_SIZE,
     PRODID,
     PUBLIC_API_RATE,

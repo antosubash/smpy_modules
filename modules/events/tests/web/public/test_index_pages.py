@@ -114,7 +114,8 @@ async def test_paging(public_locales_client, fx):
         assert props(await get(public_locales_client, f"{IDX}?page={lenient}"))["page"] == 1, (
             lenient
         )
-    for beyond in ("4", "99999999", "99999999999999999999"):
+    assert props(await get(public_locales_client, f"{IDX}?page=0000000000002"))["page"] == 2
+    for beyond in ("4", "99999999", "99999999999999999999", "9" * 5000, "1" + "0" * 4400):
         got = await get(public_locales_client, f"{IDX}?page={beyond}")
         assert got.status_code == 404 and got.json()["component"] == "Events/PublicNotFound", beyond
 

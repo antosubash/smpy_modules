@@ -46,8 +46,13 @@ __all__ = ["category_name", "make_item", "month_groups", "page_count", "page_par
 def page_param(raw: str | None) -> int:
     """``?page=`` read leniently: anything that is not a positive whole number is page 1. A number
     past the last page is the caller's 404."""
-    if raw is not None and raw.isascii() and raw.isdigit() and int(raw) >= 1:
-        return int(raw)
+    if raw is not None and raw.isascii() and raw.isdigit():
+        # Bound the length before ``int()``: Python refuses a digit string past 4,300 characters.
+        # A number of that size is simply past the last page.
+        digits = raw.lstrip("0")
+        page = int(digits or 0) if len(digits) <= constants.PAGE_DIGITS_MAX else 10**9
+        if page >= 1:
+            return page
     return 1
 
 
