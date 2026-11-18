@@ -169,6 +169,13 @@ with write and `events.publish`. Every event write starts with `claim_revision`
 `calendar/occurrences.py`, and never without an `until`. The editor's HTML is
 cleaned by both sanitisers and never inserted as markup otherwise. The API takes
 a local wall clock plus an IANA timezone, never UTC (an instant is stored UTC).
+**`/admin/events/` is the calendar (FullCalendar 7).** Import FullCalendar only under
+`sm_events/ui/calendar/adapter/` and add only the MIT packages on the allow-list
+(`boundaries.test.ts`); the adapter must load the interaction plugin or nothing
+drags. A grid change (an instant in the grid's zone) is converted into the
+**event's** wall clock through `ui/calendar/time/zones.ts`, never UTC or the grid's
+zone, and a drag never rewrites a rule (a series "all" shifts the master). The
+calendar JS is a lazy chunk that no other screen may request.
 `make worker` serves the `events` queue; scheduled publishing needs beat, which
 enumerates tenants under the framework's `all_tenants()` and then gives each
 tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
