@@ -217,3 +217,45 @@ CSP_ON_304 = False
 leaves a 304 without one, which is what a conditional response needs (a browser merges a 304's
 headers into its cached copy, whose scripts carry the nonce of the policy it was served with;
 news #322). Events sets no CSP header itself. If either value flips, the framework changed."""
+
+
+def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
+    """With ``public_base_url`` set, no canonical, hreflang, sitemap or feed URL carries a host the
+    client chose (``Host``, ``X-Forwarded-Host``, ``X-Forwarded-Proto``). Without it they follow
+    what the framework's forwarded-host allow-list accepts (nothing, here: the list is empty, so
+    only ``Host`` counts) and the response varies on ``Host``."""
+    from httpx import ASGITransport, AsyncClient
+
+    app = booted_host
+
+    async def setup_done(_app) -> bool:
+        return True
+
+    monkeypatch.setattr(app.state.sm.setup_registry, "is_setup_complete", setup_done)
+    spoof = {"X-Forwarded-Host": "evil.test", "X-Forwarded-Proto": "http"}
+    paths = ("/events/", "/events/calendar.ics", "/events/sitemap.xml")
+
+    async def fetch_both() -> tuple[dict[str, object], dict[str, object]]:
+        out: tuple[dict[str, object], dict[str, object]] = ({}, {})
+        async with (
+            app.router.lifespan_context(app),
+            AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as http,
+        ):
+            for slot, base in zip(out, ("https://events.example.org", ""), strict=True):
+                monkeypatch.setattr(app.state.sm.settings, "public_base_url", base, raising=False)
+                for path in paths:
+                    slot[path] = await http.get(path, headers={"Host": "evil.test"} | spoof)
+        return out
+
+    configured, guessed = asyncio.run(fetch_both())
+    for path, got in configured.items():
+        assert got.status_code == 200, path
+        assert "evil.test" not in got.text, path
+        if path == "/events/":  # the others hold no URL until an event exists
+            assert "https://events.example.org/events/" in got.text, path
+
+    for path, got in guessed.items():
+        assert got.status_code == 200, path
+        if path == "/events/":
+            assert "http://evil.test/events/" in got.text, path  # follows Host, as warned
+        assert "host" in got.headers.get("vary", "").lower(), path
