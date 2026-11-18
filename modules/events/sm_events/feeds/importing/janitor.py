@@ -32,7 +32,8 @@ from sm_events.models import EventImport, EventImportItem, FeedToken
 __all__ = ["janitor_async"]
 
 logger = logging.getLogger(__name__)
-_FINISHED = ("staged", "done", "failed")
+_FINISHED = ("staged", "done", "failed", "uploaded", "parsing")
+"""Expire after ``IMPORT_TTL`` like the rest: a parse that never finishes does not linger."""
 
 
 async def _tenants(factory: Any) -> list[str]:

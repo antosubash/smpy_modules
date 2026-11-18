@@ -38,6 +38,8 @@ class Claim:
     kind: Literal["claimed", "busy", "gone"]
     status: str | None = None
     """The state the import is in after a successful claim (``parsing`` or ``running``)."""
+    attempts: int = 0
+    """How many times an unfinished parse has been claimed, this claim included."""
 
 
 async def claim(db: Any, *, tenant_id: str, import_id: int, owner: str, now: datetime) -> Claim:
@@ -57,6 +59,10 @@ async def claim(db: Any, *, tenant_id: str, import_id: int, owner: str, now: dat
                 (table.c.status == "queued", "running"),
                 else_=table.c.status,
             ),
+            attempts=case(
+                (table.c.status.in_(("uploaded", "parsing")), table.c.attempts + 1),
+                else_=table.c.attempts,
+            ),
             lease_owner=owner,
             lease_until=now + constants.IMPORT_LEASE,
         )
@@ -64,14 +70,14 @@ async def claim(db: Any, *, tenant_id: str, import_id: int, owner: str, now: dat
     )
     if (await db.execute(stmt)).rowcount == 1:
         mark_written(db)
-        status = (
+        status, attempts = (
             await db.execute(
-                select(table.c.status).where(
+                select(table.c.status, table.c.attempts).where(
                     table.c.id == import_id, table.c.tenant_id == tenant_id
                 )
             )
-        ).scalar_one()
-        return Claim("claimed", status)
+        ).one()
+        return Claim("claimed", status, attempts)
     status = (
         await db.execute(
             select(table.c.status).where(table.c.id == import_id, table.c.tenant_id == tenant_id)

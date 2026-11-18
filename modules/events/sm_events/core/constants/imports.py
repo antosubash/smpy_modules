@@ -10,6 +10,7 @@ __all__ = [
     "ICS_INVALID_DETAIL",
     "IMPORTER_GONE",
     "IMPORT_ACTIVE_MAX",
+    "IMPORT_ACTIVE_TENANT_MAX",
     "IMPORT_APPLY_BATCH",
     "IMPORT_BODY_CEILING",
     "IMPORT_BUSY_CODE",
@@ -17,6 +18,7 @@ __all__ = [
     "IMPORT_DEFAULT_BYTES",
     "IMPORT_DEFAULT_DURATION",
     "IMPORT_DESCRIPTION_MAX",
+    "IMPORT_EXPAND_CAP",
     "IMPORT_FAILURE_CODES",
     "IMPORT_FILENAME_FALLBACK",
     "IMPORT_FILENAME_MAX",
@@ -37,6 +39,8 @@ __all__ = [
     "IMPORT_MAX_TIMEZONES",
     "IMPORT_MIB",
     "IMPORT_MIN_BYTES",
+    "IMPORT_PARSE_ATTEMPTS",
+    "IMPORT_PARSE_SECONDS",
     "IMPORT_READ_CHUNK",
     "IMPORT_SLICE_SECONDS",
     "IMPORT_STATES",
@@ -79,6 +83,16 @@ IMPORT_MAX_EVENT_BYTES: Final = 262_144
 IMPORT_MAX_OVERRIDES: Final = 730
 IMPORT_DESCRIPTION_MAX: Final = 20_000
 IMPORT_ACTIVE_MAX: Final = 5
+"""Unfinished imports one user may hold."""
+IMPORT_ACTIVE_TENANT_MAX: Final = 25
+"""Unfinished imports a tenant may hold, whoever started them."""
+IMPORT_EXPAND_CAP: Final = 3000
+"""Instances of a series expanded once to match its EXDATEs and overrides; a date past it is not
+verified, so ignored."""
+IMPORT_PARSE_SECONDS: Final = 20.0
+"""Wall-clock budget of one parse step; over it the import fails ``too_complex``, for good."""
+IMPORT_PARSE_ATTEMPTS: Final = 3
+"""Claims of an unfinished parse (a worker that died) before it is failed instead of retried."""
 IMPORT_READ_CHUNK: Final = 64 * 1024
 IMPORT_MIB: Final = 1024 * 1024
 IMPORT_FILENAME_MAX: Final = 200
@@ -102,6 +116,7 @@ IMPORT_FAILURE_CODES: Final = (
     "too_many_events",
     "import_failed",
     "importer_gone",
+    "too_complex",
 )
 
 IMPORT_BUSY_CODE: Final = "import_busy"

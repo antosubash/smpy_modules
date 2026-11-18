@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import time
 import uuid
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -27,6 +28,7 @@ from typing import Final
 
 from sm_events.calendar.times import to_span
 from sm_events.core import constants
+from sm_events.core.errors import ImportFailure
 from sm_events.feeds.importing.mapper_series import map_series
 from sm_events.feeds.importing.model import MappedEvent
 from sm_events.feeds.importing.scan import Prop, RawEvent
@@ -237,7 +239,11 @@ def _event(
 
 
 def map_calendar(
-    events: Sequence[RawEvent], *, calendar_tz: str, categories: Mapping[str, uuid.UUID]
+    events: Sequence[RawEvent],
+    *,
+    calendar_tz: str,
+    categories: Mapping[str, uuid.UUID],
+    deadline: float | None = None,
 ) -> Mapped:
     """Every group of ``events`` as items, in file order, and what was dropped."""
     dropped: Counter[str] = Counter()
@@ -253,6 +259,8 @@ def map_calendar(
     items: list[MappedItem] = []
     ctx = (calendar_tz, categories)
     for uid, (masters, children) in groups.items():
+        if deadline is not None and time.monotonic() > deadline:
+            raise ImportFailure("too_complex", "parse_time")  # a file this costly is refused
         if not masters:
             items += [_skipped(uid, c.props, "override_without_master") for c in children]
             continue

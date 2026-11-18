@@ -83,6 +83,7 @@ def upgrade() -> None:
         sa.Column("skipped", sa.Integer(), nullable=False),
         sa.Column("failed", sa.Integer(), nullable=False),
         sa.Column("processed", sa.Integer(), nullable=False),
+        sa.Column("attempts", sa.Integer(), nullable=False),
         sa.Column("error_code", sa.String(length=40), nullable=True),
         sa.Column("lease_owner", sa.String(length=36), nullable=True),
         sa.Column("lease_until", sa.DateTime(timezone=True), nullable=True),

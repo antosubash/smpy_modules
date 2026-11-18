@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 import uuid
 from collections import Counter
 from datetime import datetime
@@ -111,17 +112,21 @@ async def create_import(
     if not who.has(constants.PERM_MANAGE):
         raise Forbidden
     await writable_calendar(db, who, calendar_id)
-    active = (
-        await db.execute(
-            select(func.count())
-            .select_from(EventImport)
-            .where(
-                EventImport.tenant_id == bound_tenant(),  # type: ignore[arg-type]
-                EventImport.status.in_(_UNFINISHED),  # type: ignore[attr-defined]
-            )
-        )
-    ).scalar_one()
-    if active >= constants.IMPORT_ACTIVE_MAX:
+    where = (
+        EventImport.tenant_id == bound_tenant(),  # type: ignore[arg-type]
+        EventImport.status.in_(_UNFINISHED),  # type: ignore[attr-defined]
+    )
+
+    async def count(*extra: Any) -> int:
+        stmt = select(func.count()).select_from(EventImport).where(*where, *extra)
+        return (await db.execute(stmt)).scalar_one()
+
+    # One user cannot fill the tenant's slots; the tenant has a larger ceiling of its own.
+    if (
+        await count(EventImport.created_by == who.user_id)  # type: ignore[arg-type]
+        >= constants.IMPORT_ACTIVE_MAX
+        or await count() >= constants.IMPORT_ACTIVE_TENANT_MAX
+    ):
         raise ImportBusy
     row = EventImport(
         calendar_id=calendar_id,
@@ -141,8 +146,10 @@ async def create_import(
 
 
 def _scan_and_map(data: bytes, tz: str, categories: dict[str, uuid.UUID]) -> Mapped:
-    """Pure and bounded: scanned, then mapped. Runs in a thread, off the event loop."""
-    return map_calendar(scan(data).events, calendar_tz=tz, categories=categories)
+    """Pure and bounded: scanned, then mapped, within ``IMPORT_PARSE_SECONDS`` (over it:
+    ``too_complex``). Runs in a thread, off the event loop."""
+    deadline = time.monotonic() + constants.IMPORT_PARSE_SECONDS
+    return map_calendar(scan(data).events, calendar_tz=tz, categories=categories, deadline=deadline)
 
 
 async def _categories(db: Any, default_locale: str) -> dict[str, uuid.UUID]:

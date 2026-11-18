@@ -201,6 +201,8 @@ async def _work(
     if won.kind != "claimed":
         return won.kind
     if won.status == "parsing":
+        if won.attempts > constants.IMPORT_PARSE_ATTEMPTS:  # it keeps killing its workers
+            raise ImportFailure("too_complex", "attempts")
         await step.parse()
         return "done"
     if importer is not None:

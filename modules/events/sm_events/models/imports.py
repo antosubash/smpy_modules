@@ -55,6 +55,8 @@ class EventImport(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported
     skipped: int = counter()
     failed: int = counter()
     processed: int = counter()
+    attempts: int = counter()
+    """Claims of an unfinished parse: a parse that keeps dying is failed, not retried for ever."""
     error_code: str | None = Field(default=None, max_length=_CODE_LEN)
     lease_owner: str | None = Field(default=None, max_length=36)
     lease_until: datetime | None = dt_col()

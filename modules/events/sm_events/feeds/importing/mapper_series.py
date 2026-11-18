@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
+from itertools import islice
 from zoneinfo import ZoneInfo
 
 from sm_events.calendar import rrule
-from sm_events.calendar.expand import is_occurrence
+from sm_events.calendar.expand import instances
 from sm_events.calendar.times import Span, all_day_dates, localize, to_local, to_span
 from sm_events.core import constants
 from sm_events.core.errors import InvalidRule, InvalidTimes
@@ -90,6 +91,26 @@ def _adjust(rule: rrule.Rule, span: Span, times: TimesIn) -> tuple[TimesIn, str 
     if rule.count - 1 < 2:
         return adjusted, None
     return adjusted, _COUNT.sub(f"COUNT={rule.count - 1}", rule.text)
+
+
+def _occurrences(
+    rule: rrule.Rule, span: Span, times: TimesIn, until: datetime | None, wanted: list[datetime]
+) -> set[datetime]:
+    """The starts of the rule's occurrences up to the latest date asked about, expanded **once**
+    (at most ``IMPORT_EXPAND_CAP`` of them), to look dates up in. A date past the cap is not in
+    the set: it cannot be verified, so it is ignored, never guessed."""
+    if not wanted:
+        return set()
+    walk = instances(
+        rule=rule,
+        span=span,
+        all_day=times.all_day,
+        timezone=times.timezone,
+        window_start=span.starts_at,
+        window_end=max(wanted) + timedelta(seconds=1),
+        recurrence_until=until,
+    )
+    return {i.original_start for i in islice(walk, constants.IMPORT_EXPAND_CAP)}
 
 
 def _exdates(props: list[Prop], times: TimesIn) -> list[datetime]:
@@ -180,30 +201,24 @@ def map_series(
     ):
         raise ItemSkip("too_many_overrides")
 
-    def occurrence(instant: datetime) -> bool:
-        return is_occurrence(
-            instant,
-            rule=rule,
-            span=span,
-            all_day=times.all_day,
-            timezone=times.timezone,
-            recurrence_until=until,
-        )
-
-    found: dict[datetime, MappedOverride] = {}
+    exdate_values: list[datetime] = []
     try:
-        for instant in _exdates(exdates, times):
-            if occurrence(instant):
-                found[instant] = MappedOverride(original_start=instant, kind="skipped")
-            elif "exdate_ignored" not in notes:
-                notes.append("exdate_ignored")
+        exdate_values = _exdates(exdates, times)
     except ItemSkip as skip:
         if skip.code == "too_many_overrides":
             raise
         notes.append("exdate_ignored")
-    for child in children:
-        override = _child(child, times, calendar_tz)
-        if override is None or not occurrence(override.original_start):
+    pairs = [(child, _child(child, times, calendar_tz)) for child in children]
+    wanted = [*exdate_values, *(o.original_start for _c, o in pairs if o is not None)]
+    real = _occurrences(rule, span, times, until, wanted)
+    found: dict[datetime, MappedOverride] = {}
+    for instant in exdate_values:
+        if instant in real:
+            found[instant] = MappedOverride(original_start=instant, kind="skipped")
+        elif "exdate_ignored" not in notes:
+            notes.append("exdate_ignored")
+    for child, override in pairs:
+        if override is None or override.original_start not in real:
             if "override_dropped" not in notes:
                 notes.append("override_dropped")
             continue
