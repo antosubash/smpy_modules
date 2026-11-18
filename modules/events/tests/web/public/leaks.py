@@ -51,12 +51,17 @@ def event_ics(fx: PublicFixture, locale: str, hidden: str | None) -> str:
     return _urls.event_ics_path(fx.slug(fx.hidden[hidden], locale), locale)
 
 
+def _api_url(locale: str) -> str:
+    return f"{_urls.api_path()}?start=2026-01-01T00:00:00Z&end=2026-12-31T00:00:00Z&locale={locale}"
+
+
 def surfaces(fx: PublicFixture, locale: str) -> list[Surface]:
     """Every public surface. Later tasks add theirs here: the index, a calendar's page, the
     occurrences API, the sitemap, the 404's suggestions."""
     return [
         Surface("event page", "page", event_page),
         Surface("event ics", "page", event_ics),
+        Surface("occurrences api", "listing", lambda f, loc, _: _api_url(loc)),
         Surface(
             "all calendars feed", "listing", lambda f, loc, _: _urls.calendar_ics_path(None, loc)
         ),

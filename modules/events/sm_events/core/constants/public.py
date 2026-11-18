@@ -45,6 +45,8 @@ SITEMAP_MAX_URLS = 10_000
 FEED_RATE = "60/minute"
 PUBLIC_API_RATE = "120/minute"
 ICS_MEDIA_TYPE = "text/calendar; charset=utf-8"
+JSON_MEDIA_TYPE = "application/json"
+XML_MEDIA_TYPE = "application/xml; charset=utf-8"
 PRODID = "-//simple-module//events//EN"
 
 # Path segments the public routes use, so a slug may not be one (it would lose its address).

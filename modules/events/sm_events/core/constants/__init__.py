@@ -219,6 +219,7 @@ from sm_events.core.constants.public import (  # noqa: E402
     FEED_RATE,
     FEED_YEARS_AHEAD,
     ICS_MEDIA_TYPE,
+    JSON_MEDIA_TYPE,
     NEXT_OCCURRENCES,
     NOT_FOUND_SUGGESTIONS,
     PAGE_SIZE,
@@ -240,4 +241,5 @@ from sm_events.core.constants.public import (  # noqa: E402
     SLUG_RESERVED_CODE,
     SLUG_RESERVED_DETAIL,
     SUB_EVENTS_MAX,
+    XML_MEDIA_TYPE,
 )  # isort: skip

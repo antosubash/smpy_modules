@@ -196,7 +196,9 @@ def apply(
     elif seconds <= 0:
         response.headers["Cache-Control"] = NO_STORE
     else:
-        scope = "public" if shared_tenant(request) else "private"
+        # A signed-in visitor's copy of the API is private, though it holds nothing of theirs.
+        shared = shared_tenant(request) and not (kind == "api" and signed_in(request))
+        scope = "public" if shared else "private"
         response.headers["Cache-Control"] = f"{scope}, {_lifetime(seconds, kind)}"
         keep_etag = etag is not None
     if keep_etag and etag is not None:

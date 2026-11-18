@@ -37,6 +37,7 @@ from sm_events.feeds.select import feed_events, single_event
 from sm_events.web.endpoints.deps import get_settings
 from sm_events.web.endpoints.public import _cache, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
+from sm_events.web.endpoints.public._respond import machine_response
 
 __all__ = ["calendar_feed_router", "event_feed_router", "safe_filename"]
 
@@ -74,12 +75,9 @@ def _respond(
     if truncated:
         headers[TRUNCATED_HEADER] = "1"
         _log.info("events: a public feed was cut at its caps (%s)", request.url.path)
-    head = request.method == "HEAD"
-    response = Response(b"" if head else body, media_type=constants.ICS_MEDIA_TYPE, headers=headers)
-    if head:
-        response.headers["content-length"] = str(len(body))
-    _cache.apply(response, request, settings, kind="feed", etag=_cache.body_etag(body))
-    return _cache.not_modified(request, response.headers) or response
+    return machine_response(
+        request, settings, body, media_type=constants.ICS_MEDIA_TYPE, kind="feed", headers=headers
+    )
 
 
 def _file(items: list[FeedEvent], *, name: str, timezone: str, now: datetime) -> bytes:

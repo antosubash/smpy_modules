@@ -78,13 +78,12 @@ async def test_fixed_paths_before_catch_all(public_locales_client, path, expecte
 
 
 async def test_unbuilt_routes_answer_404_for_now(public_client):
-    """The pages, sitemap and API are stubs until their tasks land; the feeds are real."""
+    """The pages and the sitemap are stubs until their tasks land; the feeds and API are real."""
     for path in (
         "/events/",
         "/events/c/x",
         "/events/x",
         "/events/sitemap.xml",
-        "/events/api/occurrences",
     ):
         for method in ("GET", "HEAD"):
             got = await public_client.request(method, path)
@@ -241,7 +240,7 @@ async def test_the_limiter_reads_the_live_registry():
         assert limited.status_code == 429 and "retry-after" in limited.headers
         # Another budget: pages and the API are separate buckets.
         assert (await http.get("/events/x")).status_code == 404
-        assert (await http.get("/events/api/occurrences")).status_code == 404
+        assert (await http.get("/events/api/occurrences")).status_code == 422  # no range
     await state.engine.dispose()
 
 
