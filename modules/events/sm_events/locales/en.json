@@ -509,7 +509,7 @@
       "all": "All occurrences"
     },
     "create": {
-      "skipped_hour": "The clock skips this hour on that day, so the event starts at {time}.",
+      "skipped_hour": "On this day the clock jumps from {from} to {to} ({zone}). Check the start time.",
       "title": "New event",
       "description": "Creates a draft. Open the full editor for everything else.",
       "title_label": "Title",

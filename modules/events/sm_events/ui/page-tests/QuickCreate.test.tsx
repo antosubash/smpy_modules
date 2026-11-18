@@ -210,30 +210,51 @@ describe('closing', () => {
   });
 });
 
-describe('the skipped hour', () => {
-  const gapDay = (start: string, end: string) => ({ allDay: false, start, end });
-  it('says so when the slot starts at the first minute after the gap', async () => {
-    // 2026-03-29 02:00 does not exist in Vienna: the grid hands over 03:00 (01:00Z).
-    const { view } = await open(gapDay('2026-03-29T01:00:00Z', '2026-03-29T01:30:00Z'));
-    expect(field('quick-start').value).toBe('2026-03-29T03:00');
-    expect(document.querySelector('[role=status]')?.textContent).toContain(
-      'The clock skips this hour on that day, so the event starts at 03:00.',
-    );
-    await view.unmount();
-  });
-  it('says so for a slot the grid flagged, and not once the time is changed', async () => {
+describe('the clock jump note', () => {
+  const NOTE =
+    'On this day the clock jumps from 02:00 to 03:00 (Europe/Vienna). Check the start time.';
+  const note = () => document.querySelector('[role=status]')?.textContent;
+  // 2026-03-29 in Vienna: the grid hands over 03:00, 03:30 (02:00 and 02:30 resolved
+  // forward), or the real 03:00 and 03:30 slots; 04:00 is clear of the window.
+  it.each([
+    ['01:00:00Z', '01:30:00Z', '2026-03-29T03:00'],
+    ['01:30:00Z', '02:00:00Z', '2026-03-29T03:30'],
+    ['01:45:00Z', '02:15:00Z', '2026-03-29T03:45'],
+  ])('shows it for a start at %s', async (from, to, shown) => {
     const { view } = await open({
-      ...gapDay('2026-03-29T01:30:00Z', '2026-03-29T02:00:00Z'),
-      skipped: true,
+      allDay: false,
+      start: `2026-03-29T${from}`,
+      end: `2026-03-29T${to}`,
     });
-    expect(document.querySelector('[role=status]')?.textContent).toContain('starts at 03:30');
-    await setValue(field('quick-start'), '2026-03-29T04:30');
-    expect(document.querySelector('[role=status]')).toBeNull();
+    expect(field('quick-start').value).toBe(shown);
+    expect(note()).toBe(NOTE);
     await view.unmount();
   });
-  it('is silent for an ordinary slot', async () => {
-    const { view } = await open(TIMED);
-    expect(document.querySelector('[role=status]')).toBeNull();
+  it('is silent at 04:00, the day before and for an all-day create', async () => {
+    for (const slot of [
+      { allDay: false, start: '2026-03-29T02:00:00Z', end: '2026-03-29T02:30:00Z' },
+      { allDay: false, start: '2026-03-28T01:30:00Z', end: '2026-03-28T02:00:00Z' },
+      { allDay: true, start: '2026-03-29', end: '2026-03-30' },
+    ]) {
+      const { view } = await open(slot);
+      expect(note()).toBeUndefined();
+      await view.unmount();
+    }
+  });
+  it('goes when the start is changed out of the window', async () => {
+    const { view } = await open({
+      allDay: false,
+      start: '2026-03-29T01:30:00Z',
+      end: '2026-03-29T02:00:00Z',
+    });
+    await setValue(field('quick-start'), '2026-03-29T09:00');
+    expect(note()).toBeUndefined();
     await view.unmount();
   });
+});
+
+it('has no built-in close control with an untranslated name', async () => {
+  const { view } = await open(TIMED);
+  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('Close');
+  await view.unmount();
 });

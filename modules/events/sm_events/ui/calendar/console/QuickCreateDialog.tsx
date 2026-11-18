@@ -22,7 +22,7 @@ import { useRequestScope } from '../../hooks/useRequestScope';
 import { createEvent } from '../../utils/api-events';
 import { codeFieldPath, fieldErrorId, invalidProps, requiredText } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
-import { startsAfterGap } from '../time/zones';
+import { gapBefore } from '../time/zones';
 import type { CalendarInfo, CreateSlot } from '../types';
 import {
   type Clock,
@@ -85,13 +85,9 @@ function QuickCreateForm({
   const [calendarId, setCalendarId] = useState(first?.id ?? '');
   const zone = writable.find((c) => c.id === calendarId)?.default_timezone ?? 'UTC';
   const [clock, setClock] = useState<Clock>(() => clockOf(slot, zone));
-  const proposed = useRef(clock.start).current;
-  // What the grid offered cannot always be what was clicked: the clock skips an hour on that
-  // day. Flagged by the grid for a slot it saw run backwards, and by the start being the
-  // first minute after a gap (which a real click on that minute also is).
-  const skippedHour =
-    !clock.allDay &&
-    ((slot.skipped === true && clock.start === proposed) || startsAfterGap(clock.start, zone));
+  // The grid offers slots the clock skips and moves a click there forward; a start in the
+  // window after a clock jump may not be the time that was clicked.
+  const jump = clock.allDay ? null : gapBefore(clock.start, zone);
   const [title, setTitle] = useState('');
   const [pending, setPending] = useState(false);
   const timed = useRef<Clock | undefined>(slot.allDay ? undefined : clock);
@@ -199,9 +195,9 @@ function QuickCreateForm({
         {box('start', t(copy.start))}
         {box('end', t(clock.allDay ? copy.last_day : copy.end))}
       </div>
-      {skippedHour && (
+      {jump && (
         <p role="status" className="text-sm">
-          {t(copy.skipped_hour, { time: clock.start.slice(11, 16) })}
+          {t(copy.skipped_hour, { ...jump, zone })}
         </p>
       )}
       <p className="text-sm text-muted-foreground">{t(copy.zone_note, { zone })}</p>

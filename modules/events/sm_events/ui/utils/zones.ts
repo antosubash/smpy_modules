@@ -137,21 +137,23 @@ export function isWallTime(text: string, dateOnly = false): boolean {
   }
 }
 
-/** The wall time is the first valid minute after a spring gap: the minute before it, on the
- *  clock, is not the minute before it in time. */
-export function startsAfterGap(local: string, timeZone: string): boolean {
-  if (!isWallTime(local)) return false;
-  const wall = Temporal.PlainDateTime.from(local);
-  const before = Temporal.PlainDateTime.from(
-    toLocal(
-      Temporal.Instant.from(toInstant(local, timeZone)).subtract({ seconds: 60 }).toString(),
-      timeZone,
-    ),
-  );
-  return (
-    Temporal.PlainDateTime.compare(before, wall.subtract({ minutes: 1 })) !== 0 &&
-    !isNonexistent(local, timeZone)
-  );
+/** The clock jump (`from` to `to`, `HH:MM` on the zone's clock) whose window the wall time
+ *  `local` lies in: at or after where the gap ends, but less than the gap's length after it.
+ *  The grid draws slots the clock skips and moves a click there forward, so a start in this
+ *  window may not be the time that was clicked. `null` outside such a window. */
+export function gapBefore(local: string, timeZone: string): { from: string; to: string } | null {
+  if (!isWallTime(local)) return null;
+  const start = Temporal.PlainDateTime.from(local).toZonedDateTime(timeZone);
+  // `previous` is strictly before: nudge so a start exactly at the jump finds it.
+  const change = start.add({ nanoseconds: 1 }).getTimeZoneTransition('previous');
+  if (!change) return null;
+  const jump =
+    (change.offsetNanoseconds - change.subtract({ nanoseconds: 1 }).offsetNanoseconds) / 1e9;
+  if (jump <= 0) return null;
+  if (start.epochMilliseconds - change.epochMilliseconds >= jump * 1000) return null;
+  const to = change.toPlainDateTime();
+  const hhmm = (t: Temporal.PlainDateTime) => t.toPlainTime().toString({ smallestUnit: 'minute' });
+  return { from: hhmm(to.subtract({ seconds: jump })), to: hhmm(to) };
 }
 
 /** Whole calendar days from one date to another (negative when earlier). */

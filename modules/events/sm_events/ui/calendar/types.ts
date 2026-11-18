@@ -52,8 +52,6 @@ export type CreateSlot = {
   allDay: boolean;
   start: string;
   end: string;
-  /** The grid's slot was on a wall time the zone skips, and the library moved it forward. */
-  skipped?: true;
 };
 export type OccurrenceChange = {
   occurrence: Occurrence;

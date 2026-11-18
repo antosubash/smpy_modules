@@ -214,8 +214,5 @@ export function toSlot(selected: EditedEvent): CreateSlot {
     selected.end && length > SLOT_MINUTES * 60_000
       ? instant(selected.end)
       : Temporal.Instant.from(start).add({ minutes: DEFAULT_CREATE_MINUTES }).toString();
-  // A slot in the skipped hour resolves forward at its start but not at its end, so the
-  // selection runs backwards.
-  const backwards = Boolean(selected.start && selected.end && selected.end <= selected.start);
-  return { allDay: false, start, end, ...(backwards ? { skipped: true as const } : {}) };
+  return { allDay: false, start, end };
 }
