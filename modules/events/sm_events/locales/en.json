@@ -474,7 +474,8 @@
       "calendars": "Calendars",
       "categories": "Categories",
       "types": "Types",
-      "sources": "Sources"
+      "sources": "Sources",
+      "own_events": "Events"
     },
     "type_event": "Events",
     "status": {

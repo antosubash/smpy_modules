@@ -131,7 +131,7 @@ it('says in the console, once and in words, when a plugin file failed to load', 
   resetLoader();
 });
 
-it('offers the installed types and sources the server named, labelled by key with the id as fallback', async () => {
+it('offers the installed types and sources the server named, labelled by key (the id when no catalogue has it)', async () => {
   const calls = stubFetch({ [`GET ${OCCURRENCES}`]: { items: [], truncated: false } });
   const view = await mount(
     <CalendarPage
@@ -149,7 +149,32 @@ it('offers the installed types and sources the server named, labelled by key wit
   const text = document.body.textContent ?? '';
   expect(text).toContain('Event');
   expect(text).toContain('acme:talk');
-  expect(text).toContain('records:dates');
+  expect(text).toContain('Records with a date'); // records' catalogue is loaded in the test host
   expect(calls.length).toBeGreaterThan(0);
+  await view.unmount();
+});
+
+it("offers the calendar's own events in the source filter beside the plugin sources, so a source can be left out", async () => {
+  const calls = stubFetch({ [`GET ${OCCURRENCES}`]: { items: [], truncated: false } });
+  const view = await mount(
+    <CalendarPage
+      {...props}
+      sources={[{ id: 'records:dates', label_key: 'records.events.source.label', color: null }]}
+    />,
+  );
+  await flush();
+  await act(async () => fakeGrid.emitRange(MARCH, 'March 2026'));
+  await flush();
+  const legend = [...document.querySelectorAll('legend')].find((l) => l.textContent === 'Sources');
+  const labels = [...(legend?.parentElement?.querySelectorAll('label') ?? [])].map(
+    (l) => l.textContent,
+  );
+  expect(labels).toEqual(['Events', 'Records with a date']);
+  const own = legend?.parentElement?.querySelector('input') as HTMLInputElement;
+  await act(async () => own.click());
+  await flush();
+  await act(async () => fakeGrid.emitRange(MARCH, 'March 2026'));
+  await flush();
+  expect(calls.at(-1)?.url).toContain('source=events');
   await view.unmount();
 });

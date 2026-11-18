@@ -94,13 +94,20 @@ export function ConsoleCalendar({
         : [{ id: 'event', label: t(keys.events.calendar.type_event) }],
     [t, typeOptions],
   );
+  // With any plugin source enabled, the calendar's own events become a choice too: the filter
+  // shows only what is checked, so a source could not be left out without it.
   const sources = useMemo(
     () =>
-      (sourceOptions ?? []).map((o) => ({
-        id: o.id,
-        color: o.color,
-        label: translateKey(t, o.label_key, o.id),
-      })),
+      sourceOptions?.length
+        ? [
+            { id: 'events', label: t(keys.events.calendar.filters.own_events), color: null },
+            ...sourceOptions.map((o) => ({
+              id: o.id,
+              color: o.color,
+              label: translateKey(t, o.label_key, o.id),
+            })),
+          ]
+        : [],
     [t, sourceOptions],
   );
   const ready = useEventExtensions();

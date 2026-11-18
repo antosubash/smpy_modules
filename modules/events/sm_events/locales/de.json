@@ -474,7 +474,8 @@
       "calendars": "Kalender",
       "categories": "Kategorien",
       "types": "Arten",
-      "sources": "Quellen"
+      "sources": "Quellen",
+      "own_events": "Veranstaltungen"
     },
     "type_event": "Veranstaltungen",
     "status": {
