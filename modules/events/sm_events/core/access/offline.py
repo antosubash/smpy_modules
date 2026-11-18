@@ -15,7 +15,7 @@ over the owner's *current* account:
 **Fails closed**: every doubt answers ``None``, and the feed route answers that as it answers
 any refusal.
 
-**A known gap** (upstream issue): the membership role the tenants resolver adds to a live
+**A known gap** (upstream simple_module_python #1005, no principal outside a request): the membership role the tenants resolver adds to a live
 request (``tenant:<role>``, see :func:`simple_module_core.tenancy.tenant_role`) has no public
 read, so it is left out here. That can only *narrow* what a feed serves: a user whose
 permissions come only from their membership role gets an empty feed, never one they should not

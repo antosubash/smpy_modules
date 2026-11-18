@@ -27,9 +27,12 @@ and it stops the moment their access does.
   handler that exists at startup rewrites `/feed/<token>` to `/feed/<redacted>`. A handler an
   operator adds later is covered when the filter is installed again, and reverse proxies, load
   balancers and CDNs log paths on their own: redact `/feed/` there.
+- **Latency floor.** Every refusal is held to 0.25 s (`FEED_DENY_FLOOR_SECONDS`), so a refusal
+  is not faster than an answer.
 - **Limits.** 30 requests a minute per IP, and 20 per token in ten minutes, per process.
-- **Revocation.** Revoking a link (yours, or any as a manager, "Everyone's links") deletes the
-  row; the next request gets the same `404` an invented token gets, byte for byte. A user's links
+- **Revocation.** Revoking a link (yours, or any as a manager, "Everyone's links") sets
+  `revoked_at`; the row is deleted by the janitor 30 days later (`FEED_REVOKED_KEPT_DAYS`). The
+  next request gets the same `404` an invented token gets, byte for byte. A user's links
   also stop when they are deactivated or lose `events.view`; they are not deleted, so regaining
   the right revives them.
 - **Throttle is per process.** The per-token count lives in memory (at most 10,000 keys), so with

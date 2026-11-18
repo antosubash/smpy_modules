@@ -11,18 +11,27 @@ chosen calendar. Everything is created as a **draft**; "Import and publish" is o
 | --- | --- | --- |
 | File size (setting, default / floor / ceiling) | 5 MiB / 64 KiB / 20 MiB | `IMPORT_DEFAULT_BYTES`, `IMPORT_MIN_BYTES`, `IMPORT_BODY_CEILING` |
 | Events per file | 5,000 | `IMPORT_MAX_EVENTS` |
-| Components, nesting, time zones | 20,000, 3 deep, 100 | `IMPORT_MAX_COMPONENTS`, `IMPORT_MAX_DEPTH`, `IMPORT_MAX_TIMEZONES` |
-| Lines, line length | 1,000,000, 65,536 | `IMPORT_MAX_LINES`, `IMPORT_MAX_LINE` |
-| Properties per event, parameters per property | 500, 20 | `IMPORT_MAX_PROPERTIES`, `IMPORT_MAX_PARAMS` |
+| Components / nesting / time zones | 20,000 / 3 deep / 100 | `IMPORT_MAX_COMPONENTS`, `IMPORT_MAX_DEPTH`, `IMPORT_MAX_TIMEZONES` |
+| Lines / line length | 1,000,000 / 65,536 | `IMPORT_MAX_LINES`, `IMPORT_MAX_LINE` |
+| Properties per event / parameters per property | 500 / 20 | `IMPORT_MAX_PROPERTIES`, `IMPORT_MAX_PARAMS` |
 | Bytes per event | 262,144 | `IMPORT_MAX_EVENT_BYTES` |
+| Attendees counted per event | 200 | `IMPORT_MAX_ATTENDEES` |
+| Description characters | 20,000 | `IMPORT_DESCRIPTION_MAX` |
 | `EXDATE` values / overrides per series | 1,000 / 730 | `IMPORT_MAX_EXDATES`, `IMPORT_MAX_OVERRIDES` |
 | Instances expanded to match an exception | 3,000 | `IMPORT_EXPAND_CAP` |
-| Parse time, parse attempts | 20 s, 3 | `IMPORT_PARSE_SECONDS`, `IMPORT_PARSE_ATTEMPTS` |
+| Parse time / parse attempts | 20 s / 3 | `IMPORT_PARSE_SECONDS`, `IMPORT_PARSE_ATTEMPTS` |
 | Unfinished imports per user / per tenant | 5 / 25 | `IMPORT_ACTIVE_MAX`, `IMPORT_ACTIVE_TENANT_MAX` |
 | Kept for | 24 hours | `IMPORT_TTL` |
+| Rights captured at apply stay valid for | 1 hour | `IMPORT_GRANTS_TTL` |
 
 Over a limit the whole file is refused with a readable reason (`too_many_events`, `ics_invalid`,
 `too_complex`); one event over a limit is skipped and the rest import.
+
+The upload itself is stored in the database (`events_import.source`), not in a directory: up to
+20 MiB a row and at most 25 unfinished imports per tenant, but only an import that has not been
+parsed yet holds it, so the worst case is 25 x 20 MiB = 500 MiB per tenant (125 MiB at the 5 MiB
+default). It is cleared the moment the file is staged, or when the import fails, and the row itself
+is deleted after 24 hours.
 
 ## How a file is read
 

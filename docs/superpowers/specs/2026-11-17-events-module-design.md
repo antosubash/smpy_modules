@@ -464,7 +464,8 @@ modules' configured prefixes.
 
 Private feeds are the third documented token-bound public route; every refusal is one padded
 `404`, and tokens are never logged. `scan.py` is the only `.ics` parser and no library parses an
-upload. An import creates drafts, is idempotent by `UID`, and re-checks the importer's rights per
-slice; the one thing a worker cannot re-check is tenant membership (upstream gap, documented). A
+upload. An import creates drafts and is idempotent by `UID`. On an eager host every slice re-checks the
+importer; a real worker cannot (no app, upstream gap) and relies on the rights captured at apply,
+valid one hour (`rights_expired` after), plus per-item share, owner, trash and lock checks. A
 repeating series written in UTC keeps zone UTC (`kept_utc`). Stored URLs never carry credentials.
 

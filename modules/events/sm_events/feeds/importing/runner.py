@@ -13,11 +13,13 @@ transaction. When fewer than a batch is left the same transaction completes the 
 tenant (a request, a platform pass) is left first, so the rows written are the import's tenant's
 whatever was bound. An id that is no import of that tenant is ``gone``.
 
-**Rights.** With an ``importer`` (an app is present: the eager path) the slice first asks who
-the importer is now and applies the narrower of that and the stored grants; an importer who is
-gone ends the import ``importer_gone`` with the remaining items untouched. A Celery worker builds
-no app, so it passes none and relies on the stored grants plus the per-item checks (share,
-ownership, trash, lock): there the window runs to the end of the import.
+**Rights.** A slice first checks that the grants stored at apply have not passed ``rights_until``
+(``IMPORT_GRANTS_TTL``, one hour): later it writes nothing and ends ``rights_expired``. With an
+``importer`` (an app is present: the eager path, ``launch.launch``) it then asks who the importer
+is now and applies the narrower of that and the stored grants; an importer who is gone ends the
+import ``importer_gone`` with the remaining items untouched. A Celery worker builds no app (no
+user directory; upstream simple_module_python #1005), so it passes none and relies on the stored
+grants within that hour plus the per-item checks (share, ownership, trash, lock).
 
 **Failures.** Every write after the claim is fenced; a lost lease rolls back and answers
 ``busy``. A calendar that was trashed meanwhile, or any other exception, is recorded as ``failed``
