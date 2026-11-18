@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlmodel import col
 
-from sm_events.calendar.occurrence import Occurrence
-from sm_events.calendar.times import Span, to_local
+from sm_events.calendar.times import Span, all_day_dates, to_local
 from sm_events.content.public_read import (
     pick_text,
     public_categories,
@@ -31,7 +30,7 @@ from sm_events.content.public_read import (
 from sm_events.core import constants
 from sm_events.core.access.public import public_calendars, public_events
 from sm_events.core.tenancy import bound_tenant
-from sm_events.models import Calendar, Category, Event
+from sm_events.models import Calendar, Category, Event, EventText
 from sm_events.web.endpoints.public import _urls
 from sm_events.web.endpoints.public._api import occurrence_day, public_read
 from sm_events.web.schemas.public import (
@@ -41,7 +40,7 @@ from sm_events.web.schemas.public import (
     PublicListItem,
 )
 
-__all__ = ["category_name", "month_groups", "page_count", "page_param", "upcoming"]
+__all__ = ["category_name", "make_item", "month_groups", "page_count", "page_param", "upcoming"]
 
 
 def page_param(raw: str | None) -> int:
@@ -75,8 +74,53 @@ async def _calendars(db: Any) -> dict[uuid.UUID, Calendar]:
     return {c.id: c for c in (await db.execute(stmt)).scalars()}
 
 
-def _local(item: Occurrence) -> tuple[str, str]:
-    return to_local(Span(item.start, item.end), all_day=item.all_day, timezone=item.timezone)
+def make_item(
+    *,
+    key: str,
+    event: Event,
+    text: EventText,
+    calendar: Calendar,
+    category: Category | None,
+    locale: str,
+    default_locale: str,
+    span: Span,
+    day: date | None,
+    status: str,
+    rescheduled: bool,
+) -> PublicListItem:
+    """One list item for an event (or one of its occurrences) shown in ``span``; ``text`` is the
+    already-chosen language and ``day`` the ``?date=`` of a series instance."""
+    start_local, end_local = to_local(span, all_day=event.all_day, timezone=event.timezone)
+    first = last = None
+    if event.all_day:
+        first, after = all_day_dates(span, event.timezone)
+        last = after - timedelta(days=1)
+    return PublicListItem(
+        key=key,
+        url=_urls.event_path(text.slug, text.locale, day),
+        title=text.title,
+        lang=text.locale,
+        all_day=event.all_day,
+        start_local=start_local,
+        end_local=end_local,
+        start_date=first,
+        end_date=last,
+        timezone=event.timezone,
+        show_timezone=event.timezone != calendar.default_timezone,
+        status="cancelled" if status == "cancelled" or event.cancelled else "confirmed",
+        rescheduled=rescheduled,
+        calendar=PublicCalendarRef(slug=calendar.slug, name=calendar.name, color=calendar.color),
+        category=None
+        if category is None
+        else CategoryRef(
+            slug=category.slug,
+            name=category_name(category, locale, default_locale),
+            color=category.color,
+        ),
+        venue_name=event.venue_name,
+        attendance_mode=event.attendance_mode,
+        summary=text.summary,
+    )
 
 
 async def upcoming(
@@ -109,37 +153,19 @@ async def upcoming(
         calendar = cals.get(occ.calendar_id)
         if event is None or calendar is None or not texts.get(event.id):
             continue
-        text = pick_text(texts[event.id], locale, default_locale)
-        start_local, end_local = _local(occ)
-        category = cats.get(event.category_id) if event.category_id else None
         items.append(
-            PublicListItem(
+            make_item(
                 key=occ.key,
-                url=_urls.event_path(text.slug, text.locale, occurrence_day(occ)),
-                title=text.title,
-                lang=text.locale,
-                all_day=occ.all_day,
-                start_local=start_local,
-                end_local=end_local,
-                start_date=occ.start_date,
-                end_date=(occ.end_date - timedelta(days=1)) if occ.end_date else None,
-                timezone=occ.timezone,
-                show_timezone=occ.timezone != calendar.default_timezone,
+                event=event,
+                text=pick_text(texts[event.id], locale, default_locale),
+                calendar=calendar,
+                category=cats.get(event.category_id) if event.category_id else None,
+                locale=locale,
+                default_locale=default_locale,
+                span=Span(occ.start, occ.end),
+                day=occurrence_day(occ),
                 status=occ.status,
                 rescheduled=occ.original_start is not None and occ.original_start != occ.start,
-                calendar=PublicCalendarRef(
-                    slug=calendar.slug, name=calendar.name, color=calendar.color
-                ),
-                category=None
-                if category is None
-                else CategoryRef(
-                    slug=category.slug,
-                    name=category_name(category, locale, default_locale),
-                    color=category.color,
-                ),
-                venue_name=event.venue_name,
-                attendance_mode=event.attendance_mode,
-                summary=text.summary,
             )
         )
     return items
