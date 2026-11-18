@@ -3,6 +3,7 @@ import { errorText, isGone } from '../utils/api';
 import { getEvent } from '../utils/api-events';
 import { emptyForm, type FormState, type TextForm, toForm } from '../utils/event-form';
 import { mergeOnto } from '../utils/form-merge';
+import { type Prefill, withPrefill } from '../utils/prefill';
 import type { EventDetail } from '../utils/types-events';
 import { useLatestRequest } from './useLatestRequest';
 import type { ScopedRequest } from './useRequestScope';
@@ -16,15 +17,22 @@ export function useEvent({
   eventId,
   locales,
   timezone,
+  prefill,
 }: {
   eventId: string | null;
   locales: readonly string[];
   timezone: string;
+  /** A new event only: times and a title the calendar already knows. */
+  prefill?: Prefill | null;
 }) {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [state, setState] = useState<LoadState>(eventId ? 'loading' : 'ready');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(() => emptyForm(timezone, locales));
+  const [form, setForm] = useState<FormState>(() =>
+    eventId
+      ? emptyForm(timezone, locales)
+      : withPrefill(emptyForm(timezone, locales), prefill, locales[0] ?? 'en'),
+  );
   const [base, setBase] = useState<FormState>(form);
   const [tab, setTab] = useState(locales[0] ?? 'en');
   const begin = useLatestRequest();

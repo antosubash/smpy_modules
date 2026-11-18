@@ -7,6 +7,7 @@ import {
   toChange,
   toEventInput,
   toRangeChange,
+  toSlot,
   VIEW_NAMES,
   viewOfName,
 } from './mapping';
@@ -200,5 +201,52 @@ describe('toEventInput with an optimistic placement', () => {
     const allDay = { ...base, all_day: true, start_date: '2026-03-29', end_date: '2026-03-30' };
     const input = toEventInput(allDay, editing(), { start: '2026-03-31', end: '2026-04-01' });
     expect(input).toMatchObject({ start: '2026-03-31', end: '2026-04-01', allDay: true });
+  });
+});
+
+describe('toSlot', () => {
+  const sel = (
+    start: string,
+    end: string | null,
+    allDay = false,
+    startStr = start,
+    endStr = end ?? '',
+  ) => ({
+    start: new Date(start),
+    end: end ? new Date(end) : null,
+    allDay,
+    startStr,
+    endStr,
+  });
+  it('keeps a dragged timed range as instants', () => {
+    expect(toSlot(sel('2026-07-01T08:00:00Z', '2026-07-01T10:30:00Z'))).toEqual({
+      allDay: false,
+      start: '2026-07-01T08:00:00Z',
+      end: '2026-07-01T10:30:00Z',
+    });
+  });
+  it('turns a click on one 30-minute slot into a 60-minute event', () => {
+    expect(toSlot(sel('2026-07-01T08:00:00Z', '2026-07-01T08:30:00Z'))).toMatchObject({
+      end: '2026-07-01T09:00:00Z',
+    });
+  });
+  it('gives a click that carries no end the default length', () => {
+    expect(toSlot(sel('2026-07-01T08:00:00Z', null))).toMatchObject({
+      end: '2026-07-01T09:00:00Z',
+    });
+  });
+  it('keeps all-day dates and an exclusive end', () => {
+    expect(toSlot(sel('2026-08-01', '2026-08-04', true, '2026-08-01', '2026-08-04'))).toEqual({
+      allDay: true,
+      start: '2026-08-01',
+      end: '2026-08-04',
+    });
+  });
+  it('makes a one-day click on the day grid one day long', () => {
+    expect(toSlot(sel('2026-08-01', null, true, '2026-08-01', ''))).toEqual({
+      allDay: true,
+      start: '2026-08-01',
+      end: '2026-08-02',
+    });
   });
 });

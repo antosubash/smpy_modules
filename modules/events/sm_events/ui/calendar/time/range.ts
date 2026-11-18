@@ -5,6 +5,8 @@ import type { FilterQuery, OccurrenceQuery } from '../types';
 export const RANGE_MARGIN_DAYS = 7;
 export const MAX_RANGE_DAYS = 366;
 export const DEFAULT_CREATE_MINUTES = 60;
+/** The grid's slot (`slotDuration` in `adapter/options.ts`): a click selects one. */
+export const SLOT_MINUTES = 30;
 
 /** Aware ISO instants, half-open. */
 export type Range = { start: string; end: string };

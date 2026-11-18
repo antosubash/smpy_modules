@@ -504,6 +504,20 @@
       "description": "{name} wiederholt sich. Die Änderung gilt für:",
       "one": "Nur diesen Termin",
       "all": "Alle Termine"
+    },
+    "create": {
+      "title": "Neue Veranstaltung",
+      "description": "Legt einen Entwurf an. Alles Weitere erledigen Sie im vollständigen Editor.",
+      "title_label": "Titel",
+      "calendar": "Kalender",
+      "all_day": "Ganztägig",
+      "start": "Beginn",
+      "end": "Ende",
+      "last_day": "Letzter Tag",
+      "zone_note": "Die Zeiten gelten in {zone}",
+      "create": "Anlegen",
+      "more_options": "Weitere Optionen",
+      "created": "Veranstaltung als Entwurf angelegt"
     }
   }
 }

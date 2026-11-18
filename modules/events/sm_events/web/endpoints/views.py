@@ -23,6 +23,7 @@ from sm_events.web.endpoints.deps import (
     require_manage,
     require_view,
 )
+from sm_events.web.endpoints.prefill import parse_prefill
 from sm_events.web.schemas.categories import CategoryOut
 
 router = APIRouter(dependencies=[Depends(tenancy.bind_admin)])
@@ -145,7 +146,10 @@ async def editor_new_page(
     if cal is None or not (await calendar_rights(db, who, cal)).write_events:
         raise NotFound
     props = _editor_props(request, cal, True, await _categories(db))
-    return await inertia.render(constants._PAGE_EVENT_EDITOR, {**props, "event_id": None})
+    prefill = parse_prefill(request.query_params)
+    return await inertia.render(
+        constants._PAGE_EVENT_EDITOR, {**props, "event_id": None, "prefill": prefill}
+    )
 
 
 @router.get("/edit/{event_id}", response_model=None, dependencies=[require_view])

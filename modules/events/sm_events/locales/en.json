@@ -504,6 +504,20 @@
       "description": "{name} repeats. Apply the change to:",
       "one": "Only this occurrence",
       "all": "All occurrences"
+    },
+    "create": {
+      "title": "New event",
+      "description": "Creates a draft. Open the full editor for everything else.",
+      "title_label": "Title",
+      "calendar": "Calendar",
+      "all_day": "All day",
+      "start": "Start",
+      "end": "End",
+      "last_day": "Last day",
+      "zone_note": "Times are in {zone}",
+      "create": "Create",
+      "more_options": "More options",
+      "created": "Event created as a draft"
     }
   }
 }

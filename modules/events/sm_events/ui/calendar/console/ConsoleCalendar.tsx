@@ -9,9 +9,11 @@ import type {
   CalendarEditing,
   CalendarInfo,
   CalendarState,
+  CreateSlot,
   FilterOption,
   OccurrenceFetcher,
 } from '../types';
+import { QuickCreateDialog } from './QuickCreateDialog';
 import { useCalendarWrites } from './useCalendarWrites';
 
 type Props = {
@@ -70,15 +72,22 @@ export function ConsoleCalendar({
   const [refresh, setRefresh] = useState(0);
   const invalidate = useCallback(() => setRefresh((n) => n + 1), []);
   const writes = useCalendarWrites({ invalidate, editorUrl });
+  const [slot, setSlot] = useState<CreateSlot | null>(null);
+  // The calendar a new event starts on: the one shown, when exactly one is.
+  const [shown, setShown] = useState(initialState?.calendars ?? []);
+  const known = shown.filter((id) => calendars.some((c) => c.id === id));
+  const preferred = known.length === 1 ? (known[0] ?? null) : null;
+  const canCreate = calendars.some((c) => c.can_write_events);
   const editing = useMemo<CalendarEditing>(
     () => ({
-      canCreate: false,
-      onCreate: () => {},
+      canCreate,
+      creating: slot !== null,
+      onCreate: setSlot,
       onChange: writes.onChange,
       onMove: () => {},
       pendingKeys: writes.pendingKeys,
     }),
-    [writes.onChange, writes.pendingKeys],
+    [canCreate, slot, writes.onChange, writes.pendingKeys],
   );
   return (
     <>
@@ -89,11 +98,23 @@ export function ConsoleCalendar({
         types={types}
         defaultTimezone={defaultTimezone}
         initialState={initialState}
-        onStateChange={onStateChange}
+        onStateChange={(state) => {
+          setShown(state.calendars);
+          onStateChange?.(state);
+        }}
         editing={editing}
         refreshToken={refresh}
       />
       {writes.dialogs}
+      <QuickCreateDialog
+        slot={slot}
+        calendars={calendars}
+        preferred={preferred}
+        defaultLocale={contentLocales[0] ?? 'en'}
+        editorUrl={editorUrl}
+        onCreated={invalidate}
+        onClose={() => setSlot(null)}
+      />
     </>
   );
 }

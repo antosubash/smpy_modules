@@ -153,6 +153,55 @@ async def test_editor_new_needs_write(client):
     assert "content_locales" in props and "categories" in props
 
 
+async def _prefill(client, cals, query):
+    url = f"/admin/events/edit/new?calendar={cals['I']}&{query}"
+    response = await client.get(url, headers=STRANGER | _inertia())
+    assert response.status_code == 200, response.text
+    return response.json()["props"]["prefill"]
+
+
+async def test_editor_prefill_passed_and_validated(client):
+    cals = await cast(client)
+    assert await _prefill(
+        client, cals, "all_day=0&start=2026-07-01T10%3A00&end=2026-07-01T11%3A00&title=Team%20sync"
+    ) == {
+        "all_day": False,
+        "start": "2026-07-01T10:00",
+        "end": "2026-07-01T11:00",
+        "title": "Team sync",
+    }
+    assert await _prefill(client, cals, "all_day=1&start=2026-08-01&end=2026-08-03") == {
+        "all_day": True,
+        "start": "2026-08-01",
+        "end": "2026-08-03",
+        "title": None,
+    }
+    plain = await client.get(
+        f"/admin/events/edit/new?calendar={cals['I']}", headers=STRANGER | _inertia()
+    )
+    assert plain.json()["props"]["prefill"] is None
+
+
+async def test_editor_prefill_drops_what_does_not_check_out(client):
+    cals = await cast(client)
+    # Garbage, a mixed pair, a flag that disagrees, an end before the start: no times.
+    for query in (
+        "start=garbage&end=2026-07-01T11%3A00",
+        "start=2026-07-01&end=2026-07-01T11%3A00",
+        "all_day=1&start=2026-07-01T10%3A00&end=2026-07-01T11%3A00",
+        "start=2026-07-01T12%3A00&end=2026-07-01T11%3A00",
+        "start=2026-13-45&end=2026-13-46",
+        "start=2026-07-01T10%3A00",
+    ):
+        assert await _prefill(client, cals, query) is None, query
+    # A two-line or over-long title is dropped; the times next to it stay.
+    kept = await _prefill(client, cals, "start=2026-07-01&end=2026-07-01&title=one%0Atwo")
+    assert kept == {"all_day": True, "start": "2026-07-01", "end": "2026-07-01", "title": None}
+    assert await _prefill(client, cals, "title=" + "x" * 301) is None
+    assert (await _prefill(client, cals, "title=" + "x" * 300))["title"] == "x" * 300
+    assert await _prefill(client, cals, "title=%20%20") is None
+
+
 async def test_editor_new_without_calendar_is_404(client):
     await cast(client)
     response = await client.get("/admin/events/edit/new", headers=STRANGER | _inertia())

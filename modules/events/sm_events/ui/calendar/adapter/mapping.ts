@@ -3,8 +3,15 @@
 import type { EventInput } from '@fullcalendar/react';
 import { Temporal } from 'temporal-polyfill';
 import type { Occurrence } from '../../utils/types-events';
+import { DEFAULT_CREATE_MINUTES, SLOT_MINUTES } from '../time/range';
 import { addDays, dateIn } from '../time/zones';
-import type { CalendarEditing, CalendarView, OccurrenceChange, RangeChange } from '../types';
+import type {
+  CalendarEditing,
+  CalendarView,
+  CreateSlot,
+  OccurrenceChange,
+  RangeChange,
+} from '../types';
 
 export const VIEW_NAMES: Record<CalendarView, string> = {
   month: 'dayGridMonth',
@@ -120,4 +127,22 @@ export function toRangeChange(info: DatesSet, timeZone: string): RangeChange {
     view: viewOfName(info.view.type),
     date: dateIn(instant(info.view.currentStart), timeZone),
   };
+}
+
+/** A selection or a click on the grid as the slot to create: timed edges are instants, an
+ *  all-day span is dates with an exclusive end. A click selects one slot (or one day), which
+ *  is too short to be an event, so it gets the default length. */
+export function toSlot(selected: EditedEvent): CreateSlot {
+  if (selected.allDay) {
+    const start = day(selected.startStr);
+    return { allDay: true, start, end: selected.endStr ? day(selected.endStr) : addDays(start, 1) };
+  }
+  const start = selected.start ? instant(selected.start) : selected.startStr;
+  const length =
+    selected.end && selected.start ? selected.end.getTime() - selected.start.getTime() : 0;
+  const end =
+    selected.end && length > SLOT_MINUTES * 60_000
+      ? instant(selected.end)
+      : Temporal.Instant.from(start).add({ minutes: DEFAULT_CREATE_MINUTES }).toString();
+  return { allDay: false, start, end };
 }
