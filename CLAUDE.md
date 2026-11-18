@@ -167,8 +167,13 @@ or scheduled (locked) event is changed, trashed, restored or overridden only
 with write and `events.publish`. Every event write starts with `claim_revision`
 (the compare-and-set on `expected_revision`). Recurrence is expanded only in
 `calendar/occurrences.py`, and never without an `until`. The editor's HTML is
-cleaned by both sanitisers and never inserted as markup otherwise. `make
-worker` serves the `events` queue; scheduled publishing needs beat.
+cleaned by both sanitisers and never inserted as markup otherwise. The API takes
+a local wall clock plus an IANA timezone, never UTC (an instant is stored UTC).
+`make worker` serves the `events` queue; scheduled publishing needs beat, which
+enumerates tenants under the framework's `all_tenants()` and then gives each
+tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
+publish in the worker emits no bus event. Its `core/worker.py` is a parity-checked
+copy of newsletter's (family "worker runtime").
 
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —

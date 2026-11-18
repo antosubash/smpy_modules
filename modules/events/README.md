@@ -16,7 +16,8 @@ Add `simple_module_events` to the consuming host's dependencies:
 pip install simple_module_events
 ```
 
-The framework's `settings` and `sharing` modules must also be installed. The
+The framework's `settings`, `sharing` and `background_tasks` modules must also be
+installed (`background_tasks` runs scheduled publishing). The
 module is discovered through its `simple_module` entry point. In this repo,
 the workspace dependency and host wiring are already present:
 
@@ -134,7 +135,7 @@ Configure **Events** on the Settings screen or with
 | Field | Default | Applies |
 | --- | --- | --- |
 | `default_timezone` | `UTC` | New calendars; unknown stored names fall back to UTC with a warning |
-| `content_locales` | `["en"]` | Category names; restart required |
+| `content_locales` | `["en"]` | The languages of category names, event texts and event slugs; restart required |
 
 ### Permissions and access
 
@@ -148,5 +149,5 @@ manages categories and ownership. `events.publish`, combined with write access t
 calendar, approves, schedules and unpublishes events and is needed to change
 an event that is published or scheduled. See the guide's [access table](docs/index.md#access).
 
-There are no public routes in PR 1. A public calendar's visibility prepares it
+No anonymous page or API ships yet. A public calendar's visibility prepares it
 for later public, published-event reads; it exposes no anonymous screen today.

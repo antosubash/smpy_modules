@@ -34,7 +34,7 @@ API requests need `events.view`; creation also needs `events.edit`. Calendar
 pages need `events.view`, and Categories needs both `events.view` and
 `events.manage`; category API
 writes need both view and manage. The framework sharing API additionally needs
-`sharing.share`. No anonymous event API or page ships in PR 1.
+`sharing.share`. No anonymous event API or page ships yet.
 
 Calendar responses carry `owner_name`, a string or `null`. Every viewer of a
 calendar sees its owner's display name when the owner is an active member of the
@@ -248,7 +248,9 @@ have UUID primary keys; the remaining tables have big-int keys.
 | `events_redirect` | PR 2: locale-scoped event slug redirects |
 
 The demo host's revision `b8e1d0783868` follows `541bfbe29a28` and creates all
-seven tables. Migrations belong to the host. The `events` branch label is a
+seven tables; `f3c0b2daeaf2` follows it and adds the nullable
+`events_revision.note` (a reject note, or the overrides a series change
+dropped). Migrations belong to the host. The `events` branch label is a
 named target in a shared history, not a way to roll back this module alone.
 Calendar metadata is
 last-write-wins; event writes use `expected_revision`.
