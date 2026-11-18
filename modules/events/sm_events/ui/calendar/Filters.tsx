@@ -35,7 +35,7 @@ function Check(props: {
     <label className="flex items-center gap-2 text-sm">
       <input
         type="checkbox"
-        className="size-4 accent-primary"
+        className="size-4 accent-primary [color-scheme:light] dark:[color-scheme:dark]"
         checked={props.checked}
         onChange={props.onChange}
       />

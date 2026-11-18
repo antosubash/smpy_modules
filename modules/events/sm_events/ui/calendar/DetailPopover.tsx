@@ -23,7 +23,7 @@ function languageName(code: string, locale: string | undefined): string {
 export function DefaultDetail({ occurrence: o, gridTimeZone, actions, lockReason }: DetailProps) {
   const { t, locale } = useT();
   const copy = keys.events.calendar.detail;
-  const own = localTimeText(o, gridTimeZone, locale);
+  const own = localTimeText(o, gridTimeZone, locale, false);
   const word = statusWord(o, t) ?? (o.event_status ? t(statusKey(o.event_status)) : null);
   return (
     <div className="space-y-2 text-sm" data-testid="calendar-detail">

@@ -116,6 +116,7 @@
     "invalid_rrule": "Diese Wiederholungsregel ist ungültig.",
     "rrule_frequency_refused": "Veranstaltungen können täglich, wöchentlich, monatlich oder jährlich wiederkehren.",
     "start_not_in_rule": "Der Beginn muss das erste Datum sein, das die Wiederholungsregel erzeugt. Ändern Sie den Beginn oder die Regel.",
+    "invalid_datetime": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein.",
     "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: Die Uhren überspringen sie.",
     "end_before_start": "Das Ende muss nach dem Beginn liegen.",
     "duration_too_long": "Eine Veranstaltung kann höchstens {oneOff} Tage dauern; wiederholt sie sich, jeder Termin höchstens {series} Tage.",
@@ -472,6 +473,8 @@
       "loading": "Veranstaltungen werden geladen…",
       "empty": "In diesem Zeitraum gibt es nichts",
       "no_calendars": "Wählen Sie einen Kalender, um seine Veranstaltungen zu sehen.",
+      "none_yet": "Es gibt noch keine Kalender.",
+      "open_calendars": "Kalender öffnen",
       "error": "Die Veranstaltungen konnten nicht geladen werden.",
       "truncated": "Es werden die ersten {count} Einträge dieses Zeitraums angezeigt. Grenzen Sie die Filter ein oder wechseln Sie zu einer kürzeren Ansicht."
     },
@@ -487,7 +490,7 @@
       "calendar": "Kalender",
       "status": "Status",
       "read_only": "Sie können diesen Kalender nur ansehen",
-      "needs_publish": "Veröffentlicht: nur wer veröffentlichen darf, kann sie ändern",
+      "needs_publish": "Veröffentlicht: Nur wer veröffentlichen darf, kann diese Veranstaltung ändern.",
       "external": "Dieser Eintrag stammt aus einer anderen Quelle und kann hier nicht geändert werden",
       "lang_fallback": "Angezeigt auf {language}"
     },
@@ -506,6 +509,7 @@
       "all": "Alle Termine"
     },
     "create": {
+      "skipped_hour": "An diesem Tag wird die Uhr von {from} auf {to} Uhr vorgestellt ({zone}). Bitte die Startzeit prüfen.",
       "title": "Neue Veranstaltung",
       "description": "Legt einen Entwurf an. Alles Weitere erledigen Sie im vollständigen Editor.",
       "title_label": "Titel",

@@ -44,6 +44,15 @@ async function open(slot: CreateSlot, calendars: CalendarInfo[] = [VIENNA], pref
 }
 const select = () => field('quick-calendar') as HTMLSelectElement;
 
+describe('without a writable calendar', () => {
+  it('renders no dialog and no link without a calendar id', async () => {
+    const { view } = await open(TIMED, [{ ...VIENNA, can_write_events: false }]);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.body.innerHTML).not.toContain('edit/new?calendar=&');
+    await view.unmount();
+  });
+});
+
 describe('the slot', () => {
   it("prefills local times in the calendar's zone and names it", async () => {
     const { view } = await open(TIMED);
@@ -199,4 +208,53 @@ describe('closing', () => {
     expect(calls).toHaveLength(0);
     await view.unmount();
   });
+});
+
+describe('the clock jump note', () => {
+  const NOTE =
+    'On this day the clock jumps from 02:00 to 03:00 (Europe/Vienna). Check the start time.';
+  const note = () => document.querySelector('[role=status]')?.textContent;
+  // 2026-03-29 in Vienna: the grid hands over 03:00, 03:30 (02:00 and 02:30 resolved
+  // forward), or the real 03:00 and 03:30 slots; 04:00 is clear of the window.
+  it.each([
+    ['01:00:00Z', '01:30:00Z', '2026-03-29T03:00'],
+    ['01:30:00Z', '02:00:00Z', '2026-03-29T03:30'],
+    ['01:45:00Z', '02:15:00Z', '2026-03-29T03:45'],
+  ])('shows it for a start at %s', async (from, to, shown) => {
+    const { view } = await open({
+      allDay: false,
+      start: `2026-03-29T${from}`,
+      end: `2026-03-29T${to}`,
+    });
+    expect(field('quick-start').value).toBe(shown);
+    expect(note()).toBe(NOTE);
+    await view.unmount();
+  });
+  it('is silent at 04:00, the day before and for an all-day create', async () => {
+    for (const slot of [
+      { allDay: false, start: '2026-03-29T02:00:00Z', end: '2026-03-29T02:30:00Z' },
+      { allDay: false, start: '2026-03-28T01:30:00Z', end: '2026-03-28T02:00:00Z' },
+      { allDay: true, start: '2026-03-29', end: '2026-03-30' },
+    ]) {
+      const { view } = await open(slot);
+      expect(note()).toBeUndefined();
+      await view.unmount();
+    }
+  });
+  it('goes when the start is changed out of the window', async () => {
+    const { view } = await open({
+      allDay: false,
+      start: '2026-03-29T01:30:00Z',
+      end: '2026-03-29T02:00:00Z',
+    });
+    await setValue(field('quick-start'), '2026-03-29T09:00');
+    expect(note()).toBeUndefined();
+    await view.unmount();
+  });
+});
+
+it('has no built-in close control with an untranslated name', async () => {
+  const { view } = await open(TIMED);
+  expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('Close');
+  await view.unmount();
 });

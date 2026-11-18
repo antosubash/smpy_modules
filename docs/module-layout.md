@@ -125,6 +125,7 @@ The TS/TSX lives inside the package, next to the Python:
 | `ui/components/<feature>/` | components, grouped by the same features as the Python |
 | `ui/components/` (top) | only what every feature uses (`ConfirmDialog`, the layout) |
 | `ui/hooks/`, `ui/utils/` | hooks and plain TS. `ui/utils/i18n.ts` derives `keys` from `locales/en.json` |
+| `ui/<feature>/` (events: `ui/calendar/`) | a frontend feature that is more than components: `adapter/` (the only place the third-party library is imported), `console/` (writes and dialogs), `data/` (fetching and cache), `time/` (zone conversion), with its tests beside the source |
 | `ui/page-tests/` | page-level tests, `test-dom.tsx` and shared test support. Not shipped in the wheel |
 
 A component's unit test sits beside it (`Foo.test.tsx`). Test helpers never

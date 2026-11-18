@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toEventInput } from '../calendar/adapter/mapping';
-import { fakeGrid } from '../calendar/test-support/FakeGrid';
+import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import * as zones from '../calendar/time/zones';
 import type { CalendarProps, OccurrenceChange } from '../calendar/types';
 import {
@@ -17,7 +17,7 @@ import { act, click, mount } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }));
-vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/test-support/FakeGrid'));
+vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/FakeGrid-test-support'));
 
 const browser = (zone: string) => vi.spyOn(zones, 'browserTimeZone').mockReturnValue(zone);
 beforeEach(() => {

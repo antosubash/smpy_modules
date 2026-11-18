@@ -2,7 +2,7 @@
 
 import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { fakeGrid } from '../calendar/test-support/FakeGrid';
+import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import { ApiError } from '../utils/api';
 import {
   buttonNamed,
@@ -16,7 +16,7 @@ import { flush } from './support';
 import { click } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
-vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/test-support/FakeGrid'));
+vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/FakeGrid-test-support'));
 
 const checkbox = (label: string) =>
   [...document.querySelectorAll('label')]
@@ -132,6 +132,14 @@ it('shows an error in an alert, and Retry fetches again', async () => {
   await view.unmount();
 });
 
+it('shows the error state, not an empty grid, for a 200 that is not a page', async () => {
+  const fetchOccurrences = fetcherOf((async () => ({ nope: true })) as never);
+  const { view } = await open({ fetchOccurrences });
+  expect(document.querySelector('[role=alert]')?.textContent).toContain('Retry');
+  expect(document.body.textContent).not.toContain('Nothing in this range');
+  await view.unmount();
+});
+
 it('says when the range is empty', async () => {
   const { view } = await open();
   expect(document.body.textContent).toContain('Nothing in this range');
@@ -140,7 +148,7 @@ it('says when the range is empty', async () => {
 
 it('keeps a notice when the page was truncated', async () => {
   const { view } = await open({ fetchOccurrences: fetcherOf(pageOf([occurrence()], true)) });
-  expect(document.querySelector('[role=note]')?.textContent).toContain('first 2,000 items');
+  expect(document.querySelector('[role=status]')?.textContent).toContain('first 2,000 items');
   await view.unmount();
 });
 
@@ -163,5 +171,16 @@ it('shows the title as text, never as markup', async () => {
   const { view } = await open({ fetchOccurrences: fetcherOf(pageOf([hostile])) });
   expect(document.querySelector('[data-key] img')).toBeNull();
   expect(document.querySelector('[data-key] bdi')?.textContent).toBe(hostile.title);
+  await view.unmount();
+});
+
+it('says there are no calendars yet, with the action it was given', async () => {
+  const { view } = await open({
+    calendars: [],
+    noCalendarsAction: <a href="/admin/events/calendars">Open Calendars</a>,
+  });
+  expect(document.body.textContent).toContain('There are no calendars yet.');
+  expect(document.querySelector('a[href="/admin/events/calendars"]')).not.toBeNull();
+  expect(document.body.textContent).not.toContain('Select a calendar');
   await view.unmount();
 });

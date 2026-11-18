@@ -22,6 +22,7 @@ import { useRequestScope } from '../../hooks/useRequestScope';
 import { createEvent } from '../../utils/api-events';
 import { codeFieldPath, fieldErrorId, invalidProps, requiredText } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
+import { gapBefore } from '../time/zones';
 import type { CalendarInfo, CreateSlot } from '../types';
 import {
   type Clock,
@@ -32,6 +33,7 @@ import {
   timeProblems,
   withAllDay,
 } from './quickCreate';
+import { timeErrors } from './timeErrors';
 
 type Props = {
   slot: CreateSlot | null;
@@ -47,10 +49,15 @@ type Props = {
 export function QuickCreateDialog({ slot, onClose, ...rest }: Props) {
   const { t } = useT();
   const copy = keys.events.calendar.create;
+  // Never without a calendar to put the event on: no empty select, no link without an id.
+  const open = slot !== null && rest.calendars.some((c) => c.can_write_events);
   return (
-    <Dialog open={slot !== null} onOpenChange={(open) => !open && onClose()}>
-      {slot && (
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      {slot && open && (
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
+          showCloseButton={false}
+        >
           <DialogHeader>
             <DialogTitle>{t(copy.title)}</DialogTitle>
             <DialogDescription>{t(copy.description)}</DialogDescription>
@@ -78,6 +85,9 @@ function QuickCreateForm({
   const [calendarId, setCalendarId] = useState(first?.id ?? '');
   const zone = writable.find((c) => c.id === calendarId)?.default_timezone ?? 'UTC';
   const [clock, setClock] = useState<Clock>(() => clockOf(slot, zone));
+  // The grid offers slots the clock skips and moves a click there forward; a start in the
+  // window after a clock jump may not be the time that was clicked.
+  const jump = clock.allDay ? null : gapBefore(clock.start, zone);
   const [title, setTitle] = useState('');
   const [pending, setPending] = useState(false);
   const timed = useRef<Clock | undefined>(slot.allDay ? undefined : clock);
@@ -97,15 +107,7 @@ function QuickCreateForm({
     errors.reset();
     const found: Record<string, string> = {};
     if (!title.trim()) found[titlePath] = requiredText();
-    const times = timeProblems(clock, zone);
-    if (times.start) found['times.start'] = t(keys.events.errors.invalid_local_time);
-    if (times.end) {
-      found['times.end'] = t(
-        times.end === 'order'
-          ? keys.events.errors.end_before_start
-          : keys.events.errors.invalid_local_time,
-      );
-    }
+    Object.assign(found, timeErrors(timeProblems(clock, zone), t));
     if (Object.keys(found).length > 0) return errors.reject(found);
     const request = begin();
     setPending(true);
@@ -193,6 +195,11 @@ function QuickCreateForm({
         {box('start', t(copy.start))}
         {box('end', t(clock.allDay ? copy.last_day : copy.end))}
       </div>
+      {jump && (
+        <p role="status" className="text-sm">
+          {t(copy.skipped_hour, { ...jump, zone })}
+        </p>
+      )}
       <p className="text-sm text-muted-foreground">{t(copy.zone_note, { zone })}</p>
       {errors.error && (
         <p role="alert" className="text-sm text-destructive">

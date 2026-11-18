@@ -3,3 +3,7 @@
  *  recurring one, may last. */
 export const EVENT_MAX_DAYS = 366;
 export const SERIES_EVENT_MAX_DAYS = 31;
+
+/** `MAX_OCCURRENCES`: what the occurrences API returns before it says `truncated`. Only the
+ *  notice's wording uses it. */
+export const OCCURRENCE_LIMIT = 2000;

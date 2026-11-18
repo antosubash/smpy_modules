@@ -1,9 +1,9 @@
 /** The grid without FullCalendar: records its props and lets a test fire what the real grid
- *  would. Never shipped (the wheel excludes `test-support/`), and it imports vitest. */
+ *  would. Never shipped (the wheel excludes `*-test-support.tsx`), and it imports vitest. */
 import { type Ref, useImperativeHandle } from 'react';
 import { type Mock, vi } from 'vitest';
-import type { Range } from '../time/range';
-import type { CreateSlot, GridHandle, GridProps, OccurrenceChange } from '../types';
+import type { Range } from './time/range';
+import type { CreateSlot, GridHandle, GridProps, OccurrenceChange } from './types';
 
 type Handle = Record<keyof GridHandle, Mock>;
 const makeHandle = (): Handle => ({

@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 
+import { postCalendar, postEvent } from './events-seed';
 import { login, moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /** Seeding and guards for events-editor.spec.ts. Everything goes through the API. */
@@ -21,43 +22,24 @@ export async function apiCalendar(
   name: string,
   visibility: 'private' | 'internal' | 'public' = 'private',
 ): Promise<string> {
-  const created = await page.request.post('/api/events/calendars', {
-    headers: await moduleCsrfHeader(page, VIEW),
-    data: {
-      name,
-      color: '#2563eb',
-      description: null,
-      default_timezone: 'Europe/Vienna',
-      visibility,
-    },
-  });
-  expect(created.status(), await created.text()).toBe(201);
-  return ((await created.json()) as { id: string }).id;
+  return (await postCalendar(page, { name, visibility })).id;
 }
 
-export async function apiEvent(
+export function apiEvent(
   page: Page,
   calendarId: string,
   title: string,
   extra: { start?: string; end?: string; rrule?: string; venue?: string } = {},
 ): Promise<Seeded> {
-  const created = await page.request.post('/api/events/events', {
-    headers: await moduleCsrfHeader(page, VIEW),
-    data: {
-      calendar_id: calendarId,
-      times: {
-        all_day: false,
-        timezone: 'Europe/Vienna',
-        start: extra.start ?? '2027-01-12T10:00',
-        end: extra.end ?? '2027-01-12T11:00',
-      },
-      rrule: extra.rrule ?? null,
-      venue_name: extra.venue ?? null,
-      texts: { en: { title, description: '' } },
-    },
+  return postEvent(page, {
+    calendar: calendarId,
+    title,
+    start: extra.start ?? '2027-01-12T10:00',
+    end: extra.end ?? '2027-01-12T11:00',
+    rrule: extra.rrule,
+    venue: extra.venue,
+    description: '',
   });
-  expect(created.status(), await created.text()).toBe(201);
-  return (await created.json()) as Seeded;
 }
 
 export async function apiGet(page: Page, id: string) {

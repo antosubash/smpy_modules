@@ -29,7 +29,7 @@ export function Toolbar({ title, view, onView, onToday, onPrev, onNext, tz, star
       role="toolbar"
       aria-label={t(copy.toolbar.label)}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {start}
         <Button type="button" size="sm" variant="outline" onClick={onToday}>
           {t(copy.toolbar.today)}
@@ -52,14 +52,19 @@ export function Toolbar({ title, view, onView, onToday, onPrev, onNext, tz, star
         >
           <ChevronRight aria-hidden="true" />
         </Button>
-        <h2 className="text-lg font-semibold" aria-live="polite" data-testid="calendar-title">
+        <h2
+          tabIndex={-1}
+          className="min-w-0 text-lg font-semibold max-sm:order-first max-sm:basis-full"
+          aria-live="polite"
+          data-testid="calendar-title"
+        >
           {title}
         </h2>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {end}
         <TimezoneToggle {...tz} />
-        <fieldset className="flex gap-1" aria-label={t(copy.toolbar.views)}>
+        <fieldset className="flex min-w-0 flex-wrap gap-1" aria-label={t(copy.toolbar.views)}>
           {CALENDAR_VIEWS.map((name) => (
             <Button
               key={name}

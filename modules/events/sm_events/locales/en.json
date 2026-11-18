@@ -116,6 +116,7 @@
     "invalid_rrule": "This repeat rule is not valid.",
     "rrule_frequency_refused": "Events can repeat daily, weekly, monthly or yearly.",
     "start_not_in_rule": "The start must be the first date the repeat rule produces. Change the start or the rule.",
+    "invalid_datetime": "Enter a valid date and time.",
     "invalid_local_time": "This time does not exist in the timezone: the clocks skip it.",
     "end_before_start": "The end must be after the start.",
     "duration_too_long": "An event can last at most {oneOff} days; when it repeats, each occurrence at most {series} days.",
@@ -472,6 +473,8 @@
       "loading": "Loading events…",
       "empty": "Nothing in this range",
       "no_calendars": "Select a calendar to see its events.",
+      "none_yet": "There are no calendars yet.",
+      "open_calendars": "Open Calendars",
       "error": "The events could not be loaded.",
       "truncated": "Showing the first {count} items in this range. Narrow the filters or switch to a shorter view."
     },
@@ -506,6 +509,7 @@
       "all": "All occurrences"
     },
     "create": {
+      "skipped_hour": "On this day the clock jumps from {from} to {to} ({zone}). Check the start time.",
       "title": "New event",
       "description": "Creates a draft. Open the full editor for everything else.",
       "title_label": "Title",

@@ -67,6 +67,8 @@ export function useOccurrences({ fetcher, visible, filters, refreshToken }: Args
       .fetcher({ ...latest.current.filters, ...padded }, mine.signal)
       .then((page) => {
         if (!live()) return;
+        // A 200 that is not an occurrence page is a failure, not an empty range.
+        if (!Array.isArray(page?.items)) throw new TypeError('malformed occurrence page');
         cache.put(padded, key, page);
         setState({ items: page.items, truncated: page.truncated, loading: false, error: null });
       })

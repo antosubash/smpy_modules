@@ -6,6 +6,7 @@ import {
   calendarUrl,
   chip,
   dragBy,
+  focusIsOnCalendar,
   gridSize,
   guard,
   listEvents,
@@ -144,11 +145,18 @@ test('the keyboard reaches an event; Escape returns to it; Move... moves it', as
   await page.getByRole('button', { name: 'Move…' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Move or resize' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(target).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Move…' }).click();
   const next = addDays(day, 1);
   await dialog.getByLabel('Start').fill(`${next}T14:00`);
   await dialog.getByLabel('End', { exact: true }).fill(`${next}T15:00`);
   await dialog.getByRole('button', { name: 'Move', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Focus is on the moved chip or, while it is rebuilt, the title: never lost to the page.
+  await expect.poll(() => focusIsOnCalendar(page)).toBe(true);
   await page.reload();
   await expect(chip(page, one)).toContainText('2:00');
   const saved = await apiEvent(page, oneOff.id);
@@ -212,8 +220,15 @@ test('a writer without publish cannot drag a published event, and is told why', 
   await expect(target).toBeVisible();
   await expect(target.getByRole('img', { name: /Locked/ })).toBeVisible();
   const { column } = await gridSize(writer);
+  const writes: string[] = [];
+  writer.on('request', (request) => {
+    if (request.method() !== 'GET') writes.push(`${request.method()} ${request.url()}`);
+  });
   await dragBy(writer, target, column, 0);
-  await writer.waitForTimeout(500);
+  // A locked chip is not draggable: the drag sends nothing and the event stays put.
+  await writer.waitForLoadState('networkidle');
+  expect(writes).toEqual([]);
+  await expect(target.getByRole('img', { name: /Locked/ })).toBeVisible();
   expect((await apiEvent(page, oneOff.id)).start_local).toBe(`${day}T10:00`);
   await target.click();
   await expect(writer.getByTestId('calendar-detail')).toContainText(

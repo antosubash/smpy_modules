@@ -48,6 +48,10 @@ export function Calendar(props: CalendarProps) {
     () => calendars.filter((c) => state.calendars.includes(c.id)),
     [calendars, state.calendars],
   );
+  const focusRef = editing?.focusRef;
+  useEffect(() => {
+    if (focusRef) focusRef.current = (key) => grid.current?.focusEvent(key) ?? false;
+  }, [focusRef]);
   const myZone = browserTimeZone();
   const zone = gridTimeZone(state.tzMode, shown, props.defaultTimezone, myZone);
   const calendarZone = gridTimeZone('calendar', shown, props.defaultTimezone, myZone);
@@ -155,6 +159,8 @@ export function Calendar(props: CalendarProps) {
             empty={items.length === 0}
             truncated={!nothingShown && data.truncated}
             noCalendars={nothingShown}
+            noneExist={calendars.length === 0}
+            action={props.noCalendarsAction}
             onRetry={data.retry}
           />
           <Suspense fallback={<Skeleton className="h-[72vh] w-full" />}>

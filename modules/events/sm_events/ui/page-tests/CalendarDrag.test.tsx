@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toEventInput } from '../calendar/adapter/mapping';
-import { fakeGrid } from '../calendar/test-support/FakeGrid';
+import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import type { OccurrenceChange } from '../calendar/types';
 import { MARCH, occurrence } from './calendar-support';
 import { eventDetail, flush, refusal, stubFetch } from './support';
 import { act, mount } from './test-dom';
 
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }));
-vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/test-support/FakeGrid'));
+vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/FakeGrid-test-support'));
 const { ConsoleCalendar } = await import('../calendar/console/ConsoleCalendar');
 
 const OCCURRENCES = '/api/events/occurrences';

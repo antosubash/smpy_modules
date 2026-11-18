@@ -2,9 +2,11 @@
  *  is unit-tested without a browser; only types come from the library. */
 import type { EventInput } from '@fullcalendar/react';
 import { Temporal } from 'temporal-polyfill';
+import { readableOn } from '../../utils/contrast';
 import type { Occurrence } from '../../utils/types-events';
+import { chipTime, readsBackwards } from '../time/format';
 import { DEFAULT_CREATE_MINUTES, SLOT_MINUTES } from '../time/range';
-import { addDays, dateIn } from '../time/zones';
+import { addDays, dateIn, isNonexistent } from '../time/zones';
 import type {
   CalendarEditing,
   CalendarView,
@@ -59,6 +61,7 @@ export function toEventInput(
     start: placement?.start ?? (o.all_day ? (o.start_date ?? o.start) : o.start),
     end: placement?.end ?? (o.all_day ? (o.end_date ?? o.end) : o.end),
     color: o.color,
+    textColor: readableOn(o.color),
     interactive: true,
     startEditable: movable,
     durationEditable: movable,
@@ -79,9 +82,17 @@ export function chipFor<T>(
   event: { extendedProps: Record<string, unknown> },
   timeText: string,
   render: (occurrence: Occurrence, timeText: string) => T,
+  timeZone?: string,
+  locale?: string,
 ): T | undefined {
   const occurrence = event.extendedProps.occurrence as Occurrence | undefined;
-  return occurrence ? render(occurrence, timeText) : undefined;
+  if (!occurrence) return undefined;
+  // The library's own range text cannot tell the two passes of a repeated hour apart.
+  const text =
+    timeZone && !occurrence.all_day && readsBackwards(occurrence, timeZone)
+      ? timeText && chipTime(occurrence, timeZone, locale)
+      : timeText;
+  return render(occurrence, text);
 }
 
 /** What an edited `EventApi` reports (the library's own type satisfies it). */
@@ -121,6 +132,53 @@ export function toChange(
         .toString();
   return { occurrence, kind, start, end, allDay: false };
 }
+
+/** FullCalendar's civil delta: calendar units plus milliseconds, applied to a wall time. */
+export type CivilDelta = { years: number; months: number; days: number; milliseconds: number };
+export type DragInfo = {
+  oldEvent: EditedEvent;
+  delta?: CivilDelta;
+  startDelta?: CivilDelta;
+  endDelta?: CivilDelta;
+};
+
+function wallAfter(edgeStr: string, delta: CivilDelta): string {
+  const { years, months, days, milliseconds } = delta;
+  // Two steps: a Temporal duration cannot mix the signs of its fields.
+  return Temporal.PlainDateTime.from(edgeStr.slice(0, 19))
+    .add({ years, months, days })
+    .add({ milliseconds })
+    .toString();
+}
+
+/** Whether the wall time the pointer meant is one the grid's zone skips. FullCalendar hands
+ *  back an instant it has already moved forward out of the gap, so the intent is rebuilt
+ *  from what it does keep: the old edge's wall time and the civil delta (the time grid is
+ *  wall-clock based). A move is judged by its start, a resize by the edge it pulled. */
+export function skipsWallTime(
+  kind: 'move' | 'resize',
+  old: EditedEvent,
+  info: Omit<DragInfo, 'oldEvent'>,
+  timeZone: string,
+): boolean {
+  if (old.allDay) return false;
+  const edges: [string, CivilDelta | undefined][] =
+    kind === 'move'
+      ? [[old.startStr, info.delta]]
+      : [
+          [old.startStr, info.startDelta],
+          [old.endStr, info.endDelta],
+        ];
+  return edges.some(
+    ([edge, delta]) =>
+      Boolean(edge && delta) && isNonexistent(wallAfter(edge, delta as CivilDelta), timeZone),
+  );
+}
+
+/** Whether a click or a selection on the grid may start a new event: something writable is
+ *  shown, and no write is in flight (a press on a busy chip must not become a selection). */
+export const acceptsSelection = (editing: CalendarEditing | undefined): boolean =>
+  Boolean(editing?.canCreate) && editing?.pendingKeys.size === 0;
 
 /** A drag between the all-day row and the time grid would change `all_day`: refused (the
  *  Move dialog and the editor do that). */

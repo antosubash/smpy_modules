@@ -101,6 +101,7 @@ describe('refusals', () => {
     expect(await finish(done)).toBe(false);
     expect(calls.filter((c) => c.method === 'PATCH')).toHaveLength(1);
     expect(toast.error).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
   });
 
   it('a 403 publish_required reverts with the reason', async () => {
@@ -109,6 +110,7 @@ describe('refusals', () => {
     expect(toast.error).toHaveBeenCalledWith(
       'Only a publisher can change a published or scheduled event.',
     );
+    expect(invalidate).toHaveBeenCalledTimes(1);
   });
 
   it('a 404 says the event is gone and refreshes', async () => {
@@ -144,6 +146,7 @@ describe('refusals', () => {
     expect(toast.error).toHaveBeenCalledWith(
       expect.stringContaining('happens twice in Europe/Vienna'),
     );
+    expect(invalidate).toHaveBeenCalledTimes(1);
   });
 
   it('a network failure reverts with the offline text', async () => {
@@ -155,5 +158,6 @@ describe('refusals', () => {
     );
     expect(await finish(start(move()))).toBe(false);
     expect(toast.error).toHaveBeenCalledWith('Could not reach the server. Check your connection.');
+    expect(invalidate).toHaveBeenCalledTimes(1);
   });
 });

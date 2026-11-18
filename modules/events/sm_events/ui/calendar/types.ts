@@ -48,7 +48,11 @@ export type CalendarState = {
 };
 
 /** Instants for a timed slot; dates with an exclusive end for an all-day one. */
-export type CreateSlot = { allDay: boolean; start: string; end: string };
+export type CreateSlot = {
+  allDay: boolean;
+  start: string;
+  end: string;
+};
 export type OccurrenceChange = {
   occurrence: Occurrence;
   /** `reschedule` (the Move dialog) names both ends; a drag moves or resizes one. */
@@ -56,6 +60,8 @@ export type OccurrenceChange = {
   start: string;
   end: string;
   allDay: boolean;
+  /** The grid's drop landed on a wall time its zone skips (the library moved it forward). */
+  skipsWallTime?: true;
 };
 export type CalendarEditing = {
   canCreate: boolean;
@@ -67,6 +73,8 @@ export type CalendarEditing = {
   /** Opens the Move dialog; `returnFocus` is the event's element, for when it closes. */
   onMove: (occurrence: Occurrence, returnFocus?: HTMLElement | null) => void;
   pendingKeys: ReadonlySet<string>;
+  /** The calendar fills it with a function that focuses an occurrence's element. */
+  focusRef?: { current: ((key: string) => boolean) | null };
 };
 
 export type EventChipProps = {
@@ -111,6 +119,8 @@ export type CalendarProps = {
   /** Absent: read-only (the public site). */
   editing?: CalendarEditing;
   slots?: CalendarSlots;
+  /** Shown beside "no calendars yet", for someone who can create one. */
+  noCalendarsAction?: ReactNode;
   /** Bump to invalidate the cache and refetch. */
   refreshToken?: number;
 };
@@ -122,7 +132,8 @@ export type GridHandle = {
   next(): void;
   setView(view: CalendarView): void;
   gotoDate(date: string): void;
-  focusEvent(key: string): void;
+  /** Focus an occurrence's element; `false` when it is not on the grid. */
+  focusEvent(key: string): boolean;
 };
 export type RangeChange = { visible: Range; title: string; view: CalendarView; date: string };
 export type GridProps = {

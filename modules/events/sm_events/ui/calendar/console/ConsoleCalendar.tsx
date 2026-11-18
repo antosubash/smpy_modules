@@ -1,6 +1,7 @@
 /** The console's `Calendar`: the occurrence fetcher over the events API, the content language
  *  titles are asked in, the filter options and the write layer (drag, resize, dialogs). */
-import { useCallback, useMemo, useState } from 'react';
+import { Link } from '@inertiajs/react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { listOccurrences } from '../../utils/api-events';
 import { keys, useT } from '../../utils/i18n';
 import type { Category } from '../../utils/types';
@@ -14,6 +15,7 @@ import type {
   Occurrence,
   OccurrenceFetcher,
 } from '../types';
+import { useFocusReturn } from './focusReturn';
 import { MoveDialog } from './MoveDialog';
 import { QuickCreateDialog } from './QuickCreateDialog';
 import { useCalendarWrites } from './useCalendarWrites';
@@ -24,6 +26,8 @@ type Props = {
   defaultTimezone: string;
   contentLocales: string[];
   editorUrl: string;
+  /** The Calendars screen, for someone who may create one; absent otherwise. */
+  calendarsUrl?: string;
   initialState?: Partial<CalendarState>;
   onStateChange?: (state: CalendarState) => void;
 };
@@ -40,6 +44,7 @@ export function ConsoleCalendar({
   defaultTimezone,
   contentLocales,
   editorUrl,
+  calendarsUrl,
   initialState,
   onStateChange,
 }: Props) {
@@ -73,28 +78,37 @@ export function ConsoleCalendar({
   // A write refetches the range it changed.
   const [refresh, setRefresh] = useState(0);
   const invalidate = useCallback(() => setRefresh((n) => n + 1), []);
-  const writes = useCalendarWrites({ invalidate, editorUrl });
+  const focusRef = useRef<((key: string) => boolean) | null>(null);
+  const focusEvent = useCallback((key: string) => void focusRef.current?.(key), []);
+  const writes = useCalendarWrites({ invalidate, editorUrl, focusEvent });
   const [slot, setSlot] = useState<CreateSlot | null>(null);
   const [moving, setMoving] = useState<{
     occurrence: Occurrence;
     element: HTMLElement | null;
   } | null>(null);
-  // The calendar a new event starts on: the one shown, when exactly one is.
-  const [shown, setShown] = useState(initialState?.calendars ?? []);
-  const known = shown.filter((id) => calendars.some((c) => c.id === id));
-  const preferred = known.length === 1 ? (known[0] ?? null) : null;
-  const canCreate = calendars.some((c) => c.can_write_events);
+  // A new event goes to a calendar the filter shows (a draft on a hidden one would never
+  // appear), and starts on the shown one when exactly one is.
+  const [shown, setShown] = useState(initialState?.calendars ?? calendars.map((c) => c.id));
+  const shownCalendars = useMemo(
+    () => calendars.filter((c) => shown.includes(c.id)),
+    [calendars, shown],
+  );
+  const preferred = shownCalendars.length === 1 ? (shownCalendars[0]?.id ?? null) : null;
+  const canCreate = shownCalendars.some((c) => c.can_write_events);
   const editing = useMemo<CalendarEditing>(
     () => ({
       canCreate,
       creating: slot !== null,
-      onCreate: setSlot,
+      // Nothing opens without a shown calendar the user can write to.
+      onCreate: (next) => canCreate && setSlot(next),
       onChange: writes.onChange,
       onMove: (occurrence, element) => setMoving({ occurrence, element: element ?? null }),
       pendingKeys: writes.pendingKeys,
+      focusRef,
     }),
     [canCreate, slot, writes.onChange, writes.pendingKeys],
   );
+  const restoreFocus = useFocusReturn(focusRef);
   return (
     <>
       <Calendar
@@ -110,17 +124,25 @@ export function ConsoleCalendar({
         }}
         editing={editing}
         refreshToken={refresh}
+        noCalendarsAction={
+          calendarsUrl ? (
+            <Link className="underline" href={calendarsUrl}>
+              {t(keys.events.calendar.status.open_calendars)}
+            </Link>
+          ) : null
+        }
       />
       {writes.dialogs}
       <MoveDialog
         occurrence={moving?.occurrence ?? null}
         returnFocus={moving?.element}
+        restoreFocus={restoreFocus}
         onSubmit={writes.submit}
         onClose={() => setMoving(null)}
       />
       <QuickCreateDialog
         slot={slot}
-        calendars={calendars}
+        calendars={shownCalendars}
         preferred={preferred}
         defaultLocale={contentLocales[0] ?? 'en'}
         editorUrl={editorUrl}

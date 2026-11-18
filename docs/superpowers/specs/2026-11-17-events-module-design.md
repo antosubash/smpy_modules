@@ -439,5 +439,5 @@ client-side (13). "All occurrences" shifts the master on the event's wall clock
 and never rewrites the rule, so a weekday change on a `BYDAY` series is the
 server's `start_not_in_rule` (14). An occurrence carries no revision, so a write
 reads the event first and stops as stale when the grid is out of date (15).
-Found in the browser: FullCalendar 7 needs its interaction plugin for drag,
-resize and select, which the adapter loads explicitly.
+The interaction plugin must be in the adapter's plugin list: without it FullCalendar 7
+cannot drag, resize or select.

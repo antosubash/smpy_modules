@@ -23,6 +23,7 @@ import { Name } from '../../utils/isolate';
 import { addDays, toInstant, toLocal } from '../time/zones';
 import type { Occurrence, OccurrenceChange } from '../types';
 import { timeProblems } from './quickCreate';
+import { timeErrors } from './timeErrors';
 import type { WriteResult } from './useCalendarWrites';
 import { isSeries, type Scope } from './writes';
 
@@ -30,14 +31,21 @@ type Props = {
   occurrence: Occurrence | null;
   /** The event's element, which gets focus back when the dialog closes. */
   returnFocus?: HTMLElement | null;
+  /** Puts focus back on the occurrence's element, or wherever that element went. */
+  restoreFocus?: (occurrence: Occurrence, element: HTMLElement | null) => void;
   onSubmit: (change: OccurrenceChange, scope?: Scope) => Promise<WriteResult>;
   onClose: () => void;
 };
 
-export function MoveDialog({ occurrence, returnFocus, onSubmit, onClose }: Props) {
+export function MoveDialog({ occurrence, returnFocus, restoreFocus, onSubmit, onClose }: Props) {
   // The occurrence outlives the dialog's closing, for the exit animation and the focus.
   const last = useRef(occurrence);
-  if (occurrence) last.current = occurrence;
+  // The parent clears both when it closes the dialog, before the focus is handed back.
+  const lastElement = useRef(returnFocus);
+  if (occurrence) {
+    last.current = occurrence;
+    lastElement.current = returnFocus;
+  }
   const shown = occurrence ?? last.current;
   const { t } = useT();
   const copy = keys.events.calendar.move;
@@ -52,9 +60,14 @@ export function MoveDialog({ occurrence, returnFocus, onSubmit, onClose }: Props
             document.getElementById('move-start')?.focus();
           }}
           onCloseAutoFocus={(event) => {
-            if (!returnFocus?.isConnected) return;
+            const element = lastElement.current ?? null;
+            if (restoreFocus && last.current) {
+              event.preventDefault();
+              return restoreFocus(last.current, element);
+            }
+            if (!element?.isConnected) return;
             event.preventDefault();
-            returnFocus.focus();
+            element.focus();
           }}
         >
           <DialogHeader>
@@ -99,15 +112,7 @@ function MoveForm({
     if (!start) found['times.start'] = requiredText();
     if (!end) found['times.end'] = requiredText();
     if (Object.keys(found).length === 0) {
-      const problem = timeProblems({ allDay: o.all_day, start, end }, zone);
-      if (problem.start) found['times.start'] = t(keys.events.errors.invalid_local_time);
-      if (problem.end) {
-        found['times.end'] = t(
-          problem.end === 'order'
-            ? keys.events.errors.end_before_start
-            : keys.events.errors.invalid_local_time,
-        );
-      }
+      Object.assign(found, timeErrors(timeProblems({ allDay: o.all_day, start, end }, zone), t));
     }
     if (Object.keys(found).length > 0) return errors.reject(found);
     if (unchanged) return onClose();

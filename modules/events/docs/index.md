@@ -216,6 +216,25 @@ difference; the rule text is never rewritten, so moving a `BYDAY` series to
 another weekday is a 422 `start_not_in_rule` ("open the editor"), and a shift
 that orphans overrides asks for the confirmation the editor asks for.
 
+"All occurrences" leaves an occurrence that has its own exception where the
+exception put it: only the master moves. A change another session made to a field
+the drag does not write (a venue, say) does not make the drag stale; the write
+sends the fetched revision and keeps that field. The browser console logs the
+expected 409 and 422 answers as "Failed to load resource" lines; they are the
+network's report, not a script error.
+
+**A click near a clock jump.** On the day the clocks jump forward (02:00 to 03:00
+in Vienna) the grid still draws the slots in the skipped hour, and FullCalendar
+moves a click there forward, so the callback cannot say which slot was meant.
+Quick create therefore follows one rule: when the proposed start, on the
+calendar's clock, lies in the window after a jump (from where it ends up to one
+jump's length later: 03:00 to 03:59 in Vienna, 02:30 to 02:59 for Lord Howe's
+half-hour jump), it says "On this day the clock jumps from 02:00 to 03:00
+(Europe/Vienna). Check the start time." The note is true for a click on the
+skipped slots and on the real ones alike. A drag or resize onto a skipped hour is
+refused (`invalid_local_time`), because there the intended wall time is rebuilt
+from the old position and the delta.
+
 An occurrence carries no revision, so a write first reads the event and stops as
 stale, sending nothing, if what the grid showed no longer matches; otherwise it
 sends the fetched revision.
@@ -251,7 +270,8 @@ screens never request it.
 
 ## FullCalendar
 
-The grid is FullCalendar 7, pinned exactly, MIT packages only: the allow-list
+The grid is FullCalendar 7 (`@fullcalendar/react` `^7.1.5`, as every module ranges its
+third-party packages; `package-lock.json` holds the resolved version), MIT packages only: the allow-list
 is `@fullcalendar/react`, `@fullcalendar/core` and `@full-ui/headless-calendar`,
 and `boundaries.test.ts` fails on any other `@fullcalendar/*` or `@full-ui/*`
 package, on a name containing `scheduler`, `resource`, `timeline` or `premium`,
