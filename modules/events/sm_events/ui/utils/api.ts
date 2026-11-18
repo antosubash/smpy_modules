@@ -1,6 +1,7 @@
 /** Framework transport supplies same-origin credentials and the session CSRF token. */
 import { type ApiFetchInit, apiFetch, NETWORK_FAILURE } from '@simple-module-py/ui/lib/api';
 import { keys, translate as t } from './i18n';
+import { EVENT_MAX_DAYS, SERIES_EVENT_MAX_DAYS } from './limits';
 import type { Calendar, CalendarInput, Category, CategoryInput, Visibility } from './types';
 
 export class ApiError extends Error {
@@ -76,6 +77,12 @@ export function errorText(error: unknown, gone?: string): string {
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);
   if (error.status === 429) return rateLimitText(error.retryAfter);
+  if (error.code === 'duration_too_long') {
+    return t(messages.duration_too_long as string, {
+      oneOff: EVENT_MAX_DAYS,
+      series: SERIES_EVENT_MAX_DAYS,
+    });
+  }
   if (messages[error.code]) return t(messages[error.code]);
   if (error.status === NETWORK_FAILURE) return t(keys.events.errors.offline);
   if (error.status === 401) return t(keys.events.errors.session_expired);

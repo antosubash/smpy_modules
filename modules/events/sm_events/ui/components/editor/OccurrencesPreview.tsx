@@ -1,7 +1,7 @@
 import { Badge } from '@simple-module-py/ui/components/ui/badge';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import type { Outcome } from '../../hooks/useEventActions';
-import { formatInstant, formatWall } from '../../utils/datetime';
+import { formatInstant, formatWall, utcOffsetAt } from '../../utils/datetime';
 import { keys, useT } from '../../utils/i18n';
 import type { Override, OverrideInput, PreviewOccurrence } from '../../utils/types-events';
 import { OverrideDialog } from './OverrideDialog';
@@ -36,7 +36,9 @@ export function OccurrencesPreview(props: Props) {
   const rows = occurrences.map((occ) => {
     const found = overrides.find((o) => same(o.original_start, occ.start));
     if (found) shown.add(found.id);
-    return { occ, found, when: formatWall(occ.start_local, locale) };
+    // A date-only (all-day) row has no clock time to qualify. Labels keep the plain `when`.
+    const offset = allDay ? null : utcOffsetAt(occ.start, timezone);
+    return { occ, found, when: formatWall(occ.start_local, locale), offset };
   });
   const others = overrides.filter((o) => !shown.has(o.id));
   const off = !props.canOverride || props.busy;
@@ -75,9 +77,10 @@ export function OccurrencesPreview(props: Props) {
         <p className="text-sm text-muted-foreground">{t(copy.none)}</p>
       )}
       <ul className="grid gap-2">
-        {rows.map(({ occ, found, when }) => (
+        {rows.map(({ occ, found, when, offset }) => (
           <li key={occ.start} className="flex flex-wrap items-center gap-2 text-sm">
             <span className={found?.kind === 'skipped' ? 'line-through' : undefined}>{when}</span>
+            {offset && <span className="text-muted-foreground">({offset})</span>}
             {found && <Badge variant="secondary">{t(copy[`kind_${found.kind}`])}</Badge>}
             {found && described(found) && <span>{described(found)}</span>}
             {props.saved && (

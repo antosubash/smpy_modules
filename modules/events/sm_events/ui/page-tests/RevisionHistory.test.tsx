@@ -99,6 +99,7 @@ describe('revision history', () => {
       actor,
       actor_name: name,
       system: actor === null,
+      is_self: false,
       created_at: '2026-06-01T10:00:00Z',
       note: null,
     });
@@ -120,6 +121,38 @@ describe('revision history', () => {
     expect(rows[1]?.textContent).toContain('Unknown user');
     expect(rows[0]?.textContent).toContain('System');
     expect(rows[0]?.textContent).not.toContain('Unknown user');
+    await view.unmount();
+  });
+
+  it("says You for the caller's own steps, with or without a display name", async () => {
+    const row = (number: number, name: string | null, self: boolean) => ({
+      number,
+      action: 'updated',
+      actor: self ? 'me' : 'u2',
+      actor_name: name,
+      system: false,
+      is_self: self,
+      created_at: '2026-06-01T10:00:00Z',
+      note: null,
+    });
+    const { view } = await open(
+      {},
+      {
+        [`GET ${API}/e1/revisions`]: () => [
+          row(3, null, true),
+          row(2, 'Olga', true),
+          row(1, null, false),
+        ],
+      },
+    );
+    await click(view.button('History'));
+    await flush();
+    const rows = [...document.querySelectorAll('[role="dialog"] ol > li')];
+    expect(rows[0]?.textContent).toContain('You');
+    expect(rows[0]?.textContent).not.toContain('Unknown user');
+    expect(rows[1]?.textContent).toContain('You');
+    expect(rows[1]?.textContent).not.toContain('Olga');
+    expect(rows[2]?.textContent).toContain('Unknown user');
     await view.unmount();
   });
 });

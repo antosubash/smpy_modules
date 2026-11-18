@@ -105,10 +105,11 @@ async def _history_event(db: Any, who: Any, event_id: uuid.UUID) -> Event:
     return event
 
 
-def _revision_out(model: Any, row: Any, names: dict[str, str | None]) -> Any:
+def _revision_out(model: Any, row: Any, names: dict[str, str | None], who: Any) -> Any:
     out = model.model_validate(row, from_attributes=True)
     out.system = row.actor is None
     out.actor_name = names.get(row.actor) if row.actor else None
+    out.is_self = row.actor is not None and row.actor == who.user_id
     return out
 
 
@@ -119,7 +120,7 @@ async def list_revisions(
     await _history_event(db, who, event_id)
     rows = await revisions.list_revisions(db, event_id)
     names = await member_names(request, db, [r.actor for r in rows if r.actor])
-    return [_revision_out(RevisionOut, r, names) for r in rows]
+    return [_revision_out(RevisionOut, r, names, who) for r in rows]
 
 
 @router.get(f"{EVENT}/revisions/{{number}}")
@@ -129,7 +130,7 @@ async def get_revision(
     await _history_event(db, who, event_id)
     row = await revisions.get_revision(db, event_id, number)
     names = await member_names(request, db, [row.actor] if row.actor else [])
-    return _revision_out(RevisionDetail, row, names)
+    return _revision_out(RevisionDetail, row, names, who)
 
 
 @router.post(f"{EVENT}/overrides")

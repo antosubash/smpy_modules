@@ -196,7 +196,12 @@ def validate(rule: Rule, span: Span, *, all_day: bool, timezone: str) -> datetim
     hits = iterate(rule, dtstart_local=dtstart, lower_local=dtstart, until_local=bound)
     first = next(hits, None)
     if first != dtstart:
-        raise InvalidRule(constants.START_NOT_IN_RULE_DETAIL, code=constants.START_NOT_IN_RULE_CODE)
+        raise InvalidRule(
+            constants.START_NOT_IN_RULE_DETAIL,
+            code=constants.START_NOT_IN_RULE_CODE,
+            # The start is what a person picked last and can move; the rule is what they meant.
+            field=constants.START_FIELD,
+        )
     if rule.count is None and rule.until is None:
         return None  # endless
     last, seen = first, 1

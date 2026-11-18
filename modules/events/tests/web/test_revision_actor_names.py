@@ -134,3 +134,15 @@ async def test_a_non_member_actor_is_not_named(multi_client):
     await add_revisions(client, eid, ["e", "x"], tenant="a")
     rows = await history(client, eid, headers=owner)
     assert [rows[n]["actor_name"] for n in (1, 2, 3)] == ["Olga Owner", "Eve Editor", None]
+
+
+async def test_is_self_marks_the_callers_own_steps_only(client):
+    client.app.state.user_directory = Directory(USERS)
+    cal = (await cast(client))["I"]
+    event = await create(client, cal)  # revision 1: by the caller "o"
+    await add_revisions(client, event["id"], ["e", None])
+    rows = await history(client, event["id"])
+    assert {n: r["is_self"] for n, r in rows.items()} == {1: True, 2: False, 3: False}
+    one = await client.get(f"{EV}/{event['id']}/revisions/1", headers=OWNER)
+    assert one.json()["is_self"] is True
+    assert "mia@example.com" not in str(rows)

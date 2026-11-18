@@ -40,7 +40,7 @@ export default function EventEditor(props: Props) {
   const ev = useEvent({ eventId: props.event_id, locales, timezone: props.default_timezone });
   const parentId = props.event_id ? null : new URLSearchParams(location.search).get('parent');
   const [incomplete, setIncomplete] = useState(false);
-  const guard = useLeaveGuard(ev.dirty);
+  const guard = useLeaveGuard(ev.dirty, LIST);
   const actions = useEventActions(ev, {
     incomplete,
     allowLeave: guard.allow,
@@ -177,7 +177,11 @@ export default function EventEditor(props: Props) {
             <OccurrencesPreview
               occurrences={preview.occurrences}
               loading={preview.loading}
-              error={preview.error}
+              error={
+                preview.error && Object.values(errors.fields).includes(preview.error)
+                  ? null
+                  : preview.error
+              }
               overrides={event?.overrides ?? []}
               allDay={form.all_day}
               timezone={form.timezone}

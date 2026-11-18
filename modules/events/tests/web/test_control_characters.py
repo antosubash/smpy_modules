@@ -111,3 +111,27 @@ async def test_api_rejects_separator_and_direction_names(client, bad):
     assert cat.status_code == 422, cat.text
     desc = await client.post(BASE, json={"name": "T", "description": "a\u202eb"}, headers=OWNER)
     assert desc.status_code == 422, desc.text
+
+
+@pytest.mark.parametrize("char", ["\u200b", "\u2060", "\ufeff"])
+def test_single_line_rejects_invisible_spaces(char):
+    with pytest.raises(ValidationError):
+        CalendarCreate(name=f"a{char}b")
+    with pytest.raises(ValidationError):
+        CalendarCreate(name=char)
+
+
+@pytest.mark.parametrize("char", ["\u200c", "\u200d"])
+def test_single_line_keeps_the_joiners_scripts_need(char):
+    assert CalendarCreate(name=f"می{char}خواهم").name == f"می{char}خواهم"
+    assert CalendarCreate(name=f"👩{char}💻").name == f"👩{char}💻"
+
+
+@pytest.mark.parametrize("char", ["​", "⁠", "﻿"])
+def test_an_event_title_and_seo_title_reject_invisible_spaces(char):
+    from sm_events.web.schemas.texts import TextIn
+
+    with pytest.raises(ValidationError):
+        TextIn(title=f"Con{char}cert")
+    with pytest.raises(ValidationError):
+        TextIn(title="Concert", seo_title=f"a{char}b")

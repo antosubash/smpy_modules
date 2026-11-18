@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import random
+import re
+from pathlib import Path
 
 import pytest
 from sm_events.content.richtext import ALLOWED_TAGS, clean
@@ -200,3 +203,24 @@ def test_output_never_carries_executable_markup():
         out = clean(raw).lower()
         for needle in ("<script", "<svg", "<img", "javascript:", " on"):
             assert needle not in out, (raw, out)
+
+
+BLOCK_CASES = json.loads((Path(__file__).parents[1] / "fixtures/richtext_blocks.json").read_text())
+
+
+@pytest.mark.parametrize("case", BLOCK_CASES, ids=[c["html"] for c in BLOCK_CASES])
+def test_well_formed_blocks(case):
+    """The editor reads the same table (``richtext.test.ts``): its normal form and this
+    output are one string, so opening and leaving the field never marks it changed."""
+    assert clean(case["html"]) == case["expected"]
+    assert clean(case["expected"]) == case["expected"]
+
+
+def test_no_block_is_ever_inside_a_paragraph():
+    rng = random.Random(7)
+    blocks = ["<p>", "</p>", "<ul>", "</ul>", "<ol>", "<li>", "</li>", "<h2>", "</h2>", "x", "<br>"]
+    for _ in range(300):
+        out = clean("".join(rng.choice(blocks) for _ in range(rng.randint(1, 30))))
+        assert not re.search(r"<(p|h2|h3)>(?:(?!</\1>).)*<(ul|ol|li|p|h2|h3|blockquote)>", out), out
+        assert "<br></li>" not in out and "<br></p>" not in out
+        assert "<p></p>" not in out and "<li></li>" not in out

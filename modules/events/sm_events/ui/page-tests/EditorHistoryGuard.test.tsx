@@ -8,6 +8,7 @@ import { act, click, mount, setValue } from './test-dom';
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }));
 const { default: EventEditor } = await import('../../pages/EventEditor');
+const { router } = await import('@inertiajs/react');
 const API = '/api/events/events';
 const props = {
   event_id: 'e1',
@@ -31,6 +32,7 @@ beforeEach(() => {
   inertia = vi.fn();
 });
 afterEach(() => {
+  vi.mocked(router.visit).mockClear();
   window.removeEventListener('popstate', inertia as EventListener);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -130,5 +132,28 @@ describe('the browser Back button', () => {
     await dirtyForm();
     await view.unmount();
     expect(back).not.toHaveBeenCalled();
+  });
+
+  it('does not visit the fallback when the step back happens (reached by an in-app visit)', async () => {
+    const view = await open();
+    await dirtyForm();
+    await pressBack();
+    await click(dialogButton('Leave and discard changes'));
+    await pressBack(); // the browser's step, delivered to the guard and to Inertia
+    await flush(350);
+    expect(inertia).toHaveBeenCalledTimes(1);
+    expect(router.visit).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
+  it('visits the list when there is nothing to step back to (first page of the tab)', async () => {
+    const view = await open();
+    await dirtyForm();
+    await pressBack();
+    await click(dialogButton('Leave and discard changes'));
+    expect(go).toHaveBeenCalledWith(-2); // and no popstate follows
+    await flush(350);
+    expect(router.visit).toHaveBeenCalledWith('/admin/events/list');
+    await view.unmount();
   });
 });

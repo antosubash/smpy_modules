@@ -132,6 +132,8 @@ export type Revision = {
   actor_name: string | null;
   /** No actor at all (the beat), as opposed to an actor whose name is unknown. */
   system: boolean;
+  /** The actor is the signed-in caller; shown as "You" even without a display name. */
+  is_self: boolean;
   created_at: string;
   note: string | null;
 };

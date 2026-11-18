@@ -22,6 +22,11 @@ _BIDI = frozenset("\u200e\u200f\u061c\u202a\u202b\u202c\u202d\u202e\u2066\u2067\
 """Direction marks and embeddings/overrides/isolates: they reorder the text
 around a name when it is shown in a sentence."""
 _LINE_SEPARATORS = frozenset("\u2028\u2029")
+_INVISIBLE = frozenset("\u200b\u2060\ufeff")
+"""Zero-width space, word joiner and BOM: they make a name that looks empty or
+that differs from another one by nothing visible. U+200C and U+200D (the
+zero-width non-joiner and joiner) stay allowed: Persian, Indic scripts and emoji
+sequences need them."""
 
 
 def lower_color(value: Any) -> Any:
@@ -38,9 +43,9 @@ def _reject_controls(value: Any, allowed: frozenset[str], extra: frozenset[str])
 
 def single_line(value: Any) -> Any:
     """Reject every control character, newline and tab included, plus the line
-    and paragraph separators and the direction controls. Runs on the raw input,
-    before any whitespace stripping can hide a trailing newline."""
-    return _reject_controls(value, frozenset(), _BIDI | _LINE_SEPARATORS)
+    and paragraph separators, the direction controls and the invisible spaces. Runs on
+    the raw input, before any whitespace stripping can hide a trailing newline."""
+    return _reject_controls(value, frozenset(), _BIDI | _LINE_SEPARATORS | _INVISIBLE)
 
 
 def multi_line(value: Any) -> Any:

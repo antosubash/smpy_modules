@@ -94,7 +94,7 @@ async def test_error_envelope_on_every_new_code(locales_client):
     # 422
     check(await post(rrule="FREQ=WEEKLY;BYHOUR=3"), 422, "invalid_rrule")
     check(await post(rrule="FREQ=HOURLY"), 422, "rrule_frequency_refused")
-    check(await post(rrule="FREQ=WEEKLY;BYDAY=TH"), 422, "start_not_in_rule")
+    check(await post(rrule="FREQ=WEEKLY;BYDAY=TH"), 422, "start_not_in_rule", "times.start")
     gap = {"timezone": "Europe/Vienna", "start": "2026-03-29T02:30", "end": "2026-03-29T04:00"}
     check(await post(times=gap), 422, "invalid_local_time", "times.start")
     back = {"timezone": "Europe/Vienna", "start": "2026-07-01T10:00", "end": "2026-07-01T09:00"}

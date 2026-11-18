@@ -48,9 +48,10 @@ export default function Events({ content_locales, can_create, categories, calend
         description={t(copy.subtitle)}
         actions={
           can_create && writable.length > 0 ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {writable.length > 1 && (
                 <NativeSelect
+                  className="max-w-full"
                   aria-label={t(copy.new_calendar)}
                   value={target}
                   onChange={(e) => setTarget(e.target.value)}
@@ -69,7 +70,7 @@ export default function Events({ content_locales, can_create, categories, calend
           ) : undefined
         }
       >
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <EventFilters
             filters={list.filters}
             calendars={calendars}
@@ -77,7 +78,7 @@ export default function Events({ content_locales, can_create, categories, calend
             locales={order}
             onChange={list.change}
           />
-          <fieldset className="flex gap-2" aria-label={t(copy.view_filter)}>
+          <fieldset className="flex min-w-0 flex-wrap gap-2" aria-label={t(copy.view_filter)}>
             {[false, true].map((trash) => (
               <Button
                 key={String(trash)}

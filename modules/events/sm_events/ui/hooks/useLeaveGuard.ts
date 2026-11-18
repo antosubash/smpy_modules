@@ -1,6 +1,9 @@
 import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+/** How long a history step may take to show up as a `popstate` before there is none. */
+const STEP_WAIT_MS = 250;
+
 type Visit = { url: URL; method: string; data: unknown; replace: boolean };
 /** What is being held: an Inertia visit, or a step through the browser history. */
 type Pending = 'visit' | 'history' | null;
@@ -19,12 +22,14 @@ type Pending = 'visit' | 'history' | null;
  *    form is dirty one sentinel entry (the same page again) sits on top of the
  *    history. Back lands on the real entry; a capture-phase `popstate` listener
  *    swallows it before Inertia's own, pushes the sentinel back and asks. Leaving
- *    then steps back past both entries; staying changes nothing. Once the form is
+ *    then steps back past both entries; staying changes nothing. When the editor
+ *    was the first page of the tab there is nothing to step back to and no
+ *    `popstate` follows, so Leave visits `fallback` instead: it always leaves. Once the form is
  *    clean again the sentinel is removed, so a saved page leaves no stray entry.
  *
  *  `allow` lets the next visit through, for the one a successful create makes
  *  itself; it answers whether that visit should replace the sentinel. */
-export function useLeaveGuard(dirty: boolean) {
+export function useLeaveGuard(dirty: boolean, fallback: string) {
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
   const allowed = useRef(false);
@@ -32,6 +37,7 @@ export function useLeaveGuard(dirty: boolean) {
   const sentinel = useRef(false);
   const dropping = useRef(false);
   const gone = useRef(false);
+  const stepped = useRef(false);
   const [pending, setPending] = useState<Pending>(null);
 
   useEffect(
@@ -66,7 +72,10 @@ export function useLeaveGuard(dirty: boolean) {
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
-      if (allowed.current) return;
+      if (allowed.current) {
+        stepped.current = true; // the step Leave asked for happened
+        return;
+      }
       if (dropping.current) {
         dropping.current = false;
         e.stopImmediatePropagation();
@@ -112,12 +121,15 @@ export function useLeaveGuard(dirty: boolean) {
         data: visit.data as Record<string, never>,
         replace: visit.replace || sentinel.current,
       });
-    } else if (sentinel.current) {
-      window.history.go(-2);
     } else {
-      window.history.back();
+      stepped.current = false;
+      if (sentinel.current) window.history.go(-2);
+      else window.history.back();
+      setTimeout(() => {
+        if (!stepped.current && !gone.current) router.visit(fallback);
+      }, STEP_WAIT_MS);
     }
-  }, []);
+  }, [fallback]);
   return {
     pending: pending !== null,
     stay: useCallback(() => {

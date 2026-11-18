@@ -19,7 +19,7 @@ export function categoryName(category: Category, locales: readonly string[], fal
 
 function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-1">
+    <div className="grid min-w-0 max-w-full gap-1">
       <Label htmlFor={id}>{label}</Label>
       {children}
     </div>
@@ -43,7 +43,7 @@ export function EventFilters({
   const { t } = useT();
   const copy = keys.events.list;
   return (
-    <fieldset className="flex flex-wrap items-end gap-3" aria-label={t(copy.filters)}>
+    <fieldset className="flex min-w-0 flex-wrap items-end gap-3" aria-label={t(copy.filters)}>
       <Field id="filter-calendar" label={t(copy.f_calendar)}>
         <NativeSelect
           id="filter-calendar"

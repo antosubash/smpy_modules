@@ -85,6 +85,9 @@ class RevisionOut(BaseModel):
     beat, for a non-member and for a label that carries an address."""
     system: bool = False
     """No actor at all (the beat), as opposed to an actor whose name is unknown."""
+    is_self: bool = False
+    """The actor is the caller, decided from the principal: a caller without a
+    display name is still shown as "You", never by an address."""
     created_at: datetime
     note: str | None
 

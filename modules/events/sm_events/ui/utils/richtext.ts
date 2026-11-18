@@ -111,14 +111,76 @@ function copy(from: Node, to: Node, depth: number): void {
   }
 }
 
+const BLOCKS = new Set(['p', 'ul', 'ol', 'li', 'blockquote', 'h2', 'h3']);
+const TEXT_BLOCKS = new Set(['p', 'h2', 'h3']);
+const isBlock = (node: Node): node is Element =>
+  node.nodeType === 1 && BLOCKS.has((node as Element).tagName.toLowerCase());
+const blank = (node: Node): boolean => !node.textContent?.trim();
+
+/** Well-formed block structure, the client half of what the server writes
+ *  (`_render` in `richtext.py`; `richtext_blocks.json` holds both to the same
+ *  answers): a block inside a `p` or heading is hoisted out, with the text around
+ *  it in a block of its own; a `br` that ends a block and a block without text go. */
+function tidy(parent: Node): void {
+  for (const child of Array.from(parent.childNodes)) {
+    if (child.nodeType !== 1) continue;
+    tidy(child);
+    if (!isBlock(child)) continue;
+    let pieces: Element[] = [child];
+    if (TEXT_BLOCKS.has(child.tagName.toLowerCase()) && Array.from(child.children).some(isBlock)) {
+      pieces = split(child);
+      for (const piece of pieces) parent.insertBefore(piece, child);
+      parent.removeChild(child);
+    }
+    for (const piece of pieces) if (blank(piece)) parent.removeChild(piece);
+  }
+  if (isBlock(parent)) trimTail(parent);
+}
+
+/** A text block cut at its block children: its inline runs, each in a block of the
+ *  same kind, and the block children as they are. */
+function split(block: Element): Element[] {
+  const out: Element[] = [];
+  let run: Element | null = null;
+  for (const kid of Array.from(block.childNodes)) {
+    if (isBlock(kid)) {
+      if (run) trimTail(run);
+      run = null;
+      out.push(kid);
+      continue;
+    }
+    if (!run) {
+      run = block.cloneNode(false) as Element;
+      out.push(run);
+    }
+    run.appendChild(kid);
+  }
+  if (run) trimTail(run);
+  return out;
+}
+
+function trimTail(block: Node): void {
+  for (let last = block.lastChild; last; last = block.lastChild) {
+    const stray = last.nodeType === 3 ? !last.nodeValue?.trim() : last.nodeName === 'BR';
+    if (!stray) break;
+    block.removeChild(last);
+  }
+}
+
+/** The allowed elements of `root`'s children, built fresh in a fragment that is
+ *  not part of the page. */
+export function cleanNode(root: Node): DocumentFragment {
+  const out = document.createDocumentFragment();
+  copy(root, out, 0);
+  tidy(out);
+  return out;
+}
+
 /** The allowed elements of `html`, built fresh in a fragment that is not part of
  *  the page. The parsed input never runs: a `DOMParser` document has no
  *  scripts, no loading and no handlers. */
 export function cleanFragment(html: string): DocumentFragment {
-  const parsed = new DOMParser().parseFromString(html, 'text/html');
-  const out = document.createDocumentFragment();
-  copy(parsed.body, out, 0);
-  return out;
+  return cleanNode(new DOMParser().parseFromString(html, 'text/html').body);
 }
 
 /** `html` as the allowed markup; the empty string when nothing but blanks is left. */

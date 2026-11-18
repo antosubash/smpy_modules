@@ -38,6 +38,13 @@ function offsetMinutes(timezone: string, at: number): number {
   return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0));
 }
 
+const label = (offset: number): string => {
+  const abs = Math.abs(offset);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `UTC${offset < 0 ? '-' : '+'}${hh}:${mm}`;
+};
+
 /** "UTC+02:00" for the wall clock `wall` in `timezone`; `null` for a zone the
  *  browser does not know. Two passes settle the offset next to a clock change. */
 export function utcOffset(wall: string, timezone: string): string | null {
@@ -46,12 +53,19 @@ export function utcOffset(wall: string, timezone: string): string | null {
   try {
     const guess = found.at.getTime();
     const first = offsetMinutes(timezone, guess);
-    const offset = offsetMinutes(timezone, guess - first * 60_000);
-    const sign = offset < 0 ? '-' : '+';
-    const abs = Math.abs(offset);
-    const hh = String(Math.floor(abs / 60)).padStart(2, '0');
-    const mm = String(abs % 60).padStart(2, '0');
-    return `UTC${sign}${hh}:${mm}`;
+    return label(offsetMinutes(timezone, guess - first * 60_000));
+  } catch {
+    return null;
+  }
+}
+
+/** "UTC+02:00" that `timezone` has at the instant `iso` (the event's zone, never
+ *  the browser's); `null` for a bad instant or a zone the browser does not know. */
+export function utcOffsetAt(iso: string, timezone: string): string | null {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return null;
+  try {
+    return label(offsetMinutes(timezone, at));
   } catch {
     return null;
   }

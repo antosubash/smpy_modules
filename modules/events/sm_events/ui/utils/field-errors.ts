@@ -76,7 +76,7 @@ const AT: Record<string, string> = {
   duration_too_long: 'times.end',
   invalid_rrule: 'rrule',
   rrule_frequency_refused: 'rrule',
-  start_not_in_rule: 'rrule',
+  start_not_in_rule: 'times.start',
   unknown_category: 'category_id',
 };
 

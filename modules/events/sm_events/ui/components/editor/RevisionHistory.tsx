@@ -138,7 +138,9 @@ function HistoryList({
               </Button>
             </div>
             <span className="text-muted-foreground">
-              {row.actor_name ? (
+              {row.is_self ? (
+                t(copy.actor_you)
+              ) : row.actor_name ? (
                 <Name>{row.actor_name}</Name>
               ) : row.system || row.actor === null ? (
                 t(copy.actor_system)
