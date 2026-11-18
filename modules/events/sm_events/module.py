@@ -60,9 +60,12 @@ class EventsModule(ModuleBase):
     async def on_startup(self, app: FastAPI) -> None:
         """The tenancy mode, read off the built middleware stack, the fail-closed guard on
         the framework's session class (as images does), and, once the settings are hydrated,
-        the public routes: where they mount and in which languages depend on the database."""
+        the public routes: where they mount and in which languages depend on the database. The log
+        filter that keeps a private feed token out of every request log goes on first."""
         from sm_events.core import boot, tenancy
+        from sm_events.feeds.tokens import log_redact
 
+        log_redact.install()  # first: nothing below may log a request before the filter is on
         tenancy.configure(app)
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:

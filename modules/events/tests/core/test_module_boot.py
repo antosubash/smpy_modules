@@ -52,3 +52,17 @@ async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch)
     bare = SimpleNamespace(state=SimpleNamespace())
     await EventsModule().on_startup(bare)
     assert calls == [("configure", bare)]
+
+
+async def test_on_startup_installs_the_token_log_filter():
+    import logging
+    from types import SimpleNamespace
+
+    from sm_events.feeds.tokens import log_redact
+
+    for name in log_redact.LOGGERS:  # a clean slate: another test may have installed it
+        target = logging.getLogger(name)
+        target.filters = [f for f in target.filters if not isinstance(f, log_redact.Filter)]
+    await EventsModule().on_startup(SimpleNamespace(state=SimpleNamespace()))
+    for name in log_redact.LOGGERS:
+        assert any(isinstance(f, log_redact.Filter) for f in logging.getLogger(name).filters), name
