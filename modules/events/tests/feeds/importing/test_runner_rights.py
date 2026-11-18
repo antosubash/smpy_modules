@@ -162,3 +162,36 @@ async def test_an_importer_removed_from_the_tenant_ends_the_import(monkeypatch):
         _ = tenant_scope
     finally:
         await state.engine.dispose()
+
+
+@pytest.mark.parametrize("how", ["inactive", "roles_unknown"])
+async def test_the_eager_launch_re_checks_the_importer_every_slice(events_app, how, monkeypatch):
+    """Through ``launch.launch`` itself (not a hand-passed importer): the first slice writes,
+    the importer is then deactivated, and the later slice ends the import ``importer_gone``."""
+    monkeypatch.setattr(launch_module, "celery_eager", lambda: True)
+    monkeypatch.setattr(constants, "IMPORT_APPLY_BATCH", 2)
+    app, state, directory, _members = await _live(events_app)
+    _cal, import_id = await stage(state, corpus.simple(4))
+    await run(state, import_id)
+    await queue(state, import_id)
+
+    real, calls = launch_module.run_import_async, []
+
+    async def slices(*args, **kwargs):
+        assert kwargs["importer"] is not None  # launch passes the check
+        answer = await real(*args, **{**kwargs, "clock": _expired()})
+        calls.append(answer)
+        if len(calls) == 1:
+            if how == "inactive":
+                email, name, _ = directory.users["m"]
+                directory.users["m"] = (email, name, False)
+            else:
+                directory.roles["m"] = None
+        return answer
+
+    monkeypatch.setattr(launch_module, "run_import_async", slices)
+    await launch_module.launch(app, tenant_id="default", import_id=import_id)
+    assert calls == ["more", "done"]
+    imp, items, _events = await read(state, import_id)
+    assert (imp.status, imp.error_code) == ("failed", "importer_gone")
+    assert [i.outcome for i in items] == ["created", "created", None, None]

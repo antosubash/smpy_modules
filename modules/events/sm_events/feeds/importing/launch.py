@@ -60,8 +60,11 @@ async def launch(app: Any, *, tenant_id: str, import_id: int) -> None:
         return
     factory = app.state.sm.db.session_factory
     locales = tuple(getattr(app.state, constants.PACKAGE).settings.content_locales)
+    importer = importer_check(app)
     while (
-        await run_import_async(factory, tenant_id=tenant_id, import_id=import_id, locales=locales)
+        await run_import_async(
+            factory, tenant_id=tenant_id, import_id=import_id, locales=locales, importer=importer
+        )
         == "more"
     ):
         pass

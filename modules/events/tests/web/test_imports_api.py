@@ -9,6 +9,7 @@ from sm_events.models import Event
 from sqlalchemy import select
 
 from tests.feeds.importing import corpus
+from tests.feeds.importing.runner_support import importer_keeps_stored_rights
 from tests.feeds.importing.staging_support import make_import
 from tests.support.access import seed_calendars
 from tests.support.app import as_user
@@ -23,6 +24,7 @@ SECRET_MAIL = "mailto:jane@example.com"
 def _eager(monkeypatch):
     """Celery's eager mode: the launch runs its slices on the request's own loop."""
     monkeypatch.setattr(launch_module, "celery_eager", lambda: True)
+    importer_keeps_stored_rights(monkeypatch)
 
 
 @pytest.fixture

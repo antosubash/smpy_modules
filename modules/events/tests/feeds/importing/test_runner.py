@@ -12,7 +12,14 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
 from tests.feeds.importing import corpus
-from tests.feeds.importing.runner_support import app_for, queue, read, run, stage
+from tests.feeds.importing.runner_support import (
+    app_for,
+    importer_keeps_stored_rights,
+    queue,
+    read,
+    run,
+    stage,
+)
 
 
 class Crash(BaseException):
@@ -22,6 +29,7 @@ class Crash(BaseException):
 async def test_parse_then_apply_eager(events_app, monkeypatch):
     _app, state = events_app
     monkeypatch.setattr(launch_module, "celery_eager", lambda: True)
+    importer_keeps_stored_rights(monkeypatch)
     app = app_for(state)
     _cal, import_id = await stage(state, corpus.simple(4))
     await launch_module.launch(app, tenant_id="default", import_id=import_id)
