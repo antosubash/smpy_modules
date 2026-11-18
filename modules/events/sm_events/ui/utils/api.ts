@@ -14,6 +14,8 @@ export class ApiError extends Error {
     public readonly retryAfter: number | null = null,
     /** The input the server says the refusal belongs to (`times.end`, `texts.de.slug`). */
     public readonly field: string | null = null,
+    /** The 422's `msg` per dotted `loc` (`extra.speaker`): a plugin's section shows its own. */
+    public readonly messages: Record<string, string> = {},
   ) {
     super(code);
   }
@@ -123,6 +125,16 @@ function fieldsOf(body: ErrorBody): string[] {
   );
 }
 
+function messagesOf(body: ErrorBody): Record<string, string> {
+  if (!Array.isArray(body?.detail)) return {};
+  const out: Record<string, string> = {};
+  for (const item of body.detail as { loc?: unknown; msg?: unknown }[]) {
+    if (!Array.isArray(item?.loc) || typeof item.msg !== 'string') continue;
+    out[item.loc.filter((part) => part !== 'body' && part !== 'query').join('.')] = item.msg;
+  }
+  return out;
+}
+
 export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> {
   const result = await apiFetch<T>(url, init);
   if (result.ok) return result.data;
@@ -134,6 +146,7 @@ export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> 
     result.status === 422 ? fieldsOf(body) : [],
     result.status === 429 && Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : null,
     typeof body?.field === 'string' ? body.field : null,
+    result.status === 422 ? messagesOf(body) : {},
   );
 }
 

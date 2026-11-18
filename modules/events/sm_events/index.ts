@@ -26,3 +26,22 @@ export type {
   ToolbarSlotProps,
   TzMode,
 } from './ui/calendar/types';
+
+// The plugin surface: what an `events-extensions.ts` registers and the props it receives.
+export {
+  registerEventType,
+  registerSource,
+  registerToolbarItem,
+} from './ui/extensions/registry';
+export type {
+  EditorSectionProps,
+  EventTypeRegistration,
+  ExtraValues,
+  LazyComponent,
+  PublicDetailProps,
+  SourceRegistration,
+  SourceSettingsProps,
+  SourceStatus,
+  ToolbarItemRegistration,
+  ToolbarSurface,
+} from './ui/extensions/types';
