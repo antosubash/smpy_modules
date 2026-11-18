@@ -35,12 +35,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from sm_records.contracts._dated_access import DatedCaller, may_read
+from sm_records.core import locales
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
-from sm_records.models import RecordStatus, RecordType, tables_for
+from sm_records.models import RecordType, tables_for
 from sm_records.records.index._coerce import coerce_date, coerce_datetime
 from sm_records.records.index._fields import declared_keys, indexed_map
 from sm_records.records.index.query import Filter, QueryError, Sort
+from sm_records.records.services import public as public_read
 from sm_records.records.services._listing import page_of
 from sm_records.schema.types import IndexKind
 
@@ -103,6 +105,26 @@ def _tenant(tenant_id: object) -> str:
     return tenant_id
 
 
+def _public_locale(locale: str | None, settings: RecordsSettings | None) -> None:
+    """The public is asked for one language that the site publishes, never defaulted: records'
+    own public read requires it too, and refuses one it does not publish."""
+    if locale is None:
+        raise ValueError("a public read needs a locale")
+    if locale not in locales.supported(settings or _ambient_settings()):
+        raise ValueError(f"{locale!r} is not a content locale")
+
+
+def _ambient_settings() -> RecordsSettings:
+    """Records' settings as a worker or a web process without an ``app`` reads them; where that
+    is not available the defaults (one language), which can only narrow what the public sees."""
+    from sm_records.contracts._newsletter_settings import records_settings
+
+    try:
+        return records_settings(None)
+    except Exception:
+        return RecordsSettings()
+
+
 def _limit(limit: object) -> int:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_DATED_BATCH:
         raise ValueError(f"limit must be an int from 1 to {MAX_DATED_BATCH}")
@@ -153,10 +175,13 @@ async def dated_records(
     caller: DatedCaller | None,
     locale: str | None,
     limit: int,
+    settings: RecordsSettings | None = None,
 ) -> DatedPage:
     """Published records of ``type_key`` whose ``field`` lies in ``[lo, hi)``, ascending by it,
     at most ``limit``. See the module docstring for who gets what."""
     tenant, size = _tenant(tenant_id), _limit(limit)
+    if caller is None:
+        _public_locale(locale, settings)
     if hi <= lo or (hi - lo) > timedelta(days=MAX_DATED_WINDOW_DAYS):  # type: ignore[operator]
         raise ValueError("the window must be positive and at most 800 days")
     with tenant_scope(tenant):
@@ -173,10 +198,18 @@ async def dated_records(
         record = tables_for(rtype).record
 
         def narrow(stmt: Any) -> Any:
-            stmt = stmt.where(record.status == RecordStatus.PUBLISHED, record.tenant_id == tenant)
-            if rtype.translatable and locale is not None:
-                stmt = stmt.where(record.locale == locale)
-            return stmt
+            if (
+                caller is None
+            ):  # exactly records' own public read: published, this tenant, this language
+                assert locale is not None
+                stmt = public_read.public_narrow(record, locale)(stmt)
+            else:
+                stmt = public_read.published_only(record, stmt)
+                if rtype.translatable and locale is not None:
+                    stmt = stmt.where(record.locale == locale)
+            return stmt.where(
+                record.invalid_since.is_(None)
+            )  # never a record with a stored invalid mark
 
         try:
             found = await page_of(

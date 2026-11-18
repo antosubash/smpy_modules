@@ -105,7 +105,7 @@ async def test_unknown_type_or_field_is_empty(db):
     await make_type(db)
     assert (await read(db, "nope")).hits == []
     assert (await read(db, field="nope")).hits == []
-    assert (await read(db, "nope", who=None)).hits == []
+    assert (await read(db, "nope", who=None, locale="en")).hits == []
 
 
 async def test_not_indexed_raises(db):
