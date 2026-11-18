@@ -38,6 +38,7 @@ __all__ = [
     "guessed",
     "index_path",
     "prefix",
+    "private_feed_path",
     "public_base_url",
     "public_key",
     "site_title",
@@ -93,6 +94,11 @@ def calendar_ics_path(slug: str | None, locale: str) -> str:
     if slug is None:
         return f"{_base(locale)}/{constants.SEGMENT_CALENDAR_FEED}.ics"
     return f"{_base(locale)}/{constants.SEGMENT_CALENDAR}/{_segment(slug)}.ics"
+
+
+def private_feed_path(token: str) -> str:
+    """A private feed link, on the default language's prefix (the language is on the link's row)."""
+    return f"{_prefix}/{constants.FEED_PATH_SEGMENT}/{token}.ics"
 
 
 def sitemap_path() -> str:

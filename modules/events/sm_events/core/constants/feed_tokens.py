@@ -34,6 +34,7 @@ __all__ = [
     "TOKEN_PATTERN",
     "TOKEN_PREFIX",
     "TOKEN_USER_MAX",
+    "WEBCAL_SCHEME",
 ]
 
 TOKEN_PREFIX: Final = "evf_"  # noqa: S105 - a public prefix, not a secret
@@ -48,6 +49,7 @@ TOKEN_LABEL_MAX: Final = 100
 TOKEN_USER_MAX: Final = 64
 
 FEED_PATH_SEGMENT: Final = SEGMENT_PRIVATE_FEED
+WEBCAL_SCHEME: Final = "webcal://"
 FEED_TOKENS_PER_USER_CALENDAR: Final = 5
 FEED_REVOKED_KEPT_DAYS: Final = 30
 FEED_LAST_USED_GRANULARITY: Final = timedelta(hours=1)

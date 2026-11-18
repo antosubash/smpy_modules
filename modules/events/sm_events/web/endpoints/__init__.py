@@ -21,6 +21,7 @@ def build_api_router() -> APIRouter:
         categories_api,
         events_actions_api,
         events_api,
+        feed_tokens_api,
         occurrences_api,
         shares_api,
     )
@@ -28,6 +29,7 @@ def build_api_router() -> APIRouter:
     router = APIRouter(dependencies=[Depends(bind_admin)])
     for sub in (
         calendars_api.router,
+        feed_tokens_api.router,
         categories_api.router,
         shares_api.router,
         events_api.router,
