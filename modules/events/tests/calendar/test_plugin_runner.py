@@ -241,7 +241,7 @@ async def test_context_carries_calendar_settings_viewer_limit(db):
     assert ctx.tenant_id == "default" and ctx.viewer == VIEWER
     assert ctx.calendar == cal and ctx.settings == DeskSettings(field="z")
     assert (ctx.limit, ctx.locale, ctx.default_locale) == (500, "en", "en")
-    assert ctx.db is db
+    assert isinstance(ctx.db, type(db))  # the host's own session only on a shared-connection engine
     anon = FakeSource("acme:anon")
     await run(db, [Call(cal, entry("acme:anon"), anon)], viewer=None)
     assert anon.calls[0][0].viewer is None and anon.calls[0][0].settings is None

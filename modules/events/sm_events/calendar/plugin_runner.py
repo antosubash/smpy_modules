@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -120,7 +120,9 @@ async def _one(
     )
     phase.called += 1
     try:
-        answer = await run_isolated(db, phase.slice(), lambda: source.occurrences(ctx, *window))
+        answer = await run_isolated(
+            db, phase.slice(), lambda session: source.occurrences(replace(ctx, db=session), *window)
+        )
         if not isinstance(answer, list | tuple):
             return [], _status(call, FAILED, CODE_INVALID_ANSWER)
         if len(answer) > constants.SOURCE_CALL_HARD_MAX_ITEMS:

@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from fastapi.exceptions import RequestValidationError
@@ -147,7 +147,11 @@ async def _check(
     if check is None:
         return
     try:
-        await run_isolated(db, constants.SOURCE_TIMEOUT_SECONDS, lambda: check(ctx, model))
+        await run_isolated(
+            db,
+            constants.SOURCE_TIMEOUT_SECONDS,
+            lambda session: check(replace(ctx, db=session), model),
+        )
     except SourceSettingsError as exc:
         loc = (*_BODY, index, "settings", *exc.loc)
         raise RequestValidationError([_error(loc, exc.message)]) from None
