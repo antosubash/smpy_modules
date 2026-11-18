@@ -29,6 +29,7 @@ __all__ = [
     "REMINDER_SEND_TIMEOUT",
     "REMINDER_STATES",
     "REMINDER_USER_MAX",
+    "SETTINGS_URL",
     "_PAGE_REMINDERS",
 ]
 
@@ -70,3 +71,6 @@ INVALID_LEAD_CODE: Final = "invalid_lead"
 INVALID_LEAD_DETAIL: Final = "That is not one of the allowed reminder times"
 REMINDERS_UNAVAILABLE_CODE: Final = "reminders_unavailable"
 REMINDERS_UNAVAILABLE_DETAIL: Final = "Reminders cannot be delivered on this site right now"
+
+SETTINGS_URL: Final = "/admin/settings/"
+"""The framework's Settings screen, where the two reminder settings are edited."""

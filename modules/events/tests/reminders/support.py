@@ -53,3 +53,48 @@ async def drop_share(db: Any, calendar: Calendar, user: str) -> None:
     for row in rows.scalars():
         await db.delete(row)
     await db.flush()
+
+
+# --- the HTTP cast -------------------------------------------------------------------------
+
+ORIGIN = "https://events.example.org"
+
+
+class _Delivers:
+    delivers_email = True
+
+    async def send(self, message) -> None:  # pragma: no cover - the API tests never send
+        raise AssertionError("an API test sent mail")
+
+
+def make_ready(app: Any, monkeypatch: Any) -> None:
+    """Everything reminders need to be available: a base URL, a delivering sender and a worker
+    runtime. Each test breaks what it wants to break."""
+    from simple_module_core.mail import install_mail_sender
+    from sm_events.reminders import worker_app
+
+    app.state.sm.settings.public_base_url = ORIGIN
+    install_mail_sender(_Delivers())
+    monkeypatch.setattr(worker_app, "worker_runtime_supported", lambda: True)
+
+
+async def seed_http(client: Any, tenant: str = "default") -> dict[str, Any]:
+    """The cast's calendars with a published and a draft event in each, committed.
+    ``{"P": cal, "pub": {"P": event, ...}, "draft": {...}}`` (ids are read, so no refresh)."""
+    from sm_events.core.tenancy import tenant_scope
+
+    with tenant_scope(tenant):
+        async with client.db_state.session_factory() as db:
+            cals = await seed_calendars(db)
+            pub = {k: await published(db, c, title=f"Pub {k}") for k, c in cals.items()}
+            drafts = {
+                k: await published(db, c, title=f"Draft {k}", status="draft")
+                for k, c in cals.items()
+            }
+            ids = {
+                "cal": {k: str(c.id) for k, c in cals.items()},
+                "pub": {k: str(e.id) for k, e in pub.items()},
+                "draft": {k: str(e.id) for k, e in drafts.items()},
+            }
+            await db.commit()
+    return ids

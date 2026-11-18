@@ -38,6 +38,16 @@ def menu_items() -> list[MenuItem]:
             permissions=[c.PERM_VIEW],
         ),
         MenuItem(
+            label=c.MENU_LABEL_REMINDERS,
+            label_key=c.MENU_LABEL_KEY_REMINDERS,
+            url=c.REMINDERS_URL,
+            icon=c.MENU_ICON_REMINDERS,
+            order=405,
+            group=c.MENU_GROUP,
+            group_key=c.MENU_GROUP_KEY,
+            permissions=[c.PERM_VIEW],
+        ),
+        MenuItem(
             label=c.MENU_LABEL_CATEGORIES,
             label_key=c.MENU_LABEL_KEY_CATEGORIES,
             url=c.CATEGORIES_URL,

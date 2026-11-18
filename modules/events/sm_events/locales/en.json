@@ -6,7 +6,8 @@
     "calendars": "Calendars",
     "categories": "Event categories",
     "calendar": "Calendar",
-    "import": "Import events"
+    "import": "Import events",
+    "reminders": "Reminders"
   },
   "share": {
     "button": "Share",
@@ -158,7 +159,11 @@
     "import_state": "This import cannot be changed in its current state.",
     "import_too_large": "The file is larger than the import limit.",
     "ics_invalid": "That does not look like a calendar file.",
-    "import_busy_tenant": "Too many imports are waiting in this organisation. Try again later."
+    "import_busy_tenant": "Too many imports are waiting in this organisation. Try again later.",
+    "follow_limit": "You already follow the most events reminders allow. Stop following one first.",
+    "not_published": "Only published events can send reminders.",
+    "invalid_lead": "Choose one of the reminder times offered.",
+    "reminders_unavailable": "Reminders are not available on this site right now."
   },
   "categories": {
     "title": "Categories",

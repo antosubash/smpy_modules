@@ -6,7 +6,8 @@
     "calendars": "Kalender",
     "categories": "Veranstaltungskategorien",
     "calendar": "Kalender",
-    "import": "Termine importieren"
+    "import": "Termine importieren",
+    "reminders": "Erinnerungen"
   },
   "share": {
     "button": "Teilen",
@@ -158,7 +159,11 @@
     "import_state": "Dieser Import lässt sich in seinem jetzigen Zustand nicht ändern.",
     "import_too_large": "Die Datei ist größer als das Importlimit.",
     "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus.",
-    "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut."
+    "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut.",
+    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben. Beende zuerst eine.",
+    "not_published": "Nur veröffentlichte Veranstaltungen können erinnern.",
+    "invalid_lead": "Wähle einen der angebotenen Erinnerungszeitpunkte.",
+    "reminders_unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar."
   },
   "categories": {
     "title": "Kategorien",

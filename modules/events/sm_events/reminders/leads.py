@@ -18,7 +18,13 @@ if TYPE_CHECKING:
     from sm_events.core.settings import EventsSettings
     from sm_events.models import Calendar
 
-__all__ = ["LEADS_INPUT_MAX", "effective_defaults", "validate_distinct", "validate_leads"]
+__all__ = [
+    "LEADS_INPUT_MAX",
+    "effective_defaults",
+    "install_defaults",
+    "validate_distinct",
+    "validate_leads",
+]
 
 LEADS_INPUT_MAX: Final = 16
 """Most values a request may carry: well above the set, so duplicates are forgiven, but a body
@@ -56,8 +62,13 @@ def _readable(values: Iterable[Any]) -> tuple[int, ...]:
     return tuple(sorted({value for value in values if _known(value)}))
 
 
+def install_defaults(settings: EventsSettings) -> tuple[int, ...]:
+    """The install-wide suggestion, stored values outside the set dropped."""
+    return _readable(settings.default_reminder_minutes)
+
+
 def effective_defaults(settings: EventsSettings, calendar: Calendar) -> tuple[int, ...]:
     """What "Remind me" preselects on ``calendar``: its own list when it has one (even an empty
     one), else the install-wide setting. Stored values outside the set are dropped."""
     own = calendar.default_reminder_minutes
-    return _readable(settings.default_reminder_minutes if own is None else own)
+    return install_defaults(settings) if own is None else _readable(own)

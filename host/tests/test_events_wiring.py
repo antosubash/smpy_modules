@@ -59,6 +59,7 @@ def test_views_and_menu_mounted():
         "/admin/events/categories",
         "/admin/events/import",
         "/admin/events/list",
+        "/admin/events/reminders",
         "/admin/events/edit/new",
         "/admin/events/edit/{event_id}",
     }
@@ -69,6 +70,7 @@ def test_views_and_menu_mounted():
         "/admin/events/calendars",
         "/admin/events/categories",
         "/admin/events/import",
+        "/admin/events/reminders",
     }
     assert min(items, key=lambda i: i.order).url == "/admin/events/"
     assert {i.url: i.permissions for i in items} == {
@@ -77,6 +79,7 @@ def test_views_and_menu_mounted():
         "/admin/events/calendars": ["events.view"],
         "/admin/events/categories": ["events.view", "events.manage"],
         "/admin/events/import": ["events.view", "events.manage"],
+        "/admin/events/reminders": ["events.view"],
     }
 
 

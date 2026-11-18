@@ -65,6 +65,7 @@ def test_calendar_is_the_first_entry_of_the_events_group():
         "Calendar",
         "Events",
         "Calendars",
+        "Reminders",
         "Event categories",
         "Import events",
     ]
