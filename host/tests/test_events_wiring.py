@@ -132,11 +132,13 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
             ) as http:
                 page = await http.get("/events/no-such-event")
                 feed = await http.get("/events/calendar.ics")
+                missing = await http.get("/events/no-such-event.ics")
                 write = await http.post("/events/no-such-event")
             return {
                 "paths": paths,
                 "page": page,
                 "feed": feed,
+                "missing": missing,
                 "write": write,
                 "get_public": is_public(app, "GET", "/events/x"),
                 "post_public": is_public(app, "POST", "/events/x"),
@@ -158,6 +160,9 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
     assert got["page"].status_code == 404, got["page"].text[:300]
     assert got["page"].headers["cache-control"] == "no-store"
     assert "PageBuilder/PublicNotFound" in got["page"].text
-    assert got["feed"].status_code == 404
-    assert got["feed"].json() == {"detail": "Not found", "code": "not_found"}
+    assert got["feed"].status_code == 200
+    assert got["feed"].headers["content-type"] == "text/calendar; charset=utf-8"
+    assert got["feed"].content.startswith(b"BEGIN:VCALENDAR\r\n")
+    assert got["missing"].status_code == 404
+    assert got["missing"].json() == {"detail": "Not found", "code": "not_found"}
     assert got["write"].status_code not in (200, 404)  # still behind the sign-in
