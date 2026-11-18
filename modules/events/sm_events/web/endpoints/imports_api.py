@@ -33,6 +33,7 @@ from simple_module_db import finalize_session
 from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.orm import defer
 
 from sm_events.core import constants
 from sm_events.core.access import ACTION_WRITE_EVENTS, POLICY
@@ -77,6 +78,7 @@ async def _row(db, import_id: int) -> EventImport:
     row = (
         await db.execute(
             select(EventImport)
+            .options(defer(EventImport.source))  # never the raw upload (up to 20 MiB)
             .where(EventImport.tenant_id == bound_tenant(), EventImport.id == import_id)  # type: ignore[arg-type]
             .execution_options(populate_existing=True)
         )
@@ -132,6 +134,7 @@ async def list_imports(
         (
             await db.execute(
                 select(EventImport)
+                .options(defer(EventImport.source))
                 .where(*where)  # type: ignore[arg-type]
                 .order_by(EventImport.id.desc())  # type: ignore[union-attr]
                 .offset((page - 1) * page_size)

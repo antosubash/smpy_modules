@@ -221,3 +221,28 @@ async def test_the_filename_is_a_safe_name(world):
     client, cals = world
     got = await upload(client, cals["P"], name="../../etc/passwd.ics")
     assert got.json()["filename"] == "passwd.ics"
+
+
+async def test_list_and_get_never_load_the_raw_upload(world):
+    """``events_import.source`` holds up to 20 MiB: no list or get statement selects it."""
+    from sqlalchemy import event
+
+    client, cals = world
+    async with client.db_state.session_factory() as db:
+        held = await make_import(db, cals["P"], status="uploaded")  # still holds its bytes
+        await db.commit()
+    seen: list[str] = []
+
+    def spy(_conn, _cursor, statement, *_rest):
+        if statement.lstrip().upper().startswith("SELECT") and "events_import" in statement:
+            seen.append(statement)
+
+    sync_engine = client.db_state.engine.sync_engine
+    event.listen(sync_engine, "before_cursor_execute", spy)
+    try:
+        assert (await client.get(BASE, headers=MGR)).status_code == 200
+        assert (await client.get(f"{BASE}/{held.id}", headers=MGR)).status_code == 200
+    finally:
+        event.remove(sync_engine, "before_cursor_execute", spy)
+    assert seen
+    assert not [s for s in seen if "events_import.source" in s or ", source" in s], seen

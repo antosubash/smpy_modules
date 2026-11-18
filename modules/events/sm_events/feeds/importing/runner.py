@@ -39,6 +39,7 @@ from typing import Any, Literal
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db import finalize_session, no_tenant
 from sqlalchemy import select
+from sqlalchemy.orm import defer
 
 from sm_events.core import constants
 from sm_events.core.clock import utcnow
@@ -92,9 +93,11 @@ class _Slice:
             db, tenant_id=self.tenant_id, import_id=self.import_id, owner=self.owner, values=values
         )
 
-    async def _load(self, db: Any) -> EventImport:
+    async def _load(self, db: Any, *, source: bool = False) -> EventImport:
+        """The import row; the raw upload only for the parse step (``source``)."""
         stmt = (
             select(EventImport)
+            .options(*([] if source else [defer(EventImport.source)]))
             .where(EventImport.id == self.import_id, EventImport.tenant_id == self.tenant_id)  # type: ignore[arg-type]
             .execution_options(populate_existing=True)
         )
@@ -115,7 +118,11 @@ class _Slice:
     async def parse(self) -> None:
         async with self.factory() as db:
             await parse_step(
-                db, await self._load(db), owner=self.owner, now=self.now(), locales=self.locales
+                db,
+                await self._load(db, source=True),
+                owner=self.owner,
+                now=self.now(),
+                locales=self.locales,
             )
             await finalize_session(db)
 
