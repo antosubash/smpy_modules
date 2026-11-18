@@ -28,6 +28,7 @@ from sm_events.core import constants, locales
 from sm_events.core.tenancy import TenancyMode, mode_of
 
 __all__ = [
+    "public_key",
     "absolute",
     "api_path",
     "calendar_ics_path",
@@ -155,3 +156,11 @@ def site_title(settings: Any) -> str:
     the all-calendars feed's name. Blank or missing is the module's name; one line, bounded."""
     title = " ".join(str(getattr(settings, "public_title", "") or "").split())
     return title[: constants.TITLE_MAX] or constants.MODULE_NAME
+
+
+def public_key(slug: str, key: str) -> str:
+    """A list item's key for the page: the event's slug plus what tells its occurrences apart,
+    never the event's id. ``key`` is the occurrence's own (``"<event id>"`` for a one-off,
+    ``"<event id>:<stamp>"`` for an instance of a series)."""
+    _id, sep, stamp = key.partition(":")
+    return f"{slug}{sep}{stamp}"

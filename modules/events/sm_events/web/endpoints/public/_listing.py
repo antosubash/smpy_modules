@@ -158,11 +158,12 @@ async def upcoming(
         calendar = cals.get(occ.calendar_id)
         if event is None or calendar is None or not texts.get(event.id):
             continue
+        text = pick_text(texts[event.id], locale, default_locale)
         items.append(
             make_item(
-                key=occ.key,
+                key=_urls.public_key(text.slug, occ.key),
                 event=event,
-                text=pick_text(texts[event.id], locale, default_locale),
+                text=text,
                 calendar=calendar,
                 category=cats.get(event.category_id) if event.category_id else None,
                 locale=locale,

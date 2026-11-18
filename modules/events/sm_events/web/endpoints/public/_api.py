@@ -3,9 +3,11 @@
 Machine-read, on the default language's prefix only. The read is the occurrences read called with
 the anonymous principal and ``include_unpublished=False``; its own bounds apply (366 days, 2,000
 items, ``truncated``). Each item's ``url`` becomes its public address (:func:`public_page`),
-``editable`` is false, ``event_status`` is ``published``, and the internal ids (``event_id``,
-``original_start``) are null: the grid needs neither. A calendar or category id the public may not
-see matches nothing, as an unknown one does.
+``editable`` is false, ``event_status`` is ``published``, and the event's own identity is withheld:
+``event_id`` and ``original_start`` are null and ``key`` is ``<slug>[:<stamp>]``, not the event's
+id. What stays is the id of a *public* calendar (``calendar_id``): Ruling 32 makes calendar and
+category ids the filter's input, so the grid has to know them, and they name only rows the public
+may see. A calendar or category id the public may not see matches nothing, as an unknown one does.
 """
 
 from __future__ import annotations
@@ -55,6 +57,7 @@ def _public(item: Occurrence, texts: dict[str, Any], locale: str) -> Occurrence 
             "lang": text.locale,
             "editable": False,
             "event_status": "published",
+            "key": _urls.public_key(text.slug, item.key),
             "event_id": None,
             "original_start": None,
         }

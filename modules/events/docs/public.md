@@ -35,6 +35,13 @@ time with "Rescheduled from ...". A **cancelled** one is shown with a banner (ca
 deleted, and stays indexable). A **skipped** one, a date that is not an occurrence and a malformed
 date are the 404, as is `?date=` on a one-off.
 
+## What the public JSON names
+
+No event's id appears in a page's props or in `/api/occurrences`: `event_id` and `original_start`
+are null and an item's `key` is `<slug>` (a one-off) or `<slug>:<stamp>` (an instance of a series).
+The id of a *public* calendar or category does appear (`calendar_id`, the filter lists): the grid
+passes them back as `?calendar=` and `?category=`, and they name only rows the public may see.
+
 ## One 404
 
 A slug that never existed, a draft, an internal calendar's event, a trashed row, another
