@@ -229,10 +229,14 @@ def _read_all_day(
     return When(True, zone, start.day.isoformat(), last.isoformat(), ())
 
 
-def read_instants(prop: Prop, *, tz: str, all_day: bool) -> list[datetime]:
+def read_instants(
+    prop: Prop, *, tz: str, all_day: bool, day_start: time | None = None
+) -> list[datetime]:
     """The UTC instants an ``EXDATE`` or ``RECURRENCE-ID`` names, one per comma-separated value.
     A date (all-day series) is its local midnight in ``tz``; a timed value is its own ``TZID``,
-    ``Z``, or ``tz``. A value of the other kind or a bad one is :class:`ItemSkip`."""
+    ``Z``, or ``tz``. A date on a **timed** series (common in the wild) names that local day's
+    occurrence, at ``day_start`` when the caller gives it. A value of the other kind or a bad one
+    is :class:`ItemSkip`."""
     values = prop.value.split(",")
     if len(values) > constants.IMPORT_MAX_EXDATES + 1:
         raise ItemSkip("too_many_overrides")
@@ -240,6 +244,9 @@ def read_instants(prop: Prop, *, tz: str, all_day: bool) -> list[datetime]:
     notes: list[str] = []
     for raw in values:
         value = _read(raw, prop.params)
+        if value.clock is None and not all_day and day_start is not None:
+            found.append(localize(datetime.combine(value.day, day_start), ZoneInfo(tz)))
+            continue
         if (value.clock is None) != all_day:
             raise _skip()
         if value.clock is None:

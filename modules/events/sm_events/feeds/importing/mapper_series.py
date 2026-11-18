@@ -113,13 +113,26 @@ def _occurrences(
     return {i.original_start for i in islice(walk, constants.IMPORT_EXPAND_CAP)}
 
 
-def _exdates(props: list[Prop], times: TimesIn) -> list[datetime]:
+def _exdates(props: list[Prop], times: TimesIn) -> tuple[list[datetime], bool]:
+    """Every ``EXDATE`` value that reads, and whether any did not: each value is read **on its
+    own**, so one bad one (an unknown zone, a typo) never costs the series its other dates."""
     if sum(len(p.value.split(",")) for p in props) > constants.IMPORT_MAX_EXDATES:
         raise ItemSkip("too_many_overrides")
+    day_start = None if times.all_day else datetime.fromisoformat(times.start).time()
     found: list[datetime] = []
+    bad = False
     for prop in props:
-        found.extend(read_instants(prop, tz=times.timezone, all_day=times.all_day))
-    return found
+        for value in prop.value.split(","):
+            single = Prop(prop.name, prop.params, value)
+            try:
+                found.extend(
+                    read_instants(
+                        single, tz=times.timezone, all_day=times.all_day, day_start=day_start
+                    )
+                )
+            except ItemSkip:
+                bad = True
+    return found, bad
 
 
 def _child(child: RawEvent, times: TimesIn, calendar_tz: str) -> MappedOverride | None:
@@ -201,12 +214,8 @@ def map_series(
     ):
         raise ItemSkip("too_many_overrides")
 
-    exdate_values: list[datetime] = []
-    try:
-        exdate_values = _exdates(exdates, times)
-    except ItemSkip as skip:
-        if skip.code == "too_many_overrides":
-            raise
+    exdate_values, bad_exdate = _exdates(exdates, times)
+    if bad_exdate:
         notes.append("exdate_ignored")
     pairs = [(child, _child(child, times, calendar_tz)) for child in children]
     wanted = [*exdate_values, *(o.original_start for _c, o in pairs if o is not None)]
