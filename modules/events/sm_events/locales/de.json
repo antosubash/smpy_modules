@@ -509,7 +509,7 @@
       "all": "Alle Termine"
     },
     "create": {
-      "skipped_hour": "Die Uhr überspringt an diesem Tag diese Stunde, daher beginnt die Veranstaltung um {time}.",
+      "skipped_hour": "An diesem Tag wird die Uhr von {from} auf {to} Uhr vorgestellt ({zone}). Bitte die Startzeit prüfen.",
       "title": "Neue Veranstaltung",
       "description": "Legt einen Entwurf an. Alles Weitere erledigen Sie im vollständigen Editor.",
       "title_label": "Titel",

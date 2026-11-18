@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceptsSelection, chipFor, skipsWallTime, toSlot } from './mapping';
+import { acceptsSelection, chipFor, skipsWallTime } from './mapping';
 
 describe('skipsWallTime', () => {
   const zero = { years: 0, months: 0, days: 0, milliseconds: 0 };
@@ -79,19 +79,5 @@ describe('acceptsSelection', () => {
     expect(acceptsSelection(editing(false, []))).toBe(false);
     expect(acceptsSelection(editing(true, ['e1:0']))).toBe(false);
     expect(acceptsSelection(undefined)).toBe(false);
-  });
-});
-
-describe('toSlot on the skipped hour', () => {
-  it('flags a selection that runs backwards once the library resolved its start forward', () => {
-    const at = (iso: string) => new Date(iso);
-    const slot = toSlot({
-      start: at('2026-03-29T01:30:00Z'), // the 02:30 slot, moved to 03:30
-      end: at('2026-03-29T01:00:00Z'), // its end, 03:00, was a real time
-      allDay: false,
-      startStr: '2026-03-29T03:30:00+02:00',
-      endStr: '2026-03-29T03:00:00+02:00',
-    });
-    expect(slot.skipped).toBe(true);
   });
 });

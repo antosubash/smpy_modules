@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { browserZone, startsAfterGap, todayIn, utcOffset, utcOffsetAt } from './zones';
+import { browserZone, gapBefore, todayIn, utcOffset, utcOffsetAt } from './zones';
 
 describe('todayIn', () => {
   const now = new Date('2026-03-29T23:30:00Z');
@@ -31,16 +31,30 @@ describe('offsets', () => {
   });
 });
 
-describe('startsAfterGap', () => {
-  it('is true on the first minute after the spring gap only', () => {
-    expect(startsAfterGap('2026-03-29T03:00', 'Europe/Vienna')).toBe(true);
-    expect(startsAfterGap('2026-03-29T03:30', 'Europe/Vienna')).toBe(false);
-    expect(startsAfterGap('2026-03-29T01:59', 'Europe/Vienna')).toBe(false);
-    expect(startsAfterGap('2026-03-30T03:00', 'Europe/Vienna')).toBe(false);
+describe('gapBefore', () => {
+  const vienna = { from: '02:00', to: '03:00' };
+  it.each(['2026-03-29T03:00', '2026-03-29T03:30', '2026-03-29T03:59'])(
+    'is the jump for %s in Vienna',
+    (local) => expect(gapBefore(local, 'Europe/Vienna')).toEqual(vienna),
+  );
+  it('is the jump for a time inside the gap, which the clock moves forward', () => {
+    expect(gapBefore('2026-03-29T02:30', 'Europe/Vienna')).toEqual(vienna);
   });
-  it('is false for a time inside the gap, a repeated hour or unreadable input', () => {
-    expect(startsAfterGap('2026-03-29T02:30', 'Europe/Vienna')).toBe(false);
-    expect(startsAfterGap('2026-10-25T02:30', 'Europe/Vienna')).toBe(false);
-    expect(startsAfterGap('012026-03-29T03:00', 'Europe/Vienna')).toBe(false);
+  it('is null before the gap, an hour after it, the day before and the day after', () => {
+    expect(gapBefore('2026-03-29T01:30', 'Europe/Vienna')).toBeNull();
+    expect(gapBefore('2026-03-29T04:00', 'Europe/Vienna')).toBeNull();
+    expect(gapBefore('2026-03-28T03:30', 'Europe/Vienna')).toBeNull();
+    expect(gapBefore('2026-03-30T03:30', 'Europe/Vienna')).toBeNull();
+  });
+  it('knows a half-hour gap (Lord Howe, 2026-10-04)', () => {
+    const jump = { from: '02:00', to: '02:30' };
+    expect(gapBefore('2026-10-04T02:30', 'Australia/Lord_Howe')).toEqual(jump);
+    expect(gapBefore('2026-10-04T02:45', 'Australia/Lord_Howe')).toEqual(jump);
+    expect(gapBefore('2026-10-04T03:00', 'Australia/Lord_Howe')).toBeNull();
+  });
+  it('is null for the autumn change, a zone without changes and unreadable input', () => {
+    expect(gapBefore('2026-10-25T03:30', 'Europe/Vienna')).toBeNull();
+    expect(gapBefore('2026-03-29T03:30', 'UTC')).toBeNull();
+    expect(gapBefore('012026-03-29T03:30', 'Europe/Vienna')).toBeNull();
   });
 });
