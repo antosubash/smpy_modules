@@ -18,12 +18,15 @@ __all__ = [
     "EXTRA_TOO_LARGE_CODE",
     "EXTRA_TOO_LARGE_DETAIL",
     "PLUGIN_ID_PATTERN",
+    "SOURCES_IN_MAX",
     "SOURCE_CALLS_MAX",
     "SOURCE_CALL_MAX_ITEMS",
+    "SOURCE_ID_MAX",
     "SOURCE_KEY_MAX",
     "SOURCE_KEY_PATTERN",
     "SOURCE_MIN_SLICE_SECONDS",
     "SOURCE_PHASE_SECONDS",
+    "SOURCE_SETTINGS_MAX_BYTES",
     "SOURCE_TIMEOUT_SECONDS",
     "SOURCE_TITLE_MAX",
     "SOURCE_UNAVAILABLE_CODE",
@@ -85,3 +88,9 @@ SOURCE_UNAVAILABLE_DETAIL = "The source could not check its settings"
 BUILTIN_TYPE_LABEL_KEY = "events.types.event"
 BUILTIN_SOURCE_LABEL_KEY = "events.menu.events"
 BUILTIN_SOURCE_ICON = "calendar"
+
+# Per-calendar entries.
+SOURCE_SETTINGS_MAX_BYTES = 16_384
+SOURCE_ID_MAX = 120
+SOURCES_IN_MAX = 64
+"""What a PUT body may carry before the (smaller) per-calendar cap is applied."""
