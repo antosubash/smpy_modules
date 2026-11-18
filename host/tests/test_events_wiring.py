@@ -183,18 +183,18 @@ def test_not_modified_carries_what_we_pin(booted_host, monkeypatch):
     monkeypatch.setattr(app.state.sm.setup_registry, "is_setup_complete", setup_done)
 
     async def exercise() -> dict:
-        async with app.router.lifespan_context(app):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://localhost"
-            ) as http:
-                first = await http.get("/events/calendar.ics")
-                second = await http.get(
-                    "/events/calendar.ics", headers={"If-None-Match": first.headers["etag"]}
-                )
-                sitemap = await http.get("/events/sitemap.xml")
-                sitemap_304 = await http.get(
-                    "/events/sitemap.xml", headers={"If-None-Match": sitemap.headers["etag"]}
-                )
+        async with (
+            app.router.lifespan_context(app),
+            AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as http,
+        ):
+            first = await http.get("/events/calendar.ics")
+            second = await http.get(
+                "/events/calendar.ics", headers={"If-None-Match": first.headers["etag"]}
+            )
+            sitemap = await http.get("/events/sitemap.xml")
+            sitemap_304 = await http.get(
+                "/events/sitemap.xml", headers={"If-None-Match": sitemap.headers["etag"]}
+            )
         return {"first": first, "second": second, "sitemap": sitemap, "sitemap_304": sitemap_304}
 
     got = asyncio.run(exercise())
