@@ -31,6 +31,16 @@ export async function articleCard(page: Page, id: string, sourceId: number) {
   return { type: 'ArticleCard', props: { ...(await res.json()), id } };
 }
 
+/** A card block holding the server's snapshot of event `sourceId` (a UUID). */
+export async function eventCard(page: Page, id: string, sourceId: string) {
+  const res = await page.request.post(`${API}/cards/snapshot`, {
+    headers: await csrf(page),
+    data: { kind: 'event', source_id: sourceId },
+  });
+  expect(res.ok(), await res.text()).toBeTruthy();
+  return { type: 'EventCard', props: { ...(await res.json()), id } };
+}
+
 /** A report tile's number, under its label. */
 export const reportTile = (page: Page, label: string): Locator =>
   page
