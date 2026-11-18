@@ -1,0 +1,45 @@
+/* FullCalendar's classic theme, wired to the console's tokens so light and dark follow it.
+ * The theme reads --fc-classic-*; palette.css (its fixed colours) is deliberately not
+ * imported. This file ships in the adapter's lazy chunk, with the library's own CSS. */
+.sm-ev-calendar {
+  --fc-classic-background: var(--background);
+  --fc-classic-foreground: var(--foreground);
+  --fc-classic-border: var(--border);
+  --fc-classic-strong-border: var(--muted-foreground);
+  --fc-classic-faint: color-mix(in oklab, var(--foreground) 4%, transparent);
+  --fc-classic-muted: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --fc-classic-strong: color-mix(in oklab, var(--foreground) 14%, transparent);
+  --fc-classic-faint-foreground: var(--muted-foreground);
+  --fc-classic-muted-foreground: var(--muted-foreground);
+  --fc-classic-primary: var(--primary);
+  --fc-classic-primary-foreground: var(--primary-foreground);
+  --fc-classic-event: var(--primary);
+  --fc-classic-event-contrast: var(--primary-foreground);
+  --fc-classic-highlight: color-mix(in oklab, var(--primary) 18%, transparent);
+  --fc-classic-today: color-mix(in oklab, var(--primary) 10%, transparent);
+  --fc-classic-button: var(--muted);
+  --fc-classic-button-border: var(--border);
+  --fc-classic-button-strong: var(--accent);
+  --fc-classic-button-strong-border: var(--border);
+  --fc-classic-button-foreground: var(--foreground);
+  font-size: 0.875rem;
+  color: var(--foreground);
+}
+
+/* Status without colour: a border style, and (in the chip) a word. */
+.sm-ev-calendar .sm-ev-draft {
+  border: 2px dashed currentColor;
+}
+.sm-ev-calendar .sm-ev-review {
+  border: 2px dotted currentColor;
+}
+.sm-ev-calendar .sm-ev-cancelled [data-ev-title] {
+  text-decoration: line-through;
+}
+.sm-ev-calendar .sm-ev-pending {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.sm-ev-calendar .sm-ev-readonly-hint {
+  cursor: default;
+}
