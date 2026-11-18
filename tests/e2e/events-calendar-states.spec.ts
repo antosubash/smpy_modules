@@ -41,3 +41,21 @@ test('a view-only user gets no create dialog from a click on an empty slot', asy
   await expect(viewer.getByRole('dialog')).toHaveCount(0);
   await context.close();
 });
+
+for (const width of [390, 360]) {
+  test(`the toolbar wraps at ${width} px wide: no sideways scroll, List reachable`, async ({
+    page,
+  }) => {
+    const { cal, day } = await seedWeek(page);
+    await page.setViewportSize({ width, height: 844 });
+    for (const view of ['month', 'week', 'list'] as const) {
+      await page.goto(calendarUrl(cal.id, view, day));
+      await expect(page.getByTestId('calendar-title')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'List', exact: true })).toBeVisible();
+      const fits = await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      );
+      expect(fits, `${view} at ${width}`).toBe(true);
+    }
+  });
+}
