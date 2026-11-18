@@ -53,6 +53,7 @@ export default function EventEditor(props: Props) {
     rrule: ev.form.rrule,
     eventId: props.event_id,
     calendarId: calendar.id,
+    incomplete,
   });
   const { event, form } = ev;
   const errors = actions.errors;
