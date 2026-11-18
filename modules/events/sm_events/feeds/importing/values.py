@@ -20,11 +20,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Final
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from sm_events.calendar.times import localize
 from sm_events.core import constants
 from sm_events.feeds.importing.scan import Prop
+from sm_events.feeds.importing.zones import resolve_tzid
 
 __all__ = ["ItemSkip", "When", "read_instants", "read_when", "resolve_tzid"]
 
@@ -34,8 +35,6 @@ _DURATION: Final = re.compile(
     r"([+-])?P(?:(\d{1,6})W)?(?:(\d{1,6})D)?(?:T(?:(\d{1,6})H)?(?:(\d{1,6})M)?(?:(\d{1,6})S)?)?",
     re.ASCII,
 )
-_ZONE_NAME: Final = re.compile(r"[A-Za-z0-9_+\-/]{1,64}", re.ASCII)
-_TZONE_PREFIX: Final = "tzone://Microsoft/"
 _ONE_DAY: Final = timedelta(days=1)
 _MAX_DURATION: Final = timedelta(days=constants.MAX_EVENT_DAYS + 1)
 
@@ -55,36 +54,6 @@ class When:
     start: str
     end: str
     notes: tuple[str, ...]
-
-
-def _windows_table() -> dict[str, str]:
-    from icalendar.timezone.windows_to_olson import WINDOWS_TO_OLSON
-
-    return WINDOWS_TO_OLSON
-
-
-def resolve_tzid(tzid: str | None) -> str | None:
-    """The IANA zone a ``TZID`` names, else ``None`` (unknown: never evaluated, never guessed).
-
-    An IANA name must be in the database; a Windows name (also as Outlook's
-    ``tzone://Microsoft/<name>``) maps through ``icalendar``'s CLDR table."""
-    if not tzid:
-        return None
-    name = tzid.removeprefix(_TZONE_PREFIX)
-    if len(name) > 64 or not name.isprintable():
-        return None
-    if _ZONE_NAME.fullmatch(name):
-        try:
-            return ZoneInfo(name).key
-        except (ZoneInfoNotFoundError, ValueError, OSError):
-            pass
-    mapped = _windows_table().get(name)
-    if mapped is not None:
-        try:
-            return ZoneInfo(mapped).key
-        except (ZoneInfoNotFoundError, ValueError, OSError):
-            return None
-    return None
 
 
 def _skip(code: str = "invalid_times") -> ItemSkip:

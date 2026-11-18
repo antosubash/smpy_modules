@@ -6,7 +6,8 @@
   iCalendar library ever sees the file, so nothing in it is fetched, evaluated or resolved
   (``ATTACH``, ``URL``, ``TZURL`` and an alarm's ``ACTION`` are text), and a ``VTIMEZONE`` is
   counted and thrown away, never evaluated.
-* :mod:`~sm_events.feeds.importing.values` and ``mapper`` turn each ``VEVENT`` into what the
+* :mod:`~sm_events.feeds.importing.values`, ``zones`` and ``mapper`` (with ``mapper_props`` and
+  ``mapper_series``) turn each ``VEVENT`` into what the
   module's own validators accept (zones only from the IANA database, rules only from PR 2's
   allow-list, text through the sanitiser) or into a skip with a reason.
 * The bytes live on the ``events_import`` row until the parse step has staged the items, then
