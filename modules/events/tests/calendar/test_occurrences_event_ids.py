@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.calendar import registry
 from sm_events.calendar.occurrence import OccurrenceFilters
+from sm_events.calendar.plugins import registry
 from sm_events.core.access.public import ANONYMOUS
 from sm_events.models import OccurrenceOverride
 
