@@ -1,14 +1,18 @@
-"""Run one piece of plugin code against the request's session without letting it hurt.
+"""Run one piece of plugin code without letting it hurt the request.
 
-A plugin reads in the request's snapshot and tenant, so it gets the caller's session,
-but only inside a SAVEPOINT that is **always** rolled back (a read needs no release):
-a failing statement then rolls back only that savepoint, and on Postgres the request's
-transaction is not aborted. The call has a wall-clock timeout. ``commit``, ``rollback``
-and ``close`` are blocked on the session for the duration, and afterwards the session's
-root transaction must be the same object and ``new``/``dirty``/``deleted`` empty: a
-plugin that wrote anyway gets :class:`PluginWrote`, its pending changes are dropped and
-the savepoint is rolled back. A flush of the plugin's own pending rows counts too (they
-are then in the savepoint, which is discarded, but it is a bug worth reporting).
+**The rule: its own connection.** A plugin gets a session of its own, on a connection of its
+own bound to the caller's tenant (:func:`_own_session`), rolled back and closed afterwards in a
+cancellation-shielded ``finally``. A timeout, a cancelled statement or bad SQL can then only break
+that connection; on Postgres the database stops the statement at the budget (``SET LOCAL
+statement_timeout``). ``commit``, ``rollback`` and ``close`` are blocked for the duration, and a
+session that was changed anyway (``new``/``dirty``/``deleted``, or a flush of pending rows)
+raises :class:`PluginWrote`.
+
+**The fallback.** An engine that shares one connection between sessions (the in-memory test
+engine: ``StaticPool``/``SingletonThreadPool``) cannot give a second one, because a second
+session would roll back the first's transaction. Only there, and only when :func:`_own_session`
+answers ``None``, :func:`_run_shared` runs the call in an always-rolled-back SAVEPOINT of the
+caller's session instead. A file or Postgres engine never reaches it (a test pins that).
 
 This guards against plugin *bugs*, not malice: a plugin is code the operator installed.
 A plugin that swallows ``CancelledError`` or blocks the loop with synchronous work

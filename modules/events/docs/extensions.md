@@ -100,6 +100,8 @@ source's status instead of the generic `raised`.
 * **Limits you must know.** A plugin that blocks the event loop with synchronous CPU work,
   or swallows `CancelledError`, cannot be pre-empted: it delays the answer past its
   timeout. On SQLite a running query finishes before its connection can be closed.
+  Only an engine that shares one connection between sessions (the in-memory test engine)
+  runs your call on a savepoint of the request's session instead; a file or Postgres engine never does.
 * **Validation.** Any one invalid item rejects the whole answer (`invalid_item`,
   `duplicate_key`): aware `start < end`, an all-day `start_date < end_date`, at most 366
   days, a known timezone, the title stripped of control and direction characters (kept as

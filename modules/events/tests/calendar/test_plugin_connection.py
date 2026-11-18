@@ -155,3 +155,20 @@ async def test_a_write_by_the_plugin_is_refused_and_not_kept(state):
 
             assert (await host.execute(select(Category))).scalars().all() == []
     assert pool_out(state) == 0
+
+
+async def test_a_real_engine_never_takes_the_shared_fallback(state, monkeypatch):
+    """The savepoint fallback is only for engines that share one connection (the in-memory test
+    engine); a file or Postgres engine always gets a connection of its own."""
+    from sm_events.calendar import plugin_isolation
+
+    async def refuse(*_a, **_k):
+        raise AssertionError("the shared fallback was used")
+
+    monkeypatch.setattr(plugin_isolation, "_run_shared", refuse)
+    await seeded(state)
+    with tenant_scope("default"):
+        async with state.session_factory() as host:
+            assert plugin_isolation._own_session(host) is not None
+            result = await run(host, FakeSource("acme:x", ok(item("a"))), await call_for(host))
+            assert result.statuses[0].status == "ok"

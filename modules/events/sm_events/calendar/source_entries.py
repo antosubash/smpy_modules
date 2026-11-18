@@ -5,7 +5,7 @@
 The reader is tolerant (an older plain-string entry is an entry with no settings, and
 anything malformed is dropped and logged); writes always store objects. Settings are
 validated against the plugin's declared model, then by its optional ``check_settings``
-(in a savepoint, with a timeout), and stored as that model's JSON dump.
+(on a connection of its own, with a timeout), and stored as that model's JSON dump.
 
 Settings are stored in the clear and shown only to those who can manage the calendar:
 a plugin that needs a secret keeps it in its own module settings (sealed there) and
