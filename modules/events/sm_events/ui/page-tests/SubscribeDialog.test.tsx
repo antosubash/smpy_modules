@@ -222,6 +222,7 @@ describe('SubscribeDialog', () => {
     expect(text()).toContain('Theirs');
     expect(text()).toContain('Unknown user');
     expect(text()).not.toContain('u9');
+    expect(text()).toContain('Theirs · English · Created 1 Nov 2026'); // not "en", not US dates
     await view.unmount();
   });
 

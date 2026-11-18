@@ -1,11 +1,10 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import type { FeedToken } from '../../utils/api-feeds';
+import { formatDay } from '../../utils/datetime';
 import { keys, useT } from '../../utils/i18n';
 import { Name, withName } from '../../utils/isolate';
 import { ownLanguageName } from '../../utils/language';
 import { ConfirmDialog } from '../ConfirmDialog';
-
-const day = (iso: string) => new Date(iso).toLocaleDateString();
 
 /** Links as listed by the server: label, language, created, last used (coarse, to the hour)
  *  and Revoke. Never a link: nothing here could show one. */
@@ -19,8 +18,9 @@ export function TokenList({
   everyone: boolean;
   onRevoke: (token: FeedToken) => Promise<unknown>;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const copy = keys.events.feeds;
+  const day = (iso: string) => formatDay(iso, locale);
   if (tokens.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
