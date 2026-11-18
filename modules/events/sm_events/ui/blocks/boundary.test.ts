@@ -51,7 +51,12 @@ describe('the pagebuilder boundary', () => {
     const offenders = walk(ROOT)
       .filter((file) => PAGEBUILDER.test(readFileSync(file, 'utf8')))
       .map(rel)
-      .filter((file) => file !== 'pagebuilder-blocks.ts' && !file.startsWith('ui/blocks/'));
+      .filter(
+        (file) =>
+          file !== 'pagebuilder-blocks.ts' &&
+          !file.startsWith('ui/blocks/') &&
+          !/\.test\.tsx?$/.test(file), // a test may name the package it tests against
+      );
     expect(offenders).toEqual([]);
   });
 
@@ -63,8 +68,16 @@ describe('the pagebuilder boundary', () => {
 
   it('the registration graph is lazy for the calendar', () => {
     const entry = resolve(ROOT, 'pagebuilder-blocks.ts');
-    if (!existsSync(entry)) return; // written in the registration task
+    expect(existsSync(entry)).toBe(true);
     const files = [...reach(entry)];
+    // Not vacuous: the walk does reach the blocks' own files.
+    expect(files.map(rel)).toEqual(
+      expect.arrayContaining([
+        'ui/blocks/UpcomingEventsBlock.tsx',
+        'ui/blocks/EventsCalendarBlock.tsx',
+      ]),
+    );
+    expect(files.map(rel)).not.toContain('ui/blocks/EventsCalendarRender.tsx'); // a lazy chunk
     const calendar = files.map(rel).filter((file) => file.startsWith('ui/calendar/'));
     expect(calendar).toEqual([]);
     const fullcalendar = files.filter((file) =>
@@ -75,7 +88,7 @@ describe('the pagebuilder boundary', () => {
 
   it('the blocks reach no console code', () => {
     const entry = resolve(ROOT, 'pagebuilder-blocks.ts');
-    if (!existsSync(entry)) return;
+    expect(existsSync(entry)).toBe(true);
     const consoleCode = [...reach(entry)]
       .map(rel)
       .filter((file) =>
