@@ -1,0 +1,47 @@
+Veranstaltungen
+===============
+
+Tag der offenen Tür
+Mittwoch, 1. Juli 2026, 10:00–11:30 CEST
+Halle 1, Hauptstraße 2
+Kommen Sie vorbei.
+https://acme.example.org/events/open-day
+Zum Kalender hinzufügen: https://acme.example.org/events/open-day.ics
+
+Wöchentlicher Stammtisch
+Mittwoch, 8. Juli 2026, 18:00–20:00 CEST
+Café Central
+https://acme.example.org/de/events/stammtisch?date=2026-07-08
+Zum Kalender hinzufügen: https://acme.example.org/de/events/stammtisch.ics
+
+Sommerlager
+Samstag, 1. August 2026 – Montag, 3. August 2026
+Seestraße 9 · Online
+Drei Tage draußen.
+https://acme.example.org/events/open-day
+Zum Kalender hinzufügen: https://acme.example.org/events/open-day.ics
+
+Abgesagt: Konzert
+Mittwoch, 1. Juli 2026, 10:00–11:30 CEST
+Stadthalle
+Entfällt.
+https://acme.example.org/events/open-day
+
+Webinar
+Mittwoch, 1. Juli 2026, 04:00–05:30 EDT
+Online
+https://acme.example.org/events/open-day
+Zum Kalender hinzufügen: https://acme.example.org/events/open-day.ics
+
+<script>alert(1)</script> "Fun" & { {first_name}}
+Mittwoch, 1. Juli 2026, 10:00–11:30 CEST
+A&B <Hall>
+<img src=x onerror=alert(1)> { {unsubscribe_url}}
+https://acme.example.org/events/open-day
+Zum Kalender hinzufügen: https://acme.example.org/events/open-day.ics
+
+--
+Sie erhalten diese E-Mail, weil Sie Neuigkeiten von Acme abonniert haben.
+Acme GmbH
+Hauptstraße 1
+Abmelden: {{unsubscribe_url}}

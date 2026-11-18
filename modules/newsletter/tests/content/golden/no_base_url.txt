@@ -24,6 +24,13 @@ What is new.
 About us
 https://other.example.net/about
 
+Open day
+Mittwoch, 1. Juli 2026, 10:00–11:30 CEST
+Hall 1, Main St 2
+Meet the team.
+/events/open-day
+Add to calendar: /events/open-day.ics
+
 Leave: {{unsubscribe_url}}
 
 --

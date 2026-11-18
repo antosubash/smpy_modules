@@ -3,7 +3,10 @@
   "email": {
     "footer_reason": "Sie erhalten diese E-Mail, weil Sie Neuigkeiten von {app_name} abonniert haben.",
     "unsubscribe": "Abmelden",
-    "read_more": "Weiterlesen"
+    "read_more": "Weiterlesen",
+    "add_to_calendar": "Zum Kalender hinzufügen",
+    "cancelled": "Abgesagt",
+    "online": "Online"
   },
   "unsubscribe_page": {
     "title": "Abmelden",

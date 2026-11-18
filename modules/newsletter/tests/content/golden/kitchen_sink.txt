@@ -24,6 +24,13 @@ https://acme.example.org/news/spring
 About us
 https://other.example.net/about
 
+Open day
+Wednesday, July 1, 2026, 10:00 AM–11:30 AM CEST
+Hall 1, Main St 2
+Meet the team.
+https://acme.example.org/events/open-day
+Add to calendar: https://acme.example.org/events/open-day.ics
+
 Leave: {{unsubscribe_url}}
 
 --
