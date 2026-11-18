@@ -49,6 +49,7 @@ from sm_events.web.schemas._fields import strip_unsafe
 __all__ = [
     "create_import",
     "effective_max_bytes",
+    "grants_of",
     "parse_step",
     "read_upload",
     "safe_filename",
@@ -91,7 +92,8 @@ def safe_filename(raw: str) -> str:
     return name or constants.IMPORT_FILENAME_FALLBACK
 
 
-def _grants(who: ResourcePrincipal) -> list[str]:
+def grants_of(who: ResourcePrincipal) -> list[str]:
+    """The importer's ``events.*`` permissions (and a wildcard), as stored on the import."""
     return sorted(p for p in who.permissions if p == "*" or p.startswith("events."))
 
 
@@ -128,7 +130,7 @@ async def create_import(
         filename=safe_filename(filename),
         size_bytes=len(data),
         source=data,
-        grants=_grants(who),
+        grants=grants_of(who),
         may_publish=who.has(constants.PERM_PUBLISH),
         created_at=now,
         updated_at=now,
