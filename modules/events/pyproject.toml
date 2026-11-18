@@ -19,6 +19,7 @@ dependencies = [
     "simple_module_background_tasks>=0.0.44,<0.1",  # floor: background_tasks.core and .worker paths first shipped in 0.0.44
     "python-dateutil>=2.9,<4",
     "pydantic-settings>=2.0",
+    "icalendar>=7,<8",  # floor: 7.x is the first major checked for RRULE/EXDATE/RECURRENCE-ID/VTIMEZONE round-trip (feeds)
 ]
 
 [project.urls]
