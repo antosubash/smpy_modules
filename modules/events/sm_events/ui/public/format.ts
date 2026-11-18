@@ -1,6 +1,6 @@
 /** Text for the public screens. An event's own clock is shown as it is: its local fields are
  *  formatted in UTC so the browser's zone never touches them. */
-import { browserTimeZone } from '../calendar/time/zones';
+import { browserZone } from '../utils/zones';
 
 const parts = (local: string) => {
   const [date = '', time = ''] = local.split('T');
@@ -44,7 +44,7 @@ export function viewerSpan(
   endIso: string,
   eventZone: string,
   locale: string,
-  mine: string = browserTimeZone(),
+  mine: string = browserZone(),
 ): string | null {
   if (mine === eventZone) return null;
   const format = new Intl.DateTimeFormat(locale, {
