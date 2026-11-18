@@ -117,3 +117,59 @@ async def test_junk_tokens_cannot_free_a_real_links_throttle(monkeypatch):
         for i in range(20):  # junk far beyond the pool
             assert (await http.get(feed_path(f"evf_{i:043d}"))).status_code == 404
         assert (await http.get(world.path)).status_code == 429
+
+
+async def _revoke(http, world):
+    async with http.db_state.session_factory() as db:
+        from sm_events.core.tenancy import tenant_scope
+
+        from tests.support.access import principal
+
+        with tenant_scope("default"):
+            await service.revoke_token(db, principal("sv", "events.view"), world.token_id, now=NOW)
+            await db.commit()
+
+
+def _comparable(answer):
+    return (
+        answer.status_code,
+        answer.content,
+        {k: v for k, v in answer.headers.items() if k not in ("date", "retry-after")},
+    )
+
+
+async def test_a_revoked_token_is_throttled_exactly_like_an_invented_one(monkeypatch):
+    """Row exists but refused vs no such row: the same budget, and at the limit the same 429."""
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    async with private_http() as http:
+        world = await seed_world(http)
+        await _revoke(http, world)
+        junk = feed_path(invented())
+        limit = constants.FEED_TOKEN_RATE
+        revoked = [await http.get(world.path) for _ in range(limit + 1)]
+        unknown = [await http.get(junk) for _ in range(limit + 1)]
+        assert [r.status_code for r in revoked] == [404] * limit + [429]
+        assert [r.status_code for r in unknown] == [404] * limit + [429]
+        assert [_comparable(r) for r in revoked] == [_comparable(r) for r in unknown]
+        assert revoked[-1].headers["retry-after"] == unknown[-1].headers["retry-after"]
+
+
+async def test_a_refused_row_is_evicted_by_junk_like_an_invented_token(monkeypatch):
+    """Only a *served* link earns the pool junk cannot evict from; a refused one is junk too, so a
+    flood frees both alike (no request sequence tells a refused row from no row)."""
+    from sm_events.feeds.tokens.throttle import TokenThrottle
+
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    small = TokenThrottle(limit=2, window=600, max_keys=3)
+    monkeypatch.setattr(_private_feed, "THROTTLE", small)
+    async with private_http() as http:
+        world = await seed_world(http)
+        await _revoke(http, world)
+        mine = feed_path(invented())
+        for path in (world.path, mine):
+            assert [(await http.get(path)).status_code for _ in range(2)] == [404, 404]
+            assert (await http.get(path)).status_code == 429
+        for i in range(20):  # junk far beyond the pool
+            await http.get(feed_path(f"evf_{i:043d}"))
+        assert (await http.get(world.path)).status_code == 404
+        assert (await http.get(mine)).status_code == 404

@@ -31,17 +31,37 @@ async function openSubscribe(page: Page, name: string) {
   return dialog;
 }
 
+/** Headers that legitimately differ between two requests: the time, and a per-request id. */
+const VARIES = new Set(['date', 'x-request-id', 'x-correlation-id']);
+
 const fetchFeed = async (url: string) => {
   const anonymous = await request.newContext(); // no cookies, no session
   const got = await anonymous.get(url, { maxRedirects: 0 });
+  const headers = Object.fromEntries(
+    Object.entries(got.headers())
+      .filter(([name]) => !VARIES.has(name))
+      .map(([name, value]) => [name, value.replace(/'nonce-[^']+'/g, "'nonce-X'")]), // per-request
+  );
   const answer = {
     status: got.status(),
     type: got.headers()['content-type'],
+    headers,
     body: await got.text(),
   };
   await anonymous.dispose();
   return answer;
 };
+
+/** Two answers that must be byte-identical, or the whole difference in one message. */
+function sameAnswer(a: Awaited<ReturnType<typeof fetchFeed>>, b: typeof a) {
+  const names = new Set([...Object.keys(a.headers), ...Object.keys(b.headers)]);
+  const diff = [...names]
+    .filter((n) => a.headers[n] !== b.headers[n])
+    .map((n) => `${n}: ${a.headers[n]} | ${b.headers[n]}`);
+  if (a.status !== b.status) diff.push(`status: ${a.status} | ${b.status}`);
+  if (a.body !== b.body) diff.push(`body: ${a.body} | ${b.body}`);
+  expect(diff, 'a revoked link must answer exactly as an invented one').toEqual([]);
+}
 
 test('a private link is shown once, serves the published events, and stops when revoked', async ({
   page,
@@ -96,8 +116,12 @@ test('a private link is shown once, serves the published events, and stops when 
 
   // After revoking: exactly what an invented link gets.
   const revoked = await fetchFeed(url);
-  const invented = await fetchFeed(url.replace(/evf_[A-Za-z0-9_-]{43}/, `evf_${'Z'.repeat(43)}`));
-  expect(revoked).toEqual(invented);
+  const junk = Array.from(
+    { length: 43 },
+    () => 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)],
+  ).join('');
+  const invented = await fetchFeed(url.replace(/evf_[A-Za-z0-9_-]{43}/, `evf_${junk}`));
+  sameAnswer(revoked, invented);
   expect(revoked.status).toBe(404);
   expect(JSON.parse(revoked.body)).toEqual({ detail: 'Not found', code: 'not_found' });
 });

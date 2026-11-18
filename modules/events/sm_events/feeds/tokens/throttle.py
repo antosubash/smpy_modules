@@ -8,8 +8,9 @@ over the limit get the same answer: the limit tells nobody which tokens exist.
 **Per process**: each worker keeps its own windows, so the real budget is ``limit`` times the
 number of workers. The per-IP limit is the bound that matters.
 
-Two bounded LRUs of ``max_keys`` each. A presented string starts in the *junk* pool; once the
-lookup found a row for it, :meth:`promote` moves its window to the *real* pool. A flood of
+Two bounded LRUs of ``max_keys`` each. A presented string starts in the *junk* pool; once a feed was
+actually **served** for it, :meth:`promote` moves its window to the *real* pool (a refused row,
+revoked or otherwise, stays junk, so it is indistinguishable from an invented token). A flood of
 invented tokens can therefore only evict other junk, never a real token's window, and an
 invented token over the limit is still refused exactly as a real one. Only allowed hits are
 recorded, so being refused does not extend the wait. Only digests are kept.
@@ -73,8 +74,8 @@ class TokenThrottle:
             return None
 
     def promote(self, presented: str) -> None:
-        """The lookup found a row for ``presented``: keep its window in the pool junk cannot
-        evict from."""
+        """A feed was served for ``presented``: keep its window in the pool junk cannot evict
+        from."""
         key = self._key(presented)
         with self._lock:
             if key in self._real:
