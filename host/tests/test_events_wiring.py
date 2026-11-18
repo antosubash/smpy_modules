@@ -166,3 +166,54 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
     assert got["missing"].status_code == 404
     assert got["missing"].json() == {"detail": "Not found", "code": "not_found"}
     assert got["write"].status_code not in (200, 404)  # still behind the sign-in
+
+
+def test_not_modified_carries_what_we_pin(booted_host, monkeypatch):
+    """What a 304 from the public routes carries, so a framework change is noticed: the cache
+    headers events sets, and whatever the framework's CSP layer does to a 304 (read off a real
+    host, not assumed). A 304 that gained a ``Content-Security-Policy`` would be merged into the
+    browser's cached copy, whose scripts carry the nonce of the policy they were served with."""
+    from httpx import ASGITransport, AsyncClient
+
+    app = booted_host
+
+    async def setup_done(_app) -> bool:
+        return True
+
+    monkeypatch.setattr(app.state.sm.setup_registry, "is_setup_complete", setup_done)
+
+    async def exercise() -> dict:
+        async with app.router.lifespan_context(app):
+            async with AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://localhost"
+            ) as http:
+                first = await http.get("/events/calendar.ics")
+                second = await http.get(
+                    "/events/calendar.ics", headers={"If-None-Match": first.headers["etag"]}
+                )
+                sitemap = await http.get("/events/sitemap.xml")
+                sitemap_304 = await http.get(
+                    "/events/sitemap.xml", headers={"If-None-Match": sitemap.headers["etag"]}
+                )
+        return {"first": first, "second": second, "sitemap": sitemap, "sitemap_304": sitemap_304}
+
+    got = asyncio.run(exercise())
+    for ok, not_modified in (
+        (got["first"], got["second"]),
+        (got["sitemap"], got["sitemap_304"]),
+    ):
+        assert ok.status_code == 200 and not_modified.status_code == 304
+        assert not_modified.content == b""
+        for name in ("etag", "cache-control", "vary"):
+            assert not_modified.headers[name] == ok.headers[name], name
+        # PINNED (see CSP_ON_200 / CSP_ON_304): what the framework's CSP layer does to each.
+        assert ("content-security-policy" in not_modified.headers) == CSP_ON_304
+        assert ("content-security-policy" in ok.headers) == CSP_ON_200
+
+
+CSP_ON_200 = True
+CSP_ON_304 = False
+"""Measured on the real host (framework 0.0.44): its CSP layer adds the nonce policy to a 200 and
+leaves a 304 without one, which is what a conditional response needs (a browser merges a 304's
+headers into its cached copy, whose scripts carry the nonce of the policy it was served with;
+news #322). Events sets no CSP header itself. If either value flips, the framework changed."""
