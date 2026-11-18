@@ -15,7 +15,12 @@ __all__ = ["vtimezone"]
 
 
 def vtimezone(tzid: str, first: datetime, last: datetime) -> icalendar.Timezone:
-    """The ``VTIMEZONE`` of ``tzid`` covering the dates ``first`` to ``last``.
-    Callers pass a range wider than the events (a year either side), so a client expanding a
-    series past the last instant still finds a rule."""
+    """The ``VTIMEZONE`` of ``tzid`` with explicit ``STANDARD``/``DAYLIGHT`` transitions from the
+    dates ``first`` to ``last`` (``icalendar`` emits ``RDATE`` lists, no ``RRULE``).
+
+    Correct only inside that range: the file is the one source of offsets for a client that
+    expands the event's ``RRULE``, so the caller covers the first start, the end of a bounded
+    series and, for an open-ended one, a fixed horizon (``FEED_ZONE_YEARS_AHEAD`` years). Past
+    the horizon a client applies the last offset, which a zone with daylight saving then gets
+    wrong for half the year."""
     return icalendar.Timezone.from_tzid(tzid, first_date=first.date(), last_date=last.date())
