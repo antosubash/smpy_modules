@@ -24,7 +24,13 @@ from typing import Any
 
 from sqlalchemy import select
 
-from sm_events.calendar.slugs import free_text_slug, slug_write, slugify, text_slug_taken
+from sm_events.calendar.slugs import (
+    check_not_reserved,
+    free_text_slug,
+    slug_write,
+    slugify,
+    text_slug_taken,
+)
 from sm_events.content.redirects import record_rename, release_slug
 from sm_events.content.richtext import clean
 from sm_events.core import constants
@@ -73,6 +79,7 @@ async def _slug_for(
     """The slug a text will carry. ``SlugTaken`` for an explicit one another
     event holds in ``locale``; a derived one is the first free."""
     if data.slug is not None:
+        check_not_reserved(data.slug, field=f"texts.{locale}.slug")
         if (held is None or held.slug != data.slug) and await text_slug_taken(
             db, locale, data.slug, except_event=event.id
         ):

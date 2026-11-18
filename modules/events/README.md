@@ -126,7 +126,8 @@ A calendar name and every category name are single line: control characters,
 line and paragraph separators and text-direction controls are rejected with a
 422. A description keeps line breaks and tabs and rejects other control
 characters and text-direction controls. A name with no slug-able characters
-gets the slug `calendar` or `category` (then `-2`, `-3`, ...).
+gets the slug `calendar-2` (`calendar` is a public route segment, so no calendar
+takes it) or `category` (then `-2`, `-3`, ...).
 
 Every calendar API route also needs `events.view`. Grants, lists and revokes
 use the framework's `/api/sharing/shares` with

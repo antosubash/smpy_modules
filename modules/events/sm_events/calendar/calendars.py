@@ -11,7 +11,13 @@ from typing import Any
 from simple_module_core.resources import ACTION_DELETE, ResourcePrincipal
 from sqlmodel import select
 
-from sm_events.calendar.slugs import free_slug, slug_taken, slug_write, slugify
+from sm_events.calendar.slugs import (
+    check_not_reserved,
+    free_slug,
+    slug_taken,
+    slug_write,
+    slugify,
+)
 from sm_events.core import constants, timezones
 from sm_events.core.access import POLICY, visible_calendars
 from sm_events.core.errors import Forbidden, NotFound, SlugTaken
@@ -46,8 +52,10 @@ async def create_calendar(
     409; one derived from the name gets a ``-2``, ``-3``... suffix instead."""
     if who.user_id is None:
         raise Forbidden("A signed-in user is required")
-    if data.slug is not None and await slug_taken(db, Calendar, data.slug):
-        raise SlugTaken
+    if data.slug is not None:
+        check_not_reserved(data.slug)
+        if await slug_taken(db, Calendar, data.slug):
+            raise SlugTaken
     row = Calendar(
         slug=data.slug
         or await free_slug(db, Calendar, slugify(data.name, constants.CALENDAR_SLUG_FALLBACK)),
@@ -67,6 +75,8 @@ async def update_calendar(db: Any, cal: Calendar, data: CalendarPatch) -> Calend
     """Apply a PATCH: only the fields the body set."""
     fields = data.model_dump(exclude_unset=True)
     new_slug = fields.get("slug")
+    if new_slug is not None:
+        check_not_reserved(new_slug)
     if (
         new_slug is not None
         and new_slug != cal.slug

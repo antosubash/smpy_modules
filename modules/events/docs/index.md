@@ -51,7 +51,9 @@ A calendar name and every category name are single line: control characters,
 line and paragraph separators and text-direction controls are rejected with a
 422. A description keeps line breaks and tabs and rejects other control
 characters and text-direction controls. A name with no slug-able characters
-falls back to the slug `calendar` or `category` (then `-2`, `-3`, ...).
+falls back to the slug `calendar-2` (`calendar`, `c`, `api`, `feed` and `sitemap` are public
+route segments: no calendar or event slug may be one, and derivation skips them) or
+`category` (then `-2`, `-3`, ...).
 
 An owner or edit share can write drafts without `events.edit`; that permission
 only adds event writing on internal and public calendars. It never grants
