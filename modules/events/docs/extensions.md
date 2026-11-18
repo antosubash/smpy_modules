@@ -200,6 +200,11 @@ durable subscribers. Subscribe with `bus.subscribe_durable(Type, handler, name="
 `register_event_handlers`, before any `if app is None: return`. Payloads are identifiers,
 instants and field names: never a title, personal data or `extra`.
 
+**An import is silent.** Events created or changed by an `.ics` import (new events, updates and
+override changes alike) publish nothing: no in-process event and no outbox row, so 5,000
+imported events are not 5,000 notifications. A plugin that must know about imported events
+re-reads the calendar instead of waiting for a bus event.
+
 ## Versioning and testing
 
 Depend on events with a `>=` range, as an optional extra, with a `# floor:` comment naming
