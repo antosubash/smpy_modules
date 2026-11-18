@@ -56,3 +56,13 @@ class EventsSettings(DbBackedSettings):
     import_max_bytes: int = constants.IMPORT_DEFAULT_BYTES
     """The largest ``.ics`` file an import accepts, in bytes (default 5 MiB). Read per request
     and kept between 64 KiB and 20 MiB, whatever is stored here."""
+
+    reminders_enabled: bool = True
+    """Whether signed-in users can ask for a reminder before an event and the reminders are
+    sent. Reminders also need a mail transport that delivers, the host's public base URL and a
+    running background worker with its beat."""
+
+    default_reminder_minutes: tuple[int, ...] = (60,)
+    """How long before an event "Remind me" suggests being reminded, in minutes. Only 15, 60,
+    1440 (a day) and 10080 (a week) are used; a calendar can have its own suggestion. Nobody is
+    followed automatically."""

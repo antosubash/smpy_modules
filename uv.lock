@@ -3200,6 +3200,7 @@ name = "simple-module-events"
 version = "0.0.15"
 source = { editable = "modules/events" }
 dependencies = [
+    { name = "babel" },
     { name = "icalendar" },
     { name = "pydantic-settings" },
     { name = "python-dateutil" },
@@ -3224,6 +3225,7 @@ pagebuilder = [
 
 [package.metadata]
 requires-dist = [
+    { name = "babel", specifier = ">=2.14,<3" },
     { name = "icalendar", specifier = ">=7,<8" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
