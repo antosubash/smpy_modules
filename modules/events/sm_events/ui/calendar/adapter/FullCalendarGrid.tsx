@@ -2,17 +2,14 @@
  *  (unit-tested); this file only wires the library to the shell's `GridProps`/`GridHandle`.
  *  It is loaded lazily, so the library and its CSS stay out of every other chunk. */
 import FullCalendar, { type CalendarRef } from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/react/daygrid';
-import listPlugin from '@fullcalendar/react/list';
 import '@fullcalendar/react/skeleton.css';
-import classicTheme from '@fullcalendar/react/themes/classic';
 import '@fullcalendar/react/themes/classic/theme.css';
-import timeGridPlugin from '@fullcalendar/react/timegrid';
 import { type Ref, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import type { GridHandle, GridProps } from '../types';
 import './calendar.css';
 import {
   allowDrop,
+  chipFor,
   type EditedEvent,
   occurrenceOf,
   type Placement,
@@ -22,9 +19,7 @@ import {
   toSlot,
   VIEW_NAMES,
 } from './mapping';
-import { baseOptions, localeOptions } from './options';
-
-const PLUGINS = [dayGridPlugin, timeGridPlugin, listPlugin, classicTheme];
+import { baseOptions, localeOptions, PLUGINS } from './options';
 
 export default function FullCalendarGrid({
   ref,
@@ -130,7 +125,7 @@ export default function FullCalendarGrid({
         }
         noEventsContent={noEventsText}
         // A React node, never `{html}`: a title is text.
-        eventContent={({ event, timeText }) => renderChip(occurrenceOf(event), timeText)}
+        eventContent={({ event, timeText }) => chipFor(event, timeText, renderChip)}
         eventDidMount={({ event, el }) => {
           elements.current.set(event.id, el);
         }}

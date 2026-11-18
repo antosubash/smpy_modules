@@ -127,3 +127,13 @@ it('the popover actions are plain buttons and links in the tab order', async () 
   expect(actions.every((a) => (a as HTMLElement).tabIndex >= 0)).toBe(true);
   await view.unmount();
 });
+
+it('a timed block in week view stacks time and title so a narrow column keeps the title', async () => {
+  const { view } = await open({ fetchOccurrences: fetcherOf(pageOf([occurrence()])) });
+  const chip = () => document.querySelector('[data-key="e1:0"] > span');
+  expect(chip()?.className).not.toContain('flex-col');
+  await click(buttonNamed('Week'));
+  expect(chip()?.className).toContain('flex-col');
+  expect(chip()?.textContent).toContain('Planning');
+  await view.unmount();
+});

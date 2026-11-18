@@ -72,6 +72,18 @@ export function toEventInput(
 export const occurrenceOf = (event: { extendedProps: Record<string, unknown> }): Occurrence =>
   event.extendedProps.occurrence as Occurrence;
 
+/** The chip for a grid event, or `undefined` for one that is not an occurrence: the
+ *  selection mirror and the drag helper FullCalendar draws carry no `extendedProps`, and
+ *  those keep the library's own rendering. */
+export function chipFor<T>(
+  event: { extendedProps: Record<string, unknown> },
+  timeText: string,
+  render: (occurrence: Occurrence, timeText: string) => T,
+): T | undefined {
+  const occurrence = event.extendedProps.occurrence as Occurrence | undefined;
+  return occurrence ? render(occurrence, timeText) : undefined;
+}
+
 /** What an edited `EventApi` reports (the library's own type satisfies it). */
 export type EditedEvent = {
   start: Date | null;

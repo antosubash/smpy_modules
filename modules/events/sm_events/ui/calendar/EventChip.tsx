@@ -17,13 +17,24 @@ export function statusWord(o: Occurrence, t: (key: string) => string): string | 
 export function EventChip({ occurrence: o, view, timeText, pending, lockReason }: EventChipProps) {
   const { t } = useT();
   const word = statusWord(o, t);
+  // A timed block in the week or day grid is a narrow column: time, title and status stack
+  // instead of squeezing the title out of a single line.
+  const stacked = !o.all_day && (view === 'week' || view === 'day');
   return (
     <span
-      className="flex min-w-0 items-center gap-1 px-1 text-xs"
+      className={
+        stacked
+          ? 'flex min-w-0 flex-col px-1 text-xs leading-tight'
+          : 'flex min-w-0 items-center gap-1 px-1 text-xs'
+      }
       aria-busy={pending ? true : undefined}
     >
-      {timeText && !o.all_day ? <span className="shrink-0 tabular-nums">{timeText}</span> : null}
-      <span data-ev-title className="truncate">
+      {timeText && !o.all_day ? (
+        <span className={stacked ? 'font-medium tabular-nums' : 'shrink-0 tabular-nums'}>
+          {timeText}
+        </span>
+      ) : null}
+      <span data-ev-title className={stacked ? 'line-clamp-3 break-words' : 'truncate'}>
         <bdi>{o.title}</bdi>
       </span>
       {word ? (
