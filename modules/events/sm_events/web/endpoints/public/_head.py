@@ -87,9 +87,10 @@ def _common(
 def event_head(
     *, title: str, description: str | None, canonical: str | None, image: str | None,
     index_in_search: bool, json_ld: Any, locale: str | None,
-    alternates: list[dict[str, str]] | None,
+    alternates: list[dict[str, str]] | None, nonce: str | None = None,
 ) -> str:  # fmt: skip
-    """The head an event page needs, as markup."""
+    """The head an event page needs, as markup. ``nonce`` is the request's CSP nonce: the JSON-LD
+    script is not executable and needs none, but carries it so every script on the page does."""
     parts = _common(
         title=title,
         description=description,
@@ -102,7 +103,10 @@ def event_head(
     parts.append(_tag("twitter:card", "summary_large_image" if image else "summary"))
     parts.append(_tag("twitter:image", image))
     if json_ld:
-        parts.append(f'<script type="application/ld+json">{safe_json_ld(json_ld)}</script>')
+        attribute = f' nonce="{_e(nonce)}"' if nonce else ""
+        parts.append(
+            f'<script type="application/ld+json"{attribute}>{safe_json_ld(json_ld)}</script>'
+        )
     return "".join(part for part in parts if part)
 
 

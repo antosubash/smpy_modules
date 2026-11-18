@@ -126,3 +126,16 @@ def test_no_executable_script():
     )  # fmt: skip
     scripts = re.findall(r"<script[^>]*>", head)
     assert scripts == ['<script type="application/ld+json">']
+
+
+def test_json_ld_carries_the_request_nonce():
+    head = _head.event_head(
+        title="T", description=None, canonical=None, image=None, index_in_search=True,
+        json_ld={"@type": "Event"}, locale="en", alternates=[], nonce='abc"def',
+    )  # fmt: skip
+    assert '<script type="application/ld+json" nonce="abc&quot;def">' in head
+    plain = _head.event_head(
+        title="T", description=None, canonical=None, image=None, index_in_search=True,
+        json_ld={"@type": "Event"}, locale="en", alternates=[],
+    )  # fmt: skip
+    assert "nonce" not in plain

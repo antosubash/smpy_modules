@@ -103,6 +103,7 @@ def event_router(locale: str) -> APIRouter:
             json_ld=props.json_ld,
             locale=locale,
             alternates=[a.model_dump() for a in props.alternates],
+            nonce=getattr(request.state, "csp_nonce", None),
         )
         response = _head.inject(_head.set_html_lang(response, locale), head)
         response.headers["Content-Language"] = locale
