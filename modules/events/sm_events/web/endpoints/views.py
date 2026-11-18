@@ -24,6 +24,7 @@ from sm_events.web.endpoints.deps import (
     require_view,
 )
 from sm_events.web.endpoints.prefill import parse_prefill
+from sm_events.web.endpoints.public import _urls
 from sm_events.web.schemas.categories import CategoryOut
 
 router = APIRouter(dependencies=[Depends(tenancy.bind_admin)])
@@ -40,6 +41,8 @@ async def calendars_page(request: Request, inertia: InertiaDep) -> InertiaRespon
             "can_manage": grants(held, constants.PERM_MANAGE),
             "default_timezone": timezones.effective(get_settings(request).default_timezone),
             "user_id": str(request.state.user.id),
+            "content_locales": list(get_settings(request).content_locales),
+            "public_prefix": _urls.prefix(),
         },
     )
 

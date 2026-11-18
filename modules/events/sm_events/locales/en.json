@@ -140,7 +140,9 @@
     "note_invalid": "Enter a note of 1 to 1000 characters.",
     "stale_reloaded": "Someone else changed this event. Their version is loaded now; check it and try again.",
     "edited_meanwhile": "The action went through. Your edits made meanwhile are kept and are still unsaved.",
-    "action_stale": "Someone else changed this event. Your action was not applied."
+    "action_stale": "Someone else changed this event. Your action was not applied.",
+    "token_limit": "You already have the most private links this calendar allows. Revoke one first.",
+    "private_feeds_unavailable": "Private links are not available for your account."
   },
   "categories": {
     "title": "Categories",
@@ -607,5 +609,39 @@
       "index": "See all events",
       "suggestions": "Coming up"
     }
+  },
+  "feeds": {
+    "button": "Subscribe",
+    "button_for": "Subscribe to {name}",
+    "title": "Subscribe to this calendar",
+    "description": "Add this calendar to your own calendar app.",
+    "private_title": "Private link",
+    "private_hint": "A private link shows what you may see in this calendar, and stops working when your access does.",
+    "label": "Name for this link",
+    "label_placeholder": "Phone, laptop …",
+    "language": "Language",
+    "create": "Create a private link",
+    "creating": "Creating…",
+    "created_title": "Your new link",
+    "created_warning": "You will not see this link again. Anyone who has it sees what you can see in this calendar.",
+    "link": "Private calendar link",
+    "webcal": "Open in your calendar app",
+    "copy": "Copy link",
+    "copied": "Link copied",
+    "done": "I have copied it",
+    "mine": "Your links",
+    "everyone": "Everyone’s links",
+    "tabs": "Links",
+    "none": "You have no private links for this calendar.",
+    "none_everyone": "Nobody has a private link for this calendar.",
+    "created": "Created",
+    "last_used": "Last used",
+    "never_used": "never",
+    "unknown_user": "Unknown user",
+    "revoke": "Revoke",
+    "revoke_for": "Revoke {name}",
+    "revoke_title": "Revoke {name}?",
+    "revoke_description": "Calendar apps that use this link will stop receiving events.",
+    "revoked": "Link revoked"
   }
 }

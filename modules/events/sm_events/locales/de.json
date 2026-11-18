@@ -140,7 +140,9 @@
     "note_invalid": "Geben Sie eine Notiz mit 1 bis 1000 Zeichen ein.",
     "stale_reloaded": "Jemand anderes hat diese Veranstaltung geändert. Die neue Version ist jetzt geladen; prüfen Sie sie und versuchen Sie es erneut.",
     "edited_meanwhile": "Die Aktion wurde ausgeführt. Ihre zwischenzeitlichen Änderungen bleiben erhalten und sind noch nicht gespeichert.",
-    "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt."
+    "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt.",
+    "token_limit": "Du hast bereits die meisten privaten Links, die dieser Kalender erlaubt. Widerrufe zuerst einen.",
+    "private_feeds_unavailable": "Private Links sind für dein Konto nicht verfügbar."
   },
   "categories": {
     "title": "Kategorien",
@@ -607,5 +609,39 @@
       "index": "Alle Veranstaltungen ansehen",
       "suggestions": "Demnächst"
     }
+  },
+  "feeds": {
+    "button": "Abonnieren",
+    "button_for": "{name} abonnieren",
+    "title": "Diesen Kalender abonnieren",
+    "description": "Füge diesen Kalender deiner eigenen Kalender-App hinzu.",
+    "private_title": "Privater Link",
+    "private_hint": "Ein privater Link zeigt, was du in diesem Kalender sehen darfst, und hört auf zu funktionieren, wenn dein Zugriff endet.",
+    "label": "Name für diesen Link",
+    "label_placeholder": "Handy, Laptop …",
+    "language": "Sprache",
+    "create": "Privaten Link erstellen",
+    "creating": "Wird erstellt…",
+    "created_title": "Dein neuer Link",
+    "created_warning": "Du siehst diesen Link nicht noch einmal. Wer ihn hat, sieht, was du in diesem Kalender sehen darfst.",
+    "link": "Privater Kalenderlink",
+    "webcal": "In deiner Kalender-App öffnen",
+    "copy": "Link kopieren",
+    "copied": "Link kopiert",
+    "done": "Ich habe ihn kopiert",
+    "mine": "Deine Links",
+    "everyone": "Links aller",
+    "tabs": "Links",
+    "none": "Du hast keine privaten Links für diesen Kalender.",
+    "none_everyone": "Niemand hat einen privaten Link für diesen Kalender.",
+    "created": "Erstellt",
+    "last_used": "Zuletzt verwendet",
+    "never_used": "nie",
+    "unknown_user": "Unbekannte Person",
+    "revoke": "Widerrufen",
+    "revoke_for": "{name} widerrufen",
+    "revoke_title": "{name} widerrufen?",
+    "revoke_description": "Kalender-Apps, die diesen Link verwenden, erhalten keine Termine mehr.",
+    "revoked": "Link widerrufen"
   }
 }
