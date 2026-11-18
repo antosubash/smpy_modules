@@ -7,22 +7,21 @@ of bidirectional overrides (they would reorder the text around it in a mail clie
 
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from typing import Any
 
 from sm_newsletter.content.blocks import EventCardProps
 from sm_newsletter.content.integrations import EventHit
+from sm_newsletter.content.render.event_card import strip_bidi
 from sm_newsletter.content.urls import check_image, check_link
 from sm_newsletter.core.errors import CardSourceGone
 
 # EventCardProps' bounds; the model validates all the same.
 _TITLE, _EXCERPT, _LOCALE, _PLACE = 300, 1000, 16, 500
-_BIDI = re.compile("[‪-‮⁦-⁩]")
 
 
 def _text(value: str, limit: int) -> str:
-    return _BIDI.sub("", value)[:limit]
+    return strip_bidi(value)[:limit]
 
 
 def _fits(check: Any, value: str) -> bool:

@@ -190,3 +190,13 @@ def test_german_labels_come_from_the_footer_copy():
     out = _email("de", de, cancelled=True)
     assert "Abgesagt" in out.html and out.text.startswith("Abgesagt: Open day")
     assert "Mittwoch, 1. Juli 2026" in out.html
+
+
+def test_direction_controls_never_reach_the_email():
+    """Events' validators refuse them in a title, but a snapshot may hold text written before that
+    (or by a PATCH straight to the body): the renderer neutralises them itself."""
+    hostile = "Ev\u202eil \u2066x\u2069 \u200fend"
+    out = _email(title=hostile, excerpt=hostile, place=hostile, attendance_mode="hybrid")
+    for part in (out.html, out.text):
+        assert not re.search("[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]", part)
+    assert "Evil" in out.html and "Evil" in out.text

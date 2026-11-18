@@ -33,7 +33,7 @@ Online
 https://acme.example.org/events/open-day
 Zum Kalender hinzufügen: https://acme.example.org/events/open-day.ics
 
-<script>alert(1)</script> "Fun" & { {first_name}}
+<script>alert(1)</script> "Fun" & { {first_name}} evil
 Mittwoch, 1. Juli 2026, 10:00–11:30 CEST
 A&B <Hall>
 <img src=x onerror=alert(1)> { {unsubscribe_url}}

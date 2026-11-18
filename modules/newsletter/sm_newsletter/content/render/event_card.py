@@ -12,6 +12,7 @@ against the campaign tenant's public origin. The event's id (``source_id``) is n
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -27,11 +28,19 @@ from sm_newsletter.content.urls import absolute
 
 _FALLBACK = "en"
 _SPACES = str.maketrans({"\u202f": " ", "\u00a0": " "})  # CLDR's narrow no-break spaces
+_BIDI = re.compile("[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]")
 _ONE_DAY = timedelta(days=1)
 _CONTENT_WIDTH = s.WIDTH - 64
 _DOT = " · "
 _EN = "\u2013"  # an en dash
 _DASH = f" {_EN} "
+
+
+def strip_bidi(value: str) -> str:
+    """``value`` without direction marks, embeddings, overrides and isolates: they would reorder
+    the text around them in a mail client. Events refuses them in a title, but a snapshot may hold
+    text from before that, so the renderer neutralises them itself."""
+    return _BIDI.sub("", value)
 
 
 def _locale(name: str) -> Locale:
@@ -82,26 +91,27 @@ def place_line(p: EventCardProps, online: str) -> str:
 def html(p: EventCardProps, ctx: RenderContext) -> str:
     href = h.url(ctx.content_base, p.url)
     copy = ctx.footer
+    title, excerpt = strip_bidi(p.title), strip_bidi(p.excerpt)
     out = ""
     if p.image_url:
         out += (
             f'<a href="{href}"><img src="{h.url(ctx.content_base, p.image_url)}"'
-            f' width="{_CONTENT_WIDTH}" alt="{h.inert(p.title)}"'
+            f' width="{_CONTENT_WIDTH}" alt="{h.inert(title)}"'
             f' style="{s.fluid_image(_CONTENT_WIDTH)}"></a>'
         )
     if p.cancelled:
         out += f'<p style="{s.CARD_BADGE}">{h.inert(copy.cancelled)}</p>'
-    if p.title:
+    if title:
         title_link = f"color:{s.TEXT_COLOR};text-decoration:none"
         out += (
             f'<h3 style="{s.CARD_TITLE}">'
-            f'<a href="{href}" style="{title_link}">{h.inert(p.title)}</a></h3>'
+            f'<a href="{href}" style="{title_link}">{h.inert(title)}</a></h3>'
         )
-    for line in (when(p, ctx.locale), place_line(p, copy.online)):
+    for line in (when(p, ctx.locale), strip_bidi(place_line(p, copy.online))):
         if line:
             out += f'<p style="{s.CARD_META}">{h.inert(line)}</p>'
-    if p.excerpt:
-        out += f'<p style="{s.CARD_TEXT}">{h.inert(p.excerpt)}</p>'
+    if excerpt:
+        out += f'<p style="{s.CARD_TEXT}">{h.inert(excerpt)}</p>'
     link = f"{s.CARD_LINK_BASE};{s.accent_link(ctx.branding.accent)}"
     out += f'<a href="{href}" style="{link}">{h.inert(copy.read_more)}</a>'
     if not p.cancelled:
@@ -112,14 +122,14 @@ def html(p: EventCardProps, ctx: RenderContext) -> str:
 
 def text(p: EventCardProps, ctx: RenderContext) -> str:
     base, copy = ctx.content_base, ctx.footer
-    title = t.inert(p.title)
+    title = t.inert(strip_bidi(p.title))
     if p.cancelled:
         title = f"{t.inert(copy.cancelled)}: {title}" if title else t.inert(copy.cancelled)
     lines = [
         title,
         t.inert(when(p, ctx.locale)),
-        t.inert(place_line(p, copy.online)),
-        t.inert(p.excerpt),
+        t.inert(strip_bidi(place_line(p, copy.online))),
+        t.inert(strip_bidi(p.excerpt)),
         absolute(base, p.url),
     ]
     if not p.cancelled:

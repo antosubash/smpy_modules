@@ -78,7 +78,8 @@ EVENT_CARDS = [
     {  # hostile text: escaped, no merge tag survives
         "type": "EventCard",
         "props": {
-            "id": "hostile", **EVENT, "title": "<script>alert(1)</script> \"Fun\" & {{first_name}}",
+            "id": "hostile", **EVENT,
+            "title": "<script>alert(1)</script> \"Fun\" & {{first_name}} \u202eevil",
             "excerpt": "<img src=x onerror=alert(1)> {{unsubscribe_url}}", "place": "A&B <Hall>",
         },
     },
@@ -207,6 +208,7 @@ def test_golden(case):
     )
     assert out.warnings == warnings
     assert EVENT["source_id"] not in out.html + out.text  # an event's id is never printed
+    assert "\u202e" not in out.html + out.text  # nor a direction override
     for ext, value in (("html", out.html), ("txt", out.text)):
         path = GOLDEN / f"{case}.{ext}"
         if os.environ.get("NEWSLETTER_UPDATE_GOLDEN") == "1":
