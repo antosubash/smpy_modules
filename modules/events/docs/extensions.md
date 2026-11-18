@@ -187,7 +187,10 @@ registerEventType({
 ```
 
 Only that import is static (types may be `import type`); every component is a lazy
-loader (a repo test checks this). Events loads the files through a lazy glob, one at a time:
+loader (a repo test checks this). Events loads the files through a lazy glob, one at a time, and
+only from packages that sit beside events itself: `modules/<dist>/<package>/` in the workspace,
+`site-packages/<package>/` in a wheel install and `@simple-module-py/<package>/<dir>/` under
+`node_modules` (never another scope or an unrelated npm package; a test builds all three layouts):
 a file that fails to load, or throws while registering, is logged once by path and skipped;
 the console shows a small notice, public pages nothing. Each component runs inside an error
 boundary, so one that throws shows the default (or nothing). Slots: `Chip`, `Detail`
