@@ -535,5 +535,84 @@
       "mine": "My time",
       "same": "Your time is the same"
     }
+  },
+  "public": {
+    "index": {
+      "title": "Events",
+      "upcoming": "Upcoming events",
+      "region": "Events",
+      "tab_list": "List",
+      "tab_calendar": "Calendar",
+      "tabs": "Show events as",
+      "empty": "No upcoming events.",
+      "month_group": "Events in {month}",
+      "page_of": "Page {page} of {count}",
+      "previous": "Previous page",
+      "next": "Next page",
+      "pagination": "Pages",
+      "filter": {
+        "label": "Filter events",
+        "category": "Category",
+        "all": "All categories",
+        "calendars": "Calendars"
+      },
+      "calendar_page": "Calendar: {name}"
+    },
+    "item": {
+      "cancelled": "Cancelled",
+      "rescheduled": "Rescheduled",
+      "in_zone": "{time} ({zone})",
+      "all_day": "All day",
+      "online": "Online",
+      "hybrid": "In person and online",
+      "view_event": "View event"
+    },
+    "subscribe": {
+      "title": "Subscribe",
+      "hint": "Add these events to your own calendar. It updates itself.",
+      "feed": "Calendar link (https)",
+      "webcal": "Open in your calendar app",
+      "copy": "Copy link",
+      "copied": "Link copied"
+    },
+    "grid": {
+      "loading": "Loading the calendar…"
+    },
+    "language": {
+      "label": "Language",
+      "name_en": "English",
+      "name_de": "Deutsch"
+    },
+    "event": {
+      "when": "When",
+      "your_time": "Your time: {time}",
+      "rescheduled_from": "Rescheduled from {time}",
+      "cancelled_banner": "This event has been cancelled",
+      "cancelled_occurrence": "This date has been cancelled",
+      "series": "Repeats",
+      "next_dates": "Next dates",
+      "next_cancelled": "{time} (cancelled)",
+      "place": "Where",
+      "in_person": "In person",
+      "online": "Online",
+      "hybrid": "In person and online",
+      "join_online": "Join online",
+      "map": "Show on a map",
+      "organiser": "Organised by {name}",
+      "category": "Category",
+      "calendar": "Calendar",
+      "part_of": "Part of {title}",
+      "sub_events": "Sessions",
+      "register": "Register",
+      "add_to_calendar": "Add to calendar",
+      "all_dates": "All dates",
+      "description": "About this event"
+    },
+    "not_found": {
+      "title": "Page not found",
+      "message": "We could not find what you were looking for.",
+      "index": "See all events",
+      "suggestions": "Coming up"
+    }
   }
 }

@@ -23,7 +23,7 @@ export type Custom = { custom: string };
 export const isCustom = (rule: RuleForm | Custom): rule is Custom => 'custom' in rule;
 
 /** Mirrors `RRULE_MAX_INTERVAL`, `RRULE_MAX_COUNT` and `RRULE_MAX_LEN` in
- *  `sm_events/core/constants.py`; `recurrence.test.ts` reads that file and fails on a mismatch. */
+ *  `sm_events/core/constants/__init__.py`; `recurrence.test.ts` reads that file and fails on a mismatch. */
 export const INTERVAL_MAX = 99;
 export const COUNT_MAX = 730;
 export const RRULE_MAX_LEN = 500;
