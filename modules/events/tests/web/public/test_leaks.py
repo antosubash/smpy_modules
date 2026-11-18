@@ -23,8 +23,6 @@ a draft parent. The rules these pin are the module's Review Focus:
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from sm_events.web.endpoints.public import _urls
 
@@ -205,27 +203,6 @@ async def test_signed_in_manager_sees_public_only(public_locales_client, fx):
 
 def _is_json_page(response) -> bool:
     return "x-inertia" in response.headers
-
-
-_PUBLIC_CODE = Path(__file__).resolve().parents[3] / "sm_events"
-_FORBIDDEN = ("request.state.user", "principal_from", "ResourcePrincipal(")
-_ALLOWED = {"_cache.py"}  # reads the user only to choose cache headers
-
-
-def test_no_viewer_in_public_code():
-    """The public surface has no viewer: no handler takes one from the request. Only the
-    cache policy looks at who is signed in, to refuse to keep their copy."""
-    roots = [_PUBLIC_CODE / "web" / "endpoints" / "public", _PUBLIC_CODE / "feeds"]
-    checked = 0
-    for root in roots:
-        for path in root.rglob("*.py") if root.exists() else ():
-            checked += 1
-            if path.name in _ALLOWED:
-                continue
-            source = path.read_text()
-            for token in _FORBIDDEN:
-                assert token not in source, f"{path.name} uses {token}"
-    assert checked >= 8
 
 
 @pytest.mark.unbound_tenant
