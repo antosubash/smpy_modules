@@ -121,14 +121,17 @@ function Inner(props: UpcomingEventsProps & WithPuck) {
   ].filter((hint): hint is string => hint !== null);
   const hint =
     editing && hints.length > 0 ? (
-      <p className="text-sm text-muted-foreground" data-editor-only="">
+      <p className="container mx-auto px-4 py-2 text-sm text-muted-foreground" data-editor-only="">
         {hints.join(' ')}
       </p>
     ) : null;
   if (items === null || items.length === 0) return hint ?? <></>;
   const shown = locale ?? 'en';
   return (
-    <section className="space-y-3" aria-label={heading || t(copy.upcoming.label)}>
+    <section
+      className="container mx-auto space-y-3 px-4 py-4"
+      aria-label={heading || t(copy.upcoming.label)}
+    >
       {heading ? <h2 className="text-xl font-semibold">{heading}</h2> : null}
       {layout === 'cards' ? (
         <Cards items={items} locale={shown} images={props.showImages !== false} />

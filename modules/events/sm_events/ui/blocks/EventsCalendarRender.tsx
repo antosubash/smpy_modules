@@ -64,12 +64,17 @@ function Inner(props: EventsCalendarProps & WithPuck) {
   );
   const categories = useMemo<PublicCategory[]>(() => answer?.categories ?? [], [answer]);
   const ids = useMemo(() => calendars.map((c) => c.id), [calendars]);
-  if (loading)
-    return <div data-events-calendar="" style={{ minHeight: height }} aria-busy="true" />;
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-4">
+        <div data-events-calendar="" style={{ minHeight: height }} aria-busy="true" />
+      </div>
+    );
+  }
   if (failed || calendars.length === 0) {
     const missing = slugs.length - calendars.length;
     return editing && !failed && missing > 0 ? (
-      <p className="text-sm text-muted-foreground" data-editor-only="">
+      <p className="container mx-auto px-4 py-2 text-sm text-muted-foreground" data-editor-only="">
         {t(copy.editor_hint.unresolved, { count: missing })}
       </p>
     ) : (
@@ -77,20 +82,22 @@ function Inner(props: EventsCalendarProps & WithPuck) {
     );
   }
   return (
-    <section
-      data-events-calendar=""
-      style={{ minHeight: height }}
-      aria-label={t(copy.calendar.label)}
-    >
-      <PublicCalendarGrid
-        apiUrl={OCCURRENCES_URL}
-        calendars={calendars}
-        categories={categories}
-        defaultTimezone={answer?.default_timezone ?? 'UTC'}
-        initial={{ view }}
-        limitTo={slugs.length > 0 ? ids : undefined}
-      />
-    </section>
+    <div className="container mx-auto px-4 py-4">
+      <section
+        data-events-calendar=""
+        style={{ minHeight: height }}
+        aria-label={t(copy.calendar.label)}
+      >
+        <PublicCalendarGrid
+          apiUrl={OCCURRENCES_URL}
+          calendars={calendars}
+          categories={categories}
+          defaultTimezone={answer?.default_timezone ?? 'UTC'}
+          initial={{ view }}
+          limitTo={slugs.length > 0 ? ids : undefined}
+        />
+      </section>
+    </div>
   );
 }
 

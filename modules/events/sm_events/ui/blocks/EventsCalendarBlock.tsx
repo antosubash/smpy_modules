@@ -77,5 +77,9 @@ export const EventsCalendarBlock = lazyBlock<EventsCalendarProps>(
           }
         : { props },
   },
-  (props) => <div aria-busy="true" style={{ minHeight: minHeight(props.height) }} />,
+  (props) => (
+    <div className="container mx-auto px-4 py-4">
+      <div aria-busy="true" style={{ minHeight: minHeight(props.height) }} />
+    </div>
+  ),
 );

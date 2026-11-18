@@ -116,6 +116,7 @@ def html(p: EventCardProps, ctx: RenderContext) -> str:
     out += f'<a href="{href}" style="{link}">{h.inert(copy.read_more)}</a>'
     if not p.cancelled:
         ics = h.url(ctx.content_base, p.ics_url)
+        out += f' <span style="{s.CARD_SEP}">{_DOT.strip()}</span>'
         out += f' <a href="{ics}" style="{link}">{h.inert(copy.add_to_calendar)}</a>'
     return out
 

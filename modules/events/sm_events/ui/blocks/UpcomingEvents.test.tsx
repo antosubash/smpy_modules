@@ -243,6 +243,17 @@ describe('UpcomingEventsBlock', () => {
     expect(resolveData({ props: stored }, { trigger: 'force' }).props.count).toBe(4.5);
   });
 
+  it('summarises a calendar row with text, never a catalogue key', () => {
+    const field = (
+      UpcomingEventsBlock.fields as unknown as Record<
+        string,
+        { getItemSummary: (i: { slug?: string }) => string }
+      >
+    ).calendars;
+    expect(field.getItemSummary({ slug: '' })).toBe('Calendar');
+    expect(field.getItemSummary({ slug: 'team' })).toBe('team');
+  });
+
   it('keeps its labels as catalogue keys until pagebuilder resolves them', () => {
     expect(UpcomingEventsBlock.label).toBe('events.blocks.upcoming.label');
     expect((UpcomingEventsBlock.fields as Record<string, { label: string }>).heading.label).toBe(
