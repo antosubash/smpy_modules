@@ -53,7 +53,7 @@ class HolidaySettings(BaseModel):
 class Holidays:
     id = "holidays:public"
     label_key = "holidays.source.label"  # resolved at render; the id shows when there is none
-    public = True                         # see "What a public source must guarantee"
+    public = True  # see "What a public source must guarantee"
     color = None
     icon = "calendar"
     settings_model = HolidaySettings
@@ -61,7 +61,9 @@ class Holidays:
     async def occurrences(self, ctx: SourceContext, start, end):
         return [
             SourceOccurrence(
-                key="new-year", title="New Year's Day", all_day=True,
+                key="new-year",
+                title="New Year's Day",
+                all_day=True,
                 start_date=date(start.year, 1, 1),
                 end_date=date(start.year, 1, 2),
             )
@@ -135,15 +137,17 @@ from sm_events.contracts.extensions import EventType
 
 
 class TalkExtra(BaseModel):
-    model_config = ConfigDict(extra="forbid")   # required
+    model_config = ConfigDict(extra="forbid")  # required
     speaker: str
     room: str | None = None
     level: Literal["intro", "advanced"] = "intro"
 
 
 TALK = EventType(
-    id="acme:talk", label_key="acme.types.talk", extra_model=TalkExtra,
-    public_fields=frozenset({"speaker"}),        # the only fields a public page may carry
+    id="acme:talk",
+    label_key="acme.types.talk",
+    extra_model=TalkExtra,
+    public_fields=frozenset({"speaker"}),  # the only fields a public page may carry
 )
 
 
