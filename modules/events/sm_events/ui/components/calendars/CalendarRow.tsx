@@ -17,9 +17,11 @@ import { keys, useT } from '../../utils/i18n';
 import { Name, withName } from '../../utils/isolate';
 import type { Calendar } from '../../utils/types';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { SubscribeDialog } from '../feeds/SubscribeDialog';
 import { ShareDialog } from '../share/ShareDialog';
 import { CalendarDialog } from './CalendarDialog';
 import { OwnerDialog } from './OwnerDialog';
+import { SourcesDialog } from './SourcesDialog';
 import { VisibilityMenu } from './VisibilityMenu';
 
 /** Where a calendar is now, after a request found it missing: in the active
@@ -53,12 +55,18 @@ export function CalendarRow({
   canManage,
   trashed,
   onSaved,
+  contentLocales = ['en'],
+  publicPrefix = '/events',
 }: {
   calendar: Calendar;
   userId: string;
   canManage: boolean;
   trashed: boolean;
   onSaved: () => void;
+  /** The languages a private link may be in; the first is the default. */
+  contentLocales?: string[];
+  /** Where the public feeds live, for a public calendar's own subscribe box. */
+  publicPrefix?: string;
 }) {
   const { t } = useT();
   const { can } = usePermissions();
@@ -141,6 +149,13 @@ export function CalendarRow({
             )
           ) : (
             <>
+              <SubscribeDialog
+                calendar={calendar}
+                canManage={canManage}
+                contentLocales={contentLocales}
+                publicPrefix={publicPrefix}
+                onGone={onSaved}
+              />
               {calendar.can_edit && (
                 <CalendarDialog
                   calendar={calendar}
@@ -152,6 +167,7 @@ export function CalendarRow({
               {calendar.can_own && (
                 <>
                   <VisibilityMenu calendar={calendar} onSaved={onSaved} />
+                  <SourcesDialog calendar={calendar} onSaved={onSaved} />
                   {can('sharing.share') && (
                     <ShareDialog
                       calendarId={calendar.id}

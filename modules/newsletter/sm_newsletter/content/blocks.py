@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import date
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
     AfterValidator,
@@ -14,6 +16,7 @@ from pydantic import (
     Field,
     TypeAdapter,
     ValidationError,
+    model_validator,
 )
 
 from sm_newsletter.content.merge import MAX_FALLBACK, check_merge
@@ -31,6 +34,7 @@ BLOCK_TYPES = (
     "Spacer",
     "ArticleCard",
     "PageCard",
+    "EventCard",
 )
 MAX_BLOCKS = 200
 
@@ -114,6 +118,49 @@ class CardProps(_Props):
     snapshot_at: AwareDatetime
 
 
+UUID_RE = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
+def _zone(value: str) -> str:
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        raise ValueError("unknown timezone") from None
+    return value
+
+
+class EventCardProps(_Props):
+    """An event card's snapshot. ``source_id`` is the event's id, kept so Refresh can read it
+    again; the renderer never prints it."""
+
+    source_id: Annotated[str, Field(pattern=UUID_RE)]
+    title: Annotated[str, Field(max_length=300)] = ""
+    excerpt: Annotated[str, Field(max_length=1000)] = ""
+    image_url: ImageUrl = ""
+    url: Link
+    ics_url: Link
+    locale: Annotated[str, Field(max_length=16)] = ""
+    starts_at: AwareDatetime
+    ends_at: AwareDatetime
+    all_day: bool = False
+    start_date: date | None = None
+    end_date: date | None = None
+    timezone: Annotated[str, Field(min_length=1, max_length=64), AfterValidator(_zone)]
+    attendance_mode: Literal["in_person", "online", "hybrid"] = "in_person"
+    place: Annotated[str, Field(max_length=500)] = ""
+    cancelled: bool = False
+    snapshot_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def _consistent(self) -> EventCardProps:
+        if self.ends_at <= self.starts_at:
+            raise ValueError("an event ends after it starts")
+        dated = self.start_date is not None and self.end_date is not None
+        if self.all_day != dated or (dated and self.start_date >= self.end_date):  # type: ignore[operator]
+            raise ValueError("all-day events carry their dates, and no other does")
+        return self
+
+
 class _Block(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -158,6 +205,11 @@ class PageCardBlock(_Block):
     props: CardProps
 
 
+class EventCardBlock(_Block):
+    type: Literal["EventCard"]
+    props: EventCardProps
+
+
 Block = Annotated[
     HeadingBlock
     | RichTextBlock
@@ -166,7 +218,8 @@ Block = Annotated[
     | DividerBlock
     | SpacerBlock
     | ArticleCardBlock
-    | PageCardBlock,
+    | PageCardBlock
+    | EventCardBlock,
     Field(discriminator="type"),
 ]
 _ADAPTER: TypeAdapter[list[Block]] = TypeAdapter(list[Block])

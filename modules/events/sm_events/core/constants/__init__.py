@@ -1,14 +1,71 @@
 """Names the module registers under; one place so nothing spells them twice."""
 
+# ruff: noqa: F401 - the re-exports below are the point
 from __future__ import annotations
 
+from sm_events.core.constants.extensions import *  # noqa: F403 - plugins (PR 6)
+from sm_events.core.constants.feed_tokens import *  # noqa: F403 - private feed links (PR 5)
+from sm_events.core.constants.imports import *  # noqa: F403 - the .ics import (PR 5)
+
+# The public surface's names live in ``public.py`` and are re-exported here, so every
+# ``constants.X`` keeps working.
+from sm_events.core.constants.public import (
+    _PAGE_PUBLIC_EVENT,
+    _PAGE_PUBLIC_INDEX,
+    _PAGE_PUBLIC_NOT_FOUND,
+    BLOCK_CALENDARS_MAX,
+    DEFAULT_PUBLIC_PREFIX,
+    FEED_DAYS_AHEAD,
+    FEED_DAYS_BACK,
+    FEED_MAX_COMPONENTS,
+    FEED_MAX_EVENTS,
+    FEED_RATE,
+    FEED_ZONE_LAST_YEAR,
+    FEED_ZONE_YEARS_AHEAD,
+    ICS_MEDIA_TYPE,
+    INVALID_QUERY_CODE,
+    INVALID_QUERY_DETAIL,
+    JSON_MEDIA_TYPE,
+    NEXT_OCCURRENCES,
+    NOT_FOUND_SUGGESTIONS,
+    NOT_FOUND_WINDOW_DAYS,
+    PAGE_DIGITS_MAX,
+    PAGE_SIZE,
+    PRODID,
+    PUBLIC_API_RATE,
+    PUBLIC_CACHE_SECONDS,
+    PUBLIC_LISTING_CACHE_MAX,
+    PUBLIC_METHODS,
+    PUBLIC_PREFIX_PATTERN,
+    PUBLIC_SWR_SECONDS,
+    RESERVED_PREFIX_SEGMENTS,
+    RESERVED_SLUGS,
+    SEGMENT_API,
+    SEGMENT_CALENDAR,
+    SEGMENT_CALENDAR_FEED,
+    SEGMENT_PRIVATE_FEED,
+    SEGMENT_SITEMAP,
+    SITEMAP_MAX_URLS,
+    SITEMAP_NAMESPACE,
+    SLUG_RESERVED_CODE,
+    SLUG_RESERVED_DETAIL,
+    SUB_EVENTS_MAX,
+    UPCOMING_BLOCK_DEFAULT,
+    UPCOMING_BLOCK_MAX,
+    XML_MEDIA_TYPE,
+)  # isort: skip
+
+from sm_events.core.constants.names import MODULE_NAME  # isort: skip
+
 PACKAGE = "sm_events"
-MODULE_NAME = "Events"
 DISTRIBUTION = "simple_module_events"
 LOCALE_NAMESPACE = "events"
 BASE_NAME = "events"
 
 ROUTE_PREFIX_API = "/api/events"
+PUBLIC_BLOCKS_API = f"{ROUTE_PREFIX_API}/public"
+"""Where the pagebuilder blocks read: three anonymous, fixed-path routes (a block cannot learn
+the configurable public prefix)."""
 VIEW_PREFIX = "/admin/events"
 
 PERM_GROUP = MODULE_NAME
@@ -21,7 +78,8 @@ PERMISSIONS = (PERM_VIEW, PERM_EDIT, PERM_PUBLISH, PERM_MANAGE)
 
 _MODULE_SETTINGS = "Settings"
 _MODULE_SHARING = "Sharing"
-DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_SHARING)
+_MODULE_BACKGROUND_TASKS = "BackgroundTasks"
+DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_SHARING, _MODULE_BACKGROUND_TASKS)
 
 TENANT_REQUIRED_CODE = "tenant_required"
 NOT_FOUND_DETAIL = "Not found"
@@ -59,24 +117,52 @@ DEFAULT_LOCALE_REQUIRED_DETAIL = "A name in the default language is required"
 UNKNOWN_LOCALE_DETAIL = "That language is not one of the content locales"
 
 # Console pages and sidebar entries.
+_PAGE_CALENDAR = f"{MODULE_NAME}/Calendar"
 _PAGE_CALENDARS = f"{MODULE_NAME}/Calendars"
 _PAGE_CATEGORIES = f"{MODULE_NAME}/Categories"
+_PAGE_EVENTS = f"{MODULE_NAME}/Events"
+_PAGE_EVENT_EDITOR = f"{MODULE_NAME}/EventEditor"
+_PAGE_IMPORT = f"{MODULE_NAME}/Import"
+CALENDAR_URL = f"{VIEW_PREFIX}/"
 CALENDARS_URL = f"{VIEW_PREFIX}/calendars"
 CATEGORIES_URL = f"{VIEW_PREFIX}/categories"
+EVENTS_URL = f"{VIEW_PREFIX}/list"
+IMPORT_URL = f"{VIEW_PREFIX}/import"
+EVENT_NEW_SEGMENT = "new"
 MENU_GROUP = MODULE_NAME
 MENU_GROUP_KEY = "events.menu.group"
+MENU_LABEL_CALENDAR = "Calendar"
+MENU_LABEL_KEY_CALENDAR = "events.menu.calendar"
+MENU_ICON_CALENDAR = "calendar"
 MENU_LABEL_CALENDARS = "Calendars"
 MENU_LABEL_KEY_CALENDARS = "events.menu.calendars"
-MENU_ICON_CALENDARS = "calendar"
+MENU_ICON_CALENDARS = "layers"
 MENU_LABEL_CATEGORIES = "Event categories"
 MENU_LABEL_KEY_CATEGORIES = "events.menu.categories"
 MENU_ICON_CATEGORIES = "tag"
+MENU_LABEL_EVENTS = "Events"
+MENU_LABEL_KEY_EVENTS = "events.menu.events"
+MENU_ICON_EVENTS = "list"
 
 # Bounds on times, ranges, rules, revisions and pages.
 MAX_EVENT_DAYS = 366
 MAX_SERIES_EVENT_DAYS = 31
+# A UTC offset can change inside an instance (31 wall-clock days are 31 days and an
+# hour across a fall-back), so every look-back for one adds this many days.
+LOOK_BACK_MARGIN_DAYS = 1
 MAX_RANGE_DAYS = 366
+# A path number and an occurrence's original start: what a signed 32-bit column holds and
+# the years a calendar means (a bound keeps ``+ 1 microsecond`` and zone maths in range).
+INT32_MAX = 2**31 - 1
+ORIGINAL_START_MIN_YEAR = 1900
+ORIGINAL_START_MAX_YEAR = 9000
 MAX_OCCURRENCES = 2000
+# Cards for another module (``contracts.cards``): the most one search returns, how many
+# matching events it looks at before cutting, and how many times it re-reads series the
+# occurrences read's own cap starved (a bound on statements, never on correctness of a card).
+MAX_EVENT_SEARCH_LIMIT = 50
+CARD_SEARCH_SCAN = 50
+CARD_READ_ROUNDS = 3
 SERIES_FETCH_MAX = 2000
 RRULE_MAX_LEN = 500
 RRULE_MAX_INTERVAL = 99
@@ -91,16 +177,30 @@ DESCRIPTION_RAW_MAX = 200_000
 DESCRIPTION_MAX = 100_000
 NOTE_MAX = 1000
 QUERY_MAX = 100
+URL_MAX = 2048
+ORGANISER_MAX = 200
+VENUE_MAX = 200
+ADDRESS_MAX = 500
+RRULE_INPUT_MAX = 1000
+TITLE_MAX = 300
+SUMMARY_MAX = 1000
+SEO_TITLE_MAX = 300
+SEO_DESCRIPTION_MAX = 500
+TYPE_NAME_MAX = 64
+TIMES_FIELD_MAX = 40
+TEXTS_MAX = 20
 PUBLISH_DUE_BATCH = 200
 
 # Names.
 EVENT_SLUG_FALLBACK = "event"
 UID_SUFFIX = "@simple-module-events"
+UID_MAX = 255
 SOURCE_EVENTS = "events"
 
 # Error codes and their default messages.
 STALE_CODE = "stale"
 STALE_DETAIL = "This was changed by someone else; reload it"
+CURRENT_REVISION_HEADER = "X-Current-Revision"
 OVERRIDES_ORPHANED_CODE = "overrides_orphaned"
 OVERRIDES_ORPHANED_DETAIL = "This change would orphan overrides of single occurrences"
 HAS_SUB_EVENTS_CODE = "has_sub_events"
@@ -113,6 +213,7 @@ INVALID_RRULE_CODE = "invalid_rrule"
 INVALID_RRULE_DETAIL = "The recurrence rule is not valid"
 RRULE_FREQUENCY_REFUSED_CODE = "rrule_frequency_refused"
 RRULE_FREQUENCY_REFUSED_DETAIL = "Only daily, weekly, monthly and yearly rules are allowed"
+START_FIELD = "times.start"
 START_NOT_IN_RULE_CODE = "start_not_in_rule"
 START_NOT_IN_RULE_DETAIL = "The first occurrence must be the event's own start"
 INVALID_LOCAL_TIME_CODE = "invalid_local_time"
@@ -140,6 +241,27 @@ NOT_AN_OCCURRENCE_CODE = "not_an_occurrence"
 NOT_AN_OCCURRENCE_DETAIL = "That is not an occurrence of the event's rule"
 DESCRIPTION_TOO_LONG_CODE = "description_too_long"
 DESCRIPTION_TOO_LONG_DETAIL = "The description is too long"
+
+STATUS_SCHEDULED = "scheduled"
+"""A list filter, not a stored status: a draft or in-review event with ``publish_at`` set."""
+
+# Revisions: what a history row's action may be.
+REVISION_ACTIONS = (
+    "created",
+    "updated",
+    "override_set",
+    "override_cleared",
+    "submitted",
+    "withdrawn",
+    "approved",
+    "scheduled",
+    "unscheduled",
+    "rejected",
+    "unpublished",
+    "published_scheduled",
+    "trashed",
+    "restored",
+)
 
 # Occurrences.
 OCCURRENCE_CONFIRMED = "confirmed"

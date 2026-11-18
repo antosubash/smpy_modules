@@ -131,6 +131,10 @@ def _inner(b: Any, ctx: RenderContext) -> str:
         return f'<div style="height:{px}px;line-height:{px}px;font-size:0">&nbsp;</div>'
     if kind in ("ArticleCard", "PageCard"):
         return _card(b.props, ctx)
+    if kind == "EventCard":
+        from sm_newsletter.content.render import event_card  # imports this module
+
+        return event_card.html(b.props, ctx)
     raise TypeError(f"unknown block {kind!r}")  # the union is closed
 
 

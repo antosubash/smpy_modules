@@ -401,3 +401,103 @@ list. Calendar and category names are single line (control characters, line and
 paragraph separators and direction controls are a 422); descriptions keep line
 breaks and tabs. A name with no slug-able characters falls back to the slug
 `calendar` or `category`, with `-2`, `-3` ... on a clash.
+
+## Amendments (PR 2)
+
+The approved PR 2 rulings refine the design above: the API takes the event's
+local wall clock and a timezone, never UTC (ruling 1). The RRULE allow-list is
+bounded as in ruling 5 (daily to yearly, interval 1 to 99, count 1 to 730,
+until within 100 years, no sub-daily or week-number parts), and the start must
+be the first occurrence of its rule (6). Sub-events and recurrence exclude each
+other, one level deep, in the same calendar (9). The occurrences read is
+ordered by (start, end, source, key), cut at 2,000 and truncated by the series
+cap (13). A published or scheduled event is locked and changed only with write
+and `events.publish` (16). Every write, the beat's included, records a revision
+with an optional note, the one new column (`events_revision.note`), and the
+newest 100 are kept (18). An event always has a text in the default locale (20).
+The description editor is a small contentEditable field with no new
+dependency, and a read-only description is shown in a sandboxed frame (29).
+
+Frontend choices of the screens: the editor reads the event from the API, not
+from props, and works on the event's own clock (it shows the UTC offset of the
+zone being edited); overrides and workflow actions apply to the saved event and
+wait for unsaved edits; a save over a newer revision shows what differs and
+resends only on an explicit click; a sub-event is created with
+`/admin/events/edit/new?calendar=<id>&parent=<id>`.
+
+## Amendments (PR 3)
+
+The approved PR 3 rulings refine the design above. FullCalendar is imported only
+under `ui/calendar/adapter/`, stricter than `ui/calendar/` (ruling 2), and the
+grid is a lazily loaded chunk so no other screen or importer pays for it (4).
+The fetch range is the visible range plus seven days a side, at most 366 days,
+cached eight pages deep and aborted on every new fetch (11). "Calendar time" is
+the one shown calendar's zone, else the tenant's; "my time" is the browser's
+(12). A grid change becomes the event's own wall clock through Temporal, never
+UTC; a drop on the second occurrence of a repeated autumn hour is refused
+client-side (13). "All occurrences" shifts the master on the event's wall clock
+and never rewrites the rule, so a weekday change on a `BYDAY` series is the
+server's `start_not_in_rule` (14). An occurrence carries no revision, so a write
+reads the event first and stops as stale when the grid is out of date (15).
+The interaction plugin must be in the adapter's plugin list: without it FullCalendar 7
+cannot drag, resize or select.
+
+## Amendments (PR 4)
+
+The approved PR 4 rulings refine the design above. A sub-event is shown on its own merits: a
+published child of a public calendar has its page even when its parent is not public, and then
+names no parent anywhere (4). The public category filter lists only categories used by a public
+event (5). `calendar`, `c`, `api`, `feed` and `sitemap` are reserved slugs (9). An occurrence is
+addressed `{slug}?date=YYYY-MM-DD`; a skipped or non-instance date is the 404 (10). The index is
+list-first with a read-only calendar tab and no past events (14). A cancelled event or occurrence
+stays 200 and indexable with a banner (16). The description is rendered from a node tree, never
+injected HTML (18). Cache lifetimes derive from `public_cache_seconds`; a signed-in visitor's page
+is `private, no-store` (20). A feed holds 30 days back to 366 ahead, at most 1,000 events and 5,000
+components, counts every override toward the cap, drops a series it cannot hold whole and says so
+in `X-Events-Truncated` (25). A series' bare page lists its next ten occurrences in JSON-LD (30).
+The sitemap is bounded at 10,000 addresses and lists no `?date=` address (31). Added by review:
+feed `VTIMEZONE`s list transitions for 20 years ahead, not rules; the all-calendars feed and the
+index are named by the `public_title` setting; the public prefix is checked against other
+modules' configured prefixes.
+
+## Amendments (PR 5)
+
+Private feeds are the third documented token-bound public route; every refusal is one padded
+`404`, and tokens are never logged. `scan.py` is the only `.ics` parser and no library parses an
+upload. An import creates drafts and is idempotent by `UID`. On an eager host every slice re-checks the
+importer; a real worker cannot (no app, upstream gap) and relies on the rights captured at apply,
+valid one hour (`rights_expired` after), plus per-item share, owner, trash and lock checks. A
+repeating series written in UTC keeps zone UTC (`kept_utc`). Stored URLs never carry credentials.
+
+## Amendments (PR 6)
+
+The approved PR 6 rulings refine the design above. A plugin id is `<entry-point name>:<name>`, and plugins
+register from `events_extensions.py` (loaded in the web process and on a worker's first read, then frozen)
+(2). A source returns `SourceOccurrence`s that carry no source, calendar or editability: the read fills
+those in (5). A plugin call runs on a session of its own, read-only, under a time and item budget, and
+its output is validated whole (7, 8, 9). The occurrences answer reports a status per plugin source in the
+console and never in a public answer, and a failed public answer is not cached (11). Sources are enabled
+per calendar with settings validated against the plugin's model, written with the `sources_version` a read
+returned, and settings are never secret (12). Only `public` sources run for the public, with no viewer, and
+only in the grid and the feeds, never the server-rendered list, the sitemap or JSON-LD (13, 15). A category
+filter or a type filter without the default type excludes plugin items (14). A plugin item's key and ICS
+UID carry the calendar id (16). The type is immutable; an event of an uninstalled type keeps its `extra`
+byte for byte and refuses a change to it; public pages receive only the type's `public_fields` (19, 21,
+22). Bus events number nine and are also published durably, at least once and unordered, and the scheduled
+publish now announces `EventPublished` (23, 24). The frontend registry is a lazy, guarded glob of
+`events-extensions.ts` with an error boundary per component; the calendar's own events are a choice in the
+source filter (25-30). Records contributes `records:dates` through `sm_records.contracts.dated`, public only
+for types marked Public (31-33).
+
+## Amendments (PR 7)
+
+The approved PR 7 rulings refine the design above. `sm_events.contracts.cards` is the public projection of
+an event for a sibling: it starts from the public gate, pins the named tenant twice, and a card is a one-off's
+own times or a series' next occurrence (4). Its `id` exists for a consumer's own lookup and is never rendered
+publicly. Newsletter's Event card is its own block with its own props, snapshotted when inserted and
+refreshed on request, a series card rolling forward to its next date (12, 14); its date is formatted in the
+event's zone with the tzdata abbreviation, untranslated (15). Events contributes its blocks through the
+optional `pagebuilder` extra, from `pagebuilder-blocks.ts` (17), which amends "events gains no pagebuilder
+extra" to mean no pagebuilder Python for the blocks. The blocks read three anonymous routes at the fixed path
+`/api/events/public/` (18), by calendar slug (19), the pickers read the same anonymous route (20), and a block
+fetches at request time and stores no snapshot, so a calendar that stops being public shows nothing.

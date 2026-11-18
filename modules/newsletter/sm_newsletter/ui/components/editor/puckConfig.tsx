@@ -1,6 +1,6 @@
 /**
  * The Puck config a campaign's email is written with — newsletter's own, not
- * pagebuilder's: eight blocks that the server knows how to render as email
+ * pagebuilder's: nine blocks that the server knows how to render as email
  * (`content/blocks.py`), one column, no DropZones or slots (an email is a
  * single 600 px column and the body is a flat list, ruling R8).
  *
@@ -17,12 +17,14 @@ import type { ReactNode } from 'react';
 import { keys } from '../../utils/i18n';
 import { cardBlock } from './blocks/cards';
 import { PAGE_BG } from './blocks/email';
+import { eventCardBlock } from './blocks/eventCard';
 import { ButtonBlock, DividerBlock, imageBlock, SpacerBlock } from './blocks/media';
 import { HeadingBlock, RichTextBlock } from './blocks/text';
 
 export interface Capabilities {
   news: boolean;
   pagebuilder: boolean;
+  events: boolean;
 }
 
 const copy = keys.newsletter.blocks.categories;
@@ -49,7 +51,7 @@ function EmailColumn({ children }: { children?: ReactNode }) {
 }
 
 export function buildConfig(caps: Capabilities): Config {
-  const cards = { ArticleCard: caps.news, PageCard: caps.pagebuilder };
+  const cards = { ArticleCard: caps.news, PageCard: caps.pagebuilder, EventCard: caps.events };
   const available = Object.keys(cards).filter((name) => cards[name as keyof typeof cards]);
   const unavailable = Object.keys(cards).filter((name) => !cards[name as keyof typeof cards]);
 
@@ -82,6 +84,7 @@ export function buildConfig(caps: Capabilities): Config {
       Spacer: SpacerBlock,
       ArticleCard: cardBlock('article', caps.news),
       PageCard: cardBlock('page', caps.pagebuilder),
+      EventCard: eventCardBlock(caps.events),
     } as Config['components'],
   };
 }

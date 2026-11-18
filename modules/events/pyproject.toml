@@ -16,8 +16,10 @@ dependencies = [
     "simple_module_inertia>=0.0.44,<0.1",
     "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
     "simple_module_sharing>=0.0.44,<0.1",  # floor: sharing.core.policy path first shipped in 0.0.44
+    "simple_module_background_tasks>=0.0.44,<0.1",  # floor: background_tasks.core and .worker paths first shipped in 0.0.44
     "python-dateutil>=2.9,<4",
     "pydantic-settings>=2.0",
+    "icalendar>=7,<8",  # floor: 7.x is the first major checked for RRULE/EXDATE/RECURRENCE-ID/VTIMEZONE round-trip (feeds)
 ]
 
 [project.urls]
@@ -27,6 +29,11 @@ Repository = "https://github.com/antosubash/simple_module_python_modules"
 events = "sm_events.module:EventsModule"
 
 [project.optional-dependencies]
+# floor: 0.0.16 - events imports no pagebuilder Python for its blocks. It ships
+# ``pagebuilder-blocks.ts``, which imports ``registerPuckBlocks`` and ``lazyBlock`` from the
+# ``@simple-module-py/pagebuilder`` entry point (``index.ts``, first released in 0.0.16) and which
+# pagebuilder's ``puck-blocks.ts`` globs in from sibling packages.
+pagebuilder = ["simple_module_pagebuilder>=0.0.16,<0.1"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
@@ -67,3 +74,8 @@ asyncio_mode = "auto"
 markers = [
     "unbound_tenant: run with no events tenant bound (tests/conftest.py binds 'default' otherwise)",
 ]
+
+# Resolve the sibling module from the workspace during development. Tool config only: the
+# published wheel still carries the ranges above.
+[tool.uv.sources]
+simple_module_pagebuilder = { workspace = true }

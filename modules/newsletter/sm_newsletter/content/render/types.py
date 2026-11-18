@@ -21,6 +21,9 @@ class FooterCopy:
     reason: str  # ``{app_name}`` already substituted
     unsubscribe: str
     read_more: str = "Read more"  # the card link's label, in the footer's language
+    add_to_calendar: str = "Add to calendar"  # the event card's .ics link
+    cancelled: str = "Cancelled"  # the event card's badge
+    online: str = "Online"  # the event card's place line for an online event
 
 
 @dataclass(frozen=True)

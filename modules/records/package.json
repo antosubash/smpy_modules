@@ -10,10 +10,14 @@
     "@simple-module-py/ui": ">=0.0.38",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "sonner": "^2.0.0"
+    "sonner": "^2.0.0",
+    "@simple-module-py/events": "*"
   },
   "peerDependenciesMeta": {
     "@simple-module-py/pagebuilder": {
+      "optional": true
+    },
+    "@simple-module-py/events": {
       "optional": true
     }
   },

@@ -13,10 +13,20 @@ from sqlalchemy import UniqueConstraint, func, select
 from sqlalchemy.exc import IntegrityError
 
 from sm_events.core import constants
-from sm_events.core.errors import SlugTaken
+from sm_events.core.errors import SlugReserved, SlugTaken
+from sm_events.models import Calendar, EventText
 from sm_events.models._base import Base
 
-__all__ = ["free_slug", "slug_taken", "slug_write", "slugify"]
+__all__ = [
+    "check_not_reserved",
+    "free_slug",
+    "free_text_slug",
+    "is_slug_conflict",
+    "slug_taken",
+    "slug_write",
+    "slugify",
+    "text_slug_taken",
+]
 
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")
 
@@ -29,7 +39,7 @@ async def slug_write(db: Any, constraint: str) -> AsyncIterator[None]:
             yield
             await db.flush()
     except IntegrityError as exc:
-        if not _is_slug_conflict(exc, constraint):
+        if not is_slug_conflict(exc, constraint):
             raise
         raise SlugTaken from exc
 
@@ -37,7 +47,7 @@ async def slug_write(db: Any, constraint: str) -> AsyncIterator[None]:
 _UNIQUE_VIOLATION = "23505"
 
 
-def _is_slug_conflict(exc: IntegrityError, constraint: str) -> bool:
+def is_slug_conflict(exc: IntegrityError, constraint: str) -> bool:
     """Postgres: sqlstate ``23505`` on the expected constraint, read from the
     driver's error (SQLAlchemy's asyncpg adapter raises its own as ``orig`` and
     chains asyncpg's as ``__cause__``), never from message text, which the
@@ -76,6 +86,22 @@ def slugify(text: str, fallback: str = constants.CALENDAR_SLUG_FALLBACK) -> str:
     return slug or fallback
 
 
+def check_not_reserved(slug: str, *, field: str | None = None) -> None:
+    """Refuse an explicit calendar or event slug that a public route segment owns
+    (``/events/calendar.ics``, ``/events/c/...``): it would lose its address to the
+    route. Derived slugs skip these instead (:func:`free_slug`, :func:`free_text_slug`)."""
+    if slug in constants.RESERVED_SLUGS:
+        raise SlugReserved(field=field)
+
+
+def _numbered(base: str, n: int) -> str:
+    """``base`` for 1, else ``base-2``, ``base-3``... within the slug width."""
+    if n == 1:
+        return base
+    suffix = f"-{n}"
+    return f"{base[: constants.SLUG_MAX - len(suffix)].rstrip('-')}{suffix}"
+
+
 async def slug_taken(db: Any, model: type, slug: str, *, except_id: Any = None) -> bool:
     """Is ``slug`` used in the bound tenant? Trashed rows keep their slug (the
     unique index covers them), so they count."""
@@ -86,10 +112,34 @@ async def slug_taken(db: Any, model: type, slug: str, *, except_id: Any = None) 
 
 
 async def free_slug(db: Any, model: type, base: str) -> str:
-    """``base``, else ``base-2``, ``base-3``... the first one nobody holds."""
-    slug, n = base, 1
-    while await slug_taken(db, model, slug):
+    """``base``, else ``base-2``, ``base-3``... the first one nobody holds. A calendar's
+    also skips the reserved public segments (a category's slug is never a path)."""
+    skip = constants.RESERVED_SLUGS if model is Calendar else ()
+    n = 1
+    while (slug := _numbered(base, n)) in skip or await slug_taken(db, model, slug):
         n += 1
-        suffix = f"-{n}"
-        slug = f"{base[: constants.SLUG_MAX - len(suffix)].rstrip('-')}{suffix}"
+    return slug
+
+
+async def text_slug_taken(db: Any, locale: str, slug: str, *, except_event: Any = None) -> bool:
+    """Is ``slug`` used by an event text in ``locale``? Texts are never
+    soft-deleted, so a trashed event's slug stays held (the index covers it)."""
+    stmt = (
+        select(func.count())
+        .select_from(EventText)
+        .where(EventText.locale == locale, EventText.slug == slug)
+    )
+    if except_event is not None:
+        stmt = stmt.where(EventText.event_id != except_event)
+    return bool((await db.execute(stmt)).scalar_one())
+
+
+async def free_text_slug(db: Any, locale: str, base: str, *, except_event: Any = None) -> str:
+    """``free_slug`` scoped to one language: ``base``, ``base-2``... the first one no other
+    event's text holds in ``locale`` and no public route segment owns."""
+    n = 1
+    while (slug := _numbered(base, n)) in constants.RESERVED_SLUGS or await text_slug_taken(
+        db, locale, slug, except_event=except_event
+    ):
+        n += 1
     return slug

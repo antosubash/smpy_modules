@@ -12,12 +12,14 @@ from sm_events.core.constants import LOCALE_MAX, TEXT_SLUG_MAX
 from sm_events.models._base import Base
 from sm_events.models._cols import big_pk, fk_uuid, flag
 
+TEXT_SLUG_CONSTRAINT = "uq_events_event_text_slug"
+
 
 class EventText(Base, AuditMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "events_event_text"
     __table_args__ = (
         UniqueConstraint("tenant_id", "event_id", "locale", name="uq_events_event_text_locale"),
-        UniqueConstraint("tenant_id", "locale", "slug", name="uq_events_event_text_slug"),
+        UniqueConstraint("tenant_id", "locale", "slug", name=TEXT_SLUG_CONSTRAINT),
     )
 
     id: int | None = big_pk()

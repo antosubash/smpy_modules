@@ -1351,6 +1351,20 @@ wheels = [
 ]
 
 [[package]]
+name = "icalendar"
+version = "7.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "tzdata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/2b/1bbf82d316df18c3331d9a06228819c8a5814ceda545a3e9980e52ffce1b/icalendar-7.3.0.tar.gz", hash = "sha256:7bd001c8e648205e1bde5c6a5b77096598e8d0893dcf57755c6c597635620132", size = 525811, upload-time = "2026-08-19T15:10:21.05Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bb/82/50bff78b0bb0c7d7c0cb39e0ee189b92f611fff6bd7cf57f25e92d5a7551/icalendar-7.3.0-py3-none-any.whl", hash = "sha256:8355acfe17be81b368f0b1e3740817cea9b56ea889931f8f1a87c62f2d28db0b", size = 542540, upload-time = "2026-08-19T15:10:19.525Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.18"
 source = { registry = "https://pypi.org/simple" }
@@ -3186,8 +3200,10 @@ name = "simple-module-events"
 version = "0.0.15"
 source = { editable = "modules/events" }
 dependencies = [
+    { name = "icalendar" },
     { name = "pydantic-settings" },
     { name = "python-dateutil" },
+    { name = "simple-module-background-tasks" },
     { name = "simple-module-core" },
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
@@ -3202,22 +3218,28 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
 ]
+pagebuilder = [
+    { name = "simple-module-pagebuilder" },
+]
 
 [package.metadata]
 requires-dist = [
+    { name = "icalendar", specifier = ">=7,<8" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "python-dateutil", specifier = ">=2.9,<4" },
+    { name = "simple-module-background-tasks", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-core", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-db", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-hosting", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-inertia", specifier = ">=0.0.44,<0.1" },
+    { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
     { name = "simple-module-settings", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-sharing", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.44,<0.1" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["pagebuilder", "dev"]
 
 [[package]]
 name = "simple-module-file-storage"
@@ -3406,6 +3428,7 @@ version = "0.0.15"
 source = { editable = "modules/newsletter" }
 dependencies = [
     { name = "aiosmtplib" },
+    { name = "babel" },
     { name = "cryptography" },
     { name = "email-validator" },
     { name = "pydantic-settings" },
@@ -3424,6 +3447,9 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
 ]
+events = [
+    { name = "simple-module-events" },
+]
 news = [
     { name = "simple-module-news" },
 ]
@@ -3435,6 +3461,7 @@ pagebuilder = [
 requires-dist = [
     { name = "aiosmtpd", marker = "extra == 'dev'", specifier = ">=1.4.6" },
     { name = "aiosmtplib", specifier = ">=3.0,<6" },
+    { name = "babel", specifier = ">=2.12,<3" },
     { name = "cryptography", specifier = ">=42" },
     { name = "email-validator", specifier = ">=2.1" },
     { name = "pydantic-settings", specifier = ">=2.0" },
@@ -3443,6 +3470,7 @@ requires-dist = [
     { name = "simple-module-background-tasks", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-core", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-db", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-events", marker = "extra == 'events'", editable = "modules/events" },
     { name = "simple-module-hosting", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-news", marker = "extra == 'news'", editable = "modules/news" },
     { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
@@ -3450,7 +3478,7 @@ requires-dist = [
     { name = "simple-module-settings", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.42,<0.1" },
 ]
-provides-extras = ["news", "pagebuilder", "dev"]
+provides-extras = ["news", "pagebuilder", "events", "dev"]
 
 [[package]]
 name = "simple-module-pagebuilder"
@@ -3562,6 +3590,9 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
 ]
+events = [
+    { name = "simple-module-events" },
+]
 pagebuilder = [
     { name = "simple-module-pagebuilder" },
 ]
@@ -3575,13 +3606,14 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "simple-module-core", specifier = ">=0.0.38,<0.1" },
     { name = "simple-module-db", specifier = ">=0.0.38,<0.1" },
+    { name = "simple-module-events", marker = "extra == 'events'", editable = "modules/events" },
     { name = "simple-module-hosting", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-inertia", specifier = ">=0.0.38,<0.1" },
     { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
     { name = "simple-module-settings", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.36,<0.1" },
 ]
-provides-extras = ["dev", "pagebuilder"]
+provides-extras = ["dev", "pagebuilder", "events"]
 
 [[package]]
 name = "simple-module-settings"

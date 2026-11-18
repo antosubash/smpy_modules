@@ -1,5 +1,5 @@
 /**
- * The field of an article or page card: search, choose, refresh (ruling R9).
+ * The field of an article, page or event card: search, choose, refresh (ruling R9).
  *
  * A card is a server-side *snapshot* of its source. Choosing a hit asks the
  * server for one (`api.snapshot`) and replaces the whole block's props with
@@ -25,10 +25,16 @@ import { useEffect, useState } from 'react';
 import { SEARCH_DEBOUNCE_MS } from '../../hooks/useCampaignList';
 import { api, errorMessage } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
-import type { CardHit, CardKind, CardSnapshot } from '../../utils/types';
+import type { CardHit, CardKind, CardSnapshot, EventCardSnapshot } from '../../utils/types';
+import { CardHits } from './CardHits';
 import { useEditorActions } from './editorActions';
 
-const CARD_TYPE: Record<CardKind, string> = { article: 'ArticleCard', page: 'PageCard' };
+const CARD_TYPE: Record<CardKind, string> = {
+  article: 'ArticleCard',
+  page: 'PageCard',
+  event: 'EventCard',
+};
+const LABEL = { article: 'article', page: 'page', event: 'event' } as const;
 
 /** The parts of Puck's API `applySnapshot` uses. */
 type PuckLike = Pick<PuckApi, 'getItemById' | 'getSelectorForId' | 'dispatch'>;
@@ -44,7 +50,7 @@ export function applySnapshot(
   puck: PuckLike,
   blockId: string,
   kind: CardKind,
-  snapshot: CardSnapshot,
+  snapshot: CardSnapshot | EventCardSnapshot,
 ): boolean {
   const item = puck.getItemById(blockId);
   const at = puck.getSelectorForId(blockId);
@@ -105,7 +111,7 @@ export function CardPicker({ kind, available, readOnly }: CardPickerProps) {
   const [busy, setBusy] = useState(false);
   const disabled = !available || readOnly === true;
   const search = useCardSearch(kind, !disabled);
-  const current = (selected?.props ?? {}) as Partial<CardSnapshot>;
+  const current = (selected?.props ?? {}) as Partial<CardSnapshot & EventCardSnapshot>;
   const blockId = typeof current.id === 'string' ? current.id : null;
 
   async function pick(hit: CardHit) {
@@ -136,9 +142,11 @@ export function CardPicker({ kind, available, readOnly }: CardPickerProps) {
   }
 
   const copiedAt = current.snapshot_at ? new Date(current.snapshot_at) : null;
+  // An event card whose date is over: Refresh moves a series to its next occurrence.
+  const passed = kind === 'event' && !!current.ends_at && new Date(current.ends_at) < new Date();
 
   return (
-    <FieldLabel label={t(kind === 'article' ? copy.article : copy.page)}>
+    <FieldLabel label={t(copy[LABEL[kind]])}>
       <div className="space-y-2">
         <div className="rounded border p-2 text-sm">
           <p className="text-xs text-muted-foreground">{t(copy.current)}</p>
@@ -159,6 +167,7 @@ export function CardPicker({ kind, available, readOnly }: CardPickerProps) {
           ) : (
             <p className="text-muted-foreground">{t(copy.none)}</p>
           )}
+          {passed && <p className="text-xs text-destructive">{t(copy.date_passed)}</p>}
         </div>
 
         {!available && (
@@ -180,7 +189,7 @@ export function CardPicker({ kind, available, readOnly }: CardPickerProps) {
         <Input
           type="search"
           aria-label={t(copy.search_label)}
-          placeholder={t(kind === 'article' ? copy.search_article : copy.search_page)}
+          placeholder={t(copy[`search_${LABEL[kind]}` as const])}
           value={search.q}
           disabled={disabled}
           onChange={(e) => search.setQ(e.target.value)}
@@ -194,42 +203,11 @@ export function CardPicker({ kind, available, readOnly }: CardPickerProps) {
   );
 }
 
-function CardHits(props: {
-  hits: CardHit[] | null;
-  busy: boolean;
-  onPick: (hit: CardHit) => void;
-}) {
-  const { t } = useT();
-  const { hits, busy, onPick } = props;
-  if (hits === null) return <p className="text-xs text-muted-foreground">{t(copy.searching)}</p>;
-  if (hits.length === 0) {
-    return <p className="text-xs text-muted-foreground">{t(copy.no_results)}</p>;
-  }
-  return (
-    <ul className="max-h-64 space-y-1 overflow-y-auto">
-      {hits.map((hit) => (
-        <li key={`${hit.kind}-${hit.source_id}`}>
-          <button
-            type="button"
-            disabled={busy}
-            className="w-full rounded border p-2 text-left text-sm hover:bg-muted disabled:opacity-50"
-            onClick={() => onPick(hit)}
-          >
-            <span className="block font-medium">{hit.title}</span>
-            {hit.excerpt && (
-              <span className="line-clamp-2 block text-xs text-muted-foreground">
-                {hit.excerpt}
-              </span>
-            )}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** A card block's one field. `available` is the integration's capability. */
-export function cardField(kind: CardKind, available: boolean): CustomField<number> {
+export function cardField<V extends number | string>(
+  kind: CardKind,
+  available: boolean,
+): CustomField<V> {
   return {
     type: 'custom',
     render: ({ readOnly }) => <CardPicker kind={kind} available={available} readOnly={readOnly} />,

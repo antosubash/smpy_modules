@@ -65,6 +65,8 @@ __all__ = [
     "get_public_record",
     "get_public_type",
     "list_public_records",
+    "public_narrow",
+    "published_only",
     "published_siblings",
 ]
 
@@ -78,7 +80,7 @@ content by its absence (§10).
 """
 
 
-def _published_only(record: Any, stmt):
+def published_only(record: Any, stmt):
     """The one predicate this whole surface is defined by. Bound to a document
     class it becomes the shape ``bounded_count_query``'s ``narrow`` takes, so
     the page and both halves of its count cannot disagree about what "public"
@@ -94,7 +96,10 @@ def _published_only(record: Any, stmt):
     return stmt.where(record.status == RecordStatus.PUBLISHED, record.tenant_id == bound_tenant())
 
 
-def _narrow_for(record: Any, locale: str):
+_published_only = published_only  # the old private name
+
+
+def public_narrow(record: Any, locale: str):
     """``_published_only`` plus "and in this language".
 
     One callable so the page and both halves of its bounded count cannot
@@ -103,9 +108,12 @@ def _narrow_for(record: Any, locale: str):
     """
 
     def narrow(stmt):
-        return _published_only(record, stmt).where(record.locale == locale)
+        return published_only(record, stmt).where(record.locale == locale)
 
     return narrow
+
+
+_narrow_for = public_narrow  # the old private name
 
 
 def _check_columns(rtype: RecordType, filters: Sequence[Filter], sorts: Sequence[Sort]) -> None:
@@ -247,6 +255,6 @@ async def list_public_records(
             page_size=page_size,
             after=after,
             with_total=with_total,
-            narrow=_narrow_for(tables_for(rtype).record, locale),
+            narrow=public_narrow(tables_for(rtype).record, locale),
             locale=locale,
         )

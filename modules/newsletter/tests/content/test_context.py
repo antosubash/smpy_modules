@@ -66,6 +66,11 @@ async def test_branding_absent_defaults():
         "You are receiving this email because you subscribed to updates from Newsletter."
     )
     assert c.footer.unsubscribe == "Unsubscribe"
+    assert (c.footer.add_to_calendar, c.footer.cancelled, c.footer.online) == (
+        "Add to calendar",
+        "Cancelled",
+        "Online",
+    )
 
 
 async def test_logo_url_absolute():
@@ -88,6 +93,11 @@ async def test_footer_copy_de():
     )
     assert c.locale == "de"
     assert c.footer.unsubscribe == "Abmelden"
+    assert (c.footer.add_to_calendar, c.footer.cancelled, c.footer.online) == (
+        "Zum Kalender hinzufügen",
+        "Abgesagt",
+        "Online",
+    )
     assert c.footer.reason.startswith("Sie erhalten diese E-Mail")
     assert "Newsletter" in c.footer.reason and "{app_name}" not in c.footer.reason
     assert c.physical_address == "Hauptstr. 1"

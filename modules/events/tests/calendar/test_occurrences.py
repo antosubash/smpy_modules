@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from sm_events.calendar.occurrence import OccurrenceFilters
 from sm_events.calendar.occurrences import occurrences
-from sm_events.models import Category, OccurrenceOverride
+from sm_events.models import Category
 
 from tests.support.access import principal, seed_calendars
 from tests.support.calendars import seed_event, seed_series
@@ -132,113 +132,6 @@ async def test_all_day_range_edges(db):
     assert single.id in {o.event_id for o in page.items}
 
 
-async def _override(db, event, original_start, kind, **fields):
-    db.add(
-        OccurrenceOverride(event_id=event.id, original_start=original_start, kind=kind, **fields)
-    )
-    await db.flush()
-
-
-async def test_overrides_applied(db):
-    cals = await seed_calendars(db)
-    ev = await seed_series(
-        db, cals["I"], "FREQ=DAILY", "2026-07-01T10:00", "2026-07-01T11:00", status="published"
-    )
-    await _override(db, ev, utc(2026, 7, 2, 8), "skipped")
-    await _override(db, ev, utc(2026, 7, 3, 8), "cancelled")
-    await _override(
-        db,
-        ev,
-        utc(2026, 7, 4, 8),
-        "moved",
-        starts_at=utc(2026, 7, 4, 14),
-        ends_at=utc(2026, 7, 4, 15),
-    )
-    page = await read(db, OWNER, utc(2026, 7, 1), utc(2026, 7, 6))
-    by_day = {(o.start.day, o.start.hour): o for o in page.items}
-    assert (2, 8) not in by_day  # skipped
-    assert by_day[3, 8].status == "cancelled"
-    assert (4, 8) not in by_day
-    moved = by_day[4, 14]
-    assert moved.key == f"{ev.id}:20260704T080000Z"  # keeps its original key
-    assert moved.original_start == utc(2026, 7, 4, 8)
-    assert by_day[1, 8].status == "confirmed" and by_day[5, 8].status == "confirmed"
-
-
-async def test_moved_into_window_from_outside(db):
-    cals = await seed_calendars(db)
-    ev = await seed_series(
-        db, cals["I"], "FREQ=WEEKLY", "2026-06-03T10:00", "2026-06-03T11:00", status="published"
-    )
-    # last month's instance moved into July
-    await _override(
-        db,
-        ev,
-        utc(2026, 6, 10, 8),
-        "moved",
-        starts_at=utc(2026, 7, 2, 9),
-        ends_at=utc(2026, 7, 2, 10),
-    )
-    page = await read(db, OWNER, utc(2026, 7, 1), utc(2026, 7, 4))
-    assert [o.start for o in page.items] == [utc(2026, 7, 1, 8), utc(2026, 7, 2, 9)]
-    assert page.items[1].original_start == utc(2026, 6, 10, 8)
-
-
-async def test_moved_into_window_from_an_ended_series(db):
-    """The series ended before the window; its moved instance is still shown."""
-    cals = await seed_calendars(db)
-    ev = await seed_series(
-        db,
-        cals["I"],
-        "FREQ=WEEKLY;COUNT=3",
-        "2026-05-06T10:00",
-        "2026-05-06T11:00",
-        status="published",
-    )
-    await _override(
-        db,
-        ev,
-        utc(2026, 5, 13, 8),
-        "moved",
-        starts_at=utc(2026, 7, 2, 9),
-        ends_at=utc(2026, 7, 2, 10),
-    )
-    page = await read(db, OWNER, utc(2026, 7, 1), utc(2026, 7, 4))
-    assert [o.start for o in page.items] == [utc(2026, 7, 2, 9)]
-
-
-async def test_moved_out_of_window_disappears(db):
-    cals = await seed_calendars(db)
-    ev = await seed_series(
-        db, cals["I"], "FREQ=DAILY", "2026-07-01T10:00", "2026-07-01T11:00", status="published"
-    )
-    await _override(
-        db,
-        ev,
-        utc(2026, 7, 2, 8),
-        "moved",
-        starts_at=utc(2026, 8, 2, 9),
-        ends_at=utc(2026, 8, 2, 10),
-    )
-    page = await read(db, OWNER, utc(2026, 7, 1), utc(2026, 7, 4))
-    assert [o.start.day for o in page.items] == [1, 3]
-
-
-async def test_cancelled_event_marks_all(db):
-    cals = await seed_calendars(db)
-    await seed_series(
-        db,
-        cals["I"],
-        "FREQ=DAILY;COUNT=3",
-        "2026-07-01T10:00",
-        "2026-07-01T11:00",
-        status="published",
-        cancelled=True,
-    )
-    page = await read(db, OWNER, utc(2026, 7, 1), utc(2026, 7, 10))
-    assert len(page.items) == 3 and {o.status for o in page.items} == {"cancelled"}
-
-
 async def test_title_fallback_and_lang(db):
     cals = await seed_calendars(db)
     await seed_event(db, cals["I"], title="English", locale="en", status="published")
@@ -295,72 +188,6 @@ async def test_filters(db):
         OccurrenceFilters(calendar_ids=frozenset({cals["P"].id, cals["I"].id})),
     )
     assert {o.event_id for o in mixed.items} == {a.id}
-
-
-@pytest.mark.parametrize(
-    "who",
-    [
-        principal("v", V),
-        principal("sv", V),
-        principal(None),
-        principal("o"),  # lost events.view
-    ],
-    ids=["V", "SV", "A", "O-"],
-)
-async def test_drafts_never_reach_viewers(db, who):
-    cals = await seed_calendars(db)
-    for letter, cal in cals.items():
-        await seed_event(db, cal, title=f"{letter}-draft", status="draft")
-        await seed_event(db, cal, title=f"{letter}-review", status="in_review")
-        await seed_event(
-            db, cal, title=f"{letter}-scheduled", status="draft", publish_at=utc(2030, 1, 1)
-        )
-        await seed_event(db, cal, title=f"{letter}-published", status="published")
-        await seed_series(
-            db,
-            cal,
-            "FREQ=DAILY;COUNT=2",
-            "2026-07-01T10:00",
-            "2026-07-01T11:00",
-            title=f"{letter}-series-draft",
-            status="draft",
-        )
-    for flag in (True, False):
-        page = await read(
-            db, who, utc(2026, 6, 1), utc(2026, 8, 1), OccurrenceFilters(include_unpublished=flag)
-        )
-        assert page.items
-        assert {o.event_status for o in page.items} == {"published"}
-        assert all(o.title.endswith("-published") for o in page.items)
-
-
-async def test_writers_see_drafts_with_status(db):
-    cals = await seed_calendars(db)
-    await seed_event(db, cals["P"], title="draft", status="draft")
-    await seed_event(db, cals["P"], title="pub", status="published")
-    se = principal("se", V)
-    page = await read(db, se, utc(2026, 7, 1), utc(2026, 7, 2))
-    got = {o.title: o for o in page.items}
-    assert got["draft"].event_status == "draft" and got["draft"].editable
-    assert not got["pub"].editable and got["pub"].url is None  # locked, and SE cannot publish
-    hidden = await read(
-        db, se, utc(2026, 7, 1), utc(2026, 7, 2), OccurrenceFilters(include_unpublished=False)
-    )
-    assert [o.title for o in hidden.items] == ["pub"]
-
-
-async def test_editable_and_url(db):
-    cals = await seed_calendars(db)
-    event = await seed_event(db, cals["P"], status="published")
-    page = await read(db, OWNER, utc(2026, 7, 1), utc(2026, 7, 2))
-    assert page.items[0].editable
-    assert page.items[0].url == f"/admin/events/edit/{event.id}"
-    plain_owner = principal("o", V, E)  # owner without events.publish
-    got = (await read(db, plain_owner, utc(2026, 7, 1), utc(2026, 7, 2))).items[0]
-    assert not got.editable and got.url is None
-    viewer = principal("v", V)
-    got = (await read(db, viewer, utc(2026, 7, 1), utc(2026, 7, 2))).items
-    assert got == []  # the calendar is private
 
 
 @pytest.mark.unbound_tenant

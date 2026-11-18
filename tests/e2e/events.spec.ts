@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
-import { clickAndConfirm, login, moduleCsrfHeader, uniqueSlug } from './helpers';
+import { postCalendar } from './events-seed';
+import { clickAndConfirm, login, uniqueSlug } from './helpers';
 
 /**
  * The events console, end to end: sidebar, calendars (create, edit, visibility,
@@ -30,22 +31,6 @@ test.afterEach(() => {
 
 const row = (page: Page, text: string) => page.getByRole('row').filter({ hasText: text });
 
-async function apiCalendar(page: Page, name: string): Promise<string> {
-  const headers = await moduleCsrfHeader(page, CALENDARS);
-  const created = await page.request.post('/api/events/calendars', {
-    headers,
-    data: {
-      name,
-      color: '#2563eb',
-      description: null,
-      default_timezone: 'Europe/Vienna',
-      visibility: 'private',
-    },
-  });
-  expect(created.status(), await created.text()).toBe(201);
-  return ((await created.json()) as { slug: string }).slug;
-}
-
 async function openNewCalendar(page: Page) {
   await page.goto(CALENDARS);
   await page.getByRole('button', { name: 'New calendar', exact: true }).click();
@@ -54,14 +39,18 @@ async function openNewCalendar(page: Page) {
   return dialog;
 }
 
-test('the sidebar lists Events with Calendars and Categories, and /admin/events/ opens calendars', async ({
+test('the sidebar lists Events with Calendar, Calendars and Categories, and /admin/events/ is the calendar', async ({
   page,
 }) => {
   await page.goto('/admin/events/');
-  await expect(page).toHaveURL(new RegExp(`${CALENDARS}/?$`));
-  await expect(page.getByRole('heading', { name: 'Calendars', level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/events\/(\?.*)?$/);
+  await expect(page.getByRole('heading', { name: 'Calendar', level: 1 })).toBeVisible();
   const sidebar = page.locator('aside');
   await expect(sidebar.getByText('Events', { exact: true }).first()).toBeVisible();
+  await expect(sidebar.locator('a[href^="/admin/events"]').first()).toHaveAttribute(
+    'href',
+    '/admin/events/',
+  );
   // Named apart from News' "Categories", which news-admin.spec.ts finds by name.
   await expect(
     sidebar.locator(`a[href="${CALENDARS}"]`).getByText('Calendars', { exact: true }),
@@ -119,7 +108,7 @@ test('create, edit, change visibility, trash and restore a calendar', async ({ p
 
 test('calendar form validation: empty name, bad timezone, taken slug', async ({ page }) => {
   const existing = `Taken ${uniqueSlug('cal')}`;
-  const slug = await apiCalendar(page, existing);
+  const { slug } = await postCalendar(page, { name: existing });
 
   const dialog = await openNewCalendar(page);
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
@@ -195,7 +184,7 @@ test('share a calendar: masked addresses, exact-address lookup, grant and revoke
   });
   expect(created.status(), await created.text()).toBe(201);
   const calendar = `Shared ${sfx}`;
-  await apiCalendar(page, calendar);
+  await postCalendar(page, { name: calendar });
 
   await page.goto(CALENDARS);
   await page.getByRole('button', { name: `Share ${calendar}`, exact: true }).click();

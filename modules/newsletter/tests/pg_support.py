@@ -47,9 +47,9 @@ arm_reset = _pg.arm_reset
 def _extra_metadata() -> list[Any]:
     """Table sets that are not ``sm_newsletter``'s but that the harness needs.
 
-    Records always (subscribers are its tables); news (article cards read its
-    articles through ``news.contracts.articles``) and ``permissions`` only when
-    they are installed.
+    Records always (subscribers are its tables); news, events (cards read
+    their rows through their contracts) and ``permissions`` only when they
+    are installed.
     """
     from sm_records.models import Base as RecordsBase
 
@@ -60,6 +60,12 @@ def _extra_metadata() -> list[Any]:
         pass
     else:
         out.append(NewsBase.metadata)
+    try:
+        from sm_events.models import Base as EventsBase
+    except ImportError:  # pragma: no cover - exercised only without the `events` extra
+        pass
+    else:
+        out.append(EventsBase.metadata)
     try:
         from permissions.models import Base as PermissionsBase
     except ImportError:  # pragma: no cover - exercised only without `permissions`

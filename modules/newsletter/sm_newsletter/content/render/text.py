@@ -39,4 +39,8 @@ def block(b: Block, ctx: RenderContext) -> str:
     if kind in ("ArticleCard", "PageCard"):
         lines = [inert(p.title), inert(p.excerpt), absolute(base, p.url)]
         return "\n".join(line for line in lines if line)
+    if kind == "EventCard":
+        from sm_newsletter.content.render import event_card  # imports this module
+
+        return event_card.text(p, ctx)
     return ""

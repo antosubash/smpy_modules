@@ -19,7 +19,16 @@ from sm_events.core.tenancy import tenant_scope
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.pg_support import arm_reset, make_db_state
-from tests.support.app import client, csrf_client, events_app, multi_client  # noqa: F401 - fixtures
+from tests.support.app import (  # noqa: F401 - fixtures
+    client,
+    csrf_client,
+    events_app,
+    locales_client,
+    multi_client,
+    public_client,
+    public_locales_client,
+    public_multi_client,
+)
 
 DEFAULT_TENANT = "default"
 
@@ -59,3 +68,15 @@ async def db_state() -> AsyncIterator[Any]:
 async def db(db_state) -> AsyncIterator[AsyncSession]:
     async with db_state.session_factory() as session:
         yield session
+
+
+@pytest.fixture(autouse=True)
+def _reset_public_globals():
+    """The public prefix and the content locales are process-wide, set when an app is
+    wired; no test may leave them for the next."""
+    from sm_events.core import locales
+    from sm_events.web.endpoints.public import _urls
+
+    yield
+    locales.reset()
+    _urls.use("/events")
