@@ -14,6 +14,8 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sm_events.contracts.extensions import (
+    ITEM_MAX_DAYS,
+    ITEM_TITLE_MAX,
     SettingsContext,
     SourceContext,
     SourceError,
@@ -40,10 +42,6 @@ __all__ = ["RecordDatesSource"]
 
 LOOKBACK_DAYS = 31
 """A multi-day record that started earlier still shows while it runs."""
-SPAN_MAX_DAYS = 366
-"""What events accepts for one item; a longer record is clipped, never refused."""
-TITLE_MAX = 300
-_REASON_CODES = {"reindexing": "reindexing"}
 _ONE_DAY = timedelta(days=1)
 
 
@@ -62,7 +60,7 @@ def _window(
 
 
 def _title(hit: DatedHit) -> str:
-    return (hit.display_title.strip() or hit.type_key)[:TITLE_MAX]
+    return (hit.display_title.strip() or hit.type_key)[:ITEM_TITLE_MAX]
 
 
 def _item(hit: DatedHit, mapping: RecordDateMapping, ctx: SourceContext) -> SourceOccurrence:
@@ -77,13 +75,13 @@ def _item(hit: DatedHit, mapping: RecordDateMapping, ctx: SourceContext) -> Sour
     if not isinstance(hit.start, datetime):
         first = hit.start
         last = hit.end if isinstance(hit.end, date) and hit.end >= first else first
-        last = min(last, first + timedelta(days=SPAN_MAX_DAYS - 1))
+        last = min(last, first + timedelta(days=ITEM_MAX_DAYS - 1))
         return SourceOccurrence(all_day=True, start_date=first, end_date=last + _ONE_DAY, **common)
     begin = hit.start.astimezone(UTC)
     finish = hit.end.astimezone(UTC) if isinstance(hit.end, datetime) else None
     if finish is None or finish <= begin:
         finish = begin + timedelta(minutes=mapping.duration_minutes)
-    finish = min(finish, begin + timedelta(days=SPAN_MAX_DAYS))
+    finish = min(finish, begin + timedelta(days=ITEM_MAX_DAYS))
     return SourceOccurrence(start=begin, end=finish, **common)
 
 
@@ -136,7 +134,9 @@ class RecordDatesSource:
                     limit=min(wanted - len(items), MAX_DATED_BATCH),
                 )
             except DatedQueryError as exc:
-                raise SourceError(_REASON_CODES.get(exc.reason, "field_changed")) from None
+                raise SourceError(
+                    "reindexing" if exc.reason == "reindexing" else "field_changed"
+                ) from None
             items.extend(_item(hit, mapping, ctx) for hit in page.hits)
         return items
 

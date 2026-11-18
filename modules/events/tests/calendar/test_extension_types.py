@@ -78,8 +78,11 @@ def test_builtin_type_is_the_models_default():
 
 
 def test_contract_surface():
-    expected = sorted([*TYPES, "Registrar", "RegistryFrozenError"])
+    expected = sorted(
+        [*TYPES, "Registrar", "RegistryFrozenError", "ITEM_MAX_DAYS", "ITEM_TITLE_MAX"]
+    )
     assert list(extensions.__all__) == expected
     for name in TYPES:
         assert getattr(extensions, name) is getattr(extension_types, name)
     assert extensions.Registrar and extensions.RegistryFrozenError
+    assert extensions.ITEM_MAX_DAYS == 366 and extensions.ITEM_TITLE_MAX == 300

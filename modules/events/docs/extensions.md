@@ -104,7 +104,8 @@ source's status instead of the generic `raised`.
   runs your call on a savepoint of the request's session instead; a file or Postgres engine never does.
 * **Validation.** Any one invalid item rejects the whole answer (`invalid_item`,
   `duplicate_key`): aware `start < end`, an all-day `start_date < end_date`, at most 366
-  days, a known timezone, the title stripped of control and direction characters (kept as
+  days (`ITEM_MAX_DAYS`; clip a longer one yourself), a known timezone, the title (at most
+  `ITEM_TITLE_MAX` characters) stripped of control and direction characters (kept as
   text; every renderer escapes it), a `url` that is a same-origin path or an `http(s)` URL
   without credentials, a `#rrggbb` colour. Every item is validated again, so
   `model_construct` buys nothing. An item outside the window is dropped, not an error.

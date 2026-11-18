@@ -30,8 +30,16 @@ from sm_events.calendar.extension_types import (
 )
 from sm_events.calendar.extensions import Registrar
 from sm_events.calendar.registry import RegistryFrozenError
+from sm_events.core import constants
+
+ITEM_MAX_DAYS = constants.MAX_EVENT_DAYS
+"""The longest an item may run, in days: a longer one is refused, so clip it."""
+ITEM_TITLE_MAX = constants.SOURCE_TITLE_MAX
+"""The longest an item title, in characters."""
 
 __all__ = [
+    "ITEM_MAX_DAYS",
+    "ITEM_TITLE_MAX",
     "EventType",
     "NoExtra",
     "Registrar",
