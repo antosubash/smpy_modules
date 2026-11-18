@@ -9,7 +9,7 @@ import {
   occurrence,
   series,
   VIENNA,
-} from './writes-fixtures';
+} from './writes-test-support';
 
 describe('series instance', () => {
   it('"this one" is a moved override on the original start, in Vienna wall clock', () => {

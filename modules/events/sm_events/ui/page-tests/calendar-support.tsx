@@ -1,6 +1,6 @@
 /** Fixtures for the `Calendar` shell tests: occurrences, calendars and a fetcher. */
 import { vi } from 'vitest';
-import { fakeGrid } from '../calendar/test-support/FakeGrid';
+import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import type {
   CalendarInfo,
   CalendarProps,

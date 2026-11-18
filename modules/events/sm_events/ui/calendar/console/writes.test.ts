@@ -8,7 +8,7 @@ import {
   instance,
   occurrence,
   VIENNA,
-} from './writes-fixtures';
+} from './writes-test-support';
 
 describe('one-off', () => {
   it('moved in a New York grid writes Vienna wall clock', () => {

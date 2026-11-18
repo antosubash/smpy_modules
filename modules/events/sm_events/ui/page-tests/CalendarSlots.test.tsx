@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { fakeGrid } from '../calendar/test-support/FakeGrid';
+import { fakeGrid } from '../calendar/FakeGrid-test-support';
 import type { CalendarSlots } from '../calendar/types';
 import { calendarInfo, fetcherOf, MARCH, occurrence, pageOf } from './calendar-support';
 import { flush } from './support';
 import { act, mount } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
-vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/test-support/FakeGrid'));
+vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/FakeGrid-test-support'));
 const { Calendar } = await import('../calendar/Calendar');
 
 async function open(slots: CalendarSlots, items = [occurrence()]) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planChange } from './writes';
-import { allDayOccurrence, change, event, instance, series, VIENNA } from './writes-fixtures';
+import { allDayOccurrence, change, event, instance, series, VIENNA } from './writes-test-support';
 
 const SAO_PAULO = 'America/Sao_Paulo';
 
