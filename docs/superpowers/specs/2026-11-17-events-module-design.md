@@ -401,3 +401,61 @@ list. Calendar and category names are single line (control characters, line and
 paragraph separators and direction controls are a 422); descriptions keep line
 breaks and tabs. A name with no slug-able characters falls back to the slug
 `calendar` or `category`, with `-2`, `-3` ... on a clash.
+
+## Amendments (PR 2)
+
+The approved PR 2 rulings refine the design above: the API takes the event's
+local wall clock and a timezone, never UTC (ruling 1). The RRULE allow-list is
+bounded as in ruling 5 (daily to yearly, interval 1 to 99, count 1 to 730,
+until within 100 years, no sub-daily or week-number parts), and the start must
+be the first occurrence of its rule (6). Sub-events and recurrence exclude each
+other, one level deep, in the same calendar (9). The occurrences read is
+ordered by (start, end, source, key), cut at 2,000 and truncated by the series
+cap (13). A published or scheduled event is locked and changed only with write
+and `events.publish` (16). Every write, the beat's included, records a revision
+with an optional note, the one new column (`events_revision.note`), and the
+newest 100 are kept (18). An event always has a text in the default locale (20).
+The description editor is a small contentEditable field with no new
+dependency, and a read-only description is shown in a sandboxed frame (29).
+
+Frontend choices of the screens: the editor reads the event from the API, not
+from props, and works on the event's own clock (it shows the UTC offset of the
+zone being edited); overrides and workflow actions apply to the saved event and
+wait for unsaved edits; a save over a newer revision shows what differs and
+resends only on an explicit click; a sub-event is created with
+`/admin/events/edit/new?calendar=<id>&parent=<id>`.
+
+## Amendments (PR 3)
+
+The approved PR 3 rulings refine the design above. FullCalendar is imported only
+under `ui/calendar/adapter/`, stricter than `ui/calendar/` (ruling 2), and the
+grid is a lazily loaded chunk so no other screen or importer pays for it (4).
+The fetch range is the visible range plus seven days a side, at most 366 days,
+cached eight pages deep and aborted on every new fetch (11). "Calendar time" is
+the one shown calendar's zone, else the tenant's; "my time" is the browser's
+(12). A grid change becomes the event's own wall clock through Temporal, never
+UTC; a drop on the second occurrence of a repeated autumn hour is refused
+client-side (13). "All occurrences" shifts the master on the event's wall clock
+and never rewrites the rule, so a weekday change on a `BYDAY` series is the
+server's `start_not_in_rule` (14). An occurrence carries no revision, so a write
+reads the event first and stops as stale when the grid is out of date (15).
+The interaction plugin must be in the adapter's plugin list: without it FullCalendar 7
+cannot drag, resize or select.
+
+## Amendments (PR 4)
+
+The approved PR 4 rulings refine the design above. A sub-event is shown on its own merits: a
+published child of a public calendar has its page even when its parent is not public, and then
+names no parent anywhere (4). The public category filter lists only categories used by a public
+event (5). `calendar`, `c`, `api`, `feed` and `sitemap` are reserved slugs (9). An occurrence is
+addressed `{slug}?date=YYYY-MM-DD`; a skipped or non-instance date is the 404 (10). The index is
+list-first with a read-only calendar tab and no past events (14). A cancelled event or occurrence
+stays 200 and indexable with a banner (16). The description is rendered from a node tree, never
+injected HTML (18). Cache lifetimes derive from `public_cache_seconds`; a signed-in visitor's page
+is `private, no-store` (20). A feed holds 30 days back to 366 ahead, at most 1,000 events and 5,000
+components, counts every override toward the cap, drops a series it cannot hold whole and says so
+in `X-Events-Truncated` (25). A series' bare page lists its next ten occurrences in JSON-LD (30).
+The sitemap is bounded at 10,000 addresses and lists no `?date=` address (31). Added by review:
+feed `VTIMEZONE`s list transitions for 20 years ahead, not rules; the all-calendars feed and the
+index are named by the `public_title` setting; the public prefix is checked against other
+modules' configured prefixes.

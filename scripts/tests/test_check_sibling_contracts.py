@@ -18,7 +18,9 @@ REPO = Path(__file__).resolve().parents[2]
 def _git(root: Path, *args: str) -> None:
     subprocess.run(
         ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
-        cwd=root, check=True, capture_output=True,
+        cwd=root,
+        check=True,
+        capture_output=True,
     )
 
 

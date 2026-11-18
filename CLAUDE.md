@@ -154,12 +154,46 @@ The share picker needs three trimmed characters, matches a user whose label has
 no at-sign (any variant) by name or exact full address, and a user whose label
 has one only by the exact full address (compared NFC-normalised and
 case-insensitively); it never parses labels. It masks every address, bare or inside a label, unless the
-query is the full address. Keep calendar responses naming an owner (`owner_name`)
+query is the full address. Keep calendar responses naming an owner (`owner_name`) and revision rows
+naming their actor (`actor_name`, same resolver `web/services/names.py`)
 only for an active member of the bound tenant with a display name: a label that
 carries an address resolves to `null`, never a masked or raw address (that is
 the picker's, for owners and managers alone). A failing name lookup must leave
 the names `null`, never fail the list; the picker and the transfer
-eligibility check must still fail closed.
+eligibility check must still fail closed. Events are read through
+`core/access/events.py`: a draft, an event in review or a scheduled one is
+visible only to a caller with `write_events` on its calendar, and a published
+or scheduled (locked) event is changed, trashed, restored or overridden only
+with write and `events.publish`. Every event write starts with `claim_revision`
+(the compare-and-set on `expected_revision`). Recurrence is expanded only in
+`calendar/occurrences.py`, and never without an `until`. The editor's HTML is
+cleaned by both sanitisers and never inserted as markup otherwise. The API takes
+a local wall clock plus an IANA timezone, never UTC (an instant is stored UTC).
+**`/admin/events/` is the calendar (FullCalendar 7).** Import FullCalendar only under
+`sm_events/ui/calendar/adapter/` and add only the MIT packages on the allow-list
+(`boundaries.test.ts`, which checks the lockfile's licences too); the adapter must load the interaction plugin or nothing
+drags. A grid change (an instant in the grid's zone) is converted into the
+**event's** wall clock through `ui/calendar/time/zones.ts`, never UTC or the grid's
+zone, and a drag never rewrites a rule (a series "all" shifts the master). The
+calendar JS is a lazy chunk that no other screen may request.
+**Everything anonymous in events goes through `core/access/public.py`.** Read
+`public_events()` and `public_calendars()` (published events of public calendars of the bound
+tenant, never trashed), or the occurrences read with `ANONYMOUS` and
+`include_unpublished=False`; never build a predicate on `status` or `visibility`, take a viewer
+from the request, or answer "not here" in more than one way (`_not_found.py`: same status, body and
+`no-store` for every cause, a redirect to a hidden target included). Every new public route is added
+to `tests/web/public/leaks.py` (`surfaces()` and `ROUTE_SURFACES`) in the same commit; the
+route-table test fails otherwise. Feeds are built only in `feeds/` with `icalendar`, text passing
+through `feeds/sanitize.py`, reading rows through the gate, never the occurrences read. JSON-LD is
+serialised only by `_head.safe_json_ld` (Python) and `utils/jsonLd.ts`; the description is rendered
+from `content/richtext_tree.py`, never injected. Constants live in `core/constants/` (`public.py` for
+the public surface). **Production must set the host's `public_base_url`:** without it canonical, `og:url`,
+`hreflang`, feed and sitemap URLs follow the client's `Host` header (the response then varies on `Host`).
+`make worker` serves the `events` queue; scheduled publishing needs beat, which
+enumerates tenants under the framework's `all_tenants()` and then gives each
+tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
+publish in the worker emits no bus event. Its `core/worker.py` is a parity-checked
+copy of newsletter's (family "worker runtime").
 
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —

@@ -116,8 +116,11 @@ def _floor(req: Requirement) -> Version | None:
 
 def _next_releases(newest: Version) -> set[Version]:
     major, minor, patch = (*newest.release, 0, 0)[:3]
-    return {Version(f"{major}.{minor}.{patch + 1}"), Version(f"{major}.{minor + 1}.0"),
-            Version(f"{major + 1}.0.0")}
+    return {
+        Version(f"{major}.{minor}.{patch + 1}"),
+        Version(f"{major}.{minor + 1}.0"),
+        Version(f"{major + 1}.0.0"),
+    }
 
 
 def _ref(floor: Version, tags: dict[Version, str]) -> str | None:
