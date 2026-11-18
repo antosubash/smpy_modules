@@ -14,6 +14,26 @@ CARD = {
     "locale": "de",
     "snapshot_at": "2026-11-03T10:00:00Z",
 }
+EVENT_ID = "3f2c6c1e-8f4e-4a45-9d0e-0a5b8f6f1c11"
+EVENT = {
+    "source_id": EVENT_ID,
+    "title": "Open day",
+    "excerpt": "Come by",
+    "image_url": "https://cdn.example.com/a.png",
+    "url": "/events/open-day?date=2026-07-01",
+    "ics_url": "/events/open-day.ics",
+    "locale": "en",
+    "starts_at": "2026-07-01T08:00:00Z",
+    "ends_at": "2026-07-01T09:00:00Z",
+    "all_day": False,
+    "start_date": None,
+    "end_date": None,
+    "timezone": "Europe/Vienna",
+    "attendance_mode": "hybrid",
+    "place": "Hall 1, Main St 2",
+    "cancelled": False,
+    "snapshot_at": "2026-11-03T10:00:00Z",
+}
 BODY = [
     {
         "type": "Heading",
@@ -32,6 +52,7 @@ BODY = [
     {"type": "Spacer", "props": {"id": "f", "size": "md"}},
     {"type": "ArticleCard", "props": {"id": "g", **CARD}},
     {"type": "PageCard", "props": {"id": "h", **CARD}},
+    {"type": "EventCard", "props": {"id": "i", **EVENT}},
 ]
 
 
@@ -103,3 +124,37 @@ def test_error_never_echoes_input():
     with pytest.raises(InvalidBody) as exc:
         parse_body([{"type": "Heading", "props": {"id": "a", "text": "x", "<script>": 1}}])
     assert "script" not in exc.value.detail
+
+
+def _event_body(**changes):
+    return [{"type": "EventCard", "props": {"id": "e", **EVENT, **changes}}]
+
+
+def test_event_card_props_valid():
+    assert dump_body(parse_body(_event_body())) == _event_body()
+    all_day = _event_body(all_day=True, start_date="2026-03-29", end_date="2026-03-30")
+    assert dump_body(parse_body(all_day)) == all_day
+
+
+@pytest.mark.parametrize(
+    "changes, path",
+    [
+        ({"source_id": "7"}, "body[0].props.source_id"),
+        ({"source_id": 7}, "body[0].props.source_id"),
+        ({"ends_at": "2026-07-01T08:00:00Z"}, "body[0].props"),
+        ({"all_day": True}, "body[0].props"),
+        ({"start_date": "2026-07-01", "end_date": "2026-07-02"}, "body[0].props"),
+        ({"all_day": True, "start_date": "2026-07-02", "end_date": "2026-07-02"}, "body[0].props"),
+        ({"timezone": "Mars/Base"}, "body[0].props.timezone"),
+        ({"ics_url": "javascript:alert(1)"}, "body[0].props.ics_url"),
+        ({"url": "{{unsubscribe_url}}x"}, "body[0].props.url"),
+        ({"starts_at": "2026-07-01T08:00:00"}, "body[0].props.starts_at"),
+        ({"attendance_mode": "teleport"}, "body[0].props.attendance_mode"),
+        ({"onclick": "x"}, "body[0].props.onclick"),
+    ],
+)
+def test_event_card_props_refused(changes, path):
+    with pytest.raises(InvalidBody) as exc:
+        parse_body(_event_body(**changes))
+    assert exc.value.detail.startswith(path)
+    assert "javascript" not in exc.value.detail and "Mars" not in exc.value.detail
