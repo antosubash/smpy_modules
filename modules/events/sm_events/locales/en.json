@@ -828,5 +828,43 @@
       "failed": "The import failed: {reason}",
       "working": "The import is running."
     }
+  },
+  "blocks": {
+    "palette_group": "Events",
+    "upcoming": {
+      "label": "Upcoming events",
+      "heading": "Heading",
+      "calendars": "Calendars",
+      "category": "Category",
+      "count": "Number of events",
+      "layout": "Layout",
+      "layout_list": "List",
+      "layout_cards": "Cards",
+      "show_images": "Show images"
+    },
+    "calendar": {
+      "label": "Events calendar",
+      "calendars": "Calendars",
+      "default_view": "Opens as",
+      "view_month": "Month",
+      "view_week": "Week",
+      "view_day": "Day",
+      "view_list": "List",
+      "height": "Height",
+      "height_compact": "Compact",
+      "height_medium": "Medium",
+      "height_tall": "Tall"
+    },
+    "fields": {
+      "calendar": "Calendar",
+      "calendar_all": "All public calendars",
+      "category_any": "Any category"
+    },
+    "editor_hint": {
+      "empty": "No upcoming public events. Visitors see nothing here until there are some.",
+      "unresolved_one": "{count} chosen calendar is not public or no longer exists.",
+      "unresolved_other": "{count} chosen calendars are not public or no longer exist.",
+      "failed": "Events could not be loaded."
+    }
   }
 }

@@ -21,6 +21,7 @@ export function item(overrides: Partial<PublicListItem> = {}): PublicListItem {
     venue_name: null,
     attendance_mode: 'in_person',
     summary: null,
+    image: null,
     ...overrides,
   };
 }

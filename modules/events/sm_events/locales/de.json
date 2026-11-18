@@ -828,5 +828,43 @@
       "failed": "Der Import ist fehlgeschlagen: {reason}",
       "working": "Der Import läuft."
     }
+  },
+  "blocks": {
+    "palette_group": "Veranstaltungen",
+    "upcoming": {
+      "label": "Kommende Veranstaltungen",
+      "heading": "Überschrift",
+      "calendars": "Kalender",
+      "category": "Kategorie",
+      "count": "Anzahl der Veranstaltungen",
+      "layout": "Darstellung",
+      "layout_list": "Liste",
+      "layout_cards": "Karten",
+      "show_images": "Bilder anzeigen"
+    },
+    "calendar": {
+      "label": "Veranstaltungskalender",
+      "calendars": "Kalender",
+      "default_view": "Öffnet als",
+      "view_month": "Monat",
+      "view_week": "Woche",
+      "view_day": "Tag",
+      "view_list": "Liste",
+      "height": "Höhe",
+      "height_compact": "Kompakt",
+      "height_medium": "Mittel",
+      "height_tall": "Hoch"
+    },
+    "fields": {
+      "calendar": "Kalender",
+      "calendar_all": "Alle öffentlichen Kalender",
+      "category_any": "Jede Kategorie"
+    },
+    "editor_hint": {
+      "empty": "Keine kommenden öffentlichen Veranstaltungen. Besucher sehen hier nichts, bis es welche gibt.",
+      "unresolved_one": "{count} ausgewählter Kalender ist nicht öffentlich oder existiert nicht mehr.",
+      "unresolved_other": "{count} ausgewählte Kalender sind nicht öffentlich oder existieren nicht mehr.",
+      "failed": "Die Veranstaltungen konnten nicht geladen werden."
+    }
   }
 }
