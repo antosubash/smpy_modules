@@ -7,6 +7,7 @@ import importlib.resources
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
@@ -97,6 +98,16 @@ class EventsModule(ModuleBase):
             shares_api.PATH_PATTERN,
             RateLimitRule(shares_api.RATE, key="user", methods=frozenset({"GET"})),
         )
+
+    def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
+        """Private feed links go when their user, membership or tenant does. A worker builds no
+        app (``app`` is ``None``) and has nothing to subscribe: a link whose owner is gone
+        serves nothing anyway, so this only removes the rows."""
+        if app is None:
+            return
+        from sm_events.feeds.tokens import cleanup
+
+        cleanup.subscribe(bus, app)
 
     def register_middleware(self, app: FastAPI) -> None:
         """Remember the current request for the ``events.calendar`` loader, which

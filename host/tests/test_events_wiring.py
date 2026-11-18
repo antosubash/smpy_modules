@@ -285,3 +285,18 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
         if path == "/events/":
             assert "http://evil.test/events/" in got.text, path  # follows Host, as warned
         assert "host" in got.headers.get("vary", "").lower(), path
+
+
+def test_feed_token_cleanup_is_subscribed(booted_host):
+    """The real host gives events the bus, so a deleted user, membership or tenant takes its
+    private feed links with it."""
+    from simple_module_core.tenant_events import TenantDeleted
+    from simple_module_core.user_events import UserDeleted
+    from tenants.contracts.events import MembershipRemoved
+
+    bus = booted_host.state.sm.event_bus
+    for event in (UserDeleted, MembershipRemoved, TenantDeleted):
+        modules = [
+            getattr(h, "__module__", "") for h in bus._emitter.listeners(bus._event_key(event))
+        ]
+        assert "sm_events.feeds.tokens.cleanup" in modules, (event.__name__, modules)
