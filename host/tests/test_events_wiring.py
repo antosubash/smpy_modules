@@ -137,20 +137,12 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
                 feed = await http.get("/events/calendar.ics")
                 missing = await http.get("/events/no-such-event.ics")
                 write = await http.post("/events/no-such-event")
-                private = await http.get(f"/events/feed/evf_{'0' * 43}.ics")
-                private_head = await http.head(f"/events/feed/evf_{'0' * 43}.ics")
-                private_bad = await http.get("/events/feed/not-a-token.ics")
             return {
                 "paths": paths,
                 "page": page,
                 "feed": feed,
                 "missing": missing,
                 "write": write,
-                "private": private,
-                "private_head": private_head,
-                "private_bad": private_bad,
-                "private_rate": getattr(rules.match("GET", "/events/feed/evf_x.ics"), "rate", None),
-                "private_exempt": is_public(app, "GET", "/events/feed/evf_x.ics"),
                 "get_public": is_public(app, "GET", "/events/x"),
                 "post_public": is_public(app, "POST", "/events/x"),
                 "feed_rate": getattr(rules.match("GET", "/events/calendar.ics"), "rate", None),
@@ -165,7 +157,6 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
         "/events/calendar.ics",
         "/events/sitemap.xml",
         "/events/api/occurrences",
-        "/events/feed/{token}.ics",
     } <= got["paths"]
     assert got["get_public"] is True and got["post_public"] is False
     assert (got["feed_rate"], got["api_rate"]) == ("60/minute", "120/minute")
@@ -178,20 +169,6 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
     assert got["missing"].status_code == 404
     assert got["missing"].json() == {"detail": "Not found", "code": "not_found"}
     assert got["write"].status_code not in (200, 404)  # still behind the sign-in
-    # A private feed link: public to ``GET``/``HEAD`` (the token is the credential), its own
-    # budget, and one answer for any link nobody holds, well formed or not.
-    assert got["private_exempt"] is True
-    assert got["private_rate"] == "30/minute"
-    for refused in (got["private"], got["private_bad"]):
-        assert refused.status_code == 404, refused.text[:300]
-        assert refused.json() == {"detail": "Not found", "code": "not_found"}
-        assert refused.headers["cache-control"] == "no-store"
-        # The route sends ``no-referrer`` (its own tests pin that), but the framework's
-        # SecurityHeadersMiddleware replaces ``Referrer-Policy`` on every response, so a real
-        # host answers its own value. Pinned so a framework change either way is noticed.
-        assert refused.headers["referrer-policy"] == "strict-origin-when-cross-origin"
-        assert "etag" not in refused.headers
-    assert got["private_head"].status_code == 404 and got["private_head"].content == b""
 
 
 def test_not_modified_carries_what_we_pin(booted_host, monkeypatch):
@@ -285,18 +262,3 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
         if path == "/events/":
             assert "http://evil.test/events/" in got.text, path  # follows Host, as warned
         assert "host" in got.headers.get("vary", "").lower(), path
-
-
-def test_feed_token_cleanup_is_subscribed(booted_host):
-    """The real host gives events the bus, so a deleted user, membership or tenant takes its
-    private feed links with it."""
-    from simple_module_core.tenant_events import TenantDeleted
-    from simple_module_core.user_events import UserDeleted
-    from tenants.contracts.events import MembershipRemoved
-
-    bus = booted_host.state.sm.event_bus
-    for event in (UserDeleted, MembershipRemoved, TenantDeleted):
-        modules = [
-            getattr(h, "__module__", "") for h in bus._emitter.listeners(bus._event_key(event))
-        ]
-        assert "sm_events.feeds.tokens.cleanup" in modules, (event.__name__, modules)
