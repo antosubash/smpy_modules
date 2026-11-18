@@ -216,3 +216,19 @@ async def test_a_signed_in_manager_gets_the_same_bytes(public_locales_client, fx
 async def test_the_filename_is_ascii_safe(public_locales_client, fx):
     assert _feeds.safe_filename('a"b\r\nc/ü') == "a-b--c--"
     assert _feeds.safe_filename("") == constants.EVENT_SLUG_FALLBACK
+
+
+async def test_single_event_file_is_bounded_and_says_so(public_locales_client, fx, monkeypatch):
+    async def more(db):
+        for day in (13, 14, 15, 16):
+            when = datetime(2026, 5, day, 8, tzinfo=UTC)
+            db.add(OccurrenceOverride(event_id=fx.series.id, original_start=when, kind="skipped"))
+
+    await mutate(public_locales_client, more)
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 5)
+    path = _urls.event_ics_path(fx.slug(fx.series), "en")
+    got = await public_locales_client.get(path)
+    assert got.headers["x-events-truncated"] == "1"
+    feed = await public_locales_client.get(_urls.calendar_ics_path(None, "en"))
+    assert fx.series.uid not in uids(feed)  # a calendar feed drops a series it cannot hold whole
+    assert feed.headers["x-events-truncated"] == "1"

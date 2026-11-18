@@ -33,12 +33,11 @@ from sm_events.core import constants
 from sm_events.core.access.public import public_events
 from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.ics_event import FeedEvent
-from sm_events.models import Category, Event, OccurrenceOverride, OverrideKind
+from sm_events.models import Category, Event, OccurrenceOverride
 
 __all__ = ["FeedRead", "feed_events", "single_event"]
 
 UrlFor = Callable[[str, str], str]
-_SHOWN = (OverrideKind.MOVED.value, OverrideKind.CANCELLED.value)
 
 
 @dataclass(frozen=True)
@@ -57,21 +56,35 @@ def _in_window(lo: datetime, hi: datetime) -> Any:
     return or_(one_off, series)
 
 
-async def _overrides(db: Any, events: Sequence[Event]) -> dict[uuid.UUID, list[OccurrenceOverride]]:
+async def _overrides(
+    db: Any, events: Sequence[Event]
+) -> tuple[dict[uuid.UUID, list[OccurrenceOverride]], uuid.UUID | None]:
+    """``{series id: its overrides}`` and, when the read hit its bound, the id of the series whose
+    overrides may be incomplete (that one and every id after it, in ``event_id`` order, are cut).
+
+    At most ``FEED_MAX_COMPONENTS + 1`` rows are loaded in all, ordered by ``(event_id,
+    original_start)``: more overrides than the cap could ever emit are never read."""
     ids = [e.id for e in events if e.rrule]
     found: dict[uuid.UUID, list[OccurrenceOverride]] = {i: [] for i in ids}
-    if ids:
-        stmt = (
-            select(OccurrenceOverride)
-            .where(
-                OccurrenceOverride.tenant_id == bound_tenant(),  # type: ignore[arg-type]
-                col(OccurrenceOverride.event_id).in_(ids),
-            )
-            .order_by(col(OccurrenceOverride.original_start))
+    if not ids:
+        return found, None
+    stmt = (
+        select(OccurrenceOverride)
+        .where(
+            OccurrenceOverride.tenant_id == bound_tenant(),  # type: ignore[arg-type]
+            col(OccurrenceOverride.event_id).in_(ids),
         )
-        for row in (await db.execute(stmt)).scalars():
-            found[row.event_id].append(row)
-    return found
+        .order_by(col(OccurrenceOverride.event_id), col(OccurrenceOverride.original_start))
+        .limit(constants.FEED_MAX_COMPONENTS + 1)
+    )
+    rows = list((await db.execute(stmt)).scalars())
+    cut_at: uuid.UUID | None = None
+    if len(rows) > constants.FEED_MAX_COMPONENTS:
+        rows = rows[: constants.FEED_MAX_COMPONENTS]
+        cut_at = rows[-1].event_id
+    for row in rows:
+        found[row.event_id].append(row)
+    return found, cut_at
 
 
 async def _categories(db: Any, events: Sequence[Event]) -> dict[uuid.UUID, Category]:
@@ -101,10 +114,24 @@ def _category_name(cat: Category | None, locale: str, default: str) -> str | Non
 
 
 async def _items(
-    db: Any, events: Sequence[Event], *, locale: str, default_locale: str, url_for: UrlFor
-) -> list[FeedEvent]:
+    db: Any,
+    events: Sequence[Event],
+    *,
+    locale: str,
+    default_locale: str,
+    url_for: UrlFor,
+    drop_cut: bool,
+) -> tuple[list[FeedEvent], bool]:
+    """The items, and whether the override bound cut something. In a calendar feed a series
+    whose overrides were cut is dropped (``drop_cut``); a single event's file keeps what was read
+    and says so."""
     texts = await texts_of(db, [e.id for e in events])
-    overrides = await _overrides(db, events)
+    overrides, cut_at = await _overrides(db, events)
+    cut = cut_at is not None
+    if cut_at is not None and drop_cut:
+        # A series whose overrides were cut must not be emitted: without its EXDATEs a client
+        # would resurrect skipped occurrences. Its row and every later one (by id) are dropped.
+        events = [e for e in events if not e.rrule or e.id < cut_at]
     categories = await _categories(db, events)
     parents = await _parent_uids(db, events)
     items: list[FeedEvent] = []
@@ -122,14 +149,13 @@ async def _items(
                 parent_uid=parents.get(event.parent_id) if event.parent_id else None,
             )
         )
-    return items
+    return items, cut
 
 
 def _components(item: FeedEvent) -> int:
-    """The master, plus a ``VEVENT`` per moved or cancelled occurrence (a skip is an EXDATE)."""
-    if not item.event.rrule:
-        return 1
-    return 1 + sum(1 for o in item.overrides if o.kind in _SHOWN)
+    """What a series costs against the component cap: the master and every override, a skip
+    (an ``EXDATE``) included, so the file's size is bounded by the cap however it is made."""
+    return 1 + len(item.overrides) if item.event.rrule else 1
 
 
 async def feed_events(
@@ -150,13 +176,15 @@ async def feed_events(
     stmt = stmt.order_by(col(Event.starts_at), col(Event.id)).limit(constants.FEED_MAX_EVENTS + 1)
     events = list((await db.execute(stmt)).scalars().all())
     truncated = len(events) > constants.FEED_MAX_EVENTS
-    items = await _items(
+    items, cut = await _items(
         db,
         events[: constants.FEED_MAX_EVENTS],
         locale=locale,
         default_locale=default_locale,
         url_for=url_for,
+        drop_cut=True,
     )
+    truncated = truncated or cut
     kept: list[FeedEvent] = []
     used = 0
     for item in items:
@@ -170,10 +198,15 @@ async def feed_events(
 
 async def single_event(
     db: Any, event: Event, *, locale: str, default_locale: str, url_for: UrlFor
-) -> FeedEvent:
-    """One event, whole: no window, every override. The caller has already passed it through
-    the gate (``event_by_slug``)."""
-    (item,) = await _items(
-        db, [event], locale=locale, default_locale=default_locale, url_for=url_for
+) -> FeedRead:
+    """One event, whole: no window, its overrides up to the component cap (``truncated`` when
+    there are more). The caller has already passed it through the gate (``event_by_slug``)."""
+    items, cut = await _items(
+        db,
+        [event],
+        locale=locale,
+        default_locale=default_locale,
+        url_for=url_for,
+        drop_cut=False,
     )
-    return item
+    return FeedRead(items=items, truncated=cut)

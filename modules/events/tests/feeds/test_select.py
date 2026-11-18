@@ -115,16 +115,80 @@ async def test_component_cap_drops_whole_series_and_everything_after(db, monkeyp
         db.add(OccurrenceOverride(event_id=series.id, original_start=when, kind=kind))
     last = await seed_event(db, cal, slug="last", starts_at=NOW + timedelta(days=30), **kw)
     await db.flush()
-    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 4)
+    # first = 1; the series = its master and all three overrides, the skip included = 4
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 6)
     got = await read(db)
-    # first = 1 component; the series = master + two cancelled = 3 (a skip is an EXDATE) = 4: fits
+    assert [i.event.id for i in got.items] == [first.id, series.id, last.id] and not got.truncated
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 5)
+    got = await read(db)
     assert [i.event.id for i in got.items] == [first.id, series.id] and got.truncated
-    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 3)
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 4)
     got = await read(db)
     assert [i.event.id for i in got.items] == [first.id] and got.truncated
     assert last.id not in {i.event.id for i in got.items}
     monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 100)
     assert not (await read(db)).truncated
+
+
+async def _series_with(db, count: int, kind: str = "skipped", slug: str = "many"):
+    cal = (await seed_calendars(db))["U"]
+    series = await seed_series(
+        db, cal, "FREQ=DAILY;COUNT=60", "2026-04-02T10:00", "2026-04-02T11:00",
+        slug=slug, status="published",
+    )  # fmt: skip
+    for n in range(count):
+        when = datetime(2026, 4, 2 + n, 8, tzinfo=UTC)
+        db.add(OccurrenceOverride(event_id=series.id, original_start=when, kind=kind))
+    await db.flush()
+    return series
+
+
+async def test_overrides_are_bounded_in_sql(db, db_state, monkeypatch):
+    series = await _series_with(db, 12)
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 5)
+    ran: list[str] = []
+    sa_event.listen(
+        db_state.engine.sync_engine,
+        "before_cursor_execute",
+        lambda c, cur, stmt, *a: ran.append(stmt),
+    )
+    got = await read(db)
+    assert got.items == [] and got.truncated  # a cut series is never emitted without its EXDATEs
+    assert series.id
+    overrides = [stmt for stmt in ran if "events_occurrence_override" in stmt]
+    assert len(overrides) == 1 and "LIMIT" in overrides[0].upper()
+
+
+async def test_exactly_at_the_cap_and_one_past(db, monkeypatch):
+    series = await _series_with(db, 4)  # master + 4 skips = 5 components
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 5)
+    at = await read(db)
+    assert [i.event.id for i in at.items] == [series.id] and not at.truncated
+    assert len(at.items[0].overrides) == 4
+    db.add(
+        OccurrenceOverride(
+            event_id=series.id, original_start=datetime(2026, 5, 20, 8, tzinfo=UTC), kind="skipped"
+        )
+    )
+    await db.flush()
+    past = await read(db)
+    assert past.items == [] and past.truncated
+
+
+async def test_skips_count_toward_the_cap(db, monkeypatch):
+    await _series_with(db, 6, kind="skipped")
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 6)
+    assert (await read(db)).truncated  # 1 + 6 skips = 7 > 6
+
+
+async def test_the_single_event_file_is_capped_too(db, monkeypatch):
+    series = await _series_with(db, 8)
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 5)
+    got = await single_event(db, series, locale="en", default_locale="en", url_for=url_for)
+    assert got.truncated and len(got.items) == 1 and len(got.items[0].overrides) == 5
+    monkeypatch.setattr(constants, "FEED_MAX_COMPONENTS", 8)
+    exact = await single_event(db, series, locale="en", default_locale="en", url_for=url_for)
+    assert not exact.truncated and len(exact.items[0].overrides) == 8
 
 
 async def test_locale_fallback(db):
@@ -160,8 +224,9 @@ async def test_single_event_has_no_window_and_all_overrides(db):
         db.add(OccurrenceOverride(event_id=old.id, original_start=when, kind="skipped"))
     await db.flush()
     assert old.id not in {i.event.id for i in (await read(db)).items}  # outside the window
-    item = await single_event(db, old, locale="en", default_locale="en", url_for=url_for)
-    assert item.event.id == old.id and len(item.overrides) == 2
+    got = await single_event(db, old, locale="en", default_locale="en", url_for=url_for)
+    (item,) = got.items
+    assert item.event.id == old.id and len(item.overrides) == 2 and not got.truncated
 
 
 async def test_query_count(db, db_state):
