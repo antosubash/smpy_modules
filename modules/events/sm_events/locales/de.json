@@ -738,14 +738,16 @@
       "kept_draft_private": "In der Datei als privat markiert: als Entwurf behalten.",
       "untitled": "Kein Titel: „Termin ohne Titel“.",
       "uid_generated": "Keine Kennung in der Datei: aus Datum und Titel gebildet.",
-      "description_truncated": "Die Beschreibung wurde auf die Höchstlänge gekürzt."
+      "description_truncated": "Die Beschreibung wurde auf die Höchstlänge gekürzt.",
+      "kept_utc": "Ein sich wiederholender Termin in UTC: seine Zeiten bleiben in UTC und wandern nicht mit der Zeitumstellung."
     },
     "failure": {
       "ics_encoding": "Die Datei ist kein gültiger Text (UTF-8). Speichere den Kalender neu und versuche es erneut.",
       "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus, oder sie ist größer oder komplexer, als ein Import erlaubt.",
       "too_many_events": "Die Datei enthält mehr Termine, als ein Import aufnimmt. Teile sie und importiere die Teile.",
       "import_failed": "Der Import konnte nicht abgeschlossen werden. Es wurde nichts weiter geschrieben.",
-      "importer_gone": "Dein Konto darf hier nicht mehr importieren, der Import wurde angehalten."
+      "importer_gone": "Dein Konto darf hier nicht mehr importieren, der Import wurde angehalten.",
+      "too_complex": "Die Datei ist zu komplex, um sie in der erlaubten Zeit zu lesen. Teile sie in kleinere Dateien."
     },
     "dropped": {
       "ATTENDEE": "Teilnehmende",

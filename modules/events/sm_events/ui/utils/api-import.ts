@@ -84,6 +84,7 @@ export const SKIP_REASONS = [
 /** What was adjusted on the way in, for an item that is imported. */
 export const NOTES = [
   'floating_time',
+  'kept_utc',
   'default_duration',
   'shifted_local_time',
   'start_adjusted',
