@@ -11,8 +11,10 @@ import type {
   CalendarState,
   CreateSlot,
   FilterOption,
+  Occurrence,
   OccurrenceFetcher,
 } from '../types';
+import { MoveDialog } from './MoveDialog';
 import { QuickCreateDialog } from './QuickCreateDialog';
 import { useCalendarWrites } from './useCalendarWrites';
 
@@ -73,6 +75,10 @@ export function ConsoleCalendar({
   const invalidate = useCallback(() => setRefresh((n) => n + 1), []);
   const writes = useCalendarWrites({ invalidate, editorUrl });
   const [slot, setSlot] = useState<CreateSlot | null>(null);
+  const [moving, setMoving] = useState<{
+    occurrence: Occurrence;
+    element: HTMLElement | null;
+  } | null>(null);
   // The calendar a new event starts on: the one shown, when exactly one is.
   const [shown, setShown] = useState(initialState?.calendars ?? []);
   const known = shown.filter((id) => calendars.some((c) => c.id === id));
@@ -84,7 +90,7 @@ export function ConsoleCalendar({
       creating: slot !== null,
       onCreate: setSlot,
       onChange: writes.onChange,
-      onMove: () => {},
+      onMove: (occurrence, element) => setMoving({ occurrence, element: element ?? null }),
       pendingKeys: writes.pendingKeys,
     }),
     [canCreate, slot, writes.onChange, writes.pendingKeys],
@@ -106,6 +112,12 @@ export function ConsoleCalendar({
         refreshToken={refresh}
       />
       {writes.dialogs}
+      <MoveDialog
+        occurrence={moving?.occurrence ?? null}
+        returnFocus={moving?.element}
+        onSubmit={writes.submit}
+        onClose={() => setMoving(null)}
+      />
       <QuickCreateDialog
         slot={slot}
         calendars={calendars}

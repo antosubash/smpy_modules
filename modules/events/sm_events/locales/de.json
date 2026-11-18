@@ -518,6 +518,16 @@
       "create": "Anlegen",
       "more_options": "Weitere Optionen",
       "created": "Veranstaltung als Entwurf angelegt"
+    },
+    "move": {
+      "title": "Verschieben oder Dauer ändern",
+      "description": "Ändern Sie, wann dies stattfindet. Die Zeiten gelten in {zone}, der Zeitzone der Veranstaltung.",
+      "start": "Beginn",
+      "end": "Ende",
+      "last_day": "Letzter Tag",
+      "scope": "Gilt für",
+      "submit": "Verschieben",
+      "unchanged": "Es gibt nichts zu ändern."
     }
   }
 }

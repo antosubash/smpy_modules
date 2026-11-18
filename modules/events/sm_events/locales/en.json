@@ -518,6 +518,16 @@
       "create": "Create",
       "more_options": "More options",
       "created": "Event created as a draft"
+    },
+    "move": {
+      "title": "Move or resize",
+      "description": "Change when this happens. Times are in {zone}, the time zone of the event.",
+      "start": "Start",
+      "end": "End",
+      "last_day": "Last day",
+      "scope": "Apply to",
+      "submit": "Move",
+      "unchanged": "Nothing to change."
     }
   }
 }
