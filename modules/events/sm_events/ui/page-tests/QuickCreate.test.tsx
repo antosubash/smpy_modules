@@ -209,3 +209,31 @@ describe('closing', () => {
     await view.unmount();
   });
 });
+
+describe('the skipped hour', () => {
+  const gapDay = (start: string, end: string) => ({ allDay: false, start, end });
+  it('says so when the slot starts at the first minute after the gap', async () => {
+    // 2026-03-29 02:00 does not exist in Vienna: the grid hands over 03:00 (01:00Z).
+    const { view } = await open(gapDay('2026-03-29T01:00:00Z', '2026-03-29T01:30:00Z'));
+    expect(field('quick-start').value).toBe('2026-03-29T03:00');
+    expect(document.querySelector('[role=status]')?.textContent).toContain(
+      'The clock skips this hour on that day, so the event starts at 03:00.',
+    );
+    await view.unmount();
+  });
+  it('says so for a slot the grid flagged, and not once the time is changed', async () => {
+    const { view } = await open({
+      ...gapDay('2026-03-29T01:30:00Z', '2026-03-29T02:00:00Z'),
+      skipped: true,
+    });
+    expect(document.querySelector('[role=status]')?.textContent).toContain('starts at 03:30');
+    await setValue(field('quick-start'), '2026-03-29T04:30');
+    expect(document.querySelector('[role=status]')).toBeNull();
+    await view.unmount();
+  });
+  it('is silent for an ordinary slot', async () => {
+    const { view } = await open(TIMED);
+    expect(document.querySelector('[role=status]')).toBeNull();
+    await view.unmount();
+  });
+});

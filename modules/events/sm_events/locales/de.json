@@ -116,7 +116,7 @@
     "invalid_rrule": "Diese Wiederholungsregel ist ungültig.",
     "rrule_frequency_refused": "Veranstaltungen können täglich, wöchentlich, monatlich oder jährlich wiederkehren.",
     "start_not_in_rule": "Der Beginn muss das erste Datum sein, das die Wiederholungsregel erzeugt. Ändern Sie den Beginn oder die Regel.",
-    "invalid_datetime": "Gib ein gültiges Datum und eine gültige Uhrzeit ein.",
+    "invalid_datetime": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein.",
     "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: Die Uhren überspringen sie.",
     "end_before_start": "Das Ende muss nach dem Beginn liegen.",
     "duration_too_long": "Eine Veranstaltung kann höchstens {oneOff} Tage dauern; wiederholt sie sich, jeder Termin höchstens {series} Tage.",
@@ -473,6 +473,8 @@
       "loading": "Veranstaltungen werden geladen…",
       "empty": "In diesem Zeitraum gibt es nichts",
       "no_calendars": "Wählen Sie einen Kalender, um seine Veranstaltungen zu sehen.",
+      "none_yet": "Es gibt noch keine Kalender.",
+      "open_calendars": "Kalender öffnen",
       "error": "Die Veranstaltungen konnten nicht geladen werden.",
       "truncated": "Es werden die ersten {count} Einträge dieses Zeitraums angezeigt. Grenzen Sie die Filter ein oder wechseln Sie zu einer kürzeren Ansicht."
     },
@@ -507,6 +509,7 @@
       "all": "Alle Termine"
     },
     "create": {
+      "skipped_hour": "Die Uhr überspringt an diesem Tag diese Stunde, daher beginnt die Veranstaltung um {time}.",
       "title": "Neue Veranstaltung",
       "description": "Legt einen Entwurf an. Alles Weitere erledigen Sie im vollständigen Editor.",
       "title_label": "Titel",

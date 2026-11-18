@@ -24,7 +24,28 @@ function allDayText(o: Occurrence, locale: string | undefined): string {
     : dateText(first, locale);
 }
 
+/** Whether the range runs over the autumn change, where the end's clock reads earlier than
+ *  (or the same as) the start's: "2:30 – 2:00 AM" for half an hour. */
+export function readsBackwards(o: Occurrence, timeZone: string): boolean {
+  const wall = (iso: string) =>
+    Temporal.Instant.from(iso).toZonedDateTimeISO(timeZone).toPlainDateTime();
+  return Temporal.PlainDateTime.compare(wall(o.end), wall(o.start)) <= 0;
+}
+
 function zonedText(o: Occurrence, timeZone: string, locale: string | undefined): string {
+  if (readsBackwards(o, timeZone)) {
+    // Each end names its own offset, so the two clocks are not mistaken for each other.
+    const edge = new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+      timeZone,
+    });
+    return `${edge.format(instantDate(o.start))} – ${edge.format(instantDate(o.end))}`;
+  }
   const format = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -44,9 +65,11 @@ export function localTimeText(
   o: Occurrence,
   gridTimeZone: string,
   locale: string | undefined,
+  /** Name the zone after the time; the popover's label already does, so it leaves it off. */
+  withZone = true,
 ): string | null {
   if (o.all_day || o.timezone === gridTimeZone) return null;
   const own = zonedText(o, o.timezone, locale);
   if (own === zonedText(o, gridTimeZone, locale)) return null;
-  return `${own} (${o.timezone})`;
+  return withZone ? `${own} (${o.timezone})` : own;
 }

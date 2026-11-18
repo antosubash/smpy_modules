@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
+import { usePermissions } from '@simple-module-py/ui/hooks/use-permissions';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import { useCallback, useMemo } from 'react';
 import { ConsoleCalendar } from '../ui/calendar/console/ConsoleCalendar';
@@ -32,6 +33,7 @@ export default function CalendarPage({
   editor_url,
 }: Props) {
   const { t } = useT();
+  const { can } = usePermissions();
   const copy = keys.events.calendar;
   const ids = useMemo(() => calendars.map((c) => c.id), [calendars]);
   // Read once: the component owns its state from then on and reports every change.
@@ -57,6 +59,7 @@ export default function CalendarPage({
           defaultTimezone={default_timezone}
           contentLocales={content_locales}
           editorUrl={editor_url}
+          calendarsUrl={can('events.edit') ? '/admin/events/calendars' : undefined}
           initialState={initialState}
           onStateChange={mirror}
         />

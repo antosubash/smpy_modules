@@ -26,8 +26,8 @@ export function EventChip({ occurrence: o, view, timeText, pending, lockReason }
     <span
       className={
         stacked
-          ? 'flex min-w-0 flex-col px-1 text-xs leading-tight'
-          : 'flex min-w-0 items-center gap-1 px-1 text-xs'
+          ? 'flex max-h-full min-w-0 flex-col overflow-hidden px-1 text-xs leading-tight'
+          : 'flex min-w-0 items-center gap-1 overflow-hidden px-1 text-xs'
       }
       aria-busy={pending ? true : undefined}
     >

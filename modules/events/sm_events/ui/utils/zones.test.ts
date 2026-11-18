@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { browserZone, todayIn, utcOffset, utcOffsetAt } from './zones';
+import { browserZone, startsAfterGap, todayIn, utcOffset, utcOffsetAt } from './zones';
 
 describe('todayIn', () => {
   const now = new Date('2026-03-29T23:30:00Z');
@@ -28,5 +28,19 @@ describe('offsets', () => {
     expect(utcOffsetAt('nope', 'Europe/Vienna')).toBeNull();
     expect(utcOffsetAt('2026-03-30T09:00:00Z', 'Not/AZone')).toBeNull();
     expect(utcOffset('2026-03-30T09:00', 'Not/AZone')).toBeNull();
+  });
+});
+
+describe('startsAfterGap', () => {
+  it('is true on the first minute after the spring gap only', () => {
+    expect(startsAfterGap('2026-03-29T03:00', 'Europe/Vienna')).toBe(true);
+    expect(startsAfterGap('2026-03-29T03:30', 'Europe/Vienna')).toBe(false);
+    expect(startsAfterGap('2026-03-29T01:59', 'Europe/Vienna')).toBe(false);
+    expect(startsAfterGap('2026-03-30T03:00', 'Europe/Vienna')).toBe(false);
+  });
+  it('is false for a time inside the gap, a repeated hour or unreadable input', () => {
+    expect(startsAfterGap('2026-03-29T02:30', 'Europe/Vienna')).toBe(false);
+    expect(startsAfterGap('2026-10-25T02:30', 'Europe/Vienna')).toBe(false);
+    expect(startsAfterGap('012026-03-29T03:00', 'Europe/Vienna')).toBe(false);
   });
 });

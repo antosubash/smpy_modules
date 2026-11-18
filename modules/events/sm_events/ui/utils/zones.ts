@@ -137,6 +137,23 @@ export function isWallTime(text: string, dateOnly = false): boolean {
   }
 }
 
+/** The wall time is the first valid minute after a spring gap: the minute before it, on the
+ *  clock, is not the minute before it in time. */
+export function startsAfterGap(local: string, timeZone: string): boolean {
+  if (!isWallTime(local)) return false;
+  const wall = Temporal.PlainDateTime.from(local);
+  const before = Temporal.PlainDateTime.from(
+    toLocal(
+      Temporal.Instant.from(toInstant(local, timeZone)).subtract({ seconds: 60 }).toString(),
+      timeZone,
+    ),
+  );
+  return (
+    Temporal.PlainDateTime.compare(before, wall.subtract({ minutes: 1 })) !== 0 &&
+    !isNonexistent(local, timeZone)
+  );
+}
+
 /** Whole calendar days from one date to another (negative when earlier). */
 export const daysBetween = (from: string, to: string): number =>
   Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: 'day' }).days;

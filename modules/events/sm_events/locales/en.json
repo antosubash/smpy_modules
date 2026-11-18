@@ -473,6 +473,8 @@
       "loading": "Loading events…",
       "empty": "Nothing in this range",
       "no_calendars": "Select a calendar to see its events.",
+      "none_yet": "There are no calendars yet.",
+      "open_calendars": "Open Calendars",
       "error": "The events could not be loaded.",
       "truncated": "Showing the first {count} items in this range. Narrow the filters or switch to a shorter view."
     },
@@ -507,6 +509,7 @@
       "all": "All occurrences"
     },
     "create": {
+      "skipped_hour": "The clock skips this hour on that day, so the event starts at {time}.",
       "title": "New event",
       "description": "Creates a draft. Open the full editor for everything else.",
       "title_label": "Title",

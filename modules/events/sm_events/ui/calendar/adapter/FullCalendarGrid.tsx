@@ -8,6 +8,7 @@ import { type Ref, useEffect, useImperativeHandle, useMemo, useRef } from 'react
 import type { GridHandle, GridProps } from '../types';
 import './calendar.css';
 import {
+  acceptsSelection,
   allowDrop,
   chipFor,
   type DragInfo,
@@ -119,10 +120,13 @@ export default function FullCalendarGrid({
         selectable={Boolean(editing?.canCreate)}
         selectMirror
         // A click selects one slot, so `select` covers it; `dateClick` is the same slot again.
-        select={(info) => editing?.canCreate && editing.onCreate(toSlot(info))}
+        select={(info) => {
+          if (acceptsSelection(editing)) editing?.onCreate(toSlot(info));
+          else calendar.current?.getApi().unselect();
+        }}
         dateClick={(info) =>
-          editing?.canCreate &&
-          editing.onCreate(
+          acceptsSelection(editing) &&
+          editing?.onCreate(
             toSlot({
               start: info.date,
               end: null,
@@ -134,7 +138,9 @@ export default function FullCalendarGrid({
         }
         noEventsContent={noEventsText}
         // A React node, never `{html}`: a title is text.
-        eventContent={({ event, timeText }) => chipFor(event, timeText, renderChip)}
+        eventContent={({ event, timeText }) =>
+          chipFor(event, timeText, renderChip, timeZone, locale)
+        }
         eventDidMount={({ event, el }) => {
           elements.current.set(event.id, el);
         }}
