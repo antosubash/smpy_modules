@@ -52,11 +52,11 @@ def safe_filename(slug: str) -> str:
 
 
 def _zone_range(now: datetime) -> tuple[datetime, datetime]:
-    """Whole calendar years around ``now``, so the ``VTIMEZONE`` (and with it the body and
-    its ``ETag``) does not change from one day to the next."""
+    """Whole calendar years around ``now``: the ``VTIMEZONE``, and with it the body and its
+    ``ETag``, changes once a year, not from one day to the next."""
     return (
         datetime(now.year - 1, 1, 1, tzinfo=UTC),
-        datetime(now.year + constants.FEED_YEARS_AHEAD, 12, 31, tzinfo=UTC),
+        datetime(now.year + constants.FEED_ZONE_YEARS_AHEAD, 12, 31, tzinfo=UTC),
     )
 
 
@@ -104,7 +104,7 @@ def calendar_feed_router(locale: str) -> APIRouter:
         )
         body = _file(
             read.items,
-            name=constants.MODULE_NAME,
+            name=_urls.site_title(settings),
             timezone=timezones.effective(settings.default_timezone),
             now=now,
         )
@@ -162,7 +162,7 @@ def event_feed_router(locale: str) -> APIRouter:
                 raise NotFound
             return _cache.permanent_redirect(request, settings, _urls.event_ics_path(moved, locale))
         event, text = found
-        item = await single_event(
+        read = await single_event(
             db,
             event,
             locale=locale,
@@ -171,11 +171,11 @@ def event_feed_router(locale: str) -> APIRouter:
         )
         now = _clock.now()
         body = _file(
-            [item],
+            read.items,
             name=text.title,
             timezone=timezones.effective(event.timezone),
             now=now,
         )
-        return _respond(request, settings, body, filename=text.slug)
+        return _respond(request, settings, body, truncated=read.truncated, filename=text.slug)
 
     return router

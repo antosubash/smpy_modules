@@ -39,9 +39,11 @@ FEED_MAX_EVENTS = 1000
 FEED_MAX_COMPONENTS = 5000
 FEED_DAYS_BACK = 30
 FEED_DAYS_AHEAD = 366
-FEED_YEARS_AHEAD = 2
-"""Whole years of ``VTIMEZONE`` rules written after the current one."""
+FEED_ZONE_YEARS_AHEAD = 20
+"""Whole years of ``VTIMEZONE`` transitions written after the current one."""
+FEED_ZONE_LAST_YEAR = 2100
 SITEMAP_MAX_URLS = 10_000
+SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9"
 FEED_RATE = "60/minute"
 PUBLIC_API_RATE = "120/minute"
 ICS_MEDIA_TYPE = "text/calendar; charset=utf-8"

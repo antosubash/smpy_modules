@@ -39,6 +39,7 @@ __all__ = [
     "index_path",
     "prefix",
     "public_base_url",
+    "site_title",
     "sitemap_path",
     "use",
     "warn_if_unset",
@@ -147,3 +148,10 @@ def warn_if_unset(app: Any, mode: TenancyMode) -> bool:
         "public responses vary on Host"
     )
     return True
+
+
+def site_title(settings: Any) -> str:
+    """What the site calls its events (the ``public_title`` setting): the index page's title and
+    the all-calendars feed's name. Blank or missing is the module's name; one line, bounded."""
+    title = " ".join(str(getattr(settings, "public_title", "") or "").split())
+    return title[: constants.TITLE_MAX] or constants.MODULE_NAME
