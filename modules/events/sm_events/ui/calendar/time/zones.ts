@@ -107,6 +107,14 @@ export const millisBetween = (from: string, to: string): number =>
 export const plusMillis = (instantIso: string, millis: number): string =>
   Temporal.Instant.from(instantIso).add({ milliseconds: millis }).toString();
 
+/** Where the server puts the occurrence of a master (wall time `masterLocal`) on the date
+ *  `slotIso` falls on in the zone: a time the clocks skip is moved forward, as `zoneinfo`
+ *  does, so this is the instant the occurrence read has for that slot. */
+export function occurrenceInstant(slotIso: string, masterLocal: string, timeZone: string): string {
+  const time = Temporal.PlainDateTime.from(masterLocal).toPlainTime().toString();
+  return toInstant(`${dateIn(slotIso, timeZone)}T${time}`, timeZone);
+}
+
 /** Two wall times with the same clock reading, whatever their dates. */
 export const sameTimeOfDay = (a: string, b: string): boolean =>
   Temporal.PlainDateTime.from(a).toPlainTime().equals(Temporal.PlainDateTime.from(b).toPlainTime());

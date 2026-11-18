@@ -56,6 +56,8 @@ export type OccurrenceChange = {
   start: string;
   end: string;
   allDay: boolean;
+  /** The grid's drop landed on a wall time its zone skips (the library moved it forward). */
+  skipsWallTime?: true;
 };
 export type CalendarEditing = {
   canCreate: boolean;
