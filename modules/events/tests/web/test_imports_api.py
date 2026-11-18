@@ -93,7 +93,8 @@ async def test_publish_needs_permission(world):
     refused = await client.post(f"{BASE}/{made['id']}/apply", json={"publish": True}, headers=MGR)
     assert (refused.status_code, refused.json()["code"]) == (403, "publish_required")
     assert (await client.get(f"{BASE}/{made['id']}", headers=MGR)).json()["status"] == "staged"
-    ok = await client.post(f"{BASE}/{made['id']}/apply", json={"publish": True}, headers=PUB)
+    mine = (await upload(client, cals["I"], headers=PUB)).json()  # the publisher's own import
+    ok = await client.post(f"{BASE}/{mine['id']}/apply", json={"publish": True}, headers=PUB)
     assert ok.status_code == 202
     assert {e.status for e in await events_of(client)} == {"published"}
 
@@ -190,9 +191,10 @@ async def test_error_envelopes(world):
     )
     assert (missing.status_code, missing.json()["code"]) == (404, "not_found")
     assert (await client.get(f"{BASE}/99999", headers=MGR)).json()["code"] == "not_found"
-    assert (await client.get(f"{BASE}/1/items?verdict=bogus", headers=MGR)).status_code == 422
-    assert (await client.get(f"{BASE}/1/items?page_size=101", headers=MGR)).status_code == 422
-    for _ in range(constants.IMPORT_ACTIVE_MAX):
+    real = (await upload(client, cals["P"], name="real.ics")).json()["id"]
+    assert (await client.get(f"{BASE}/{real}/items?verdict=bogus", headers=MGR)).status_code == 422
+    assert (await client.get(f"{BASE}/{real}/items?page_size=101", headers=MGR)).status_code == 422
+    for _ in range(constants.IMPORT_ACTIVE_MAX - 1):
         assert (await upload(client, cals["P"])).status_code == 202
     busy = await upload(client, cals["P"])
     assert (busy.status_code, busy.json()["code"]) == (409, "import_busy")
