@@ -20,6 +20,7 @@ PB = "modules/pagebuilder/pagebuilder"
 NEWS = "modules/news/news"
 AI = "modules/ai/sm_ai"
 RECORDS = "modules/records/sm_records"
+EVENTS = "modules/events/sm_events"
 
 _AS_MODULE = {"pagebuilder": "MODULE", "news": "MODULE", "sm_ai": "MODULE", "sm_records": "MODULE"}
 
@@ -35,6 +36,15 @@ FAMILIES: tuple[Family, ...] = (
             "etag_for": "A page's chrome also changes with the site layout and the nav list, "
             "so pagebuilder digests layout_updated_at and nav as well; an article has neither.",
         },
+    ),
+    Family(
+        "viewer key (events)",
+        (
+            Copy(f"{PB}/web/public_cache.py"),
+            Copy(f"{NEWS}/web/endpoints/public/_urls.py"),
+            Copy(f"{EVENTS}/web/endpoints/public/_cache.py"),
+        ),
+        shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key"),
     ),
     Family(
         "slug redirects",
