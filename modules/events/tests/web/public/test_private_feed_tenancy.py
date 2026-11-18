@@ -198,3 +198,41 @@ async def test_a_failing_dependency_answers_every_token_alike(monkeypatch, caplo
         assert any("RuntimeError" in r.getMessage() for r in server)
         for secret in (world.secret, revoked.secret):
             assert all(secret not in r.getMessage() for r in server)
+
+
+async def test_a_mounted_child_with_no_framework_answer_is_not_single(monkeypatch):
+    """The reviewer's case, over HTTP. The app's stored mode is SINGLE and the link's row is
+    tenant ``default``, but the app is mounted under a parent (Starlette's ``Mount`` sets
+    ``app_root_path``) and the framework has no answer for it, so ``scope_mode`` says MULTI for
+    the request: membership is asked. A member is served; once removed, the answer is the same
+    bytes as a forged token, never the feed the single-tenant shortcut would have served."""
+    from fastapi import FastAPI
+    from httpx import ASGITransport, AsyncClient
+    from sm_events.core.tenancy import _mode
+
+    from tests.support.tokens import install_members
+
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    async with private_http() as http:
+        world = await seed_world(http)
+        members = {"default": {"sv"}}
+        install_members(http.app, members)
+        parent = FastAPI()
+        parent.mount("/child", http.app)
+        async with AsyncClient(transport=ASGITransport(app=parent), base_url="http://test") as via:
+            path = f"/child{world.path}"
+            # A normal single-tenant answer first: the framework answers for this app.
+            assert (await via.get(path)).status_code == 200
+            monkeypatch.setattr(_mode, "_framework_mode", lambda _app: None)
+            baseline = fingerprint(await via.get(f"/child{feed_path(invented('U'))}"))
+            assert (await via.get(path)).status_code == 200  # a member
+            members["default"].discard("sv")  # the owner's membership removed
+            for method in ("get", "head"):
+                got = fingerprint(await getattr(via, method)(path))
+                base = (
+                    baseline
+                    if method == "get"
+                    else fingerprint(await via.head(f"/child{feed_path(invented('U'))}"))
+                )
+                assert got == base, method
+                assert got[0] == 404
