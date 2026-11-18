@@ -19,7 +19,6 @@ __all__ = [
     "EXTRA_TOO_LARGE_DETAIL",
     "PLUGIN_ID_PATTERN",
     "PLUGIN_LANG_PATTERN",
-    "PLUGIN_URL_SCHEMES",
     "SOURCES_IN_MAX",
     "SOURCE_CALLS_MAX",
     "SOURCE_CALL_HARD_MAX_ITEMS",
@@ -42,6 +41,7 @@ __all__ = [
     "TYPE_NOT_INSTALLED_DETAIL",
     "UNKNOWN_SOURCE_CODE",
     "UNKNOWN_SOURCE_DETAIL",
+    "WEB_URL_SCHEMES",
 ]
 
 # Discovery: a package with the ``simple_module`` entry point ships ``events_extensions.py``.
@@ -102,4 +102,4 @@ SOURCES_IN_MAX = 64
 # it is refused unread (up to ``SOURCE_CALL_MAX_ITEMS`` are kept, the earliest first).
 SOURCE_CALL_HARD_MAX_ITEMS = 5_000
 PLUGIN_LANG_PATTERN = r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
-PLUGIN_URL_SCHEMES = ("http", "https")
+WEB_URL_SCHEMES = ("http", "https")

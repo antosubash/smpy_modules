@@ -41,13 +41,13 @@ from sm_events.core.errors import (
 )
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
+from sm_events.core.text_safety import strip_unsafe
 from sm_events.feeds.importing.fence import fenced
 from sm_events.feeds.importing.mapper import Mapped, map_calendar
 from sm_events.feeds.importing.preview_diff import is_unchanged
 from sm_events.feeds.importing.scan import scan, sniff
 from sm_events.feeds.importing.verdicts import existing_uids, item_row
 from sm_events.models import Calendar, Category, EventImport
-from sm_events.web.schemas._fields import strip_unsafe
 
 __all__ = [
     "create_import",

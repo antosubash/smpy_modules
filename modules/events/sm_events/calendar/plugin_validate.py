@@ -11,7 +11,6 @@ filled in here: the source id (so it cannot claim another's), the calendar being
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
@@ -21,15 +20,14 @@ from sm_events.calendar.extension_types import SourceCalendar, SourceOccurrence
 from sm_events.calendar.occurrence import PluginOccurrence
 from sm_events.calendar.times import Span, localize, supported_instant
 from sm_events.core import constants, timezones
+from sm_events.core.text_safety import strip_unsafe
 from sm_events.core.web_urls import is_web_url
-from sm_events.web.schemas._fields import _BIDI, _INVISIBLE, _LINE_SEPARATORS
 
 __all__ = ["InvalidPluginItem", "to_occurrences"]
 
 INVALID_ITEM = "invalid_item"
 DUPLICATE_KEY = "duplicate_key"
 
-_HIDDEN = _BIDI | _LINE_SEPARATORS | _INVISIBLE
 _LANG = re.compile(constants.PLUGIN_LANG_PATTERN)
 _URL_FORBIDDEN = re.compile(r"[\x00-\x20\x7f-\x9f\\]")
 _ONE_DAY = timedelta(days=1)
@@ -42,12 +40,8 @@ class InvalidPluginItem(Exception):  # noqa: N818 - a verdict on an answer, not 
 
 
 def _title(raw: str) -> str:
-    kept = "".join(
-        " " if ch in "\n\r\t" else ch
-        for ch in raw
-        if ch in "\n\r\t" or (unicodedata.category(ch) != "Cc" and ch not in _HIDDEN)
-    )
-    text = kept.strip()
+    """One line: line breaks and tabs become spaces, other controls and direction characters go."""
+    text = strip_unsafe(re.sub(r"[\n\r\t]", " ", raw)).strip()
     if not text:
         raise InvalidPluginItem
     return text

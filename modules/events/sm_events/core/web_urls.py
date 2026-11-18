@@ -19,7 +19,7 @@ def is_web_url(value: str) -> bool:
     except ValueError:
         return False
     return (
-        parts.scheme.lower() in constants.PLUGIN_URL_SCHEMES
+        parts.scheme.lower() in constants.WEB_URL_SCHEMES
         and bool(parts.hostname)
         and not has_credentials
     )
