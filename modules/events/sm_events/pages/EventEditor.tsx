@@ -2,15 +2,20 @@ import { Head, Link } from '@inertiajs/react';
 import { PageShell } from '@simple-module-py/ui/components/PageShell';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
+import { ConflictPanel } from '../ui/components/editor/ConflictPanel';
 import { EventForm } from '../ui/components/editor/EventForm';
 import { OccurrencesPreview } from '../ui/components/editor/OccurrencesPreview';
 import { OrphanDialog } from '../ui/components/editor/OrphanDialog';
 import { RecurrenceEditor } from '../ui/components/editor/RecurrenceEditor';
+import { RevisionHistory } from '../ui/components/editor/RevisionHistory';
 import { SubEvents } from '../ui/components/editor/SubEvents';
 import { TextsTabs } from '../ui/components/editor/TextsTabs';
+import { WorkflowBar } from '../ui/components/editor/WorkflowBar';
+import { categoryName } from '../ui/components/events/EventFilters';
 import { useEvent } from '../ui/hooks/useEvent';
 import { useEventActions } from '../ui/hooks/useEventActions';
 import { usePreview } from '../ui/hooks/usePreview';
+import { diffForms } from '../ui/utils/event-diff';
 import { times } from '../ui/utils/event-form';
 import { keys, useT } from '../ui/utils/i18n';
 import type { Category } from '../ui/utils/types';
@@ -26,7 +31,7 @@ type Props = {
 const LIST = '/admin/events/list';
 
 export default function EventEditor(props: Props) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const copy = keys.events.editor;
   const { calendar, content_locales: locales } = props;
   const ev = useEvent({ eventId: props.event_id, locales, timezone: props.default_timezone });
@@ -50,10 +55,19 @@ export default function EventEditor(props: Props) {
   const hasSubs = (event?.sub_events.length ?? 0) > 0;
   const heading = t(event ? copy.title_edit : copy.title_new);
   const back = (
-    <Button asChild variant="outline">
-      <Link href={LIST}>{t(copy.back)}</Link>
-    </Button>
+    <div className="flex flex-wrap gap-2">
+      {event?.can_write && (
+        <RevisionHistory eventId={event.id} timezone={form.timezone} revision={event.revision} />
+      )}
+      <Button asChild variant="outline">
+        <Link href={LIST}>{t(copy.back)}</Link>
+      </Button>
+    </div>
   );
+  const named = (id: string) => {
+    const found = props.categories.find((c) => c.id === id);
+    return found ? categoryName(found, locales, t(keys.events.list.no_category_name)) : id;
+  };
   const body =
     ev.state === 'loading' ? (
       <p role="status">{t(keys.events.common.loading)}</p>
@@ -81,6 +95,22 @@ export default function EventEditor(props: Props) {
                   : copy.locked_published,
             )}
           </p>
+        )}
+        {actions.conflict && (
+          <ConflictPanel
+            differences={diffForms(form, ev.base, { ui: locale, category: named })}
+            busy={actions.saving}
+            onLoadTheirs={actions.loadTheirs}
+            onSaveMine={() => void actions.saveMine()}
+          />
+        )}
+        {event && (
+          <WorkflowBar
+            event={event}
+            dirty={ev.dirty}
+            busy={actions.busy}
+            run={actions.transition}
+          />
         )}
         {actions.notice && (
           <p role="alert" className="text-destructive">

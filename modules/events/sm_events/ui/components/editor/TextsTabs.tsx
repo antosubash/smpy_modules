@@ -8,17 +8,10 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import type { TextForm } from '../../utils/event-form';
 import { fieldErrorId, invalidProps } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
+import { languageName } from '../../utils/language';
 import { RichTextField } from './RichTextField';
 
 type Errors = Record<string, string>;
-
-function languageName(code: string, ui?: string): string {
-  try {
-    return new Intl.DisplayNames(ui ? [ui, 'en'] : ['en'], { type: 'language' }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
 
 function Line({
   id,

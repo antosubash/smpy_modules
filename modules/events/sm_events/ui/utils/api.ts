@@ -22,6 +22,7 @@ export const CODE = {
   overridesOrphaned: 'overrides_orphaned',
   slugTaken: 'slug_taken',
   defaultLocaleRequired: 'default_locale_required',
+  invalidLocalTime: 'invalid_local_time',
 } as const;
 
 const hasCode = (error: unknown, status: number, code: string): boolean =>
