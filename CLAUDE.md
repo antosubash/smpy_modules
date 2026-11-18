@@ -159,7 +159,15 @@ only for an active member of the bound tenant with a display name: a label that
 carries an address resolves to `null`, never a masked or raw address (that is
 the picker's, for owners and managers alone). A failing name lookup must leave
 the names `null`, never fail the list; the picker and the transfer
-eligibility check must still fail closed.
+eligibility check must still fail closed. Events are read through
+`core/access/events.py`: a draft, an event in review or a scheduled one is
+visible only to a caller with `write_events` on its calendar, and a published
+or scheduled (locked) event is changed, trashed, restored or overridden only
+with write and `events.publish`. Every event write starts with `claim_revision`
+(the compare-and-set on `expected_revision`). Recurrence is expanded only in
+`calendar/occurrences.py`, and never without an `until`. The editor's HTML is
+cleaned by both sanitisers and never inserted as markup otherwise. `make
+worker` serves the `events` queue; scheduled publishing needs beat.
 
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —

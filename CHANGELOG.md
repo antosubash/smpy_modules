@@ -16,6 +16,19 @@ name the module they affect.
   the request). Names are single line (control and direction characters are
   a 422), and a name with no slug-able characters gets the slug `calendar` or
   `category`.
+- **events: events, recurrence, occurrences and workflow** (PR 2 of the events
+  module). Events have a text in each content language (a rich-text
+  description cleaned by an allow-list), one-off, all-day and recurring
+  schedules on the event's own wall clock and timezone, overrides that skip,
+  cancel or move one occurrence, and revisions. `GET /api/events/occurrences`
+  and `sm_events.contracts.occurrences` read any range within fixed bounds
+  (366 days, 2,000 items). Events move draft, in review, published, directly or
+  on a schedule; a published or scheduled event can be changed only with
+  `events.publish`; every write carries `expected_revision` (409 `stale`). The
+  console gets an Events list and an editor with a conflict panel and the
+  revision history. **Upgrading:** run the host's new migration (a `note`
+  column on `events_revision`), and start Celery beat and a worker for the
+  `events` queue (`events.publish_due`) or scheduled events never publish.
 
 ### Security
 

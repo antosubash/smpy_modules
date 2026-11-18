@@ -401,3 +401,26 @@ list. Calendar and category names are single line (control characters, line and
 paragraph separators and direction controls are a 422); descriptions keep line
 breaks and tabs. A name with no slug-able characters falls back to the slug
 `calendar` or `category`, with `-2`, `-3` ... on a clash.
+
+## Amendments (PR 2)
+
+The approved PR 2 rulings refine the design above: the API takes the event's
+local wall clock and a timezone, never UTC (ruling 1). The RRULE allow-list is
+bounded as in ruling 5 (daily to yearly, interval 1 to 99, count 1 to 730,
+until within 100 years, no sub-daily or week-number parts), and the start must
+be the first occurrence of its rule (6). Sub-events and recurrence exclude each
+other, one level deep, in the same calendar (9). The occurrences read is
+ordered by (start, end, source, key), cut at 2,000 and truncated by the series
+cap (13). A published or scheduled event is locked and changed only with write
+and `events.publish` (16). Every write, the beat's included, records a revision
+with an optional note, the one new column (`events_revision.note`), and the
+newest 100 are kept (18). An event always has a text in the default locale (20).
+The description editor is a small contentEditable field with no new
+dependency, and a read-only description is shown in a sandboxed frame (29).
+
+Frontend choices of the screens: the editor reads the event from the API, not
+from props, and works on the event's own clock (it shows the UTC offset of the
+zone being edited); overrides and workflow actions apply to the saved event and
+wait for unsaved edits; a save over a newer revision shows what differs and
+resends only on an explicit click; a sub-event is created with
+`/admin/events/edit/new?calendar=<id>&parent=<id>`.
