@@ -19,21 +19,61 @@ const props = {
 };
 const TITLE = 'Leave without saving?';
 
+/** The browser as Chrome really behaves, which happy-dom does not model:
+ *
+ *  - Inertia's `popstate` listener is added to `window` when the app boots,
+ *    before any page mounts, and Chrome runs a window's listeners in the order
+ *    they were added, capture or not (happy-dom runs capture ones first, which
+ *    is why a capture listener that stopped the event looked enough here and
+ *    was not in Chrome). Once Inertia sees the event it restores the other
+ *    page, so a guard that waits for `popstate` is always too late.
+ *  - A step through the history first fires the Navigation API's `navigate`,
+ *    cancellable only while the user has interacted since the last cancel. A
+ *    cancelled step moves nothing and fires no `popstate`.
+ *  - happy-dom has no `navigation` at all; this fake stands in for it. */
+let inertia: ReturnType<typeof vi.fn<(e: PopStateEvent) => void>>;
+let nav: (EventTarget & { traverseTo: ReturnType<typeof vi.fn> }) | null;
 let push: ReturnType<typeof vi.spyOn>;
-let go: ReturnType<typeof vi.spyOn>;
 let back: ReturnType<typeof vi.spyOn>;
-/** Stands in for Inertia's own popstate handler: registered after the guard's. */
-let inertia: ReturnType<typeof vi.fn>;
+
+function fakeNavigation() {
+  const target = new EventTarget() as EventTarget & { traverseTo: ReturnType<typeof vi.fn> };
+  target.traverseTo = vi.fn((key: string) => {
+    // A step the page asked for is script-initiated, so always cancellable.
+    const went = step({ key, cancelable: true });
+    return { finished: went ? Promise.resolve() : Promise.reject(new Error('AbortError')) };
+  });
+  return target;
+}
+
+/** One step back as Chrome delivers it; answers whether the history moved. */
+function step({ key = 'list', cancelable = true, sameDocument = true } = {}): boolean {
+  if (nav) {
+    const e = Object.assign(new Event('navigate', { cancelable }), {
+      navigationType: 'traverse',
+      destination: { key, sameDocument },
+    });
+    nav.dispatchEvent(e);
+    if (e.defaultPrevented) return false;
+  }
+  if (!sameDocument) return true;
+  const pop = new PopStateEvent('popstate', { state: { page: { url: '/admin/events/list' } } });
+  inertia(pop); // first, as registered at boot
+  window.dispatchEvent(pop);
+  return true;
+}
+const pressBack = (options?: Parameters<typeof step>[0]) => act(async () => void step(options));
 
 beforeEach(() => {
+  inertia = vi.fn<(e: PopStateEvent) => void>();
+  nav = fakeNavigation();
+  vi.stubGlobal('navigation', nav);
   push = vi.spyOn(window.history, 'pushState');
-  go = vi.spyOn(window.history, 'go').mockImplementation(() => {});
   back = vi.spyOn(window.history, 'back').mockImplementation(() => {});
-  inertia = vi.fn();
+  vi.spyOn(window.history, 'go').mockImplementation(() => {});
 });
 afterEach(() => {
   vi.mocked(router.visit).mockClear();
-  window.removeEventListener('popstate', inertia as EventListener);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   setCsrfToken(undefined);
@@ -47,11 +87,8 @@ async function open() {
   });
   const view = await mount(<EventEditor {...props} />);
   await flush();
-  window.addEventListener('popstate', inertia as EventListener);
   return view;
 }
-/** The browser's Back button: the event is delivered while the form is mounted. */
-const pressBack = () => act(async () => void window.dispatchEvent(new PopStateEvent('popstate')));
 /** The dialog is portaled out of the page, so the view does not see it. */
 const dialogButton = (text: string) =>
   [...document.querySelectorAll('button')].find((b) => b.textContent === text);
@@ -66,24 +103,23 @@ const submit = async () => {
 };
 
 describe('the browser Back button', () => {
-  it('is not intercepted while the form is clean', async () => {
+  it('is not held while the form is clean', async () => {
     const view = await open();
     await pressBack();
     expect(inertia).toHaveBeenCalledTimes(1);
     expect(document.body.textContent).not.toContain(TITLE);
-    expect(push).not.toHaveBeenCalled();
     await view.unmount();
   });
 
-  it('asks before leaving, and never reaches Inertia while it asks', async () => {
+  it('is held before the history moves, so Inertia never restores the other page', async () => {
     const view = await open();
     await dirtyForm();
-    expect(push).toHaveBeenCalledTimes(1); // the sentinel entry
     await pressBack();
     expect(inertia).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain(TITLE);
-    expect(push).toHaveBeenCalledTimes(2); // put back on top, so staying stays
-    expect(go).not.toHaveBeenCalled();
+    expect(field('text-en-title').value).toBe('Changed');
+    // No entry of its own: the history is the user's, at every point.
+    expect(push).not.toHaveBeenCalled();
     await view.unmount();
   });
 
@@ -94,66 +130,77 @@ describe('the browser Back button', () => {
     await click(dialogButton('Stay and keep editing'));
     expect(document.body.textContent).not.toContain(TITLE);
     expect(field('text-en-title').value).toBe('Changed');
-    expect(go).not.toHaveBeenCalled();
     await pressBack();
     expect(document.body.textContent).toContain(TITLE);
     expect(inertia).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
     await view.unmount();
   });
 
-  it('leaves on Leave by stepping past the sentinel, without asking twice', async () => {
+  it('takes the held step on Leave, without asking twice', async () => {
     const view = await open();
     await dirtyForm();
-    await pressBack();
-    await click(dialogButton('Leave and discard changes'));
-    expect(go).toHaveBeenCalledWith(-2);
-    // The step it takes now is Inertia's to handle, not the guard's.
-    await pressBack();
+    await pressBack({ key: 'list-entry' });
+    await act(async () => void dialogButton('Leave and discard changes')?.click());
+    await flush();
+    expect(nav?.traverseTo).toHaveBeenCalledWith('list-entry');
     expect(inertia).toHaveBeenCalledTimes(1);
     expect(document.body.textContent).not.toContain(TITLE);
-    await view.unmount();
-  });
-
-  it('removes the sentinel once saved, and the swallowed step never reaches Inertia', async () => {
-    const view = await open();
-    await dirtyForm();
-    await submit();
-    expect(back).toHaveBeenCalledTimes(1);
-    await pressBack(); // the popstate of that removal
-    expect(inertia).not.toHaveBeenCalled();
-    expect(document.body.textContent).not.toContain(TITLE);
-    await pressBack(); // a real Back afterwards is clean
-    expect(inertia).toHaveBeenCalledTimes(1);
-    await view.unmount();
-  });
-
-  it('leaves no entry behind when the page itself closes', async () => {
-    const view = await open();
-    await dirtyForm();
-    await view.unmount();
-    expect(back).not.toHaveBeenCalled();
-  });
-
-  it('does not visit the fallback when the step back happens (reached by an in-app visit)', async () => {
-    const view = await open();
-    await dirtyForm();
-    await pressBack();
-    await click(dialogButton('Leave and discard changes'));
-    await pressBack(); // the browser's step, delivered to the guard and to Inertia
-    await flush(350);
-    expect(inertia).toHaveBeenCalledTimes(1);
     expect(router.visit).not.toHaveBeenCalled();
     await view.unmount();
   });
 
-  it('visits the list when there is nothing to step back to (first page of the tab)', async () => {
+  it('visits the list when the held step cannot be taken any more', async () => {
     const view = await open();
     await dirtyForm();
     await pressBack();
+    nav?.traverseTo.mockReturnValueOnce({ finished: Promise.reject(new Error('gone')) });
     await click(dialogButton('Leave and discard changes'));
-    expect(go).toHaveBeenCalledWith(-2); // and no popstate follows
-    await flush(350);
+    await flush();
     expect(router.visit).toHaveBeenCalledWith('/admin/events/list');
+    await view.unmount();
+  });
+
+  it('leaves at once after a save: nothing to clean up, nothing to swallow', async () => {
+    const view = await open();
+    await dirtyForm();
+    await submit();
+    expect(back).not.toHaveBeenCalled();
+    await pressBack();
+    expect(inertia).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain(TITLE);
+    await view.unmount();
+  });
+
+  it('lets a step through that the browser will not let it cancel, rather than trap the page', async () => {
+    const view = await open();
+    await dirtyForm();
+    await pressBack({ cancelable: false });
+    expect(inertia).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain(TITLE);
+    await view.unmount();
+  });
+
+  it('leaves a step to another document to beforeunload', async () => {
+    const view = await open();
+    await dirtyForm();
+    await pressBack({ sameDocument: false });
+    expect(document.body.textContent).not.toContain(TITLE);
+    const unload = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(unload);
+    expect(unload.defaultPrevented).toBe(true);
+    await view.unmount();
+  });
+
+  it('adds no history entry and holds nothing without the Navigation API', async () => {
+    nav = null;
+    vi.stubGlobal('navigation', undefined);
+    const view = await open();
+    await dirtyForm();
+    await pressBack();
+    expect(push).not.toHaveBeenCalled();
+    expect(inertia).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain(TITLE);
     await view.unmount();
   });
 });

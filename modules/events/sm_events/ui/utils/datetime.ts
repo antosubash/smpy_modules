@@ -71,6 +71,20 @@ export function utcOffsetAt(iso: string, timezone: string): string | null {
   }
 }
 
+/** Whether the server will take `timezone` as typed: a zone the browser knows,
+ *  spelled as it spells it (an alias such as "US/Eastern" counts; "europe/berlin"
+ *  and the half-typed "Europe/Ber" do not). */
+export function knownZone(timezone: string): boolean {
+  if (timezone === 'UTC') return true;
+  try {
+    const resolved = new Intl.DateTimeFormat('en', { timeZone: timezone }).resolvedOptions()
+      .timeZone;
+    return resolved === timezone || resolved.toLowerCase() !== timezone.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 export const browserZone = (): string => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;

@@ -59,7 +59,7 @@ async function conflict(patch: () => unknown = () => refusal(409, 'stale')) {
 const patches = (calls: Call[]) => calls.filter((c) => c.method === 'PATCH');
 
 describe('stale save', () => {
-  it('409 stale shows panel with differing fields', async () => {
+  it('409 stale shows the panel with the fields both sides set differently', async () => {
     const { view } = await conflict();
     const panel = view.find('section[aria-label="Someone else saved this event first"]');
     expect(panel).not.toBeNull();
@@ -67,9 +67,11 @@ describe('stale save', () => {
       [...r.querySelectorAll('td')].map((c) => c.textContent),
     );
     expect(rows).toContainEqual(['Title (English)', 'Theirs', 'Mine']);
-    expect(rows).toContainEqual(['Venue', 'Their hall', '(empty)']);
+    // Only they changed the venue: it is theirs now, so not a difference.
+    expect(rows.some((r) => r[0] === 'Venue')).toBe(false);
     expect(panel?.querySelector('[role="alert"]')?.textContent).toContain('Someone else saved');
     expect(field('text-en-title').value).toBe('Mine'); // the unsaved edit is kept
+    expect(field('event-venue-name').value).toBe('Their hall'); // and their change shown
     await view.unmount();
   });
 
@@ -90,7 +92,7 @@ describe('stale save', () => {
     await view.unmount();
   });
 
-  it('save mine resends with the new revision, only on the click', async () => {
+  it('save mine sends only my changes, with the new revision, only on the click', async () => {
     let n = 0;
     const { calls, view } = await conflict(() =>
       n++ === 0 ? refusal(409, 'stale') : eventDetail({ revision: 6 }),
@@ -99,16 +101,55 @@ describe('stale save', () => {
     await flush();
     type Sent = {
       expected_revision: number;
-      texts: { en: { title: string } };
+      texts: Record<string, { title: string; description: string } | null>;
       venue_name?: unknown;
+      times?: unknown;
     };
     const sent = patches(calls);
     expect(sent).toHaveLength(2);
     const second = sent[1]?.body as Sent;
     expect(second.expected_revision).toBe(5);
-    expect(second.texts.en.title).toBe('Mine');
-    expect(second.venue_name).toBeNull(); // mine over theirs: the form wins
+    expect(Object.keys(second.texts)).toEqual(['en']);
+    expect(second.texts.en?.title).toBe('Mine');
+    // Fields I never touched keep their values: venue and description are theirs.
+    expect('venue_name' in second).toBe(false);
+    expect('times' in second).toBe(false);
+    expect(second.texts.en?.description).toBe('');
     expect(view.find('section[aria-label="Someone else saved this event first"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('save mine keeps my value where we both changed the same field', async () => {
+    let n = 0;
+    const { view } = await conflict(() =>
+      n++ === 0 ? refusal(409, 'stale') : eventDetail({ revision: 6 }),
+    );
+    // Both set the title (theirs "Theirs", mine "Mine"): mine is what is sent.
+    expect(field('text-en-title').value).toBe('Mine');
+    await click(view.button('Save mine over theirs'));
+    await flush();
+    expect(view.find('section[aria-label="Someone else saved this event first"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('answers a conflict that leaves none of my edits by loading theirs, with no panel', async () => {
+    let loads = 0;
+    stubFetch({
+      [`GET ${API}/e1`]: () => (loads++ === 0 ? eventDetail({ revision: 4 }) : theirs()),
+      [`PATCH ${API}/e1`]: () => refusal(409, 'stale'),
+    });
+    const view = await mount(<EventEditor {...props} />);
+    await flush();
+    await setValue(field('text-en-title'), 'Theirs'); // the same as they saved
+    await act(async () => {
+      document
+        .querySelector('form')
+        ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await flush();
+    expect(view.find('section[aria-label="Someone else saved this event first"]')).toBeNull();
+    expect(field('event-venue-name').value).toBe('Their hall');
+    expect(view.host.textContent).toContain('Their version is loaded now');
     await view.unmount();
   });
 

@@ -51,17 +51,19 @@ export function useEvent({
     },
     [locales],
   );
-  /** Their version becomes the base the form is saved against; the form stays.
-   *  Given the form the user started from, the form becomes their version with
-   *  only the user's own edits on top, and the answer is whether any remain. */
+  /** Their version becomes the base the form is saved against, and the form
+   *  becomes their version with only the user's own edits on top: what differs
+   *  between `started` (the version the user began from, by default the current
+   *  base) and the form. A field the user left alone takes their value, so a
+   *  later save sends only what the user changed. The answer is whether any
+   *  edit remains. Every conflict path goes through here. */
   const rebase = useCallback(
-    (theirs: EventDetail, started?: FormState) => {
+    (theirs: EventDetail, started: FormState = latest.current.base) => {
       const loaded = toForm(theirs, locales);
-      setEvent(theirs);
-      setBase(loaded);
-      if (!started) return true;
       const merged = mergeOnto(started, latest.current.form, loaded);
       latest.current = { form: merged, base: loaded };
+      setEvent(theirs);
+      setBase(loaded);
       setForm(merged);
       return JSON.stringify(merged) !== JSON.stringify(loaded);
     },

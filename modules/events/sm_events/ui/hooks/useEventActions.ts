@@ -45,9 +45,8 @@ export function useEventActions(
     parentId: string | null;
     defaultLocale: string;
     incomplete?: boolean;
-    /** Called before the page moves on after a create, so the unsaved-changes guard stays quiet;
-     *  answers whether the visit replaces the guard's history entry. */
-    allowLeave?: () => boolean;
+    /** Called before the page moves on after a create, so the unsaved-changes guard stays quiet. */
+    allowLeave?: () => void;
   },
 ) {
   const locales = useMemo(() => Object.keys(ev.form.texts), [ev.form.texts]);
@@ -83,12 +82,14 @@ export function useEventActions(
     errors.fail(e);
   }
 
-  /** Someone else saved first: load their version as the base, keep the form. */
+  /** Someone else saved first: their version becomes the base, with the
+   *  user's own edits (since the version they began from) laid on top. */
   async function openConflict(request: ScopedRequest) {
+    const started = ev.latest.current.base;
     const theirs = await ev.fetchEvent(request);
     if (!request.alive()) return;
-    ev.rebase(theirs);
-    setConflict(true);
+    if (ev.rebase(theirs, started)) setConflict(true);
+    else setNotice(t(keys.events.errors.stale_reloaded));
   }
 
   async function writeExisting(event: EventDetail, drop: boolean, request: ScopedRequest) {
@@ -134,9 +135,9 @@ export function useEventActions(
         };
         const created = await createEvent(body);
         if (request.alive()) {
-          const url = `/admin/events/edit/${created.id}`;
-          if (allowLeave?.()) router.visit(url, { replace: true });
-          else router.visit(url);
+          allowLeave?.();
+          // The saved event takes the blank form's place, so Back goes where the user came from.
+          router.visit(`/admin/events/edit/${created.id}`, { replace: true });
         }
       }
     } catch (e) {
