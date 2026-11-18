@@ -23,68 +23,31 @@ a draft parent. The rules these pin are the module's Review Focus:
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 import pytest
 from sm_events.web.endpoints.public import _urls
 
-from tests.support.access import principal  # noqa: F401 - re-exported for later batches
 from tests.support.app import as_user
 from tests.support.calendars import PublicFixture
 from tests.support.public import INERTIA, seed_public, tenant_header
-
-HIDDEN = (
-    "draft",
-    "in_review",
-    "scheduled",
-    "internal",
-    "private",
-    "trashed",
-    "calendar_trashed",
+from tests.web.public.leaks import (
+    HIDDEN,
+    HIDDEN_CALENDARS,
+    LOCALES,
+    assert_absent,
+    surfaces,
 )
-"""The names of :attr:`PublicFixture.hidden` the leak tests parametrize over."""
-
-LOCALES = ("en", "de")
-HIDDEN_CALENDARS = ("internal", "private", "trashed")
-
-Url = Callable[[PublicFixture, str, str | None], str]
 
 
-@dataclass(frozen=True)
-class Surface:
-    """One public address family. ``url(fx, locale, hidden)``: for ``kind="page"``, the
-    address of the hidden event named ``hidden`` (a key of ``fx.hidden``); for
-    ``kind="listing"``, the listing's address (``hidden`` is ``None``)."""
+@pytest.fixture(autouse=True)
+def _clock(monkeypatch):
+    """The fixture's events are in 2026; the feeds' window is around "now"."""
+    from datetime import UTC, datetime
 
-    name: str
-    kind: Literal["page", "listing"]
-    url: Url
+    from sm_events.web.endpoints.public import _feeds
 
-
-def _event_page(fx: PublicFixture, locale: str, hidden: str | None) -> str:
-    assert hidden is not None
-    return _urls.event_path(fx.slug(fx.hidden[hidden], locale), locale)
-
-
-def surfaces(fx: PublicFixture, locale: str) -> list[Surface]:
-    """Every public surface. Later tasks add theirs here: the event ``.ics``, the index, a
-    calendar's page and feed, the occurrences API, the sitemap, the 404's suggestions."""
-    return [Surface("event page", "page", _event_page)]
-
-
-def assert_absent(body: str, fx: PublicFixture, names: tuple[str, ...] = ()) -> None:
-    """The hidden events' title, slug and UID appear nowhere in ``body``."""
-    for name, event in fx.hidden.items():
-        if names and name not in names:
-            continue
-        for locale in LOCALES:
-            slug = fx.slugs.get(f"{event.id}:{locale}")
-            assert slug is None or slug not in body, (name, locale, "slug")
-        assert event.uid not in body, (name, "uid")
-        assert fx.slugs[f"{event.id}:en"].title() not in body, (name, "title")
+    monkeypatch.setattr(_feeds, "utcnow", lambda: datetime(2026, 4, 1, tzinfo=UTC))
 
 
 @pytest.fixture
@@ -131,12 +94,14 @@ async def test_hidden_relatives_are_hidden_too(public_locales_client, fx, hidden
 async def test_hidden_calendar_404(public_locales_client, fx, hidden):
     calendar = {"internal": fx.internal, "private": fx.private, "trashed": fx.gone}[hidden]
     for locale in LOCALES:
-        got = await public_locales_client.get(
-            _urls.calendar_path(calendar.slug, locale), headers=INERTIA
-        )
-        assert got.status_code == 404, (hidden, locale)
-        assert got.headers["cache-control"] == "no-store"
-        assert "etag" not in got.headers
+        for url in (
+            _urls.calendar_path(calendar.slug, locale),
+            _urls.calendar_ics_path(calendar.slug, locale),
+        ):
+            got = await public_locales_client.get(url, headers=INERTIA)
+            assert got.status_code == 404, (hidden, url)
+            assert got.headers["cache-control"] == "no-store"
+            assert "etag" not in got.headers
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -162,11 +127,14 @@ async def test_not_found_indistinguishable(public_locales_client, fx, hidden, lo
 async def test_conditional_get_needs_visibility(public_locales_client, fx):
     """A guessed validator on a hidden address is a 404, never a 304."""
     for tag in ('W/"abc"', "*"):
-        for hidden in HIDDEN:
-            got = await public_locales_client.get(
-                _event_page(fx, "en", hidden), headers=INERTIA | {"If-None-Match": tag}
-            )
-            assert got.status_code == 404, (hidden, tag)
+        for surface in surfaces(fx, "en"):
+            if surface.kind != "page":
+                continue
+            for hidden in HIDDEN:
+                got = await public_locales_client.get(
+                    surface.url(fx, "en", hidden), headers=INERTIA | {"If-None-Match": tag}
+                )
+                assert got.status_code == 404, (surface.name, hidden, tag)
 
 
 async def test_signed_in_manager_sees_public_only(public_locales_client, fx):
@@ -181,7 +149,8 @@ async def test_signed_in_manager_sees_public_only(public_locales_client, fx):
             anon = await public_locales_client.get(url, headers=INERTIA)
             signed = await public_locales_client.get(url, headers=INERTIA | manager)
             assert signed.status_code == anon.status_code == 404, (surface.name, hidden)
-            assert signed.json()["props"].keys() == anon.json()["props"].keys()
+            a, b = anon.json(), signed.json()  # an Inertia page's props, or the JSON envelope
+            assert b.get("props", b).keys() == a.get("props", a).keys()
             assert signed.headers["cache-control"] == "no-store"
 
 
@@ -230,11 +199,13 @@ async def test_other_tenant_absent_everywhere(public_multi_client):
                     )
                     assert got.status_code == 404, (surface.name, slug, "public event of b")
             else:
-                got = await public_multi_client.get(surface.url(theirs, locale, None), headers=as_a)
-                assert got.status_code == 200
+                # a's own listing, which must hold none of b's; b's calendar's own address is a 404
+                got = await public_multi_client.get(surface.url(mine, locale, None), headers=as_a)
+                assert got.status_code == 200, surface.name
                 for event in theirs.public_events:
-                    assert theirs.slugs[f"{event.id}:en"] not in got.text
-                    assert event.uid not in got.text
+                    assert theirs.slugs[f"{event.id}:en"] not in got.text, surface.name
+                    assert event.uid not in got.text, surface.name
+                assert_absent(got.text, theirs)
         for surface in surfaces(mine, locale):
             nobody = await public_multi_client.get(
                 surface.url(mine, locale, "draft")

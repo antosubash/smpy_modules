@@ -77,14 +77,12 @@ async def test_fixed_paths_before_catch_all(public_locales_client, path, expecte
     assert handler(public_locales_client.app, path) == expected
 
 
-async def test_every_stub_answers_404_for_now(public_client):
+async def test_unbuilt_routes_answer_404_for_now(public_client):
+    """The pages, sitemap and API are stubs until their tasks land; the feeds are real."""
     for path in (
         "/events/",
         "/events/c/x",
         "/events/x",
-        "/events/x.ics",
-        "/events/calendar.ics",
-        "/events/c/x.ics",
         "/events/sitemap.xml",
         "/events/api/occurrences",
     ):
@@ -96,8 +94,9 @@ async def test_every_stub_answers_404_for_now(public_client):
 
 
 async def test_machine_routes_answer_the_json_envelope(public_client):
-    got = await public_client.get("/events/calendar.ics")
-    assert got.json() == {"detail": constants.NOT_FOUND_DETAIL, "code": "not_found"}
+    for path in ("/events/nope.ics", "/events/c/nope.ics"):
+        got = await public_client.get(path)
+        assert got.json() == {"detail": constants.NOT_FOUND_DETAIL, "code": "not_found"}
 
 
 async def test_custom_prefix_from_settings():
@@ -237,7 +236,7 @@ async def test_the_limiter_reads_the_live_registry():
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as http:
         for _ in range(60):
-            assert (await http.get("/events/calendar.ics")).status_code == 404
+            assert (await http.get("/events/calendar.ics")).status_code == 200
         limited = await http.get("/events/calendar.ics")
         assert limited.status_code == 429 and "retry-after" in limited.headers
         # Another budget: pages and the API are separate buckets.

@@ -239,6 +239,8 @@ FEED_MAX_EVENTS = 1000
 FEED_MAX_COMPONENTS = 5000
 FEED_DAYS_BACK = 30
 FEED_DAYS_AHEAD = 366
+FEED_YEARS_AHEAD = 2
+"""Whole years of ``VTIMEZONE`` rules written after the current one."""
 SITEMAP_MAX_URLS = 10_000
 FEED_RATE = "60/minute"
 PUBLIC_API_RATE = "120/minute"
