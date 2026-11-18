@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import icalendar
+import pytest
 from sm_events.calendar.times import localize
 from sm_events.feeds.ics_event import FeedEvent, components, tzids
 
@@ -170,8 +171,8 @@ def test_description_lines():
 def test_special_characters_are_escaped_by_the_library():
     item = make(text={"title": "A, B; C\nD \\ E", "slug": "x"})
     raw = components(item)[0].to_ical().decode()
-    assert "SUMMARY:A\\, B\\; C\\nD \\\\ E" in raw.replace("\r\n ", "")
-    assert str(parse(item)[0]["SUMMARY"]) == "A, B; C\nD \\ E"
+    assert "SUMMARY:A\\, B\\; C D \\\\ E" in raw.replace("\r\n ", "")
+    assert str(parse(item)[0]["SUMMARY"]) == "A, B; C D \\ E"  # a title is one line
 
 
 def test_related_to_only_with_parent_uid():
@@ -198,3 +199,69 @@ def test_dtstamp_falls_back_to_created_at():
     item.event.updated_at = None
     (ev,) = parse(item)
     assert ev["DTSTAMP"].dt == datetime(2026, 4, 1, tzinfo=UTC)
+
+
+def _all_day_series(start: str, end: str, rule: str) -> FeedEvent:
+    return make(rule=rule, start=start, end=end, all_day=True)
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "cancelled", "expected_end"),
+    [
+        ("2026-10-18", "2026-10-18", (2026, 10, 25), date(2026, 10, 26)),  # autumn Sunday, 25 h
+        ("2026-03-22", "2026-03-22", (2026, 3, 29), date(2026, 3, 30)),  # spring Sunday, 23 h
+        ("2026-03-22", "2026-03-22", (2026, 4, 5), date(2026, 4, 6)),  # the week after
+        ("2026-10-17", "2026-10-18", (2026, 10, 24), date(2026, 10, 26)),  # two days across it
+        ("2026-03-21", "2026-03-22", (2026, 3, 28), date(2026, 3, 30)),
+        ("2026-10-11", "2026-10-13", (2026, 10, 25), date(2026, 10, 28)),  # three days
+    ],
+)
+def test_cancelled_all_day_counts_days_not_hours(start, end, cancelled, expected_end):
+    item = _all_day_series(start, end, "FREQ=WEEKLY;COUNT=12")
+    day = datetime(*cancelled)
+    row = override(item.event, "cancelled", localize(day, VIENNA))
+    item = FeedEvent(item.event, item.text, (row,), item.url, None, None)
+    _, cancelled_ev = parse(item)
+    assert cancelled_ev["DTSTART"].dt == date(*cancelled)
+    assert cancelled_ev["DTEND"].dt == expected_end
+    assert cancelled_ev["DTEND"].dt > cancelled_ev["DTSTART"].dt
+    raw = components(item)[1].to_ical()
+    assert f"DTEND;VALUE=DATE:{expected_end:%Y%m%d}".encode() in raw
+
+
+def test_moved_all_day_over_a_dst_sunday():
+    item = _all_day_series("2026-10-18", "2026-10-18", "FREQ=WEEKLY;COUNT=6")
+    row = override(
+        item.event,
+        "moved",
+        localize(datetime(2026, 10, 25), VIENNA),
+        starts_at=localize(datetime(2026, 10, 26), VIENNA),
+        ends_at=localize(datetime(2026, 10, 27), VIENNA),
+    )
+    item = FeedEvent(item.event, item.text, (row,), item.url, None, None)
+    _, moved = parse(item)
+    assert moved["RECURRENCE-ID"].dt == date(2026, 10, 25)
+    assert (moved["DTSTART"].dt, moved["DTEND"].dt) == (date(2026, 10, 26), date(2026, 10, 27))
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [("2026-03-29", "2026-03-29"), ("2026-10-25", "2026-10-25"), ("2026-03-28", "2026-03-30")],
+)
+def test_all_day_masters_on_dst_days(start, end):
+    item = _all_day_series(start, end, "FREQ=YEARLY;COUNT=2")
+    (master,) = parse(item)
+    first, last = date.fromisoformat(start), date.fromisoformat(end)
+    assert master["DTSTART"].dt == first
+    assert master["DTEND"].dt == last + timedelta(days=1)
+
+
+def test_timed_cancelled_keeps_the_exact_duration_across_dst():
+    item = make(rule="FREQ=WEEKLY;COUNT=12", start="2026-03-22T01:30", end="2026-03-22T04:30")
+    row = override(item.event, "cancelled", localize(datetime(2026, 3, 29, 1, 30), VIENNA))
+    item = FeedEvent(item.event, item.text, (row,), item.url, None, None)
+    _, cancelled = parse(item)
+    # the master lasts 3 h; on 29 March the clock jumps over 02:00, so 01:30 + 3 h is 05:30 local
+    elapsed = cancelled["DTEND"].dt.astimezone(UTC) - cancelled["DTSTART"].dt.astimezone(UTC)
+    assert elapsed == timedelta(hours=3)
+    assert cancelled["DTEND"].dt.replace(tzinfo=None) == datetime(2026, 3, 29, 5, 30)

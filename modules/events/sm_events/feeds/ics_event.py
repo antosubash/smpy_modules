@@ -27,6 +27,7 @@ import icalendar
 
 from sm_events.calendar.times import Span, all_day_dates
 from sm_events.feeds.plaintext import to_text
+from sm_events.feeds.sanitize import multi_line, single_line
 from sm_events.models import Event, EventText, OccurrenceOverride, OverrideKind
 
 __all__ = ["FeedEvent", "components", "tzids"]
@@ -67,40 +68,40 @@ def _stamp(event: Event) -> datetime:
 
 
 def _description(item: FeedEvent) -> str | None:
-    lines = [to_text(item.text.description)]
+    lines = [multi_line(to_text(item.text.description))]
     if item.event.organiser:
-        lines.append(f"Organiser: {item.event.organiser}")
+        lines.append(f"Organiser: {single_line(item.event.organiser)}")
     if item.event.online_url:
-        lines.append(item.event.online_url)
+        lines.append(single_line(item.event.online_url))
     joined = "\n".join(line for line in lines if line)
     return joined or None
 
 
 def _location(event: Event) -> str | None:
-    place = ", ".join(part for part in (event.venue_name, event.address) if part)
-    return place or event.online_url
+    place = ", ".join(single_line(part) for part in (event.venue_name, event.address) if part)
+    return single_line(place or event.online_url) or None
 
 
 def _common(item: FeedEvent) -> icalendar.Event:
     event, text = item.event, item.text
     out = icalendar.Event()
-    out.add("uid", event.uid)
+    out.add("uid", single_line(event.uid))
     out.add("sequence", event.revision)
     out.add("dtstamp", _stamp(event))
     out.add("last-modified", _stamp(event))
     out.add("created", event.created_at.astimezone(UTC))
-    out.add("summary", text.title)
+    out.add("summary", single_line(text.title))
     if description := _description(item):
         out.add("description", description)
     if location := _location(event):
         out.add("location", location)
     if event.latitude is not None and event.longitude is not None:
         out.add("geo", (event.latitude, event.longitude))
-    out.add("url", item.url)
+    out.add("url", single_line(item.url))
     if item.category:
-        out.add("categories", [item.category])
+        out.add("categories", [single_line(item.category)])
     if item.parent_uid:
-        out.add("related-to", item.parent_uid, parameters={"RELTYPE": "PARENT"})
+        out.add("related-to", single_line(item.parent_uid), parameters={"RELTYPE": "PARENT"})
     return out
 
 
@@ -113,6 +114,20 @@ def _span(item: FeedEvent, out: icalendar.Event, span: Span) -> None:
     else:
         out.add("dtstart", _when(event, span.starts_at))
         out.add("dtend", _when(event, span.ends_at))
+
+
+def _original_span(item: FeedEvent, out: icalendar.Event, original: datetime) -> None:
+    """The span of the instance that starts at ``original``, as the occurrences read has it: a
+    timed one lasts the master's exact duration, an all-day one the master's number of *days*
+    (never its UTC length, which differs by an hour across a DST change)."""
+    event = item.event
+    if event.all_day:
+        first, after = all_day_dates(Span(event.starts_at, event.ends_at), event.timezone)
+        day = _day(event, original)
+        out.add("dtstart", day)
+        out.add("dtend", day + (after - first))
+    else:
+        _span(item, out, Span(original, original + (event.ends_at - event.starts_at)))
 
 
 def _recurrence_id(event: Event, original: datetime) -> date | datetime:
@@ -145,8 +160,7 @@ def _override(item: FeedEvent, row: OccurrenceOverride) -> icalendar.Event:
         out.add("status", "CONFIRMED")
     else:
         # A cancelled instance keeps its original time and says so.
-        length = event.ends_at - event.starts_at
-        _span(item, out, Span(row.original_start, row.original_start + length))
+        _original_span(item, out, row.original_start)
         out.add("status", "CANCELLED")
     return out
 
