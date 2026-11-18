@@ -48,7 +48,13 @@ export type CalendarState = {
 };
 
 /** Instants for a timed slot; dates with an exclusive end for an all-day one. */
-export type CreateSlot = { allDay: boolean; start: string; end: string };
+export type CreateSlot = {
+  allDay: boolean;
+  start: string;
+  end: string;
+  /** The grid's slot was on a wall time the zone skips, and the library moved it forward. */
+  skipped?: true;
+};
 export type OccurrenceChange = {
   occurrence: Occurrence;
   /** `reschedule` (the Move dialog) names both ends; a drag moves or resizes one. */
@@ -115,6 +121,8 @@ export type CalendarProps = {
   /** Absent: read-only (the public site). */
   editing?: CalendarEditing;
   slots?: CalendarSlots;
+  /** Shown beside "no calendars yet", for someone who can create one. */
+  noCalendarsAction?: ReactNode;
   /** Bump to invalidate the cache and refetch. */
   refreshToken?: number;
 };

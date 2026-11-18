@@ -159,6 +159,8 @@ export function Calendar(props: CalendarProps) {
             empty={items.length === 0}
             truncated={!nothingShown && data.truncated}
             noCalendars={nothingShown}
+            noneExist={calendars.length === 0}
+            action={props.noCalendarsAction}
             onRetry={data.retry}
           />
           <Suspense fallback={<Skeleton className="h-[72vh] w-full" />}>

@@ -38,7 +38,8 @@
 }
 .sm-ev-calendar .sm-ev-pending {
   opacity: 0.55;
-  pointer-events: none;
+  /* Still the target of the pointer: a press on a busy chip must not start a selection. */
+  cursor: progress;
 }
 .sm-ev-calendar .sm-ev-readonly-hint {
   cursor: default;

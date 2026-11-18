@@ -1,5 +1,6 @@
 /** The console's `Calendar`: the occurrence fetcher over the events API, the content language
  *  titles are asked in, the filter options and the write layer (drag, resize, dialogs). */
+import { Link } from '@inertiajs/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { listOccurrences } from '../../utils/api-events';
 import { keys, useT } from '../../utils/i18n';
@@ -24,6 +25,8 @@ type Props = {
   defaultTimezone: string;
   contentLocales: string[];
   editorUrl: string;
+  /** The Calendars screen, for someone who may create one; absent otherwise. */
+  calendarsUrl?: string;
   initialState?: Partial<CalendarState>;
   onStateChange?: (state: CalendarState) => void;
 };
@@ -40,6 +43,7 @@ export function ConsoleCalendar({
   defaultTimezone,
   contentLocales,
   editorUrl,
+  calendarsUrl,
   initialState,
   onStateChange,
 }: Props) {
@@ -125,6 +129,13 @@ export function ConsoleCalendar({
         }}
         editing={editing}
         refreshToken={refresh}
+        noCalendarsAction={
+          calendarsUrl ? (
+            <Link className="underline" href={calendarsUrl}>
+              {t(keys.events.calendar.status.open_calendars)}
+            </Link>
+          ) : null
+        }
       />
       {writes.dialogs}
       <MoveDialog

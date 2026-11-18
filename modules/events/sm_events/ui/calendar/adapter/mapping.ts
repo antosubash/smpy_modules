@@ -2,7 +2,9 @@
  *  is unit-tested without a browser; only types come from the library. */
 import type { EventInput } from '@fullcalendar/react';
 import { Temporal } from 'temporal-polyfill';
+import { readableOn } from '../../utils/contrast';
 import type { Occurrence } from '../../utils/types-events';
+import { readsBackwards, timeText as timeRangeText } from '../time/format';
 import { DEFAULT_CREATE_MINUTES, SLOT_MINUTES } from '../time/range';
 import { addDays, dateIn, isNonexistent } from '../time/zones';
 import type {
@@ -59,6 +61,7 @@ export function toEventInput(
     start: placement?.start ?? (o.all_day ? (o.start_date ?? o.start) : o.start),
     end: placement?.end ?? (o.all_day ? (o.end_date ?? o.end) : o.end),
     color: o.color,
+    textColor: readableOn(o.color),
     interactive: true,
     startEditable: movable,
     durationEditable: movable,
@@ -79,9 +82,17 @@ export function chipFor<T>(
   event: { extendedProps: Record<string, unknown> },
   timeText: string,
   render: (occurrence: Occurrence, timeText: string) => T,
+  timeZone?: string,
+  locale?: string,
 ): T | undefined {
   const occurrence = event.extendedProps.occurrence as Occurrence | undefined;
-  return occurrence ? render(occurrence, timeText) : undefined;
+  if (!occurrence) return undefined;
+  // The library's own range text cannot tell the two passes of a repeated hour apart.
+  const text =
+    timeZone && !occurrence.all_day && readsBackwards(occurrence, timeZone)
+      ? timeText && timeRangeText(occurrence, timeZone, locale)
+      : timeText;
+  return render(occurrence, text);
 }
 
 /** What an edited `EventApi` reports (the library's own type satisfies it). */
@@ -164,6 +175,11 @@ export function skipsWallTime(
   );
 }
 
+/** Whether a click or a selection on the grid may start a new event: something writable is
+ *  shown, and no write is in flight (a press on a busy chip must not become a selection). */
+export const acceptsSelection = (editing: CalendarEditing | undefined): boolean =>
+  Boolean(editing?.canCreate) && editing?.pendingKeys.size === 0;
+
 /** A drag between the all-day row and the time grid would change `all_day`: refused (the
  *  Move dialog and the editor do that). */
 export const allowDrop = (o: Occurrence, dropAllDay: boolean): boolean => o.all_day === dropAllDay;
@@ -198,5 +214,8 @@ export function toSlot(selected: EditedEvent): CreateSlot {
     selected.end && length > SLOT_MINUTES * 60_000
       ? instant(selected.end)
       : Temporal.Instant.from(start).add({ minutes: DEFAULT_CREATE_MINUTES }).toString();
-  return { allDay: false, start, end };
+  // A slot in the skipped hour resolves forward at its start but not at its end, so the
+  // selection runs backwards.
+  const backwards = Boolean(selected.start && selected.end && selected.end <= selected.start);
+  return { allDay: false, start, end, ...(backwards ? { skipped: true as const } : {}) };
 }

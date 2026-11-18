@@ -60,3 +60,23 @@ describe('localTimeText', () => {
     expect(text).toContain('Europe/Vienna');
   });
 });
+
+describe('the repeated hour', () => {
+  // Daily 02:30-03:00 in Vienna on 2026-10-25: half an hour from 02:30 CEST to 02:00 CET.
+  const fold: Occurrence = {
+    ...base,
+    start: '2026-10-25T00:30:00Z',
+    end: '2026-10-25T01:00:00Z',
+  };
+  it('names each end\'s offset instead of reading "2:30 – 2:00 AM"', () => {
+    const text = timeText(fold, 'Europe/Vienna', 'en');
+    expect(text).toMatch(/2:30\s?AM GMT\+2/);
+    expect(text).toMatch(/2:00\s?AM GMT\+1/);
+  });
+  it('leaves an ordinary range alone', () => {
+    expect(timeText(base, 'Europe/Vienna', 'en')).not.toContain('GMT');
+  });
+  it('is the popover text without a second zone name', () => {
+    expect(localTimeText(base, 'America/New_York', 'en', false)).not.toContain('Europe/Vienna');
+  });
+});

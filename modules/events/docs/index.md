@@ -214,6 +214,23 @@ difference; the rule text is never rewritten, so moving a `BYDAY` series to
 another weekday is a 422 `start_not_in_rule` ("open the editor"), and a shift
 that orphans overrides asks for the confirmation the editor asks for.
 
+"All occurrences" leaves an occurrence that has its own exception where the
+exception put it: only the master moves. A change another session made to a field
+the drag does not write (a venue, say) does not make the drag stale; the write
+sends the fetched revision and keeps that field. The browser console logs the
+expected 409 and 422 answers as "Failed to load resource" lines; they are the
+network's report, not a script error.
+
+**A click on a skipped hour.** On the day the clocks jump forward (02:00 to 03:00
+in Vienna) the grid still draws a 02:00 and a 02:30 slot, and FullCalendar moves
+a click there forward. The quick-create dialog says "The clock skips this hour on
+that day, so the event starts at 03:30" when the grid saw its selection run
+backwards (the 02:30 slot) or the start is the first minute after the gap. The
+02:00 slot gives 03:00, which a real click on 03:00 gives too, so the note also
+appears for that click. A drag or resize onto a skipped hour is refused
+(`invalid_local_time`), because there the intended wall time is rebuilt from the
+old position and the delta.
+
 An occurrence carries no revision, so a write first reads the event and stops as
 stale, sending nothing, if what the grid showed no longer matches; otherwise it
 sends the fetched revision.
