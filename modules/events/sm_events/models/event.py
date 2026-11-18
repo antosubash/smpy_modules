@@ -15,11 +15,13 @@ from sm_events.models._base import Base
 from sm_events.models._cols import dt_col, dt_required, fk_uuid, flag, json_col, pk_uuid
 from sm_events.models.enums import DEFAULT_EVENT_TYPE
 
+UID_CONSTRAINT = "uq_events_event_uid"
+
 
 class Event(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: ignore[unsupported-base]
     __tablename__ = "events_event"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "calendar_id", "uid", name="uq_events_event_uid"),
+        UniqueConstraint("tenant_id", "calendar_id", "uid", name=UID_CONSTRAINT),
         Index("ix_events_event_range", "tenant_id", "calendar_id", "starts_at"),
         # The recurrence prefilter: rrule IS NOT NULL AND
         # (recurrence_until IS NULL OR recurrence_until >= :start).

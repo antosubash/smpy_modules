@@ -72,6 +72,7 @@ async def create_core(
     status: str = EventStatus.DRAFT.value,
     published_at: datetime | None = None,
     note: str | None = None,
+    before_history: Callable[[Event], Awaitable[None]] | None = None,
 ) -> Event:
     """Everything :func:`create_event` does after the rights check. The import calls it with
     its own ``uid`` (a file's), ``status`` and ``published_at`` and a history ``note``; a
@@ -105,6 +106,8 @@ async def create_core(
         db.add(event)
         await db.flush()
         await apply_texts(db, event, data.texts, locales=locales, creating=True)
+        if before_history is not None:
+            await before_history(event)
         await revisions.record(db, event, action="created", actor=actor, note=note)
     return event
 
