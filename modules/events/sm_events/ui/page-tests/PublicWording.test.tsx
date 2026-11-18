@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { afterEach, expect, it } from 'vitest';
+import { TimezoneToggle } from '../calendar/TimezoneToggle';
 import { EventPlace } from '../public/EventPlace';
 import { LanguageSwitch } from '../public/LanguageSwitch';
 import { ItemRow } from '../public/UpcomingList';
@@ -48,4 +49,17 @@ it('an online or hybrid event says how to attend', async () => {
     <EventPlace place={{ ...place, mode: 'hybrid', venue_name: 'Hall' }} />,
   );
   expect(hybrid.host.textContent).toContain('In person and online');
+});
+
+it('the zone switch offers only "my time" when there is no calendar time to offer', async () => {
+  const view = await mount(
+    <TimezoneToggle
+      mode="mine"
+      calendarZone="UTC"
+      myZone="Europe/Vienna"
+      calendarTime={false}
+      onMode={() => {}}
+    />,
+  );
+  expect(view.all('button').map((b) => b.textContent)).toEqual(['My time Europe/Vienna']);
 });

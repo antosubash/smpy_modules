@@ -3,6 +3,7 @@ import { Calendar } from '../calendar/Calendar';
 import type { CalendarInfo, CalendarState, DetailProps, FilterOption } from '../calendar/types';
 import { keys, useT } from '../utils/i18n';
 import { publicFetcher } from './api-public';
+import { publicGridZone } from './gridZone';
 import type { PublicCalendar, PublicCategory } from './types';
 
 /** A detail popover whose one action opens the event's public page. The default's
@@ -51,6 +52,7 @@ export function PublicCalendarGrid({
       })),
     [calendars],
   );
+  const zone = useMemo(() => publicGridZone(infos, defaultTimezone), [infos, defaultTimezone]);
   const filters = useMemo<FilterOption[]>(
     () => categories.map((c) => ({ id: c.id, label: c.name, color: c.color })),
     [categories],
@@ -62,8 +64,9 @@ export function PublicCalendarGrid({
       fetchOccurrences={fetcher}
       calendars={infos}
       categories={filters}
-      defaultTimezone={defaultTimezone}
-      initialState={initial}
+      defaultTimezone={zone.defaultTimezone}
+      calendarTime={zone.calendarTime}
+      initialState={{ tzMode: zone.tzMode, ...initial }}
       onStateChange={report}
       slots={slots}
     />

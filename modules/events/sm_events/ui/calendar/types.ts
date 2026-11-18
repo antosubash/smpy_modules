@@ -114,6 +114,9 @@ export type CalendarProps = {
   types?: FilterOption[];
   /** The tenant's zone, for "calendar time" over several calendars. */
   defaultTimezone: string;
+  /** Offer "calendar time" beside "my time" (default). The public grid drops it when its
+   *  calendars have no zone in common. */
+  calendarTime?: boolean;
   initialState?: Partial<CalendarState>;
   onStateChange?: (state: CalendarState) => void;
   /** Absent: read-only (the public site). */

@@ -138,7 +138,13 @@ export function Calendar(props: CalendarProps) {
         onToday={() => grid.current?.today()}
         onPrev={() => grid.current?.prev()}
         onNext={() => grid.current?.next()}
-        tz={{ mode: state.tzMode, calendarZone, myZone, onMode: (tzMode) => patch({ tzMode }) }}
+        tz={{
+          mode: state.tzMode,
+          calendarZone,
+          myZone,
+          calendarTime: props.calendarTime ?? true,
+          onMode: (tzMode) => patch({ tzMode }),
+        }}
         start={Start ? <Start {...toolbarProps} /> : null}
         end={End ? <End {...toolbarProps} /> : null}
       />

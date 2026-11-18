@@ -11,10 +11,12 @@ type Props = {
   calendarZone: string;
   /** The browser's zone. */
   myZone: string;
+  /** Whether "calendar time" is offered; without it only the visitor's own zone is. */
+  calendarTime?: boolean;
   onMode: (mode: TzMode) => void;
 };
 
-export function TimezoneToggle({ mode, calendarZone, myZone, onMode }: Props) {
+export function TimezoneToggle({ mode, calendarZone, myZone, calendarTime = true, onMode }: Props) {
   const { t } = useT();
   const copy = keys.events.calendar.tz;
   const option = (value: TzMode, label: string, zone: string) => (
@@ -30,9 +32,9 @@ export function TimezoneToggle({ mode, calendarZone, myZone, onMode }: Props) {
   );
   return (
     <fieldset className="flex flex-wrap items-center gap-1" aria-label={t(copy.label)}>
-      {option('calendar', t(copy.calendar), calendarZone)}
+      {calendarTime ? option('calendar', t(copy.calendar), calendarZone) : null}
       {option('mine', t(copy.mine), myZone)}
-      {calendarZone === myZone ? (
+      {calendarTime && calendarZone === myZone ? (
         <span className="text-xs text-muted-foreground">{t(copy.same)}</span>
       ) : null}
     </fieldset>

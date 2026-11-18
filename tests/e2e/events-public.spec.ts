@@ -63,6 +63,9 @@ test('the calendar chunk loads only for the grid view, which is read-only', asyn
   await expect(page.getByTestId('calendar-title')).not.toBeEmpty();
   await page.getByRole('button', { name: 'List', exact: true }).click();
   await expect(page.getByText(seed.weekly.title).first()).toBeVisible();
+  // The grid opens in the calendar's zone, so it shows the hour the list shows (10:00 Vienna).
+  await expect(page.getByRole('button', { name: /^Calendar time/ })).toContainText('Europe/Vienna');
+  await expect(page.getByText(/10:00.*Writing circle/).first()).toBeVisible();
   expect(chunks.length).toBeGreaterThan(0);
   await expect(body(page)).not.toContainText(seed.draft.title);
   await expect(page.getByRole('button', { name: /Move/ })).toHaveCount(0);
@@ -100,6 +103,16 @@ test('an event page: place, description, sub-events, JSON-LD with a nonce', asyn
   const json = JSON.parse(scripts[0]?.replace(/^<script[^>]*>|<\/script>$/g, '') ?? '');
   expect(json['@type']).toBe('Event');
   expect(json.name).toBe(seed.conference.title);
+});
+
+test('lists in a description keep their bullets', async ({ page }) => {
+  await page.goto(`/events/${seed.weekly.slug}`);
+  const list = page.locator('ul', { hasText: 'A story to share' });
+  await expect(list).toBeVisible();
+  expect(await list.evaluate((el) => getComputedStyle(el).listStyleType)).toBe('disc');
+  expect(
+    await list.evaluate((el) => Number.parseFloat(getComputedStyle(el).paddingLeft)),
+  ).toBeGreaterThan(8);
 });
 
 test('a talk names its parent', async ({ page }) => {
