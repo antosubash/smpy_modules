@@ -73,6 +73,7 @@ def upgrade() -> None:
         sa.Column("publish", sa.Boolean(), nullable=False),
         sa.Column("may_publish", sa.Boolean(), nullable=False),
         sa.Column("grants", sa.JSON(), nullable=False),
+        sa.Column("rights_until", sa.DateTime(timezone=True), nullable=True),
         sa.Column("total", sa.Integer(), nullable=False),
         sa.Column("counts", sa.JSON(), nullable=False),
         sa.Column("reasons", sa.JSON(), nullable=False),

@@ -22,6 +22,7 @@ __all__ = [
     "IMPORT_FAILURE_CODES",
     "IMPORT_FILENAME_FALLBACK",
     "IMPORT_FILENAME_MAX",
+    "IMPORT_GRANTS_TTL",
     "IMPORT_ITEM_CHUNK",
     "IMPORT_KEEP_REASONS",
     "IMPORT_LEASE",
@@ -103,6 +104,9 @@ IMPORT_APPLY_BATCH: Final = 50
 IMPORT_SLICE_SECONDS: Final = 45
 IMPORT_LEASE: Final = timedelta(minutes=5)
 IMPORT_TTL: Final = timedelta(hours=24)
+IMPORT_GRANTS_TTL: Final = timedelta(hours=1)
+"""How long the rights captured when an import is applied stay valid: a worker cannot re-check the
+importer, so a slice that starts after this ends the import ``rights_expired``."""
 IMPORT_KEEP_REASONS: Final = 1000
 IMPORT_DEFAULT_DURATION: Final = timedelta(hours=1)
 IMPORT_UNTITLED: Final = "Untitled event"
@@ -117,6 +121,7 @@ IMPORT_FAILURE_CODES: Final = (
     "import_failed",
     "importer_gone",
     "too_complex",
+    "rights_expired",
 )
 
 IMPORT_BUSY_CODE: Final = "import_busy"

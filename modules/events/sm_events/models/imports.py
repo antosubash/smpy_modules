@@ -45,6 +45,9 @@ class EventImport(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported
     worker builds no app (no directory, no grant sources), so this is what it can check the
     calendar's policy with: share, ownership and trash are read fresh for every item, the
     permissions are as of the launch."""
+    rights_until: datetime | None = dt_col()
+    """When ``grants`` stop being valid (set at apply; ``NULL`` is expired): a worker cannot
+    re-check the importer, so the window is bounded here."""
     total: int = counter()
     counts: dict[str, Any] = json_col(dict)
     reasons: dict[str, Any] = json_col(dict)

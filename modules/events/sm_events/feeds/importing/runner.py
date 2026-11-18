@@ -31,7 +31,7 @@ import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from simple_module_core.resources import ResourcePrincipal
@@ -77,6 +77,13 @@ class _Slice:
         if now is None:
             raise ImportFailure(constants.IMPORTER_GONE, "importer")
         self.grants = [p for p in constants.PERMISSIONS if stored.has(p) and now.has(p)]
+
+    async def check_rights_window(self) -> None:
+        """Rights captured at apply are valid until ``rights_until``; later nothing is written."""
+        async with self.factory() as db:
+            until = (await self._load(db)).rights_until
+        if until is None or self.now() > until.replace(tzinfo=until.tzinfo or UTC):
+            raise ImportFailure("rights_expired", "ttl")
 
     async def fence(self, db: Any, values: dict[str, Any]) -> None:
         await fenced(
@@ -205,6 +212,7 @@ async def _work(
             raise ImportFailure("too_complex", "attempts")
         await step.parse()
         return "done"
+    await step.check_rights_window()
     if importer is not None:
         await step.narrow(importer)
     deadline = clock() + slice_seconds

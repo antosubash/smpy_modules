@@ -747,7 +747,8 @@
       "too_many_events": "Die Datei enthält mehr Termine, als ein Import aufnimmt. Teile sie und importiere die Teile.",
       "import_failed": "Der Import konnte nicht abgeschlossen werden. Es wurde nichts weiter geschrieben.",
       "importer_gone": "Dein Konto darf hier nicht mehr importieren, der Import wurde angehalten.",
-      "too_complex": "Die Datei ist zu komplex, um sie in der erlaubten Zeit zu lesen. Teile sie in kleinere Dateien."
+      "too_complex": "Die Datei ist zu komplex, um sie in der erlaubten Zeit zu lesen. Teile sie in kleinere Dateien.",
+      "rights_expired": "Deine Importrechte sind abgelaufen, bevor der Import fertig war. Es wurde nichts mehr importiert; lade die Datei erneut hoch."
     },
     "dropped": {
       "ATTENDEE": "Teilnehmende",

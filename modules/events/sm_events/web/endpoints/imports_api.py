@@ -233,6 +233,7 @@ async def apply(
             publish=body.publish,
             may_publish=may_publish,
             grants=staging.grants_of(who),
+            rights_until=utcnow() + constants.IMPORT_GRANTS_TTL,
             updated_at=utcnow(),
         )
         .execution_options(synchronize_session=False)

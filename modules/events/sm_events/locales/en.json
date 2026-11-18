@@ -747,7 +747,8 @@
       "too_many_events": "The file has more events than one import takes. Split it and import the parts.",
       "import_failed": "The import could not be completed. Nothing more was written.",
       "importer_gone": "Your account can no longer import here, so the import was stopped.",
-      "too_complex": "The file is too complex to read in the time allowed. Split it into smaller files."
+      "too_complex": "The file is too complex to read in the time allowed. Split it into smaller files.",
+      "rights_expired": "Your import rights expired before it finished. Nothing more was imported; upload the file again."
     },
     "dropped": {
       "ATTENDEE": "attendees",

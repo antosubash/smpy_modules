@@ -57,12 +57,14 @@ edited in the console since the import is not overwritten (`changed_since_previe
 
 ## Rights are re-checked
 
-In a real Celery worker (`events.run_import`) there is no app, so **no** account, membership or
-permission check runs per slice. It relies on the grants stored at apply time (the importer's
-permissions then) and per-item checks against the database: the calendar's share and owner, trash
-and published-lock. A role, membership or account removed mid-import therefore applies only from the
-next import; the worker finishes the import with the stored grants (at most 24 h, the import's
-lifetime). `importer_gone` and the per-slice narrowing exist in `runner._Slice.narrow` and work only
-when a caller passes an `importer` (`launch.importer_check`, which uses the offline principal); the
-inline (eager) path in `launch.launch` does not pass one today, so that path is not narrowed either.
+On a host that runs tasks inline (eager), every slice asks the user directory who the importer is
+now (`launch.importer_check`, the offline principal): a deactivated or removed importer ends the
+import as `importer_gone`, and lost permissions narrow what the remaining items may do. A real
+Celery worker (`events.run_import`) has no app, so it cannot ask. It relies on the rights captured
+when the import was applied, which are valid for one hour (`IMPORT_GRANTS_TTL`; stored as
+`rights_until`): a slice that starts later writes nothing and ends the import `rights_expired`
+(upload again). Within the hour it also checks, per item, the calendar's share and owner, trash and
+the published lock. A framework gap (no way to resolve a user's permissions outside a request) is why
+the worker cannot do more. One hour is above the slowest measured run: about 0.2 s an item on
+SQLite, so 5,000 items take about 17 minutes.
 Only the person who uploaded an import can see, apply or discard it.
