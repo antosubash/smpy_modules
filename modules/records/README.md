@@ -299,6 +299,16 @@ On a public page the **Records list** block shows nothing for a `media` field:
 `file_storage` does not serve files to anonymous visitors, so there is no
 picture a visitor could load — see [Showing records on a page](#showing-records-on-a-page).
 
+### Showing records' dates on an events calendar
+
+With the optional `events` extra (`pip install simple_module_records[events]`, which needs
+`simple_module_events`) records registers the source `records:dates` with the events module: an admin
+enables it on a calendar (Calendars, **Sources**) and maps a record type to an indexed `date` or
+`datetime` field (and an optional end field). Published, untrashed records show with their title; each
+viewer sees only what records' own rules let them read (`records.view` and the type's `allowed_roles`),
+and the public only types marked Public. Records runs without events: nothing of events is imported until
+events loads `sm_records/events_extensions.py`. The contract behind it is `sm_records.contracts.dated`.
+
 ### Showing records on a page
 
 Pagebuilder is optional: records installs and builds without it. Install

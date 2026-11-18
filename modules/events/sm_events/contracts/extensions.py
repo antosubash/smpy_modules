@@ -10,7 +10,7 @@ needs is here.
 calendar and
 shown to whoever manages it, so registration refuses a model with a ``SecretStr``/``SecretBytes``
 or sealed-secret field: keep secrets in your own module's settings and name them here.
-See ``docs/writing-a-plugin.md``.
+See ``docs/extensions.md``.
 """
 
 from __future__ import annotations

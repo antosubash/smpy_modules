@@ -56,6 +56,25 @@ name the module they affect.
   `Sitemap: https://<site>/events/sitemap.xml` to `robots.txt`. Feeds carry time zone
   definitions for the next 20 years.
 
+- **events: extensions, a plugin registry and the final bus events** (PR 6 of the events
+  module). A second package can add its own dates to a calendar (a source), add an event type
+  with its own validated `extra` and contribute UI, from `events_extensions.py` and
+  `events-extensions.ts` (`sm_events.contracts.extensions`, `@simple-module-py/events`). Plugins
+  load in the web process and on a worker's first registry read, then the registry freezes;
+  install them identically in every image. A plugin call runs on its own database connection
+  with a time budget, a call and item cap and validated output; a failing source is a status in
+  the calendar. Admins enable sources per calendar in the Sources dialog (`PUT
+  /api/events/calendars/{id}/sources` needs the `sources_version` a GET returned). The occurrences
+  read answers `sources`, the public API and feeds call only `public` sources, and a failed public
+  answer is not cached. An event of an uninstalled type keeps its `extra` untouched. Bus events:
+  `EventUnpublished`, `EventReinstated`, `OccurrenceSkipped`, `EventRestored` and `EventUpdated`
+  join the four from PR 2, are also published durably (outbox, at least once, no ordering) and the
+  scheduled publish now announces `EventPublished` through the worker's bus. Guide:
+  `modules/events/docs/extensions.md`.
+- **records: dates on events calendars** (the optional `events` extra, floor 0.0.16): the source
+  `records:dates`, `sm_records.contracts.dated` (published records of a type the caller may read,
+  in a date window, tenant pinned) and the calendar's settings section and detail.
+
 ### Security
 
 - **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in

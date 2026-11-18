@@ -2,7 +2,8 @@
 
 [Installation, settings, screens and API](../README.md). The
 [approved design](../../../docs/superpowers/specs/2026-11-17-events-module-design.md)
-sets out the later calendar engine and integrations.
+sets out the later calendar engine and integrations. [Writing a plugin](extensions.md) covers
+sources, event types and UI from another package.
 
 ## Access
 
@@ -322,12 +323,25 @@ an explicit click that resends with the new revision. It never retries by itself
 
 ## Bus events
 
-`sm_events.contracts.events`: `EventPublished`, `EventRescheduled` (a time,
-timezone, all-day or rule change of a published event, or a moved occurrence),
-`EventCancelled` and `EventDeleted`, for events that are or were published, and
-only after the write commits. Reinstating, unpublishing and skipping emit
-nothing yet. A scheduled publish runs in a worker with no in-process bus, so it
-emits nothing either.
+`sm_events.contracts.events` has nine events, for events that are or were published, and only
+for a write that commits: `EventPublished`, `EventRescheduled` (a time, timezone, all-day or
+rule change, or a moved occurrence), `EventCancelled`, `EventDeleted`, `EventUnpublished`
+(unpublish, or a cancelled schedule), `EventReinstated`, `OccurrenceSkipped`, `EventRestored` and
+`EventUpdated` (the names of the fields that changed). A write a specific event covers emits only
+that one. Each is published in process after the commit and, when the host has the `background_tasks`
+outbox and the event has durable handlers, also written to the outbox in the writer's own
+transaction and delivered at least once by a worker (retries, backoff and a dead-letter state are
+the framework's). There is no ordering between two events of one `event_id`; re-read the event.
+The scheduled publish announces `EventPublished` through the worker's bus, so it reaches durable
+subscribers; in-process subscribers see web-process changes only. See
+[extensions.md](extensions.md#bus-events).
+
+## Extensions
+
+Another package can put its own dates on a calendar (a source), add an event type with its own
+data (`extra`) and contribute UI, from `events_extensions.py` and `events-extensions.ts`. An admin
+enables a source per calendar in the **Sources** dialog. [extensions.md](extensions.md) is the guide;
+records ships `records:dates` as its optional `events` extra.
 
 ## Scheduled publishing (needs beat)
 
