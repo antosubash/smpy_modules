@@ -26,6 +26,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from fastapi import Request
+
 from sm_events.core.tenancy import note_tenant_source, resolve_public, tenant_scope
 
 __all__ = ["public_tenant"]

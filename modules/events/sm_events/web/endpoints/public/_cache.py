@@ -22,23 +22,23 @@ gate, by the caller, so a guessed tag on a hidden URL is a 404, never a 304. A 3
 news #322).
 
 **Errors are never stored** (records #88): :func:`error_headers` gives every public error
-answer ``no-store`` and no ``ETag``, with the same tenant ``Vary`` a success has, and
-:class:`PublicErrorRoute` applies it to every error the public routers produce, the
-host-rendered ones (an ``HTTPException``, a 422) included, because an exception left to
-propagate is rendered where nothing here can add a header. Existence is no oracle: an
-unknown, a hidden and a trashed target are answered by the same code path.
+answer ``no-store`` and no ``ETag``, with the same tenant ``Vary`` a success has;
+:class:`~sm_events.web.endpoints.public._errors.PublicErrorRoute` applies it to every error
+the public routers produce. Existence is no oracle: an unknown, a hidden and a trashed target
+are answered by the same code path.
 """
 
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, Final, Literal
+from typing import Final, Literal
 
 from fastapi import Request, Response
-from fastapi.routing import APIRoute
+from fastapi.responses import RedirectResponse
 from simple_module_hosting.tenancy import tenant_vary as recorded_vary
+
 from sm_events.core import constants
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import (
@@ -55,13 +55,13 @@ from sm_events.web.endpoints.public import _urls
 __all__ = [
     "NO_STORE",
     "PER_VIEWER_VARY",
-    "PublicErrorRoute",
     "apply",
     "body_etag",
     "error_headers",
     "matches",
     "not_modified",
     "page_etag",
+    "permanent_redirect",
     "shared_tenant",
     "signed_in",
     "tenant_vary",
@@ -208,6 +208,15 @@ def apply(
     return response
 
 
+def permanent_redirect(request: Request, settings: EventsSettings, target: str) -> Response:
+    """A 301 to ``target`` (a renamed slug, the default language's redundant prefix) that is
+    kept no longer than a listing and keyed like one, so a slug reclaimed later is not stuck
+    in a browser's cache forever and one tenant's redirect never answers another's."""
+    return apply(
+        RedirectResponse(target, status_code=301), request, settings, kind="listing", etag=None
+    )
+
+
 def not_modified(request: Request, response_headers: Mapping[str, str]) -> Response | None:
     """A 304 for a conditional request that matches the validator in ``response_headers``,
     else ``None``. Call it only for a row that already passed the gate."""
@@ -229,37 +238,3 @@ def error_headers(request: Request, response: Response) -> Response:
     _drop(response, "ETag")
     _add_vary(response, *tenant_vary(request))
     return response
-
-
-def _host_handler(request: Request, exc: Exception) -> Callable[..., Any] | None:
-    """The handler the app registered for ``exc``'s nearest class, as Starlette's
-    ``ExceptionMiddleware`` would pick it (``Exception`` itself aside)."""
-    handlers = getattr(request.app, "exception_handlers", None) or {}
-    for cls in type(exc).__mro__:
-        if cls is not Exception and cls in handlers:
-            return handlers[cls]
-    return None
-
-
-class PublicErrorRoute(APIRoute):
-    """The public routers' route class: every error answer, a host-rendered one included,
-    leaves through :func:`error_headers`. An exception nobody has a handler for propagates
-    (the host's last-resort page); the public routes write nothing, so there is nothing to
-    roll back."""
-
-    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
-        handler = super().get_route_handler()
-
-        async def wrapped(request: Request) -> Response:
-            try:
-                response = await handler(request)
-            except Exception as exc:
-                host = _host_handler(request, exc)
-                if host is None:
-                    raise
-                response = host(request, exc)
-                if hasattr(response, "__await__"):
-                    response = await response
-            return error_headers(request, response)
-
-        return wrapped

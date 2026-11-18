@@ -23,6 +23,7 @@ from urllib.parse import quote
 
 from fastapi import Request
 from simple_module_core.environments import NON_PROD_ENVIRONMENTS
+
 from sm_events.core import constants, locales
 from sm_events.core.tenancy import TenancyMode, mode_of
 

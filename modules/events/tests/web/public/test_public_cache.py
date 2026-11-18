@@ -12,7 +12,7 @@ from simple_module_hosting.middleware import TenantMiddleware
 from sm_events.core.errors import NotFound, install_exception_handlers
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import TenancyMode
-from sm_events.web.endpoints.public import _cache
+from sm_events.web.endpoints.public import _cache, _errors
 from sm_events.web.endpoints.public._tenant import public_tenant
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -47,7 +47,7 @@ def make_app(
     if mode is TenancyMode.MULTI:
         app.add_middleware(TenantMiddleware, header=header)
     app.add_middleware(_Upstream)
-    router = APIRouter(route_class=_cache.PublicErrorRoute, dependencies=[Depends(public_tenant)])
+    router = APIRouter(route_class=_errors.PublicErrorRoute, dependencies=[Depends(public_tenant)])
 
     @router.get("/p/{kind}")
     async def page(request: Request, kind: str):
