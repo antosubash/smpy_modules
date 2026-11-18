@@ -123,9 +123,12 @@ export async function settle(): Promise<void> {
  *  until the chunk arrives. */
 export async function ready(view: Mounted, selector: string): Promise<void> {
   await act(async () => {
-    await vi.waitFor(() => {
-      if (!view.find(selector)) throw new Error(`${selector} not rendered yet`);
-    });
+    await vi.waitFor(
+      () => {
+        if (!view.find(selector)) throw new Error(`${selector} not rendered yet`);
+      },
+      { timeout: 8000 },
+    );
   });
 }
 

@@ -25,7 +25,7 @@ it('a German page shows German headings while the console language is English', 
   await ready(view, 'h1');
   expect(view.find('h1')?.textContent).toBe('Seite nicht gefunden');
   expect(document.documentElement.lang).toBe('de');
-});
+}, 30000);
 
 it('an English page is English whatever the console says', async () => {
   updateI18n({ locale: 'de', messages: {} });

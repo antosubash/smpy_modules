@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import { updateI18n } from '@simple-module-py/i18n';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { loadCatalogue } from '../utils/PageLocale';
 import { item } from './public-support';
 import { mount, ready } from './test-dom';
 
@@ -76,6 +77,9 @@ function viewerZone(zone: string) {
 beforeEach(() => {
   history.replaceState(null, '', '/events/concert');
 });
+// The German catalogue is a lazy chunk: have it in place so a test does not wait on the loader.
+beforeAll(() => loadCatalogue('de'));
+
 afterEach(() => {
   vi.restoreAllMocks();
   document.body.innerHTML = '';

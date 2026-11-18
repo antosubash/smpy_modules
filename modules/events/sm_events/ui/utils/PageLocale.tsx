@@ -20,7 +20,8 @@ type Flat = Record<string, string>;
 const loaded = new Map<string, Flat>();
 const pending = new Map<string, Promise<Flat>>();
 
-function load(locale: string): Promise<Flat> {
+/** Start loading a language's catalogue (the pages do it on first render; tests do it up front). */
+export function loadCatalogue(locale: string): Promise<Flat> {
   const hit = pending.get(locale);
   if (hit) return hit;
   const loader = loaders[locale];
@@ -64,7 +65,7 @@ function Provide({
 }
 
 function Lazy({ locale, children }: { locale: string; children: ReactNode }) {
-  const messages = loaded.get(locale) ?? use(load(locale));
+  const messages = loaded.get(locale) ?? use(loadCatalogue(locale));
   return (
     <Provide locale={locale} messages={messages}>
       {children}

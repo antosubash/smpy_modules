@@ -1,11 +1,15 @@
 // @vitest-environment happy-dom
 
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { loadCatalogue } from '../utils/PageLocale';
 import { item } from './public-support';
 import { mount, ready } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 const { default: PublicNotFound } = await import('../../pages/PublicNotFound');
+
+// The German catalogue is a lazy chunk: have it in place so a test does not wait on the loader.
+beforeAll(() => loadCatalogue('de'));
 
 afterEach(() => {
   document.body.innerHTML = '';

@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 
 import { updateI18n } from '@simple-module-py/i18n';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { fakeGrid } from '../calendar/FakeGrid-test-support';
+import { loadCatalogue } from '../utils/PageLocale';
 import { indexProps, item } from './public-support';
 import { flush, stubFetch } from './support';
 import { act, click, mount, ready } from './test-dom';
@@ -15,6 +16,9 @@ beforeEach(() => {
   fakeGrid.reset();
   history.replaceState(null, '', '/events/');
 });
+// The German catalogue is a lazy chunk: have it in place so a test does not wait on the loader.
+beforeAll(() => loadCatalogue('de'));
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
