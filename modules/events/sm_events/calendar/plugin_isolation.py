@@ -101,8 +101,10 @@ async def _run_shared[T](db: Any, timeout: float, call: Callable[[Any], Awaitabl
                 await savepoint.rollback()
         except Exception as exc:
             raise SessionBroken(type(exc).__name__) from exc
-        if not db.is_active:  # cancelled inside a statement: SQLAlchemy invalidated it
-            raise SessionBroken("PendingRollbackError")
+        try:  # cancelled inside a statement, SQLAlchemy invalidates the connection: is it usable?
+            await db.execute(text("SELECT 1"))
+        except Exception as exc:
+            raise SessionBroken(type(exc).__name__) from exc
 
 
 _TASKS: set[asyncio.Task[None]] = set()

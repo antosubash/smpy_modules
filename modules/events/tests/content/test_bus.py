@@ -276,3 +276,18 @@ async def test_in_process_and_durable_both_deliver(db):
     bus.emit(db, deleted())
     await bus.commit(db)
     assert len(seen) == 1 and len(transport.calls) == 1
+
+
+@pytest.mark.unbound_tenant
+async def test_the_durable_publish_runs_under_the_events_tenant(db):
+    """The outbox row is written for the tenant the event describes, not whichever is bound at
+    the end of the request."""
+    transport = Transport()
+    bus.attach(db, durable_bus(transport))
+    with tenant_scope("b"):
+        await dirty_write(db)
+        await db.flush()
+        bus.emit(db, deleted("b"))
+    await bus.commit(db)  # no tenant is bound here
+    ((_event, _names, tenant, _txn),) = transport.calls
+    assert tenant == "b"
