@@ -385,7 +385,8 @@ last-write-wins; event writes use `expected_revision`.
 
 ## Status
 
-PR 3 adds the calendar: the `Calendar` component and the console grid at
+PR 4 adds the public surface: pages, ICS feeds, JSON-LD and a sitemap, with calendar slug
+redirects (see [Public pages](public.md) and [Operating](operations.md)). PR 3 adds the calendar: the `Calendar` component and the console grid at
 `/admin/events/`. PR 2 adds events: texts, recurrence and overrides, the
 occurrences read, the workflow, scheduled publishing, the API, and the Events list and editor. PR 1
 provided calendars, categories, settings, the tenancy and access policy and all
@@ -395,8 +396,8 @@ Later delivery remains:
 | PR | Delivers |
 | --- | --- |
 | 2 | Events and texts, recurrence and overrides, occurrences read, workflow, API, list and editor |
-| 3 (this release) | Calendar component and console grid: views, create, drag, resize, timezone |
-| 4 | Public pages, calendar slug redirects, public ICS, JSON-LD and sitemap |
+| 3 | Calendar component and console grid: views, create, drag, resize, timezone |
+| 4 (this release) | Public pages, calendar slug redirects, public ICS, JSON-LD and sitemap |
 | 5 | Private feed tokens and `.ics` upload |
 | 6 | Extension registry, plugin guide and records date-field source |
 | 7 | Pagebuilder blocks and newsletter card |

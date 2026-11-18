@@ -4,8 +4,8 @@ Owned calendars with private, internal or public visibility, calendar sharing,
 multilingual categories, and events for SimpleModule hosts. Events have texts in
 each content language, one-off, all-day and recurring schedules, overrides for
 single occurrences, a review and publishing workflow, and a bounded occurrences
-read. This is **PR 2 of 10**: calendar grids, public pages and ICS feeds arrive
-in later PRs. See the [guide](docs/index.md) and the
+read, a console calendar, and (from PR 4) a public site: pages, ICS feeds, JSON-LD and a
+sitemap. This is **PR 4 of 10**. See the [guide](docs/index.md), [public pages](docs/public.md), [operating](docs/operations.md) and the
 [approved design](../../docs/superpowers/specs/2026-11-17-events-module-design.md).
 
 ## Install
@@ -161,3 +161,19 @@ an event that is published or scheduled. See the guide's [access table](docs/ind
 
 No anonymous page or API ships yet. A public calendar's visibility prepares it
 for later public, published-event reads; it exposes no anonymous screen today.
+
+## Public pages
+
+Anonymous visitors get a public calendar's published events under `public_prefix` (default
+`/events`, restart-only), with `/{locale}` prefixes:
+
+| Route | Serves |
+| --- | --- |
+| `/events/` | Upcoming list and a read-only calendar tab |
+| `/events/c/{calendar}` | One public calendar |
+| `/events/{slug}` (`?date=`) | An event, or one occurrence of a series |
+| `/events/{slug}.ics`, `/events/calendar.ics`, `/events/c/{calendar}.ics` | Event file and subscription feeds |
+| `/events/sitemap.xml` | Every public, indexable event |
+
+Everything else (drafts, internal and private calendars, trash, other tenants) answers one
+identical 404. See [Public pages](docs/public.md).
