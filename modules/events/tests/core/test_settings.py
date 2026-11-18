@@ -21,6 +21,7 @@ def test_public_fields():
     settings = EventsSettings()
     assert settings.public_prefix == "/events"
     assert settings.public_cache_seconds == 300
+    assert settings.public_title == "Events"
     extra = EventsSettings.model_fields["public_prefix"].json_schema_extra or {}
     assert extra.get("requires_restart") is True
     cache_extra = EventsSettings.model_fields["public_cache_seconds"].json_schema_extra or {}

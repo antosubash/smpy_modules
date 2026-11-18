@@ -48,3 +48,7 @@ class EventsSettings(DbBackedSettings):
     public_cache_seconds: int = constants.PUBLIC_CACHE_SECONDS
     """How long a browser or cache may keep a public event page, feed or sitemap, in
     seconds. ``0`` sends ``no-store``, so a change shows at once."""
+
+    public_title: str = constants.MODULE_NAME
+    """The title of the public events pages and of the all-calendars feed (``calendar.ics``):
+    what the site calls its events, for example ``What's on``."""

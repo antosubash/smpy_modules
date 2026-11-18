@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
@@ -77,13 +78,8 @@ async def test_fixed_paths_before_catch_all(public_locales_client, path, expecte
     assert handler(public_locales_client.app, path) == expected
 
 
-async def test_unbuilt_routes_answer_404_for_now(public_client):
-    """The pages and the sitemap are stubs until their tasks land; the feeds and API are real."""
-    for path in (
-        "/events/c/x",
-        "/events/x",
-        "/events/sitemap.xml",
-    ):
+async def test_unknown_addresses_are_the_404(public_client):
+    for path in ("/events/c/x", "/events/x", "/events/nope.ics", "/events/c/nope.ics"):
         for method in ("GET", "HEAD"):
             got = await public_client.request(method, path)
             assert got.status_code == 404, (method, path)
@@ -129,6 +125,32 @@ async def test_a_prefix_another_module_already_serves_is_refused(caplog):
             found = paths(http.app)
     assert "/events/{slug}" in found
     assert "is not usable" in caplog.text
+
+
+@pytest.mark.parametrize("prefix", ["/news", "/news/"])
+async def test_a_prefix_another_module_is_configured_for_is_refused(prefix, caplog):
+    """News mounts its router in its own ``on_startup``, perhaps after this one: its *setting*
+    is what is checked, since the route is not there yet."""
+
+    def news_configured(app: FastAPI) -> None:
+        app.state.news = SimpleNamespace(settings=SimpleNamespace(public_route_prefix="/news"))
+        app.state.pagebuilder = SimpleNamespace(settings=SimpleNamespace(public_route_prefix=""))
+
+    with caplog.at_level(logging.ERROR, logger="sm_events.core.public_prefix"):
+        async with public_http(
+            settings={"public_prefix": prefix}, before_wire=news_configured
+        ) as http:
+            found = paths(http.app)
+    assert "/events/{slug}" in found and "/news/{slug}" not in found
+    assert "is not usable" in caplog.text
+
+
+async def test_an_unrelated_prefix_is_not_refused_by_other_settings():
+    def other(app: FastAPI) -> None:
+        app.state.news = SimpleNamespace(settings=SimpleNamespace(public_route_prefix="/news"))
+
+    async with public_http(settings={"public_prefix": "/whats-on"}, before_wire=other) as http:
+        assert "/whats-on/{slug}" in paths(http.app)
 
 
 async def test_wiring_twice_changes_nothing(public_locales_client):

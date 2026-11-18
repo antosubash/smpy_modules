@@ -135,6 +135,7 @@ class AlternateOut(BaseModel):
 
 class PublicIndexProps(BaseModel):
     locale: str
+    title: str
     page: int
     page_count: int
     groups: list[MonthGroup]

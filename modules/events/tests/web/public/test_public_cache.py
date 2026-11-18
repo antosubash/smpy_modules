@@ -118,6 +118,9 @@ async def test_request_tenant_never_shareable(case):
     got = await get(app, "/p/feed", **headers)
     assert got.status_code == 200
     assert got.headers["cache-control"] == "private, max-age=300"
+    # As news does: a tenant someone else picked varies on the session, in whatever mode the
+    # stack was detected (a single-tenant app under a multi-tenant parent included).
+    assert "Cookie" in vary(got)
     if case.startswith("multi"):
         assert {"Cookie", header} <= set(vary(got))
 

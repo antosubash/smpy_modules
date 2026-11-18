@@ -29,6 +29,7 @@ from simple_module_core.app_state import get_public_routes, get_rate_limit_rules
 from simple_module_core.rate_limit import RateLimitRule
 
 from sm_events.core import constants, locales, public_prefix, tenancy
+from sm_events.core.settings import EventsSettings
 from sm_events.web.endpoints.public import _urls
 
 __all__ = [
@@ -58,6 +59,35 @@ def _first_segments(app: FastAPI) -> frozenset[str]:
     return frozenset(found)
 
 
+_PREFIX_SETTINGS = ("public_route_prefix", "public_prefix")
+"""The settings other modules name their public prefix by (news and pagebuilder:
+``public_route_prefix``)."""
+
+
+def _configured_prefixes(app: FastAPI) -> frozenset[str]:
+    """First segments of the public prefixes other modules are *configured* to mount at.
+
+    ``_first_segments`` sees only what is mounted already, and a module that mounts its router in
+    its own ``on_startup`` (news does) may start after this one. Its settings are hydrated before
+    any ``on_startup`` runs, so they are read here: every service container on ``app.state``
+    that holds settings with one of :data:`_PREFIX_SETTINGS`, this module's own excepted."""
+    found: set[str] = set()
+    # Starlette's ``State`` keeps its attributes in ``_state``; a test double has ``__dict__``.
+    attributes = getattr(app.state, "_state", None) or vars(app.state)
+    for name, services in attributes.items():
+        if name == constants.PACKAGE:
+            continue
+        settings = getattr(services, "settings", None)
+        if isinstance(settings, EventsSettings):  # this module's own, under whatever name
+            continue
+        for attr in _PREFIX_SETTINGS:
+            value = getattr(settings, attr, None)
+            first = value.strip().strip("/").split("/", 1)[0] if isinstance(value, str) else ""
+            if first:
+                found.add(first)
+    return frozenset(found)
+
+
 def wire_public(app: FastAPI) -> str | None:
     """Publish the prefix and languages, then mount, exempt and limit. The effective
     prefix, or ``None`` when no settings were registered (nothing to read)."""
@@ -69,7 +99,7 @@ def wire_public(app: FastAPI) -> str | None:
     settings = services.settings
     locales.use(*settings.content_locales)
     languages = locales.supported()
-    taken = _first_segments(app) | set(languages)
+    taken = _first_segments(app) | _configured_prefixes(app) | set(languages)
     prefix = public_prefix.effective(settings.public_prefix, taken=taken)
     _urls.use(prefix)
     _urls.warn_if_unset(app, tenancy.mode_of(app))

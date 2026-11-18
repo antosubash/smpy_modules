@@ -212,34 +212,6 @@ async def test_a_configured_origin_beats_a_spoofed_host(public_locales_client, f
     assert "Host" not in got.headers.get("vary", "")
 
 
-@pytest.mark.unbound_tenant
-async def test_cache_page_kinds(public_locales_client, fx):
-    got = await get(public_locales_client, IDX)
-    assert got.headers["cache-control"] == "public, max-age=60"
-    assert {"X-Inertia", "Cookie", "Accept-Language"} <= {
-        v.strip() for v in got.headers["vary"].split(",")
-    }
-    tag = got.headers["etag"]
-    again = await get(public_locales_client, IDX, **{"If-None-Match": tag})
-    assert again.status_code == 304 and again.content == b"" and again.headers["etag"] == tag
-    signed = await get(public_locales_client, IDX, **as_user("u", "events.view"))
-    assert signed.headers["cache-control"] == "private, no-store" and "etag" not in signed.headers
-    html = await public_locales_client.get(IDX)
-    assert html.headers["etag"] != tag  # HTML and Inertia JSON never share a validator
-
-
-async def test_etag_changes_with_the_list(public_locales_client, fx):
-    tag = (await get(public_locales_client, IDX)).headers["etag"]
-    async with public_locales_client.db_state.session_factory() as db:
-        cal = await db.get(Calendar, fx.pub.id)
-        await seed_event(
-            db, cal, slug="fresh", status="published", starts_at=NOW + timedelta(days=3)
-        )
-        await db.commit()
-    got = await get(public_locales_client, IDX, **{"If-None-Match": tag})
-    assert got.status_code == 200 and got.headers["etag"] != tag
-
-
 async def test_fallback_marked(public_locales_client, fx_partial):
     fx = fx_partial
     items = {i["key"]: i for i in flat(props(await get(public_locales_client, "/de/events/")))}

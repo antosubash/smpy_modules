@@ -118,6 +118,7 @@ async def _render(
     calendars = (await db.execute(public_calendars().order_by(col(Calendar.name)))).scalars()
     props = PublicIndexProps(
         locale=locale,
+        title=calendar.name if calendar else _urls.site_title(settings),
         page=page,
         page_count=pages,
         groups=month_groups(items, page),
@@ -142,7 +143,7 @@ async def _render(
     response = await inertia.render(constants._PAGE_PUBLIC_INDEX, body)
     canonical = _urls.absolute(request, _path(locale, calendar) + _query(category, page))
     head = _head.listing_head(
-        title=calendar.name if calendar else constants.MODULE_NAME,
+        title=props.title,
         description=calendar.description if calendar else None,
         canonical=canonical,
         feed_url=_urls.absolute(request, props.feed_url),

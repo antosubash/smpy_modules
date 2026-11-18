@@ -116,12 +116,16 @@ def shared_tenant(request: Request) -> bool:
 
 
 def tenant_vary(request: Request) -> tuple[str, ...]:
-    """The request headers that picked this request's tenant; none when it is shared."""
+    """The request headers that picked this request's tenant; none when it is shared.
+
+    As news does (``request_vary``): whenever the tenant is not the host's one default, the answer
+    varies on ``Cookie`` (a member's session may have chosen it) and the tenant header, plus what
+    the framework recorded, whatever mode the stack was detected in. A request-level multi-tenant
+    answer on an app detected single-tenant (a child mounted under a multi-tenant parent) is
+    covered the same way."""
     if shared_tenant(request):
         return ()
-    names: list[str] = []
-    if mode_of(request.app) is TenancyMode.MULTI:
-        names.append("Cookie")
+    names = ["Cookie"]
     if (header := tenant_header(request.app)) is not None:
         names.append(header)
     names.extend(recorded_vary(request) or ())
