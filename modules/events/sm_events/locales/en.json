@@ -143,7 +143,11 @@
     "edited_meanwhile": "The action went through. Your edits made meanwhile are kept and are still unsaved.",
     "action_stale": "Someone else changed this event. Your action was not applied.",
     "token_limit": "You already have the most private links this calendar allows. Revoke one first.",
-    "private_feeds_unavailable": "Private links are not available for your account."
+    "private_feeds_unavailable": "Private links are not available for your account.",
+    "import_busy": "Too many imports are still running. Wait for one to finish.",
+    "import_state": "This import cannot be changed in its current state.",
+    "import_too_large": "The file is larger than the import limit.",
+    "ics_invalid": "That does not look like a calendar file."
   },
   "categories": {
     "title": "Categories",
@@ -645,5 +649,113 @@
     "revoke_title": "Revoke {name}?",
     "revoke_description": "Calendar apps that use this link will stop receiving events.",
     "revoked": "Link revoked"
+  },
+  "import": {
+    "title": "Import events",
+    "subtitle": "Upload an .ics file, preview what will happen, then import it.",
+    "calendar": "Into calendar",
+    "file": "Calendar file (.ics)",
+    "upload": "Upload and preview",
+    "uploading": "Uploading…",
+    "too_large": "This file is larger than {max}.",
+    "no_calendars": "You cannot write events in any calendar yet.",
+    "hint": "Events are imported as drafts. A file you import again updates the events it already created.",
+    "progress": {
+      "uploaded": "Waiting to start…",
+      "parsing": "Reading the file…",
+      "queued": "Waiting for a worker…",
+      "running": "Importing… {done} of {total}"
+    },
+    "preview": {
+      "title": "Preview",
+      "summary": "{filename} into {calendar}",
+      "all": "All",
+      "filter": "Show",
+      "col_title": "Title",
+      "col_start": "Starts",
+      "col_what": "What happens",
+      "col_why": "Why",
+      "repeats": "Repeats",
+      "all_day": "All day",
+      "empty": "Nothing to show.",
+      "more": "Showing {shown} of {total}.",
+      "next": "More",
+      "dropped": "Not imported",
+      "verdict": {
+        "new": "New",
+        "update": "Update",
+        "skip": "Skipped"
+      }
+    },
+    "apply_drafts": "Import as drafts",
+    "apply_publish": "Import and publish",
+    "locked_hint": "Existing published events are updated only if you may publish.",
+    "start_again": "Start again",
+    "result": {
+      "title": "Result",
+      "created": "Created {count}",
+      "updated": "Updated {count}",
+      "unchanged": "Unchanged {count}",
+      "skipped": "Skipped {count}",
+      "failed": "Failed {count}",
+      "open": "Open",
+      "col_outcome": "Outcome"
+    },
+    "failed_title": "The import failed",
+    "outcome": {
+      "created": "Created",
+      "updated": "Updated",
+      "unchanged": "Unchanged",
+      "skipped": "Skipped",
+      "failed": "Failed"
+    },
+    "reasons": {
+      "unknown_timezone": "The time zone is not one we know, so the event was left out.",
+      "invalid_times": "The start or end time could not be read.",
+      "end_before_start": "The event ends before it starts.",
+      "duration_too_long": "The event lasts longer than the allowed maximum.",
+      "unsupported_rule": "This rule is not supported (only daily, weekly, monthly and yearly repeats).",
+      "too_many_overrides": "The series has too many changed or skipped dates.",
+      "override_without_master": "A changed date without its series.",
+      "uid_too_long": "The event's identifier is too long.",
+      "uid_invalid": "The event's identifier holds characters that are not allowed.",
+      "uid_in_trash": "An event with this identifier is in the trash of this calendar.",
+      "duplicate_uid": "Another event in the file or the calendar already has this identifier.",
+      "changed_since_preview": "The event was changed or removed after the preview.",
+      "publish_required": "Changing a published event needs the publish permission.",
+      "write_failed": "The event could not be written.",
+      "forbidden": "You may no longer write events in this calendar.",
+      "private_kept": "Marked private in the file, so a published event is left untouched.",
+      "invalid_event": "The event's details were not accepted.",
+      "floating_time": "No time zone given: read in the calendar's zone.",
+      "default_duration": "No end given: one hour assumed.",
+      "shifted_local_time": "The time does not exist that day (clock change): moved forward.",
+      "start_adjusted": "The first date was not part of the repeat: moved to the first one that is.",
+      "exdate_ignored": "Some skipped dates are not part of the repeat and were ignored.",
+      "override_fields_dropped": "Changed dates keep the series' title and place; only their times are imported.",
+      "override_dropped": "Some changed dates could not be used and were left out.",
+      "category_dropped": "The category is not one of this site's: left out.",
+      "kept_draft_private": "Marked private in the file: kept as a draft.",
+      "untitled": "No title: named “Untitled event”.",
+      "uid_generated": "No identifier in the file: one was made from the date and title.",
+      "description_truncated": "The description was cut to its maximum length."
+    },
+    "failure": {
+      "ics_encoding": "The file is not valid text (UTF-8). Save the calendar again and retry.",
+      "ics_invalid": "This does not look like a calendar file, or it is larger or more complex than an import accepts.",
+      "too_many_events": "The file has more events than one import takes. Split it and import the parts.",
+      "import_failed": "The import could not be completed. Nothing more was written.",
+      "importer_gone": "Your account can no longer import here, so the import was stopped."
+    },
+    "dropped": {
+      "ATTENDEE": "attendees",
+      "ORGANIZER": "organisers",
+      "VALARM": "alarms",
+      "ATTACH": "attachments",
+      "RELATED-TO": "relations",
+      "X-ALT-DESC": "rich descriptions",
+      "X-*": "extension properties",
+      "other": "other properties"
+    }
   }
 }

@@ -6,6 +6,11 @@ import { act } from './test-dom';
 export type Call = { url: string; method: string; body: unknown; headers: Headers };
 type Handler = (call: Call) => unknown;
 
+/** A JSON body parsed, a multipart one (an upload) kept as the raw text. */
+function parseBody(raw: string, type: string | null): unknown {
+  return type?.includes('multipart/form-data') ? raw : JSON.parse(raw);
+}
+
 export function stubFetch(routes: Record<string, Handler | unknown>): Call[] {
   const calls: Call[] = [];
   vi.stubGlobal(
@@ -18,7 +23,7 @@ export function stubFetch(routes: Record<string, Handler | unknown>): Call[] {
       const call = {
         url: url.pathname + url.search,
         method: request.method,
-        body: raw ? JSON.parse(raw) : null,
+        body: raw ? parseBody(raw, request.headers.get('content-type')) : null,
         headers: request.headers,
       };
       calls.push(call);
