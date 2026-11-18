@@ -38,7 +38,7 @@ describe('the recurrence preview', () => {
   it('shows each occurrence with its own offset across a clock change', async () => {
     stubFetch({
       [`GET ${API}/e1`]: () => eventDetail({ rrule: 'FREQ=DAILY;COUNT=2', revision: 1 }),
-      ['POST /api/events/recurrence/preview']: () => ({
+      'POST /api/events/recurrence/preview': () => ({
         occurrences: [
           {
             start: '2026-03-28T09:00:00Z',

@@ -490,6 +490,20 @@
       "needs_publish": "Veröffentlicht: nur wer veröffentlichen darf, kann sie ändern",
       "external": "Dieser Eintrag stammt aus einer anderen Quelle und kann hier nicht geändert werden",
       "lang_fallback": "Angezeigt auf {language}"
+    },
+    "writes": {
+      "moved": "Verschoben",
+      "resized": "Dauer geändert",
+      "stale": "Diese Veranstaltung wurde geändert, seit sie geladen wurde. Der Kalender wurde aktualisiert; versuchen Sie es erneut.",
+      "repeated_local_time": "Diese Uhrzeit gibt es in {zone} an diesem Tag zweimal; wählen Sie eine andere Zeit.",
+      "not_in_rule": "Wenn Sie die ganze Serie auf einen anderen Wochentag verschieben, ändert sich ihre Regel; öffnen Sie den Editor.",
+      "open_editor": "Editor öffnen"
+    },
+    "scope": {
+      "title": "Wiederkehrende Veranstaltung ändern",
+      "description": "{name} wiederholt sich. Die Änderung gilt für:",
+      "one": "Nur diesen Termin",
+      "all": "Alle Termine"
     }
   }
 }
