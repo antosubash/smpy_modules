@@ -83,13 +83,17 @@ class Filter(logging.Filter):
         """Redact the *rendered* message, never the template: rewriting ``/feed/%s.ics`` would
         eat its placeholder and break formatting. A message that holds nothing to hide is left
         exactly as it was; one that does becomes its redacted text with no arguments."""
+        if isinstance(record.args, tuple | dict) and record.args:
+            # Keep the arguments' *shape*: a formatter may unpack them (uvicorn's access line
+            # takes exactly five), so each string in them is redacted in place.
+            record.args = _clean(record.args, digests)
         try:
             rendered = record.getMessage()
         except Exception:  # a malformed record: the handler will report it, not leak it
             rendered = str(record.msg)
         cleaned = redact(rendered, digests=digests)
         if cleaned != rendered or redact(str(record.msg), digests=digests) != str(record.msg):
-            record.msg, record.args = cleaned, ()
+            record.msg, record.args = cleaned, ()  # sensitive text in the template itself
 
     def filter(self, record: logging.LogRecord) -> bool:
         digests = record.name.startswith(_DIGEST_LOGGERS)

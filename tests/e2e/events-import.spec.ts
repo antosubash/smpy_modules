@@ -48,7 +48,8 @@ test('a realistic file goes through preview, import and a second import', async 
   await shoot(page, '03-import-upload');
 
   await upload(page, cal.name, 'term.ics', FIXTURE);
-  await expect(page.getByRole('heading', { name: 'Preview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Preview' })).toBeFocused();
+  await expect(page.getByTestId('events-import-announce')).toContainText('Preview ready: 5 events');
   const table = page.getByRole('table');
   await expect(table.getByText('Imported lecture')).toBeVisible();
   await expect(table.getByText('Imported choir')).toBeVisible();
@@ -71,6 +72,8 @@ test('a realistic file goes through preview, import and a second import', async 
   // The same file again changes nothing.
   await upload(page, cal.name, 'term.ics', FIXTURE);
   await expect(page.getByRole('heading', { name: 'Preview' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Unchanged 4/ })).toBeVisible(); // the preview agrees
+  await expect(page.getByRole('button', { name: /^Update 0/ })).toBeVisible();
   await page.getByRole('button', { name: 'Import as drafts' }).click();
   await expect(page.getByRole('heading', { name: 'Result' })).toBeVisible();
   await expect(page.getByText('Created 0')).toBeVisible();
@@ -84,8 +87,8 @@ test('a file with too many events is refused with a readable message', async ({ 
     `BEGIN:VEVENT\r\nUID:h${n}@x\r\nDTSTART:20270301T080000Z\r\nDTEND:20270301T090000Z\r\nSUMMARY:E${n}\r\nEND:VEVENT\r\n`;
   const body = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${Array.from({ length: 5001 }, (_, n) => one(n)).join('')}END:VCALENDAR\r\n`;
   await upload(page, cal.name, 'huge.ics', Buffer.from(body));
-  await expect(page.getByText('The import failed')).toBeVisible();
-  await expect(page.getByText(/more events than one import takes/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The import failed' })).toBeFocused();
+  await expect(page.getByRole('alert')).toContainText(/more events than one import takes/);
   await shoot(page, '06-import-refused', { fullPage: true });
 });
 

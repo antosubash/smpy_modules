@@ -177,3 +177,19 @@ def test_another_modules_checksum_is_left_alone():
     leaked.name = "some_module.images"
     log_redact.Filter().filter(leaked)
     assert checksum not in leaked.getMessage()  # a path after /feed/ is still redacted
+
+
+def test_a_five_argument_access_line_keeps_its_shape_for_uvicorns_formatter():
+    """uvicorn's access formatter unpacks exactly five arguments; collapsing them made it fail
+    and lose the line."""
+    from uvicorn.logging import AccessFormatter
+
+    record = _record(
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:1", "GET", "/events/feed/evf_abcdefghijklmnopqrstuvwxyz0123.ics", "1.1", 200),
+    )
+    record.name = "uvicorn.access"
+    log_redact.Filter().filter(record)
+    assert len(record.args) == 5  # type: ignore[arg-type]
+    line = AccessFormatter("%(message)s", use_colors=False).format(record)
+    assert "/events/feed/<redacted>" in line and "evf_" not in line
