@@ -25,6 +25,14 @@ CASES = [
     (errors.NotRecurring, 422, "not_recurring"),
     (errors.NotAnOccurrence, 422, "not_an_occurrence"),
     (errors.DescriptionTooLong, 422, "description_too_long"),
+    (errors.SlugReserved, 422, "slug_reserved"),
+    # PR 5: private feeds and the import.
+    (errors.TokenLimit, 409, "token_limit"),
+    (errors.ImportBusy, 409, "import_busy"),
+    (errors.ImportState, 409, "import_state"),
+    (errors.ImportTooLarge, 413, "import_too_large"),
+    (errors.IcsInvalid, 422, "ics_invalid"),
+    (errors.PrivateFeedsUnavailable, 503, "private_feeds_unavailable"),
 ]
 
 EXTRA_CODES = [
@@ -62,3 +70,26 @@ def test_alternative_codes_keep_status(cls, code):
     assert exc.code == code
     assert exc.status_code == 422
     assert exc.detail
+
+
+async def test_stale_carries_the_current_revision_in_a_header_not_the_body():
+    app = FastAPI()
+    install_exception_handlers(app)
+
+    @app.get("/boom")
+    async def boom():
+        raise errors.Stale(7)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as http:
+        got = await http.get("/boom")
+    assert got.status_code == 409
+    assert set(got.json()) == {"detail", "code"}
+    assert got.headers["x-current-revision"] == "7"
+
+
+def test_import_failure_carries_a_code_only():
+    """Not an HTTP error: a parse step raises it, and the row keeps its code, never a message."""
+    failure = errors.ImportFailure("too_many_events")
+    assert failure.code == "too_many_events"
+    assert not isinstance(failure, errors.EventsError)
+    assert str(failure) == "too_many_events"

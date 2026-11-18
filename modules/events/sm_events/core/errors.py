@@ -2,8 +2,8 @@
 
 Services never import FastAPI, so they raise these and the app-level handler
 installed by :func:`install_exception_handlers` renders them. The body is
-``{"detail": ..., "code": ...}``; FastAPI's own request-validation 422 keeps its
-standard shape.
+``{"detail": ..., "code": ...}``, plus ``"field"`` when the refusal belongs to one
+input; FastAPI's own request-validation 422 keeps its standard shape.
 """
 
 from __future__ import annotations
@@ -20,12 +20,21 @@ class EventsError(Exception):
     status_code: int = 400
     code: str = "events_error"
     detail: str = "Events error"
+    headers: dict[str, str] | None = None
+    """Extra response headers; the body is always exactly ``detail`` and ``code``."""
+    field: str | None = None
+    """The request input the refusal belongs to (a dotted path such as ``times.end`` or
+    ``texts.de.slug``), when the server knows. It is the body's only extra key."""
 
-    def __init__(self, detail: str | None = None, code: str | None = None) -> None:
+    def __init__(
+        self, detail: str | None = None, code: str | None = None, field: str | None = None
+    ) -> None:
         if detail is not None:
             self.detail = detail
         if code is not None:  # else the class default stands
             self.code = code
+        if field is not None:
+            self.field = field
         super().__init__(self.detail)
 
 
@@ -80,8 +89,17 @@ class UnknownLocale(Invalid):
 
 
 class Stale(Conflict):
+    """The caller's ``expected_revision`` is not the event's. The current one rides
+    in a header (and on the instance), never in the body."""
+
     code = constants.STALE_CODE
     detail = constants.STALE_DETAIL
+
+    def __init__(self, current_revision: int | None = None) -> None:
+        super().__init__()
+        self.current_revision = current_revision
+        if current_revision is not None:
+            self.headers = {constants.CURRENT_REVISION_HEADER: str(current_revision)}
 
 
 class OverridesOrphaned(Conflict):
@@ -167,10 +185,62 @@ class DescriptionTooLong(Invalid):
     detail = constants.DESCRIPTION_TOO_LONG_DETAIL
 
 
+class SlugReserved(Invalid):
+    """An explicit slug that a public route segment already owns."""
+
+    code = constants.SLUG_RESERVED_CODE
+    detail = constants.SLUG_RESERVED_DETAIL
+
+
 class ServiceUnavailable(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 503
     code = "service_unavailable"
     detail = "Service unavailable"
+
+
+class TokenLimit(Conflict):
+    """The user already holds the most private links one calendar allows."""
+
+    code = constants.TOKEN_LIMIT_CODE
+    detail = constants.TOKEN_LIMIT_DETAIL
+
+
+class ImportBusy(Conflict):
+    code = constants.IMPORT_BUSY_CODE
+    detail = constants.IMPORT_BUSY_DETAIL
+
+
+class ImportState(Conflict):
+    code = constants.IMPORT_STATE_CODE
+    detail = constants.IMPORT_STATE_DETAIL
+
+
+class ImportTooLarge(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
+    status_code = 413
+    code = constants.IMPORT_TOO_LARGE_CODE
+    detail = constants.IMPORT_TOO_LARGE_DETAIL
+
+
+class IcsInvalid(Invalid):
+    code = constants.ICS_INVALID_CODE
+    detail = constants.ICS_INVALID_DETAIL
+
+
+class PrivateFeedsUnavailable(ServiceUnavailable):
+    """The caller's rights cannot be worked out without their session (the identity provider
+    keeps their roles), so a link could never serve anything: none is handed out."""
+
+    code = constants.PRIVATE_FEEDS_UNAVAILABLE_CODE
+    detail = constants.PRIVATE_FEEDS_UNAVAILABLE_DETAIL
+
+
+class ImportFailure(Exception):  # noqa: N818 - not an HTTP error
+    """An import step that cannot go on. Carries a failure ``code`` and nothing else: a
+    library's message can echo the file, so it is never kept."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 def install_exception_handlers(app: FastAPI) -> None:
@@ -179,5 +249,11 @@ def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(EventsError)
     async def _events_error(_request: Request, exc: EventsError) -> JSONResponse:
         return JSONResponse(
-            status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
+            status_code=exc.status_code,
+            content={
+                "detail": exc.detail,
+                "code": exc.code,
+                **({"field": exc.field} if exc.field else {}),
+            },
+            headers=exc.headers,
         )

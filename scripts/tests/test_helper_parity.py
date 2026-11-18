@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from parity_families import FAMILIES, NEWS, PB
+from parity_families import EVENTS, FAMILIES, NEWS, PB
 from parity_support import REPO, Copy, Family, problems
 
 
@@ -49,6 +49,8 @@ def test_per_viewer_vary_names_the_same_headers() -> None:
     pagebuilder = _literal(f"{PB}/web/public_cache.py", "VARY")
     news = _literal(f"{NEWS}/web/endpoints/public/_urls.py", "PER_VIEWER_VARY")
     assert pagebuilder == ", ".join(news)  # type: ignore[arg-type]
+    events = _literal(f"{EVENTS}/web/endpoints/public/_cache.py", "PER_VIEWER_VARY")
+    assert events == news
 
 
 def test_slug_bound_is_one_number() -> None:

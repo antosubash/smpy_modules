@@ -16,9 +16,25 @@ def build_api_router() -> APIRouter:
     for every route below. Not cosmetic: yield dependencies exit in reverse, and
     ``get_db`` - opened by the permission check - commits on its way out, which
     has to happen while the tenant is still bound."""
-    from sm_events.web.endpoints import calendars_api, categories_api, shares_api
+    from sm_events.web.endpoints import (
+        calendars_api,
+        categories_api,
+        events_actions_api,
+        events_api,
+        feed_tokens_api,
+        occurrences_api,
+        shares_api,
+    )
 
     router = APIRouter(dependencies=[Depends(bind_admin)])
-    for sub in (calendars_api.router, categories_api.router, shares_api.router):
+    for sub in (
+        calendars_api.router,
+        feed_tokens_api.router,
+        categories_api.router,
+        shares_api.router,
+        events_api.router,
+        events_actions_api.router,
+        occurrences_api.router,
+    ):
         router.include_router(sub)
     return router
