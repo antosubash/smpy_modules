@@ -17,6 +17,7 @@ from sqlalchemy import select
 
 from sm_events.core import constants
 from sm_events.core.tenancy import bound_tenant
+from sm_events.feeds.importing import policy
 from sm_events.feeds.importing.mapper import MappedItem
 from sm_events.models import Event, EventImport, EventImportItem
 
@@ -25,13 +26,20 @@ __all__ = ["existing_uids", "item_row"]
 
 async def existing_uids(
     db: Any, calendar_id: uuid.UUID, uids: Sequence[str]
-) -> dict[str, tuple[uuid.UUID, int, bool]]:
-    """``{uid: (event id, revision, trashed)}`` for the calendar's events, trash included."""
-    found: dict[str, tuple[uuid.UUID, int, bool]] = {}
+) -> dict[str, tuple[uuid.UUID, int, bool, bool]]:
+    """``{uid: (event id, revision, trashed, locked)}``, the calendar's events with the trash."""
+    found: dict[str, tuple[uuid.UUID, int, bool, bool]] = {}
     for start in range(0, len(uids), constants.IMPORT_UID_CHUNK):
         chunk = list(uids[start : start + constants.IMPORT_UID_CHUNK])
         stmt = (
-            select(Event.id, Event.uid, Event.revision, Event.is_deleted)
+            select(
+                Event.id,
+                Event.uid,
+                Event.revision,
+                Event.is_deleted,
+                Event.status,
+                Event.publish_at,
+            )
             .where(
                 Event.tenant_id == bound_tenant(),  # type: ignore[arg-type]
                 Event.calendar_id == calendar_id,  # type: ignore[arg-type]
@@ -40,12 +48,20 @@ async def existing_uids(
             .execution_options(include_deleted=True)
         )
         for row in await db.execute(stmt):
-            found[row.uid] = (row.id, row.revision, bool(row.is_deleted))
+            found[row.uid] = (
+                row.id,
+                row.revision,
+                bool(row.is_deleted),
+                policy.update_refused(private=True, status=row.status, publish_at=row.publish_at),
+            )
     return found
 
 
 def item_row(
-    imp: EventImport, seq: int, item: MappedItem, existing: dict[str, tuple[uuid.UUID, int, bool]]
+    imp: EventImport,
+    seq: int,
+    item: MappedItem,
+    existing: dict[str, tuple[uuid.UUID, int, bool, bool]],
 ) -> EventImportItem:
     verdict, reason, event_id, revision = "skip", item.skip, None, None
     if item.event is not None:
@@ -54,6 +70,8 @@ def item_row(
             verdict, reason = "new", None
         elif held[2]:
             reason = "uid_in_trash"
+        elif item.event.private_class and held[3]:
+            reason = policy.PRIVATE_KEPT  # the write would refuse it: the preview says so
         else:
             verdict, reason, event_id, revision = "update", None, held[0], held[1]
     return EventImportItem(

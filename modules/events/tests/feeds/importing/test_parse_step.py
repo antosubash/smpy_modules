@@ -162,3 +162,38 @@ async def test_categories_match_by_default_locale_name(db):
     await staging.parse_step(db, imp, owner="w", now=utcnow(), locales=LOCALES)
     item = (await db.execute(select(EventImportItem))).scalar_one()
     assert item.payload["category_id"] == str(cat.id)
+
+
+async def test_the_preview_shows_the_verdict_the_write_produces_for_private_items(db):
+    """A private item onto a published or scheduled event is previewed as a skip
+    (``private_kept``); onto a draft, or a public item onto a published one, as an update."""
+    cals = await seed(db)
+    await seed_event(db, cals["P"], uid="live@x", status="published")
+    await seed_event(db, cals["P"], uid="sched@x", publish_at=utcnow())
+    await seed_event(db, cals["P"], uid="draft@x", status="draft")
+    data = corpus.calendar(
+        *corpus.vevent("live@x", "CLASS:PRIVATE"),
+        *corpus.vevent("sched@x", "CLASS:CONFIDENTIAL"),
+        *corpus.vevent("draft@x", "CLASS:PRIVATE"),
+        *corpus.vevent("fresh@x", "CLASS:PRIVATE"),
+    )
+    other = corpus.calendar(*corpus.vevent("live@x"))
+    imp = await make_import(db, cals["P"], data=data)
+    await claim(db, tenant_id="default", import_id=imp.id, owner="w", now=utcnow())
+    await staging.parse_step(db, imp, owner="w", now=utcnow(), locales=LOCALES)
+    got = {
+        i.uid: (i.verdict, i.reason) for i in (await db.execute(select(EventImportItem))).scalars()
+    }
+    assert got == {
+        "live@x": ("skip", "private_kept"),
+        "sched@x": ("skip", "private_kept"),
+        "draft@x": ("update", None),
+        "fresh@x": ("new", None),
+    }
+    again = await make_import(db, cals["P"], data=other)
+    await claim(db, tenant_id="default", import_id=again.id, owner="w2", now=utcnow())
+    await staging.parse_step(db, again, owner="w2", now=utcnow(), locales=LOCALES)
+    item = (
+        await db.execute(select(EventImportItem).where(EventImportItem.import_id == again.id))
+    ).scalar_one()
+    assert (item.verdict, item.reason) == ("update", None)

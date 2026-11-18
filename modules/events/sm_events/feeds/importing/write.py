@@ -43,6 +43,7 @@ from sm_events.core import constants
 from sm_events.core.access.events import event_rights, require
 from sm_events.core.access.rights import writable_calendar
 from sm_events.core.errors import EventsError, Forbidden, NotFound, PublishRequired, Stale
+from sm_events.feeds.importing import policy
 from sm_events.feeds.importing.model import MappedEvent, MappedOverride
 from sm_events.models import Event, EventImport, EventImportItem, OccurrenceOverride
 from sm_events.models.enums import EventStatus
@@ -51,6 +52,11 @@ from sm_events.web.schemas.events_in import EventCreate, EventPatch
 from sm_events.web.schemas.texts import TextIn
 
 __all__ = ["Written", "write_item"]
+
+
+class PrivateKept(Exception):  # noqa: N818 - a verdict, not an error
+    """A private item meets a published or scheduled event (see :mod:`.policy`)."""
+
 
 Outcome = Literal["created", "updated", "unchanged", "skipped"]
 
@@ -158,7 +164,11 @@ def _create_body(imp: EventImport, mapped: MappedEvent, locale: str) -> EventCre
 async def _create(db: Any, imp: EventImport, mapped: MappedEvent, locales, now) -> Written:
     who = _principal(imp)
     calendar = await _calendar(db, imp)
-    publish = imp.publish and who.has(constants.PERM_PUBLISH) and not mapped.private_class
+    publish = policy.publish_new(
+        private=mapped.private_class,
+        requested=imp.publish,
+        may_publish=who.has(constants.PERM_PUBLISH),
+    )
     async with db.begin_nested():
         event = await create_core(
             db,
@@ -213,6 +223,10 @@ async def _update(db: Any, imp, item, mapped: MappedEvent, locales) -> Written:
     ).scalar_one_or_none()
     if event is None or event.calendar_id != imp.calendar_id:
         raise Stale
+    if policy.update_refused(
+        private=mapped.private_class, status=event.status, publish_at=event.publish_at
+    ):
+        raise PrivateKept
     require(await event_rights(db, who, event))
     patch = await _patch(db, imp, item, mapped, event, locales)
     try:
@@ -246,6 +260,8 @@ async def write_item(
             if item.verdict == "update":
                 return await _update(db, imp, item, mapped, locales)
             return await _create(db, imp, mapped, locales, now)
+    except PrivateKept:
+        return _skip(policy.PRIVATE_KEPT)
     except PublishRequired as exc:
         return _skip(exc.code)
     except Forbidden:
