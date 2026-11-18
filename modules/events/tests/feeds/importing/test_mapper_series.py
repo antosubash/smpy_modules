@@ -253,3 +253,19 @@ def test_a_date_valued_until_on_a_timed_rule_is_the_end_of_that_local_day():
         )
     ]
     assert days == [6, 13, 20, 27]
+
+
+def test_a_series_whose_first_occurrence_is_in_the_gap_is_skipped_with_the_modules_code():
+    lines = series(count=4)
+    lines[2] = f"DTSTART;{VIENNA}:20270328T023000"
+    lines[3] = f"DTEND;{VIENNA}:20270328T033000"
+    item = one(*lines)
+    assert item.skip == "invalid_local_time" and item.event is None
+
+
+def test_a_later_occurrence_in_the_gap_is_still_expanded_by_the_rule_not_refused():
+    lines = series(count=4)
+    lines[2] = f"DTSTART;{VIENNA}:20270321T023000"  # a Sunday before the change: valid
+    lines[3] = f"DTEND;{VIENNA}:20270321T033000"
+    item = one(*lines)
+    assert item.skip is None  # 28 March 02:30 does not exist: the module's expansion shifts it

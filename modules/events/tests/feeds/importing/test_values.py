@@ -143,11 +143,34 @@ def test_mixed_kinds_skip():
     )
 
 
-def test_gap_shifted():
-    got = when(
-        P("DTSTART", "20260329T023000", tzid=VIENNA), P("DTEND", "20260329T043000", tzid=VIENNA)
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        ("20260329T023000", "20260329T043000"),  # the start is in the gap, the end is valid
+        ("20260329T013000", "20260329T023000"),  # the start is valid, the end is in the gap
+        ("20270328T023000", "20270328T033000"),  # both in the gap (QA: was end_before_start)
+        ("20260329T023000", "20260329T024500"),  # both, still ordered
+    ],
+)
+def test_a_wall_time_the_clocks_skip_is_the_modules_own_invalid_local_time(start, end):
+    assert (
+        skip_code(P("DTSTART", start, tzid=VIENNA), P("DTEND", end, tzid=VIENNA))
+        == "invalid_local_time"
     )
-    assert got.start == "2026-03-29T03:30" and "shifted_local_time" in got.notes
+
+
+def test_a_time_just_outside_the_gap_is_fine():
+    got = when(
+        P("DTSTART", "20260329T030000", tzid=VIENNA), P("DTEND", "20260329T040000", tzid=VIENNA)
+    )
+    assert (got.start, got.end) == ("2026-03-29T03:00", "2026-03-29T04:00")
+
+
+def test_the_repeated_hour_is_its_first_occurrence_not_a_skip():
+    got = when(
+        P("DTSTART", "20261025T023000", tzid=VIENNA), P("DTEND", "20261025T033000", tzid=VIENNA)
+    )
+    assert (got.start, got.end) == ("2026-10-25T02:30", "2026-10-25T03:30")
 
 
 def test_fold_takes_the_first_occurrence():

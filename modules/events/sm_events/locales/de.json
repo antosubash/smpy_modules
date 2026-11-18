@@ -736,7 +736,8 @@
       "untitled": "Kein Titel: „Termin ohne Titel“.",
       "uid_generated": "Keine Kennung in der Datei: aus Datum und Titel gebildet.",
       "description_truncated": "Die Beschreibung wurde auf die Höchstlänge gekürzt.",
-      "kept_utc": "Ein sich wiederholender Termin in UTC: seine Zeiten bleiben in UTC und wandern nicht mit der Zeitumstellung."
+      "kept_utc": "Ein sich wiederholender Termin in UTC: seine Zeiten bleiben in UTC und wandern nicht mit der Zeitumstellung.",
+      "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: die Uhr überspringt sie."
     },
     "failure": {
       "ics_encoding": "Die Datei ist kein gültiger Text (UTF-8). Speichere den Kalender neu und versuche es erneut.",

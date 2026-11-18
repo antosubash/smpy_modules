@@ -736,7 +736,8 @@
       "untitled": "No title: named “Untitled event”.",
       "uid_generated": "No identifier in the file: one was made from the date and title.",
       "description_truncated": "The description was cut to its maximum length.",
-      "kept_utc": "A repeating event in UTC: its times stay in UTC, so they do not move with the clock change."
+      "kept_utc": "A repeating event in UTC: its times stay in UTC, so they do not move with the clock change.",
+      "invalid_local_time": "This time does not exist in the timezone: the clocks skip it."
     },
     "failure": {
       "ics_encoding": "The file is not valid text (UTF-8). Save the calendar again and retry.",

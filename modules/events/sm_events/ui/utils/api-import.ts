@@ -65,6 +65,7 @@ export const POLL_MS = 1000;
 export const SKIP_REASONS = [
   'unknown_timezone',
   'invalid_times',
+  'invalid_local_time',
   'end_before_start',
   'duration_too_long',
   'unsupported_rule',

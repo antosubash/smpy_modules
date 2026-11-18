@@ -22,7 +22,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Final
 from zoneinfo import ZoneInfo
 
-from sm_events.calendar.times import localize
+from sm_events.calendar.times import is_nonexistent, localize
 from sm_events.core import constants
 from sm_events.feeds.importing.scan import Prop
 from sm_events.feeds.importing.zones import resolve_tzid
@@ -125,6 +125,16 @@ def _local(instant: datetime, zone: str) -> str:
     return f"{text}:{local.second:02d}" if local.second else text
 
 
+def _refuse_gap(value: _Value, zone: str) -> None:
+    """A local wall time the clocks skip is the module's own ``invalid_local_time`` (what the
+    editor says for it), judged on the **raw** value: shifting it first could turn a gap into an
+    empty or reversed range that reads as something else."""
+    if value.clock is None or value.utc:
+        return
+    if is_nonexistent(datetime.combine(value.day, value.clock), ZoneInfo(value.tz or zone)):
+        raise ItemSkip(constants.INVALID_LOCAL_TIME_CODE)
+
+
 def _instant(value: _Value, zone: str, notes: list[str]) -> datetime:
     """The aware UTC instant of a timed value read in ``zone`` (its own TZID wins)."""
     assert value.clock is not None
@@ -195,6 +205,9 @@ def read_when(
     if recurring and start.utc and start.tz is None and into is None:
         zone = "UTC"
         notes.append("kept_utc")
+    _refuse_gap(start, calendar_tz)
+    if end is not None:
+        _refuse_gap(end, calendar_tz)
     begins = _instant(start, calendar_tz, notes)
     if end is not None:
         finishes = _instant(end, calendar_tz, notes)
