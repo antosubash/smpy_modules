@@ -54,14 +54,18 @@ async function openNewCalendar(page: Page) {
   return dialog;
 }
 
-test('the sidebar lists Events with Calendars and Categories, and /admin/events/ opens calendars', async ({
+test('the sidebar lists Events with Calendar, Calendars and Categories, and /admin/events/ is the calendar', async ({
   page,
 }) => {
   await page.goto('/admin/events/');
-  await expect(page).toHaveURL(new RegExp(`${CALENDARS}/?$`));
-  await expect(page.getByRole('heading', { name: 'Calendars', level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/events\/(\?.*)?$/);
+  await expect(page.getByRole('heading', { name: 'Calendar', level: 1 })).toBeVisible();
   const sidebar = page.locator('aside');
   await expect(sidebar.getByText('Events', { exact: true }).first()).toBeVisible();
+  await expect(sidebar.locator('a[href^="/admin/events"]').first()).toHaveAttribute(
+    'href',
+    '/admin/events/',
+  );
   // Named apart from News' "Categories", which news-admin.spec.ts finds by name.
   await expect(
     sidebar.locator(`a[href="${CALENDARS}"]`).getByText('Calendars', { exact: true }),

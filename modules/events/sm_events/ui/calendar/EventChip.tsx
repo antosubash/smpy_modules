@@ -19,7 +19,9 @@ export function EventChip({ occurrence: o, view, timeText, pending, lockReason }
   const word = statusWord(o, t);
   // A timed block in the week or day grid is a narrow column: time, title and status stack
   // instead of squeezing the title out of a single line.
-  const stacked = !o.all_day && (view === 'week' || view === 'day');
+  // A block under 45 minutes is too short for two lines: it keeps one.
+  const long = Date.parse(o.end) - Date.parse(o.start) >= 45 * 60_000;
+  const stacked = !o.all_day && (view === 'week' || view === 'day') && long;
   return (
     <span
       className={

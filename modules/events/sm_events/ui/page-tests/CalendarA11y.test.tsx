@@ -137,3 +137,11 @@ it('a timed block in week view stacks time and title so a narrow column keeps th
   expect(chip()?.textContent).toContain('Planning');
   await view.unmount();
 });
+
+it('a short block in week view keeps one line', async () => {
+  const short = occurrence({ end: '2026-03-23T09:15:00Z' });
+  const { view } = await open({ fetchOccurrences: fetcherOf(pageOf([short])) });
+  await click(buttonNamed('Week'));
+  expect(document.querySelector('[data-key="e1:0"] > span')?.className).not.toContain('flex-col');
+  await view.unmount();
+});
