@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import heapq
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -19,7 +19,10 @@ from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.listeners import current_tenant_id
 
 from sm_events.calendar import registry
+from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters, OccurrencePage
+from sm_events.calendar.plugin_runner import run_sources
+from sm_events.calendar.plugin_scope import plugin_calls
 from sm_events.calendar.sources import TRUNCATED, ReadContext, sort_key
 from sm_events.calendar.times import supported_instant
 from sm_events.core import constants
@@ -53,6 +56,11 @@ async def _merge(streams: list[AsyncIterator[Occurrence]]) -> AsyncIterator[Occu
             heapq.heappush(heap, (sort_key(following), index, following))
 
 
+async def _stream(items: Sequence[Occurrence]) -> AsyncIterator[Occurrence]:
+    for item in items:
+        yield item
+
+
 async def occurrences(
     db: Any,
     *,
@@ -62,12 +70,18 @@ async def occurrences(
     end: datetime,
     filters: OccurrenceFilters,
     default_locale: str,
+    source_viewer: SourceViewer | None = None,
 ) -> OccurrencePage:
     """What ``viewer`` may see in ``[start, end)``, sorted by ``(start, end, source, key)``.
 
     ``start`` and ``end`` are aware. ``tenant_id`` must be the tenant bound for
-    this call. Raises :class:`InvalidRange` for ``end <= start`` and for more than
-    366 days, and :class:`ValueError` for an instant outside the supported years."""
+    this call. Plugin sources are called first, each isolated and bounded (see
+    :mod:`sm_events.calendar.plugin_runner`), and their answers join the built-in stream
+    in the one order and under the one cap; ``source_viewer`` is who they are asked for
+    (``None`` for a signed-in viewer skips every plugin pair, see
+    :mod:`sm_events.calendar.plugin_scope`). Raises :class:`InvalidRange` for ``end <= start``
+    and for more than 366 days, and :class:`ValueError` for an instant outside the supported
+    years."""
     _aware(start, "start")
     _aware(end, "end")
     supported_instant(start)
@@ -85,7 +99,22 @@ async def occurrences(
         editor_url=_editor_url,
         locale=filters.locale,
     )
-    merged = _merge([registry.builtin_source().occurrences(db, ctx, start, end, filters)])
+    calls, skipped = await plugin_calls(db, viewer, source_viewer, filters)
+    ran = await run_sources(
+        db,
+        calls,
+        tenant_id=tenant_id,
+        viewer=None if viewer.user_id is None else source_viewer,
+        start=start,
+        end=end,
+        locale=filters.locale or default_locale,
+        default_locale=default_locale,
+    )
+    streams: list[AsyncIterator[Occurrence]] = []
+    if filters.sources is None or constants.SOURCE_EVENTS in filters.sources:
+        streams.append(registry.builtin_source().occurrences(db, ctx, start, end, filters))
+    streams.append(_stream(ran.items))
+    merged = _merge(streams)
     items: list[Occurrence] = []
     async for item in merged:
         items.append(item)
@@ -94,5 +123,7 @@ async def occurrences(
     await merged.aclose()
     over = len(items) > constants.MAX_OCCURRENCES
     return OccurrencePage(
-        items=items[: constants.MAX_OCCURRENCES], truncated=over or TRUNCATED in ctx.flags
+        items=items[: constants.MAX_OCCURRENCES],
+        truncated=over or TRUNCATED in ctx.flags or ran.truncated,
+        sources=[*ran.statuses, *skipped],
     )

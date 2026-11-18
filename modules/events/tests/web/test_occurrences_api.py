@@ -33,7 +33,8 @@ async def test_occurrences_api_bounds(client):
     exact = await client.get(
         f"{OCC}?start=2026-01-01T00:00:00Z&end=2027-01-02T00:00:00Z", headers=OWNER
     )
-    assert exact.status_code == 200 and exact.json() == {"items": [], "truncated": False}
+    assert exact.status_code == 200
+    assert exact.json() == {"items": [], "truncated": False, "sources": []}
     backwards = await client.get(
         f"{OCC}?start=2026-07-02T00:00:00Z&end=2026-07-01T00:00:00Z", headers=OWNER
     )
@@ -115,3 +116,63 @@ async def test_locale_query_picks_the_title(locales_client):
 async def test_anonymous_is_refused(client):
     got = await client.get(f"{OCC}?{JULY}")
     assert got.status_code in (401, 403)
+
+
+async def test_api_200_with_failing_source(client, monkeypatch):
+    from sm_events.calendar import registry
+
+    from tests.support.sources import FakeSource, install, raises
+
+    install(monkeypatch, FakeSource("acme:fake", raises))
+    try:
+        ids = await cast(client)
+        await seed_event(client, ids["I"], status="published")
+        await _enable(client, ids["I"], ["acme:fake"])
+        got = await client.get(f"{OCC}?{JULY}", headers=OWNER)
+        assert got.status_code == 200, got.text
+        body = got.json()
+        assert body["sources"] == [
+            {"id": "acme:fake", "calendar_id": ids["I"], "status": "failed", "code": "raised"}
+        ]
+        assert len(body["items"]) == 1 and body["items"][0]["source"] == "events"
+    finally:
+        registry.reset_registry()
+
+
+async def test_source_param(client, monkeypatch):
+    from sm_events.calendar import registry
+
+    from tests.support.sources import FakeSource, install, item, ok
+
+    fake = FakeSource("acme:fake", ok(item("a")))
+    install(monkeypatch, fake)
+    try:
+        ids = await cast(client)
+        await seed_event(client, ids["I"], status="published")
+        await _enable(client, ids["I"], ["acme:fake"])
+        both = await client.get(f"{OCC}?{JULY}", headers=OWNER)
+        assert {i["source"] for i in both.json()["items"]} == {"events", "acme:fake"}
+        only = await client.get(f"{OCC}?{JULY}&source=acme:fake", headers=OWNER)
+        assert {i["source"] for i in only.json()["items"]} == {"acme:fake"}
+        own = await client.get(f"{OCC}?{JULY}&source=events", headers=OWNER)
+        assert {i["source"] for i in own.json()["items"]} == {"events"}
+        assert own.json()["sources"] == []
+    finally:
+        registry.reset_registry()
+
+
+async def _enable(client, calendar_id, source_ids):
+    import uuid
+
+    from sm_events.models import Calendar
+    from sqlalchemy import select
+
+    from tests.support.events_http import run
+
+    async def go(db):
+        cal = (
+            await db.execute(select(Calendar).where(Calendar.id == uuid.UUID(calendar_id)))
+        ).scalar_one()
+        cal.sources = [{"id": i, "settings": {}} for i in source_ids]
+
+    await run(client, go)

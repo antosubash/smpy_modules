@@ -13,6 +13,7 @@ from sm_events.calendar.occurrences import occurrences
 from sm_events.core.tenancy import bound_tenant
 from sm_events.web.endpoints.deps import Principal, content_locales, event_db, require_view
 from sm_events.web.schemas.occurrences import OccurrenceParams
+from sm_events.web.services.source_viewer import source_viewer_from
 
 router = APIRouter(prefix="/occurrences", tags=["occurrences"], dependencies=[require_view])
 
@@ -29,4 +30,5 @@ async def read_occurrences(
         end=query.end,
         filters=query.filters,
         default_locale=content_locales(request)[0],
+        source_viewer=source_viewer_from(request, who),
     )

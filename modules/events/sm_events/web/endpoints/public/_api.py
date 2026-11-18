@@ -87,6 +87,9 @@ async def public_read(
             category_ids=category_ids,
             locale=locale,
             include_unpublished=False,
+            # Until the public grid shows plugin sources (a later commit), only this module's
+            # own events: a plugin is not even called for a public read.
+            sources=frozenset({constants.SOURCE_EVENTS}),
         ),
         default_locale=locales.default(),
     )
@@ -126,7 +129,8 @@ def api_router() -> APIRouter:
         return machine_response(
             request,
             settings,
-            page.model_dump_json().encode(),
+            # A public answer may be cached: it never carries a plugin's health.
+            page.model_dump_json(exclude={"sources"}).encode(),
             media_type=constants.JSON_MEDIA_TYPE,
             kind="api",
         )

@@ -9,6 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from sm_events.calendar.extension_types import SourceStatus
+
 __all__ = ["Occurrence", "OccurrenceFilters", "OccurrencePage"]
 
 
@@ -45,6 +47,9 @@ class OccurrencePage(BaseModel):
 
     items: list[Occurrence]
     truncated: bool
+    sources: list[SourceStatus] = []
+    """How each plugin source went (the built-in one is never listed). Only a console read
+    carries it: a public answer may be cached and must not vary with a plugin's health."""
 
 
 @dataclass(frozen=True)
@@ -55,5 +60,8 @@ class OccurrenceFilters:
     calendar_ids: frozenset[uuid.UUID] | None = None
     category_ids: frozenset[uuid.UUID] | None = None
     types: frozenset[str] | None = None
+    """Filters the built-in stream only: a plugin's item is always of the default type."""
+    sources: frozenset[str] | None = None
+    """``None``: every applicable source. ``SOURCE_EVENTS`` names the built-in one."""
     locale: str | None = None
     include_unpublished: bool = True

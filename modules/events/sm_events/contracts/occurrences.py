@@ -23,6 +23,7 @@ from simple_module_core.resources import ResourcePrincipal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_events.calendar import occurrences as _read
+from sm_events.calendar.extension_types import SourceViewer
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters, OccurrencePage
 from sm_events.core.tenancy import tenant_scope
 
@@ -45,14 +46,23 @@ async def occurrences(
     types: Iterable[str] | None = None,
     locale: str | None = None,
     default_locale: str = "en",
+    sources: Iterable[str] | None = None,
+    source_viewer: SourceViewer | None = None,
 ) -> OccurrencePage:
     """What ``viewer`` (``None``: the public) may see in ``[start, end)``, sorted
-    by ``(start, end, source, key)``. ``start`` and ``end`` are aware."""
+    by ``(start, end, source, key)``. ``start`` and ``end`` are aware.
+
+    ``sources`` names the sources to read (``None``: every applicable one; ``"events"`` is
+    this module's own). Plugin sources are called for the public view with no viewer, and
+    for a signed-in ``viewer`` only with ``source_viewer`` (who they are asked for); without
+    it every plugin pair of a signed-in read is skipped (``no_viewer`` in ``sources`` of the
+    answer), which fails safe."""
     who = viewer if viewer is not None else ResourcePrincipal(user_id=None, permissions=frozenset())
     filters = OccurrenceFilters(
         calendar_ids=_set(calendar_ids),
         category_ids=_set(category_ids),
         types=_set(types),
+        sources=_set(sources),
         locale=locale,
         include_unpublished=viewer is not None,
     )
@@ -65,4 +75,5 @@ async def occurrences(
             end=end,
             filters=filters,
             default_locale=default_locale,
+            source_viewer=source_viewer,
         )
