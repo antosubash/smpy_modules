@@ -33,6 +33,7 @@ from sm_events.web.schemas.overrides import (
 )
 from sm_events.web.schemas.workflow import ApproveIn, RejectIn
 from sm_events.web.services.events_out import render
+from sm_events.web.services.names import member_names
 
 router = APIRouter(tags=["events"], dependencies=[require_view])
 
@@ -104,22 +105,31 @@ async def _history_event(db: Any, who: Any, event_id: uuid.UUID) -> Event:
     return event
 
 
+def _revision_out(model: Any, row: Any, names: dict[str, str | None]) -> Any:
+    out = model.model_validate(row, from_attributes=True)
+    out.system = row.actor is None
+    out.actor_name = names.get(row.actor) if row.actor else None
+    return out
+
+
 @router.get(f"{EVENT}/revisions")
 async def list_revisions(
-    event_id: uuid.UUID, who: Principal, db=Depends(event_db)
+    event_id: uuid.UUID, request: Request, who: Principal, db=Depends(event_db)
 ) -> list[RevisionOut]:
     await _history_event(db, who, event_id)
     rows = await revisions.list_revisions(db, event_id)
-    return [RevisionOut.model_validate(r, from_attributes=True) for r in rows]
+    names = await member_names(request, db, [r.actor for r in rows if r.actor])
+    return [_revision_out(RevisionOut, r, names) for r in rows]
 
 
 @router.get(f"{EVENT}/revisions/{{number}}")
 async def get_revision(
-    event_id: uuid.UUID, number: RowNumber, who: Principal, db=Depends(event_db)
+    event_id: uuid.UUID, number: RowNumber, request: Request, who: Principal, db=Depends(event_db)
 ) -> RevisionDetail:
     await _history_event(db, who, event_id)
     row = await revisions.get_revision(db, event_id, number)
-    return RevisionDetail.model_validate(row, from_attributes=True)
+    names = await member_names(request, db, [row.actor] if row.actor else [])
+    return _revision_out(RevisionDetail, row, names)
 
 
 @router.post(f"{EVENT}/overrides")

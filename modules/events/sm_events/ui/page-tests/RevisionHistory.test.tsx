@@ -72,7 +72,7 @@ describe('revision history', () => {
     ]);
     expect(rows[0]?.textContent).toContain('Rejected');
     expect(rows[0]?.textContent).toContain('Add the room');
-    expect(rows[0]?.textContent).toContain('A team member');
+    expect(rows[0]?.textContent).toContain('Unknown user');
     expect(rows[1]?.textContent).toContain('System');
     expect(rows[0]?.textContent).toContain('3 Jun 2026, 12:00');
     await click(document.querySelector('[aria-label="View revision 3"]'));
@@ -89,6 +89,37 @@ describe('revision history', () => {
     const dialog = document.querySelector('[role="dialog"]');
     expect(dialog?.querySelector('[role="alert"]')?.textContent).toContain('The request failed');
     expect(dialog?.textContent).not.toContain('No history yet.');
+    await view.unmount();
+  });
+
+  it('names the member inside an isolate, else says unknown, else system', async () => {
+    const row = (number: number, actor: string | null, name: string | null) => ({
+      number,
+      action: 'updated',
+      actor,
+      actor_name: name,
+      system: actor === null,
+      created_at: '2026-06-01T10:00:00Z',
+      note: null,
+    });
+    const { view } = await open(
+      {},
+      {
+        [`GET ${API}/e1/revisions`]: () => [
+          row(3, null, null),
+          row(2, 'u2', null),
+          row(1, 'u1', 'Olga Owner'),
+        ],
+      },
+    );
+    await click(view.button('History'));
+    await flush();
+    const rows = [...document.querySelectorAll('[role="dialog"] ol > li')];
+    expect(rows[2]?.querySelector('bdi')?.textContent).toBe('Olga Owner');
+    expect(rows[2]?.textContent).not.toContain('Unknown user');
+    expect(rows[1]?.textContent).toContain('Unknown user');
+    expect(rows[0]?.textContent).toContain('System');
+    expect(rows[0]?.textContent).not.toContain('Unknown user');
     await view.unmount();
   });
 });

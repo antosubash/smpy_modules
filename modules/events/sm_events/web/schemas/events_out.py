@@ -80,6 +80,11 @@ class RevisionOut(BaseModel):
     number: int
     action: str
     actor: str | None
+    actor_name: str | None = None
+    """The actor's display name, resolved like a calendar owner's; ``None`` for the
+    beat, for a non-member and for a label that carries an address."""
+    system: bool = False
+    """No actor at all (the beat), as opposed to an actor whose name is unknown."""
     created_at: datetime
     note: str | None
 

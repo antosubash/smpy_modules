@@ -154,7 +154,8 @@ The share picker needs three trimmed characters, matches a user whose label has
 no at-sign (any variant) by name or exact full address, and a user whose label
 has one only by the exact full address (compared NFC-normalised and
 case-insensitively); it never parses labels. It masks every address, bare or inside a label, unless the
-query is the full address. Keep calendar responses naming an owner (`owner_name`)
+query is the full address. Keep calendar responses naming an owner (`owner_name`) and revision rows
+naming their actor (`actor_name`, same resolver `web/services/names.py`)
 only for an active member of the bound tenant with a display name: a label that
 carries an address resolves to `null`, never a masked or raw address (that is
 the picker's, for owners and managers alone). A failing name lookup must leave

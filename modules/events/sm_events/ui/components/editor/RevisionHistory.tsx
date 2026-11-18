@@ -138,8 +138,14 @@ function HistoryList({
               </Button>
             </div>
             <span className="text-muted-foreground">
-              {row.actor === null ? t(copy.actor_system) : t(copy.actor_user)} ·{' '}
-              {formatInstant(row.created_at, timezone, locale)}
+              {row.actor_name ? (
+                <Name>{row.actor_name}</Name>
+              ) : row.system || row.actor === null ? (
+                t(copy.actor_system)
+              ) : (
+                t(copy.actor_unknown)
+              )}{' '}
+              · {formatInstant(row.created_at, timezone, locale)}
             </span>
             {row.note && (
               <span>

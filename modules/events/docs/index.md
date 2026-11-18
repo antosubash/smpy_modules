@@ -182,7 +182,11 @@ form for a locked event.
 
 Every write, the beat's included, increments `revision` and records a revision
 with its action, actor (`null` for the beat) and, for a rejection or dropped
-overrides, a note. The newest 100 are kept. History is read-only. A write's first
+overrides, a note. The newest 100 are kept. History is read-only. Its rows carry
+`actor_name`, resolved in one batch with the owner-name rules above (an actor who
+is not a named member is `null`), and `system: true` for the beat's rows, which
+have no actor at all; the console shows the name, else "Unknown user", else
+"System". A write's first
 statement is a compare-and-set on `expected_revision`: a stale one is 409
 `stale` and writes nothing. The editor then loads the newer event, shows the
 fields that differ and offers "Load their version" or "Save mine over theirs",

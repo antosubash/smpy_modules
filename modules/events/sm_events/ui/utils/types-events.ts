@@ -128,6 +128,10 @@ export type Revision = {
   number: number;
   action: string;
   actor: string | null;
+  /** The member's display name; `null` for a non-member, an address label or the beat. */
+  actor_name: string | null;
+  /** No actor at all (the beat), as opposed to an actor whose name is unknown. */
+  system: boolean;
   created_at: string;
   note: string | null;
 };

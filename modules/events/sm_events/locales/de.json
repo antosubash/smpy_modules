@@ -403,7 +403,7 @@
     "view": "Ansehen",
     "view_for": "Version {number} ansehen",
     "actor_system": "System",
-    "actor_user": "Ein Teammitglied",
+    "actor_unknown": "Unbekannter Benutzer",
     "snapshot": "Version {number} wie gespeichert",
     "snapshot_title": "Titel",
     "snapshot_when": "Wann",

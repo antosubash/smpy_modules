@@ -403,7 +403,7 @@
     "view": "View",
     "view_for": "View revision {number}",
     "actor_system": "System",
-    "actor_user": "A team member",
+    "actor_unknown": "Unknown user",
     "snapshot": "Revision {number} as it was saved",
     "snapshot_title": "Title",
     "snapshot_when": "When",
