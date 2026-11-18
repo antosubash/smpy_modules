@@ -591,10 +591,7 @@
     "subscribe": {
       "title": "Abonnieren",
       "hint": "Fügen Sie diese Veranstaltungen Ihrem eigenen Kalender hinzu. Er aktualisiert sich selbst.",
-      "feed": "Kalenderlink (https)",
-      "webcal": "In der Kalender-App öffnen",
-      "copy": "Link kopieren",
-      "copied": "Link kopiert"
+      "feed": "Kalenderlink (https)"
     },
     "grid": {
       "loading": "Kalender wird geladen…"
@@ -645,8 +642,6 @@
     "created_warning": "Du siehst diesen Link nicht noch einmal. Wer ihn hat, sieht, was du in diesem Kalender sehen darfst.",
     "link": "Privater Kalenderlink",
     "webcal": "In deiner Kalender-App öffnen",
-    "copy": "Link kopieren",
-    "copied": "Link kopiert",
     "done": "Ich habe ihn kopiert",
     "mine": "Deine Links",
     "everyone": "Links aller",
@@ -681,7 +676,6 @@
     "description": "Fügen Sie diesem Kalender Termine aus anderen Modulen hinzu. Was eine Quelle zeigt, bestimmen die Zugriffsregeln des jeweiligen Moduls.",
     "loading": "Quellen werden geladen…",
     "none": "Auf diesem Server sind keine Quellen installiert.",
-    "enable": "In diesem Kalender anzeigen",
     "public": "Öffentlich",
     "public_hint": "Kann auch auf der öffentlichen Website erscheinen",
     "not_installed": "Nicht installiert",

@@ -591,10 +591,7 @@
     "subscribe": {
       "title": "Subscribe",
       "hint": "Add these events to your own calendar. It updates itself.",
-      "feed": "Calendar link (https)",
-      "webcal": "Open in your calendar app",
-      "copy": "Copy link",
-      "copied": "Link copied"
+      "feed": "Calendar link (https)"
     },
     "grid": {
       "loading": "Loading the calendar…"
@@ -645,8 +642,6 @@
     "created_warning": "You will not see this link again. Anyone who has it sees what you can see in this calendar.",
     "link": "Private calendar link",
     "webcal": "Open in your calendar app",
-    "copy": "Copy link",
-    "copied": "Link copied",
     "done": "I have copied it",
     "mine": "Your links",
     "everyone": "Everyone’s links",
@@ -681,7 +676,6 @@
     "description": "Add dates from other modules to this calendar. What a source shows is decided by that module's own access rules.",
     "loading": "Loading sources…",
     "none": "No sources are installed on this server.",
-    "enable": "Show on this calendar",
     "public": "Public",
     "public_hint": "May also appear on the public site",
     "not_installed": "Not installed",

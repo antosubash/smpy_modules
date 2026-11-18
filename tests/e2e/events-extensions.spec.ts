@@ -10,6 +10,7 @@ import {
   wednesday,
 } from './events-calendar-helpers';
 import { publishEvent } from './events-seed';
+import { shoot } from './events-shots';
 import { login, moduleCsrfHeader } from './helpers';
 import {
   apiCreateRecord,
@@ -29,7 +30,6 @@ import {
  */
 
 test.use({ viewport: { width: 1440, height: 1100 } });
-const SHOTS = '.skill-state/qa/pr6-shots';
 const LABEL = 'Records with a date';
 let problems: string[] = [];
 
@@ -100,14 +100,14 @@ test('enable the source in the Sources dialog, see the record, open it', async (
   await dialog.getByLabel(LABEL).check();
   await dialog.getByLabel('Record type').selectOption(s.key);
   await dialog.getByLabel('Date field').selectOption('due');
-  await dialog.screenshot({ path: `${SHOTS}/01-sources-dialog.png` });
+  await shoot(dialog, '01-sources-dialog');
   await dialog.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(dialog).toBeHidden();
 
   await page.goto(calendarUrl(s.calendar.id, 'month', s.day));
   await expect(chip(page, 'Kick-off meeting')).toBeVisible();
   await expect(chip(page, 'Grant report due')).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/02-calendar-with-records.png` });
+  await shoot(page, '02-calendar-with-records');
   await chip(page, 'Grant report due').click();
   await page.getByRole('link', { name: 'Open record' }).click();
   await expect(page).toHaveURL(new RegExp(`/admin/records/${s.key}/${s.uuid}$`));
@@ -173,7 +173,7 @@ test('a setting that no longer fits shows a notice and the calendar keeps workin
   const notice = page.getByTestId('source-status');
   await expect(notice).toContainText(`${LABEL} could not be loaded`);
   await expect(chip(page, 'Grant report due')).toHaveCount(0);
-  await page.screenshot({ path: `${SHOTS}/03-source-status-notice.png` });
+  await shoot(page, '03-source-status-notice');
 });
 
 test('German: the dialog, the filter and the notice', async ({ page, context }) => {
@@ -191,5 +191,5 @@ test('German: the dialog, the filter and the notice', async ({ page, context }) 
   await page.goto(calendarUrl(s.calendar.id, 'month', s.day));
   await expect(chip(page, 'Grant report due')).toBeVisible();
   await expect(page.getByRole('group', { name: 'Quellen' })).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/06-de.png` });
+  await shoot(page, '06-de');
 });
