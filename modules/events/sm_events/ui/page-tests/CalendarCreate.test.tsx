@@ -98,3 +98,14 @@ it('never starts a draft on a hidden calendar (K7)', async () => {
   expect(options).toEqual(['c2']);
   await view.unmount();
 });
+
+it('a slot selected with nothing writable shown opens no dialog (BUG-1)', async () => {
+  const readOnly = calendarInfo({ id: 'c3', name: 'Board', can_write_events: false });
+  for (const calendars of [[readOnly], [TEAM, readOnly]]) {
+    const { view } = await open(calendars, { calendars: ['c3'] });
+    await act(async () => fakeGrid.select(slot));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(fakeGrid.last?.editing?.creating).toBe(false);
+    await view.unmount();
+  }
+});

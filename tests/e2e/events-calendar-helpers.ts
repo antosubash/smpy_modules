@@ -166,8 +166,11 @@ export async function resizeBy(page: Page, target: Locator, by: number) {
   await page.mouse.up();
 }
 
-/** A user who may view and edit events but not publish them; returns the email. */
-export async function seedWriter(page: Page): Promise<string> {
+/** A user who may view and edit events but not publish them (or holds `permissions`); returns the email. */
+export async function seedWriter(
+  page: Page,
+  permissions = ['events.view', 'events.edit'],
+): Promise<string> {
   const email = `cal-writer-${uniqueSlug('w').replace(/-/g, '')}@example.com`;
   const created = await page.request.post('/api/users/admin', {
     headers: { 'content-type': 'application/json' },
@@ -181,7 +184,7 @@ export async function seedWriter(page: Page): Promise<string> {
   const id = users.find((u) => u.email === email)?.id;
   const granted = await page.request.put(`/api/permissions/users/${id}`, {
     headers: { 'content-type': 'application/json' },
-    data: { permissions: ['events.view', 'events.edit'] },
+    data: { permissions },
   });
   expect(granted.status(), await granted.text()).toBe(200);
   return email;

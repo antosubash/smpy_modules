@@ -47,9 +47,11 @@ type Props = {
 export function QuickCreateDialog({ slot, onClose, ...rest }: Props) {
   const { t } = useT();
   const copy = keys.events.calendar.create;
+  // Never without a calendar to put the event on: no empty select, no link without an id.
+  const open = slot !== null && rest.calendars.some((c) => c.can_write_events);
   return (
-    <Dialog open={slot !== null} onOpenChange={(open) => !open && onClose()}>
-      {slot && (
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      {slot && open && (
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t(copy.title)}</DialogTitle>

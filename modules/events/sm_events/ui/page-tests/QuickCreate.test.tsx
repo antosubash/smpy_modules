@@ -44,6 +44,15 @@ async function open(slot: CreateSlot, calendars: CalendarInfo[] = [VIENNA], pref
 }
 const select = () => field('quick-calendar') as HTMLSelectElement;
 
+describe('without a writable calendar', () => {
+  it('renders no dialog and no link without a calendar id', async () => {
+    const { view } = await open(TIMED, [{ ...VIENNA, can_write_events: false }]);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.body.innerHTML).not.toContain('edit/new?calendar=&');
+    await view.unmount();
+  });
+});
+
 describe('the slot', () => {
   it("prefills local times in the calendar's zone and names it", async () => {
     const { view } = await open(TIMED);

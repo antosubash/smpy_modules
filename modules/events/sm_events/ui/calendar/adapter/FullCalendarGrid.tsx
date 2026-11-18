@@ -117,9 +117,10 @@ export default function FullCalendarGrid({
         selectable={Boolean(editing?.canCreate)}
         selectMirror
         // A click selects one slot, so `select` covers it; `dateClick` is the same slot again.
-        select={(info) => editing?.onCreate(toSlot(info))}
+        select={(info) => editing?.canCreate && editing.onCreate(toSlot(info))}
         dateClick={(info) =>
-          editing?.onCreate(
+          editing?.canCreate &&
+          editing.onCreate(
             toSlot({
               start: info.date,
               end: null,
