@@ -54,6 +54,7 @@ from sm_events.core.constants.public import (
     UPCOMING_BLOCK_MAX,
     XML_MEDIA_TYPE,
 )  # isort: skip
+from sm_events.core.constants.reminders import *  # noqa: F403 - reminders (PR 8)
 
 from sm_events.core.constants.names import MODULE_NAME  # isort: skip
 

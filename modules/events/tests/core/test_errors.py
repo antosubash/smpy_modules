@@ -123,3 +123,29 @@ async def test_extension_codes(cls, status, code):
         response = await client.get("/x")
     assert response.status_code == status
     assert response.json() == {"detail": cls.detail, "code": code}
+
+
+def _reminder_cases():
+    from sm_events.core import errors_reminders as rem
+
+    return [
+        (rem.FollowLimit, 409, "follow_limit"),
+        (rem.NotPublished, 409, "not_published"),
+        (rem.InvalidLead, 422, "invalid_lead"),
+        (rem.RemindersUnavailable, 503, "reminders_unavailable"),
+    ]
+
+
+@pytest.mark.parametrize(("cls", "status", "code"), _reminder_cases())
+async def test_reminder_codes(cls, status, code):
+    app = FastAPI()
+    install_exception_handlers(app)
+
+    @app.get("/x")
+    async def raiser():
+        raise cls()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        response = await client.get("/x")
+    assert response.status_code == status
+    assert response.json() == {"detail": cls.detail, "code": code}
