@@ -9,6 +9,7 @@ here, by slug, by an old slug, by parent or by category.
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Iterable, Mapping
 from typing import Any
@@ -22,6 +23,8 @@ from sm_events.core.access.public import public_calendars, public_events
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Calendar, Category, Event, EventText, Redirect
 
+_SLUG = re.compile(constants.SLUG_PATTERN)
+
 __all__ = [
     "calendar_by_slug",
     "category_by_slug",
@@ -32,11 +35,20 @@ __all__ = [
     "public_parent",
     "public_texts",
     "resolve_event_redirect",
+    "valid_slug",
 ]
+
+
+def valid_slug(value: str, max_len: int = constants.SLUG_MAX) -> bool:
+    """Could ``value`` be a stored slug? One that cannot (a NUL byte, a space, too long) is
+    answered as a miss without asking the database, which would refuse some of them."""
+    return len(value) <= max_len and _SLUG.fullmatch(value) is not None
 
 
 async def event_by_slug(db: Any, locale: str, slug: str) -> tuple[Event, EventText] | None:
     """The public event whose text in ``locale`` has ``slug``, with that text."""
+    if not valid_slug(slug, constants.TEXT_SLUG_MAX):
+        return None
     stmt = (
         public_events()
         .join(EventText, col(EventText.event_id) == col(Event.id))
@@ -55,6 +67,8 @@ async def resolve_event_redirect(db: Any, locale: str, slug: str) -> str | None:
     """The current slug in ``locale`` of the event an old ``slug`` pointed at, only when
     that event is public and has a text there. Anything else is ``None``: a 301 to a
     draft's current slug would publish the slug."""
+    if not valid_slug(slug, constants.TEXT_SLUG_MAX):
+        return None
     redirect = Redirect.__table__  # type: ignore[attr-defined]
     stmt = (
         select(EventText.slug)
@@ -73,6 +87,8 @@ async def resolve_event_redirect(db: Any, locale: str, slug: str) -> str | None:
 
 
 async def calendar_by_slug(db: Any, slug: str) -> Calendar | None:
+    if not valid_slug(slug):
+        return None
     return (await db.execute(public_calendars().where(Calendar.slug == slug))).scalars().first()
 
 
@@ -126,6 +142,8 @@ async def public_categories(db: Any) -> list[Category]:
 
 
 async def category_by_slug(db: Any, slug: str) -> Category | None:
+    if not valid_slug(slug):
+        return None
     return next((c for c in await public_categories(db) if c.slug == slug), None)
 
 

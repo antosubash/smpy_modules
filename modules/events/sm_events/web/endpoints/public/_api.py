@@ -32,7 +32,7 @@ from sm_events.web.endpoints.public._errors import PublicErrorRoute
 from sm_events.web.endpoints.public._respond import machine_response
 from sm_events.web.schemas.public import PublicOccurrenceParams
 
-__all__ = ["api_router", "occurrence_day", "public_page"]
+__all__ = ["api_router", "occurrence_day", "public_page", "public_read"]
 
 
 def occurrence_day(item: Occurrence) -> date | None:
@@ -61,7 +61,7 @@ def _public(item: Occurrence, texts: dict[str, Any], locale: str) -> Occurrence 
     )
 
 
-async def public_page(
+async def public_read(
     db: Any,
     *,
     tenant: str,
@@ -71,8 +71,9 @@ async def public_page(
     category_ids: frozenset[uuid.UUID] | None,
     locale: str,
 ) -> OccurrencePage:
-    """What an anonymous visitor may see in ``[start, end)``: the read plus one texts query."""
-    page = await occurrences(
+    """The occurrences read for the anonymous principal, as it comes back (event ids included:
+    for the server's own use, never sent out; see :func:`public_page`)."""
+    return await occurrences(
         db,
         tenant_id=tenant,
         viewer=ANONYMOUS,
@@ -86,6 +87,13 @@ async def public_page(
         ),
         default_locale=locales.default(),
     )
+
+
+async def public_page(db: Any, **query: Any) -> OccurrencePage:
+    """What an anonymous visitor may see in ``[start, end)``: the read plus one texts query,
+    with public addresses and no internal ids."""
+    page = await public_read(db, **query)
+    locale = query["locale"]
     texts = await public_texts(db, {i.event_id for i in page.items if i.event_id})
     shown = [p for item in page.items if (p := _public(item, texts, locale)) is not None]
     return OccurrencePage(items=shown, truncated=page.truncated)

@@ -228,7 +228,7 @@ async def seed_public_fixture(db: Any, tag: str = "") -> PublicFixture:
     draft = await event(pub, "draft", status="draft", category_id=draft_cat.id)
     in_review = await event(pub, "in-review", status="in_review")
     scheduled = await event(
-        pub, "scheduled", status="draft", publish_at=datetime(2030, 1, 1, tzinfo=UTC)
+        pub, "scheduled-later", status="draft", publish_at=datetime(2030, 1, 1, tzinfo=UTC)
     )
     trashed = await event(pub, "trashed")
     await db.delete(trashed)

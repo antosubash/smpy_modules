@@ -39,6 +39,8 @@ class Surface:
     name: str
     kind: Literal["page", "listing"]
     url: Url
+    status: int = 200
+    """What a listing answers (the 404's suggestions are listings that answer 404)."""
 
 
 def event_page(fx: PublicFixture, locale: str, hidden: str | None) -> str:
@@ -61,6 +63,14 @@ def surfaces(fx: PublicFixture, locale: str) -> list[Surface]:
     return [
         Surface("event page", "page", event_page),
         Surface("event ics", "page", event_ics),
+        Surface("index", "listing", lambda f, loc, _: _urls.index_path(loc)),
+        Surface("calendar page", "listing", lambda f, loc, _: _urls.calendar_path(f.pub.slug, loc)),
+        Surface(
+            "404 suggestions",
+            "listing",
+            lambda f, loc, _: _urls.event_path("no-such-event", loc),
+            status=404,
+        ),
         Surface("occurrences api", "listing", lambda f, loc, _: _api_url(loc)),
         Surface(
             "all calendars feed", "listing", lambda f, loc, _: _urls.calendar_ics_path(None, loc)

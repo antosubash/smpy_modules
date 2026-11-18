@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi import Response
 from sm_events.integrations import pagebuilder
 from sqlalchemy import event
 
 from tests.support.public import INERTIA
+
+# No tenant bound around the app: "resolved no tenant" has to mean that.
+pytestmark = pytest.mark.unbound_tenant
 
 
 async def test_without_pagebuilder(public_client):

@@ -40,16 +40,6 @@ from tests.web.public.leaks import (
 )
 
 
-@pytest.fixture(autouse=True)
-def _clock(monkeypatch):
-    """The fixture's events are in 2026; the feeds' window is around "now"."""
-    from datetime import UTC, datetime
-
-    from sm_events.web.endpoints.public import _feeds
-
-    monkeypatch.setattr(_feeds, "utcnow", lambda: datetime(2026, 4, 1, tzinfo=UTC))
-
-
 @pytest.fixture
 async def fx(public_locales_client) -> PublicFixture:
     return await seed_public(public_locales_client)
@@ -79,7 +69,7 @@ async def test_hidden_event_absent_everywhere(public_locales_client, fx, hidden,
                 assert "etag" not in got.headers, surface.name
         else:
             got = await public_locales_client.get(surface.url(fx, locale, None), headers=INERTIA)
-            assert got.status_code == 200, surface.name
+            assert got.status_code == surface.status, surface.name
             assert_absent(got.text, fx)
 
 
@@ -201,7 +191,7 @@ async def test_other_tenant_absent_everywhere(public_multi_client):
             else:
                 # a's own listing, which must hold none of b's; b's calendar's own address is a 404
                 got = await public_multi_client.get(surface.url(mine, locale, None), headers=as_a)
-                assert got.status_code == 200, surface.name
+                assert got.status_code == surface.status, surface.name
                 for event in theirs.public_events:
                     assert theirs.slugs[f"{event.id}:en"] not in got.text, surface.name
                     assert event.uid not in got.text, surface.name

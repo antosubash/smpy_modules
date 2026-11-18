@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col
 
 from sm_events.calendar.slugs import is_slug_conflict
+from sm_events.content.public_read import valid_slug
 from sm_events.core.access.public import public_calendars
 from sm_events.core.clock import utcnow
 from sm_events.core.tenancy import bound_tenant
@@ -79,6 +80,8 @@ async def resolve(db: Any, slug: str) -> str | None:
     """The current slug of the calendar an old ``slug`` pointed at, only if that
     calendar is public (trashed and non-public ones are not: Ruling 3). A redirect
     onto its own slug is ``None``."""
+    if not valid_slug(slug):
+        return None
     stmt = (
         public_calendars()
         .join(CalendarRedirect, col(CalendarRedirect.calendar_id) == col(Calendar.id))

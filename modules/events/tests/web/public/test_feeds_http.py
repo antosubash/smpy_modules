@@ -17,11 +17,6 @@ from tests.support.public import seed_public
 NOW = datetime(2026, 4, 1, tzinfo=UTC)
 
 
-@pytest.fixture(autouse=True)
-def _clock(monkeypatch):
-    monkeypatch.setattr(_feeds, "utcnow", lambda: NOW)
-
-
 @pytest.fixture
 async def fx(public_locales_client):
     return await seed_public(public_locales_client)

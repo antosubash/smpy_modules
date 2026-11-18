@@ -13,7 +13,7 @@ from fastapi import Request, Response
 from sm_events.core.settings import EventsSettings
 from sm_events.web.endpoints.public import _cache
 
-__all__ = ["machine_response"]
+__all__ = ["conditional", "machine_response"]
 
 
 def machine_response(
@@ -31,3 +31,14 @@ def machine_response(
         response.headers["content-length"] = str(len(body))
     _cache.apply(response, request, settings, kind=kind, etag=_cache.body_etag(body))
     return _cache.not_modified(request, response.headers) or response
+
+
+def conditional(
+    request: Request, settings: EventsSettings, *, kind: _cache.Kind, etag: str
+) -> Response | None:
+    """A 304 when ``If-None-Match`` matches ``etag`` under the policy of ``kind``, else ``None``.
+    A policy that sends no validator (a signed-in page, ``public_cache_seconds = 0``) never 304s.
+    Asked after the row passed the gate, before the page is rendered."""
+    probe = Response()
+    _cache.apply(probe, request, settings, kind=kind, etag=etag)
+    return _cache.not_modified(request, probe.headers)

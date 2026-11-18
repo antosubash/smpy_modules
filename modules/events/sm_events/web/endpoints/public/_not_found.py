@@ -20,16 +20,26 @@ from typing import Any
 from fastapi import Request, Response
 from simple_module_hosting.inertia_deps import InertiaDep
 
-from sm_events.core import constants
+from sm_events.core import constants, locales
 from sm_events.integrations import pagebuilder
-from sm_events.web.endpoints.public import _urls
+from sm_events.web.endpoints.public import _clock, _urls
+from sm_events.web.endpoints.public._listing import upcoming
 
 __all__ = ["not_found"]
 
 
 async def _suggestions(db: Any, *, locale: str) -> list[dict[str, Any]]:
-    """The next public occurrences to offer instead. Filled with the upcoming list."""
-    return []
+    """The next public occurrences to offer instead: the same for every cause and never derived
+    from what was requested, so they say nothing about it."""
+    items = await upcoming(
+        db,
+        locale=locale,
+        default_locale=locales.default(),
+        now=_clock.now(),
+        calendar_id=None,
+        category_id=None,
+    )
+    return [item.model_dump(mode="json") for item in items[: constants.NOT_FOUND_SUGGESTIONS]]
 
 
 async def not_found(

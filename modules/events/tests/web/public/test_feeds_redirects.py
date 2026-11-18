@@ -9,18 +9,13 @@ import pytest
 from sm_events.calendar import calendars
 from sm_events.content.texts import apply_texts
 from sm_events.models import Calendar, Event, Redirect
-from sm_events.web.endpoints.public import _feeds, _urls
+from sm_events.web.endpoints.public import _urls
 from sm_events.web.schemas.calendars import CalendarPatch
 from sm_events.web.schemas.texts import TextIn
 
 from tests.support.public import seed_public, tenant_header
 
 NOW = datetime(2026, 4, 1, tzinfo=UTC)
-
-
-@pytest.fixture(autouse=True)
-def _clock(monkeypatch):
-    monkeypatch.setattr(_feeds, "utcnow", lambda: NOW)
 
 
 def events_of(response) -> list[icalendar.Event]:
