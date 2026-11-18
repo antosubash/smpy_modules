@@ -59,21 +59,39 @@ def as_user(user_id: str, *perms: str, tenant: str | None = None) -> dict[str, s
     return headers
 
 
+ROLE_MAP = {
+    "viewer": ["events.view"],
+    "manager": ["events.view", "events.manage"],
+    "admin": ["*"],
+}
+"""What ``build_app`` maps onto the permission registry, so a user's directory roles resolve."""
+
+
 class Directory:
-    """A user directory over a dict: ``{id: (email, full_name, is_active)}``."""
+    """A user directory over a dict: ``{id: (email, full_name, is_active)}``.
+
+    ``roles`` is ``{id: role names}``; a user with no entry has none, and an entry of ``None``
+    is what a provider that keeps roles in the IdP reports (roles unknown). Roles are returned
+    only when asked for (``with_roles=True``), as the real directory does."""
 
     entity_type = None
 
-    def __init__(self, users: dict[str, tuple[str, str | None, bool]] | None = None) -> None:
+    def __init__(
+        self,
+        users: dict[str, tuple[str, str | None, bool]] | None = None,
+        roles: dict[str, tuple[str, ...] | None] | None = None,
+    ) -> None:
         self.users = users or {}
+        self.roles = roles or {}
         self.searches: list[str | None] = []
 
-    def _user(self, uid: str) -> DirectoryUser:
+    def _user(self, uid: str, *, with_roles: bool = False) -> DirectoryUser:
         email, name, active = self.users[uid]
-        return DirectoryUser(id=uid, email=email, full_name=name, is_active=active)
+        roles = self.roles.get(uid, ()) if with_roles else None
+        return DirectoryUser(id=uid, email=email, full_name=name, is_active=active, roles=roles)
 
     async def get_many(self, db, ids, *, with_roles=False):
-        return {i: self._user(i) for i in ids if i in self.users}
+        return {i: self._user(i, with_roles=with_roles) for i in ids if i in self.users}
 
     async def search(self, db, term, *, limit):
         self.searches.append(term)
@@ -119,6 +137,8 @@ async def build_app(
     module.settings = EventsSettings(**(settings or {}))
     permissions = PermissionRegistry()
     module.register_permissions(permissions)
+    for role, perms in ROLE_MAP.items():
+        permissions.map_role(role, perms)
     app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     app.state.sm = SimpleNamespace(
         db=state,
