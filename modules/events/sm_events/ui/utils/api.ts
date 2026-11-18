@@ -16,6 +16,22 @@ export class ApiError extends Error {
   }
 }
 
+/** The error codes the editor branches on (`sm_events/core/constants.py`). */
+export const CODE = {
+  stale: 'stale',
+  overridesOrphaned: 'overrides_orphaned',
+  slugTaken: 'slug_taken',
+  defaultLocaleRequired: 'default_locale_required',
+} as const;
+
+const hasCode = (error: unknown, status: number, code: string): boolean =>
+  error instanceof ApiError && error.status === status && error.code === code;
+
+/** The event changed under the caller: 409 `stale`. */
+export const isStale = (error: unknown): boolean => hasCode(error, 409, CODE.stale);
+/** A series change would orphan overrides: 409 `overrides_orphaned`. */
+export const isOrphaning = (error: unknown): boolean => hasCode(error, 409, CODE.overridesOrphaned);
+
 /** The request hit something that is gone: a 404, whatever its code. */
 export const isGone = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 404;
@@ -33,6 +49,26 @@ export function errorText(error: unknown, gone?: string): string {
     owner_not_allowed: keys.events.errors.owner_not_allowed,
     unknown_locale: keys.events.errors.unknown_locale,
     default_locale_required: keys.events.errors.default_locale_required,
+    stale: keys.events.errors.stale,
+    overrides_orphaned: keys.events.errors.overrides_orphaned,
+    has_sub_events: keys.events.errors.has_sub_events,
+    invalid_transition: keys.events.errors.invalid_transition,
+    publish_required: keys.events.errors.publish_required,
+    invalid_rrule: keys.events.errors.invalid_rrule,
+    rrule_frequency_refused: keys.events.errors.rrule_frequency_refused,
+    start_not_in_rule: keys.events.errors.start_not_in_rule,
+    invalid_local_time: keys.events.errors.invalid_local_time,
+    end_before_start: keys.events.errors.end_before_start,
+    duration_too_long: keys.events.errors.duration_too_long,
+    range_too_long: keys.events.errors.range_too_long,
+    invalid_range: keys.events.errors.invalid_range,
+    unknown_category: keys.events.errors.unknown_category,
+    unknown_type: keys.events.errors.unknown_type,
+    invalid_parent: keys.events.errors.invalid_parent,
+    immutable_field: keys.events.errors.immutable_field,
+    not_recurring: keys.events.errors.not_recurring,
+    not_an_occurrence: keys.events.errors.not_an_occurrence,
+    description_too_long: keys.events.errors.description_too_long,
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);
