@@ -176,3 +176,21 @@ async def _enable(client, calendar_id, source_ids):
         cal.sources = [{"id": i, "settings": {}} for i in source_ids]
 
     await run(client, go)
+
+
+async def test_type_filter_over_http(client, monkeypatch):
+    from sm_events.calendar import registry
+
+    from tests.support.sources import FakeSource, install, item, ok
+
+    install(monkeypatch, FakeSource("acme:fake", ok(item("a"))))
+    try:
+        ids = await cast(client)
+        await seed_event(client, ids["I"], status="published")
+        await _enable(client, ids["I"], ["acme:fake"])
+        default = await client.get(f"{OCC}?{JULY}&type=event", headers=OWNER)
+        assert {i["source"] for i in default.json()["items"]} == {"events", "acme:fake"}
+        other = await client.get(f"{OCC}?{JULY}&type=acme:talk", headers=OWNER)
+        assert other.json()["items"] == [] and other.json()["sources"] == []
+    finally:
+        registry.reset_registry()

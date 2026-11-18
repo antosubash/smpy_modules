@@ -111,3 +111,14 @@ async def test_a_category_filter_excludes_every_plugin_source(db, plugins):
     filtered = OccurrenceFilters(category_ids=frozenset({uuid.uuid4()}))
     assert await plugin_calls(db, OWNER, SV, filtered) == ([], [])
     assert await plugin_calls(db, ANONYMOUS, None, filtered) == ([], [])
+
+
+@pytest.mark.parametrize(
+    ("types", "called"),
+    [({"event"}, True), ({"event", "acme:talk"}, True), ({"acme:talk"}, False), (set(), False)],
+)
+async def test_a_type_filter_keeps_plugins_only_for_the_default_type(db, plugins, types, called):
+    """A plugin's item has the default type, so a read narrowed to other types excludes it."""
+    await enable(db, I=["acme:pub"])
+    calls, _ = await plugin_calls(db, OWNER, SV, OccurrenceFilters(types=frozenset(types)))
+    assert bool(calls) is called

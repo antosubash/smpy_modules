@@ -101,7 +101,7 @@ async def test_public_source_items_reach_the_grid_and_the_feeds(public_locales_c
     api = (await public_locales_client.get(surfaces(fx)["api"])).json()
     mine = [i for i in api["items"] if i["source"] == "acme:pub"]
     assert [(i["title"], i["key"], i["editable"], i["event_id"]) for i in mine] == [
-        ("SPY-PUBLIC", "acme:pub:q1", False, None)
+        ("SPY-PUBLIC", f"acme:pub:{fx.pub.id}:q1", False, None)
     ]
     for name in ("calendar_ics", "cal_ics"):
         got = await public_locales_client.get(surfaces(fx)[name])
@@ -180,7 +180,7 @@ async def test_keys_and_urls_are_namespaced_and_http_only(public_locales_client,
     public._behave = ok(item(clash, "Clash", url="https://ok.example/x", **WHEN))
     body = (await public_locales_client.get(surfaces(fx)["api"])).json()["items"]
     mine = [i for i in body if i["source"] == "acme:pub"]
-    assert [i["key"] for i in mine] == [f"acme:pub:{clash}"]
+    assert [i["key"] for i in mine] == [f"acme:pub:{fx.pub.id}:{clash}"]
     assert len({i["key"] for i in body}) == len(body)  # unique across sources
     ics = await public_locales_client.get(surfaces(fx)["cal_ics"])
     uids = [str(e["UID"]) for e in icalendar.Calendar.from_ical(ics.content).walk("VEVENT")]
@@ -260,6 +260,9 @@ async def test_one_source_on_two_public_calendars_gives_two_distinct_uids(
             await db.commit()
     got = await public_locales_client.get(surfaces(fx)["calendar_ics"])
     uids = [str(e["UID"]) for e in icalendar.Calendar.from_ical(got.content).walk("VEVENT")]
+    api = (await public_locales_client.get(surfaces(fx)["api"])).json()["items"]
+    keys = sorted(i["key"] for i in api if i["source"] == "acme:pub")
+    assert len(keys) == 2 and len(set(keys)) == 2  # the grid's keys differ per calendar too
     mine = sorted(u for u in uids if u.startswith("acme:pub:"))
     assert mine == sorted([f"acme:pub:{fx.pub.id}:q1", f"acme:pub:{second_id}:q1"])
 

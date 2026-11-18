@@ -53,7 +53,9 @@ def plugin_vevents(
     out: list[icalendar.Event] = []
     seen: set[str] = set()
     for item in items:
-        uid = single_line(f"{item.source}:{item.calendar_id}:{item.key}")[: constants.UID_MAX]
+        uid = single_line(f"{item.source}:{item.key}")[
+            : constants.UID_MAX
+        ]  # key: calendar id first
         if uid in seen:
             continue
         seen.add(uid)

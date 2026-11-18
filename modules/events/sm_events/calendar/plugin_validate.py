@@ -113,7 +113,7 @@ def _one(
     supported_instant(span.ends_at)
     return PluginOccurrence(
         source=source_id,
-        key=item.key,
+        key=f"{calendar.id}:{item.key}",  # unique per calendar wherever two are shown together
         calendar_id=calendar.id,
         start=span.starts_at,
         end=span.ends_at,

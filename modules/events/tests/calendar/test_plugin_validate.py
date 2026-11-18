@@ -163,7 +163,7 @@ def test_outside_window_dropped_not_an_error():
         timed("touch", start=utc(2026, 6, 30), end=utc(2026, 7, 1)),
     )
     got = run([inside, before, after, touching], start=utc(2026, 7, 1), end=utc(2026, 7, 10))
-    assert [o.key for o in got] == ["in"]
+    assert [o.key.split(":", 1)[1] for o in got] == ["in"]
 
 
 def test_invalid_item_outside_the_window_still_rejects_the_answer():

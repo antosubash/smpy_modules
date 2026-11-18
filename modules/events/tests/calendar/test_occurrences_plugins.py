@@ -110,12 +110,15 @@ async def test_builtin_never_in_statuses(db, fake):
     assert page.sources == []
 
 
-async def test_types_filter_ignores_plugins(db, fake):
+async def test_types_filter_excludes_plugins_unless_it_names_the_default_type(db, fake):
+    """A plugin's item is of the default type: a filter narrower than that drops it."""
     cal = await setup(db, None)
     await seed_event(db, cal, title="own", status="published", type="event")
     fake._behave = ok(at(7, 9, "a"))
-    page = await read(db, OccurrenceFilters(types=frozenset({"nothing"})))
-    assert [o.source for o in page.items] == ["acme:fake"]
+    other = await read(db, OccurrenceFilters(types=frozenset({"nothing"})))
+    assert other.items == [] and other.sources == [] and fake.calls == []
+    default = await read(db, OccurrenceFilters(types=frozenset({"event"})))
+    assert sorted(o.source for o in default.items) == ["acme:fake", "events"]
 
 
 async def test_sources_events_only_excludes_plugins(db, fake):
@@ -170,3 +173,15 @@ async def test_category_filter_excludes_plugins_console_read(db, fake):
     fake._behave = ok(at(7, 9, "a"))
     page = await read(db, OccurrenceFilters(category_ids=frozenset({uuid.uuid4()})))
     assert page.items == [] and page.sources == [] and fake.calls == []
+
+
+async def test_keys_are_unique_across_calendars(db, fake):
+    cals = await seed_calendars(db)
+    for letter in ("I", "U"):
+        cals[letter].sources = [{"id": "acme:fake", "settings": {}}]
+    await db.flush()
+    fake._behave = ok(at(7, 9, "same"))
+    page = await read(db)
+    keys = [o.key for o in page.items if o.source == "acme:fake"]
+    assert len(keys) == 2 and len(set(keys)) == 2
+    assert {o.calendar_id for o in page.items} == {cals["I"].id, cals["U"].id}

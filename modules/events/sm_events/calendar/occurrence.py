@@ -67,7 +67,7 @@ class OccurrenceFilters:
     calendar_ids: frozenset[uuid.UUID] | None = None
     category_ids: frozenset[uuid.UUID] | None = None
     types: frozenset[str] | None = None
-    """Filters the built-in stream only: a plugin's item is always of the default type."""
+    """A plugin's item is of the default type: a filter without that type excludes it."""
     sources: frozenset[str] | None = None
     """``None``: every applicable source. ``SOURCE_EVENTS`` names the built-in one."""
     locale: str | None = None

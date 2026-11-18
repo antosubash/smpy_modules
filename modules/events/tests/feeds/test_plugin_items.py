@@ -27,6 +27,7 @@ def occ(key="k", title="T", **kw) -> Occurrence:
         "type": "event",
         **kw,
     }
+    fields["key"] = f"{fields['calendar_id']}:{key}"  # what the validator makes of a plugin's key
     return PluginOccurrence(**fields)
 
 

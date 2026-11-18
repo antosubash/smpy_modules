@@ -72,7 +72,7 @@ async def test_ok(db):
     src = FakeSource(behave=ok(item("b", "B"), item("a", "A")))
     result = await one(db, src)
     assert status(result) == ("ok", None)
-    assert [o.key for o in result.items] == ["a", "b"] or len(result.items) == 2
+    assert sorted(o.key.split(":", 1)[1] for o in result.items) == ["a", "b"]
     assert {o.source for o in result.items} == {"acme:fake"} and not result.truncated
 
 
@@ -165,7 +165,7 @@ async def test_calls_capped(db):
 async def test_flood_truncated(db):
     result = await one(db, FakeSource(behave=floods(600)))
     assert status(result) == ("truncated", None) and result.truncated
-    assert [o.key for o in result.items] == [f"k{i}" for i in range(500)]
+    assert [o.key.split(":", 1)[1] for o in result.items] == [f"k{i}" for i in range(500)]
 
 
 async def test_a_million_items_are_refused_unread(db):
@@ -262,7 +262,7 @@ async def test_items_from_sources_are_merged_in_order(db):
     late = FakeSource("acme:late", ok(item("l", start=day9, end=day10)))
     early = FakeSource("acme:early", ok(item("e")))
     result = await run(db, [Call(cal, entry(s.id), s) for s in (late, early)])
-    assert [o.key for o in result.items] == ["e", "l"]
+    assert [o.key.split(":", 1)[1] for o in result.items] == ["e", "l"]
 
 
 async def test_session_that_cannot_be_restored_skips_the_rest(db, monkeypatch):
