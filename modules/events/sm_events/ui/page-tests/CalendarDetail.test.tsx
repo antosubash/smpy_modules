@@ -101,7 +101,11 @@ it('offers Move… for an editable occurrence', async () => {
   const { view } = await open({ editing, fetchOccurrences: fetcherOf(pageOf([occurrence()])) });
   await act(async () => fakeGrid.open('e1:0', document.body));
   await click(buttonNamed('Move…'));
-  expect(editing.onMove).toHaveBeenCalledWith(expect.objectContaining({ key: 'e1:0' }));
+  // The popover's element comes along, so the dialog can give focus back to it.
+  expect(editing.onMove).toHaveBeenCalledWith(
+    expect.objectContaining({ key: 'e1:0' }),
+    document.body,
+  );
   await view.unmount();
 });
 

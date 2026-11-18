@@ -11,7 +11,16 @@ import timeGridPlugin from '@fullcalendar/react/timegrid';
 import { type Ref, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import type { GridHandle, GridProps } from '../types';
 import './calendar.css';
-import { allowDrop, occurrenceOf, toEventInput, toRangeChange, VIEW_NAMES } from './mapping';
+import {
+  allowDrop,
+  type EditedEvent,
+  occurrenceOf,
+  type Placement,
+  toChange,
+  toEventInput,
+  toRangeChange,
+  VIEW_NAMES,
+} from './mapping';
 import { baseOptions, localeOptions } from './options';
 
 const PLUGINS = [dayGridPlugin, timeGridPlugin, listPlugin, classicTheme];
@@ -56,7 +65,35 @@ export default function FullCalendarGrid({
     if (date !== reportedDate.current) calendar.current?.getApi().gotoDate(date);
   }, [date]);
 
-  const events = useMemo(() => items.map((o) => toEventInput(o, editing)), [items, editing]);
+  // Where drops are shown while their writes run. A fresh page of items already carries the
+  // server's answer, so the entries end with it.
+  const placed = useRef(new Map<string, Placement>());
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `items` is the trigger, not a read
+  useEffect(() => placed.current.clear(), [items]);
+  const events = useMemo(
+    () => items.map((o) => toEventInput(o, editing, placed.current.get(o.key))),
+    [items, editing],
+  );
+
+  /** A drop or resize: show it at once, ask the shell, and put it back on any refusal. */
+  async function apply(
+    kind: 'move' | 'resize',
+    info: { event: EditedEvent & { extendedProps: Record<string, unknown> }; revert: () => void },
+  ) {
+    const occurrence = occurrenceOf(info.event);
+    if (!editing) return info.revert();
+    const change = toChange(kind, occurrence, info.event);
+    placed.current.set(occurrence.key, { start: change.start, end: change.end });
+    let keep = false;
+    try {
+      keep = await editing.onChange(change);
+    } finally {
+      if (!keep) {
+        placed.current.delete(occurrence.key);
+        info.revert();
+      }
+    }
+  }
 
   return (
     <section className="sm-ev-calendar" aria-label={ariaLabel}>
@@ -69,6 +106,7 @@ export default function FullCalendarGrid({
         initialDate={date}
         timeZone={timeZone}
         events={events}
+        editable={Boolean(editing)}
         noEventsContent={noEventsText}
         // A React node, never `{html}`: a title is text.
         eventContent={({ event, timeText }) => renderChip(occurrenceOf(event), timeText)}
@@ -81,6 +119,8 @@ export default function FullCalendarGrid({
         eventClick={({ event, el }) =>
           onEventOpen(occurrenceOf(event), elements.current.get(event.id) ?? el)
         }
+        eventDrop={(info) => void apply('move', info)}
+        eventResize={(info) => void apply('resize', info)}
         eventAllow={(span, moving) =>
           moving ? allowDrop(occurrenceOf(moving), span.allDay) : true
         }

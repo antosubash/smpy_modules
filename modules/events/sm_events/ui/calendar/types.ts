@@ -62,7 +62,8 @@ export type CalendarEditing = {
   onCreate: (slot: CreateSlot) => void;
   /** Resolves `true` to keep the grid's optimistic position, `false` to revert it. */
   onChange: (change: OccurrenceChange) => Promise<boolean>;
-  onMove: (occurrence: Occurrence) => void;
+  /** Opens the Move dialog; `returnFocus` is the event's element, for when it closes. */
+  onMove: (occurrence: Occurrence, returnFocus?: HTMLElement | null) => void;
   pendingKeys: ReadonlySet<string>;
 };
 

@@ -183,3 +183,22 @@ describe('views and ranges', () => {
     expect(occurrenceOf({ extendedProps: { occurrence: base } })).toBe(base);
   });
 });
+
+describe('toEventInput with an optimistic placement', () => {
+  it('shows a timed occurrence where the user dropped it', () => {
+    const input = toEventInput(base, editing(['e1:0']), {
+      start: '2026-03-30T09:00:00Z',
+      end: '2026-03-30T10:00:00Z',
+    });
+    expect(input).toMatchObject({
+      start: '2026-03-30T09:00:00Z',
+      end: '2026-03-30T10:00:00Z',
+      startEditable: false,
+    });
+  });
+  it('shows an all-day occurrence on the dropped dates', () => {
+    const allDay = { ...base, all_day: true, start_date: '2026-03-29', end_date: '2026-03-30' };
+    const input = toEventInput(allDay, editing(), { start: '2026-03-31', end: '2026-04-01' });
+    expect(input).toMatchObject({ start: '2026-03-31', end: '2026-04-01', allDay: true });
+  });
+});

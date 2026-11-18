@@ -29,6 +29,7 @@ export default function CalendarPage({
   categories,
   default_timezone,
   content_locales,
+  editor_url,
 }: Props) {
   const { t } = useT();
   const copy = keys.events.calendar;
@@ -55,6 +56,7 @@ export default function CalendarPage({
           categories={categories}
           defaultTimezone={default_timezone}
           contentLocales={content_locales}
+          editorUrl={editor_url}
           initialState={initialState}
           onStateChange={mirror}
         />
