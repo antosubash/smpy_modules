@@ -78,7 +78,7 @@ MENU_LABEL_KEY_CATEGORIES = "events.menu.categories"
 MENU_ICON_CATEGORIES = "tag"
 MENU_LABEL_EVENTS = "Events"
 MENU_LABEL_KEY_EVENTS = "events.menu.events"
-MENU_ICON_EVENTS = "calendar-days"
+MENU_ICON_EVENTS = "list"
 
 # Bounds on times, ranges, rules, revisions and pages.
 MAX_EVENT_DAYS = 366
