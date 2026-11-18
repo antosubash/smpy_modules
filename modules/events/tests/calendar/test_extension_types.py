@@ -76,7 +76,6 @@ def test_builtin_type_is_the_models_default():
     assert constants.BUILTIN_TYPE == DEFAULT_EVENT_TYPE
 
 
-@pytest.mark.xfail(strict=True, reason="Registrar and RegistryFrozenError arrive with the registry")
 def test_contract_surface():
     expected = sorted([*TYPES, "Registrar", "RegistryFrozenError"])
     assert list(extensions.__all__) == expected
