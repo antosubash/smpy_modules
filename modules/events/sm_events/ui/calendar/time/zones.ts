@@ -84,3 +84,29 @@ function validDate(text: string): boolean {
     return false;
   }
 }
+
+/** A wall time the zone's clocks skip (the spring gap): `toInstant` would move it forward,
+ *  so what is sent is not what was meant. */
+export function isNonexistent(local: string, timeZone: string): boolean {
+  const wall = Temporal.PlainDateTime.from(local);
+  const back = Temporal.PlainDateTime.from(toLocal(toInstant(local, timeZone), timeZone));
+  return Temporal.PlainDateTime.compare(wall, back) !== 0;
+}
+
+/** Whole calendar days from one date to another (negative when earlier). */
+export const daysBetween = (from: string, to: string): number =>
+  Temporal.PlainDate.from(from).until(Temporal.PlainDate.from(to), { largestUnit: 'day' }).days;
+
+export const sameInstant = (a: string, b: string): boolean =>
+  Temporal.Instant.from(a).equals(Temporal.Instant.from(b));
+
+/** Elapsed milliseconds from one instant to another. */
+export const millisBetween = (from: string, to: string): number =>
+  Temporal.Instant.from(to).epochMilliseconds - Temporal.Instant.from(from).epochMilliseconds;
+
+export const plusMillis = (instantIso: string, millis: number): string =>
+  Temporal.Instant.from(instantIso).add({ milliseconds: millis }).toString();
+
+/** Two wall times with the same clock reading, whatever their dates. */
+export const sameTimeOfDay = (a: string, b: string): boolean =>
+  Temporal.PlainDateTime.from(a).toPlainTime().equals(Temporal.PlainDateTime.from(b).toPlainTime());

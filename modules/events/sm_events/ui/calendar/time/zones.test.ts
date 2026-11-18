@@ -3,9 +3,15 @@ import type { CalendarInfo } from '../types';
 import {
   addDays,
   dateIn,
+  daysBetween,
   gridTimeZone,
   isDate,
+  isNonexistent,
   isRepeatedSecond,
+  millisBetween,
+  plusMillis,
+  sameInstant,
+  sameTimeOfDay,
   shiftLocal,
   toInstant,
   toLocal,
@@ -107,5 +113,29 @@ describe('dates', () => {
     expect(isDate('2026-02-30')).toBe(false);
     expect(isDate('2026-3-30')).toBe(false);
     expect(isDate('soon')).toBe(false);
+  });
+});
+
+describe('helpers for writes', () => {
+  it('isNonexistent finds the spring gap only', () => {
+    expect(isNonexistent('2026-03-29T02:30', 'Europe/Vienna')).toBe(true);
+    expect(isNonexistent('2026-03-29T03:30', 'Europe/Vienna')).toBe(false);
+    expect(isNonexistent('2026-10-25T02:30', 'Europe/Vienna')).toBe(false);
+    expect(isNonexistent('2026-03-08T02:30', 'America/New_York')).toBe(true);
+  });
+  it('daysBetween counts calendar days across a clock change', () => {
+    expect(daysBetween('2026-03-28', '2026-03-30')).toBe(2);
+    expect(daysBetween('2026-03-30', '2026-03-28')).toBe(-2);
+  });
+  it('plusMillis and millisBetween are exact elapsed time', () => {
+    expect(plusMillis('2026-03-29T00:30:00Z', 3_600_000)).toBe('2026-03-29T01:30:00Z');
+    expect(millisBetween('2026-03-29T00:00:00Z', '2026-03-29T02:00:00Z')).toBe(7_200_000);
+  });
+  it('sameInstant ignores the spelling of the offset', () => {
+    expect(sameInstant('2026-03-23T10:00:00+01:00', '2026-03-23T09:00:00Z')).toBe(true);
+  });
+  it('sameTimeOfDay compares wall time only', () => {
+    expect(sameTimeOfDay('2026-03-23T10:00', '2026-07-01T10:00:00')).toBe(true);
+    expect(sameTimeOfDay('2026-03-23T10:00', '2026-03-23T11:00')).toBe(false);
   });
 });

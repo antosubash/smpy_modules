@@ -51,7 +51,8 @@ export type CalendarState = {
 export type CreateSlot = { allDay: boolean; start: string; end: string };
 export type OccurrenceChange = {
   occurrence: Occurrence;
-  kind: 'move' | 'resize';
+  /** `reschedule` (the Move dialog) names both ends; a drag moves or resizes one. */
+  kind: 'move' | 'resize' | 'reschedule';
   start: string;
   end: string;
   allDay: boolean;
