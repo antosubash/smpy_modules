@@ -14,6 +14,17 @@ session would roll back the first's transaction. Only there, and only when :func
 answers ``None``, :func:`_run_shared` runs the call in an always-rolled-back SAVEPOINT of the
 caller's session instead. A file or Postgres engine never reaches it (a test pins that).
 
+**What a plugin sees.** Its own connection reads *committed* data only: not the request's
+uncommitted rows (an event created earlier in the same request is invisible to a source until the
+request commits). Nothing in events relies on the opposite: the built-in stream reads on the
+request's session, a plugin's source on its own.
+
+**What the timeout bounds.** On Postgres the database stops the statement at the budget
+(``SET LOCAL statement_timeout``, about the budget in practice). On SQLite the shielded discard
+waits for a running statement to finish (a 30-million-row recursive query returned after 8.6 s
+against a 0.5 s timeout), and a plugin write blocks on the host's write lock for SQLite's busy
+timeout (5 s) before it is refused. SQLite is the development default; production runs Postgres.
+
 This guards against plugin *bugs*, not malice: a plugin is code the operator installed.
 A plugin that swallows ``CancelledError`` or blocks the loop with synchronous work
 cannot be pre-empted.

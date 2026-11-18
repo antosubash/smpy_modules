@@ -101,7 +101,12 @@ source's status instead of the generic `raised`.
   refused unread.
 * **Limits you must know.** A plugin that blocks the event loop with synchronous CPU work,
   or swallows `CancelledError`, cannot be pre-empted: it delays the answer past its
-  timeout. On SQLite a running query finishes before its connection can be closed.
+  timeout. On SQLite a running query finishes before its connection can be closed (a 30-million-row
+  query returned after 8.6 s against a 0.5 s timeout) and a write waits on the host's write lock for
+  the 5 s busy timeout; Postgres stops the statement at the budget. SQLite is the development default:
+  run Postgres in production.
+* **Committed data only.** Your session is not the request's: it does not see the request's
+  uncommitted rows, so a source never sees an event created earlier in the same request.
   Only an engine that shares one connection between sessions (the in-memory test engine)
   runs your call on a savepoint of the request's session instead; a file or Postgres engine never does.
 * **Validation.** Any one invalid item rejects the whole answer (`invalid_item`,
