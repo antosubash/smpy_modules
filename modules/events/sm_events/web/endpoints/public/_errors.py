@@ -49,23 +49,22 @@ class PublicErrorRoute(APIRoute):
         async def wrapped(request: Request) -> Response:
             try:
                 response = await handler(request)
-            except RequestValidationError:
-                if not self.json_validation:
-                    raise
-                response = JSONResponse(
-                    {
-                        "detail": constants.INVALID_QUERY_DETAIL,
-                        "code": constants.INVALID_QUERY_CODE,
-                    },
-                    status_code=422,
-                )
             except Exception as exc:
-                host = _host_handler(request, exc)
-                if host is None:
-                    raise
-                response = host(request, exc)
-                if hasattr(response, "__await__"):
-                    response = await response
+                if self.json_validation and isinstance(exc, RequestValidationError):
+                    response = JSONResponse(
+                        {
+                            "detail": constants.INVALID_QUERY_DETAIL,
+                            "code": constants.INVALID_QUERY_CODE,
+                        },
+                        status_code=422,
+                    )
+                else:
+                    host = _host_handler(request, exc)
+                    if host is None:
+                        raise
+                    response = host(request, exc)
+                    if hasattr(response, "__await__"):
+                        response = await response
             return error_headers(request, response)
 
         return wrapped
