@@ -53,6 +53,7 @@ export function Toolbar({ title, view, onView, onToday, onPrev, onNext, tz, star
           <ChevronRight aria-hidden="true" />
         </Button>
         <h2
+          tabIndex={-1}
           className="min-w-0 text-lg font-semibold max-sm:order-first max-sm:basis-full"
           aria-live="polite"
           data-testid="calendar-title"

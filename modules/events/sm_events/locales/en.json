@@ -116,6 +116,7 @@
     "invalid_rrule": "This repeat rule is not valid.",
     "rrule_frequency_refused": "Events can repeat daily, weekly, monthly or yearly.",
     "start_not_in_rule": "The start must be the first date the repeat rule produces. Change the start or the rule.",
+    "invalid_datetime": "Enter a valid date and time.",
     "invalid_local_time": "This time does not exist in the timezone: the clocks skip it.",
     "end_before_start": "The end must be after the start.",
     "duration_too_long": "An event can last at most {oneOff} days; when it repeats, each occurrence at most {series} days.",

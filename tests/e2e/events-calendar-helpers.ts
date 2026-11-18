@@ -214,3 +214,11 @@ export async function tabTo(page: Page, target: Locator) {
     await page.keyboard.press('Tab');
   }
 }
+
+/** Focus is on a calendar chip or the toolbar title, not lost to the page body. */
+export const focusIsOnCalendar = (page: Page) =>
+  page.evaluate(
+    () =>
+      document.activeElement?.getAttribute('data-testid') === 'calendar-title' ||
+      document.activeElement?.closest('[class*="fc-"], .fc') != null,
+  );

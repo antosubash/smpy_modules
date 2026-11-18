@@ -2,7 +2,7 @@
  *  moment in another zone, the request body and the "More options" link. Pure. */
 import { emptyForm, type FormState, toCreate } from '../../utils/event-form';
 import type { EventCreate } from '../../utils/types-events';
-import { addDays, isNonexistent, toInstant, toLocal } from '../time/zones';
+import { addDays, isNonexistent, isWallTime, toInstant, toLocal } from '../time/zones';
 import type { CreateSlot } from '../types';
 
 export type Clock = { allDay: boolean; start: string; end: string };
@@ -22,6 +22,7 @@ export function clockOf(slot: CreateSlot, zone: string): Clock {
 /** The same moment in another calendar's zone. An all-day span is dates, which no zone moves. */
 export function reexpress(clock: Clock, from: string, to: string): Clock {
   if (clock.allDay || from === to) return clock;
+  if (!isWallTime(clock.start) || !isWallTime(clock.end)) return clock;
   return {
     allDay: false,
     start: toLocal(toInstant(clock.start, from), to),
@@ -45,8 +46,11 @@ export function withAllDay(clock: Clock, allDay: boolean, remembered?: Clock): C
 export function timeProblems(
   clock: Clock,
   zone: string,
-): { start?: 'skipped'; end?: 'order' | 'skipped' } {
+): { start?: 'skipped' | 'invalid'; end?: 'order' | 'skipped' | 'invalid' } {
   const found: ReturnType<typeof timeProblems> = {};
+  if (!isWallTime(clock.start, clock.allDay)) found.start = 'invalid';
+  if (!isWallTime(clock.end, clock.allDay)) found.end = 'invalid';
+  if (found.start || found.end) return found;
   if (clock.allDay) {
     if (clock.end < clock.start) found.end = 'order';
     return found;

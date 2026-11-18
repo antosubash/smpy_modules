@@ -69,6 +69,8 @@ export type CalendarEditing = {
   /** Opens the Move dialog; `returnFocus` is the event's element, for when it closes. */
   onMove: (occurrence: Occurrence, returnFocus?: HTMLElement | null) => void;
   pendingKeys: ReadonlySet<string>;
+  /** The calendar fills it with a function that focuses an occurrence's element. */
+  focusRef?: { current: ((key: string) => boolean) | null };
 };
 
 export type EventChipProps = {
@@ -124,7 +126,8 @@ export type GridHandle = {
   next(): void;
   setView(view: CalendarView): void;
   gotoDate(date: string): void;
-  focusEvent(key: string): void;
+  /** Focus an occurrence's element; `false` when it is not on the grid. */
+  focusEvent(key: string): boolean;
 };
 export type RangeChange = { visible: Range; title: string; view: CalendarView; date: string };
 export type GridProps = {
