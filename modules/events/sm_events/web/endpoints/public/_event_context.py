@@ -42,6 +42,7 @@ class EventContext:
     parent_text: EventText | None
     children: list[Event]
     child_texts: dict[Any, dict[str, EventText]]
+    child_calendars: dict[Any, Calendar]  # a sub-event may sit on another public calendar
     overrides: list[OccurrenceOverride]
     locale: str
 
@@ -66,6 +67,11 @@ async def load_context(db: Any, event: Event, text: EventText, locale: str) -> E
         parent = parent if parent_text is not None else None
     children = await public_children(db, event.id)
     child_texts = await public_texts(db, [c.id for c in children])
+    wanted = {c.calendar_id for c in children}
+    child_calendars: dict[Any, Calendar] = {}
+    if wanted:
+        stmt = public_calendars().where(col(Calendar.id).in_(wanted))
+        child_calendars = {c.id: c for c in (await db.execute(stmt)).scalars()}
     overrides: list[OccurrenceOverride] = []
     if event.rrule:
         stmt = select(OccurrenceOverride).where(
@@ -75,7 +81,7 @@ async def load_context(db: Any, event: Event, text: EventText, locale: str) -> E
         overrides = list((await db.execute(stmt)).scalars())
     return EventContext(
         event, text, texts, calendar, category, parent, parent_text, children, child_texts,
-        overrides, locale,
+        child_calendars, overrides, locale,
     )  # fmt: skip
 
 
@@ -96,6 +102,7 @@ def validator_parts(
         ctx.parent.id if ctx.parent else None,
         ctx.parent.revision if ctx.parent else None,
         *[(c.id, c.revision) for c in ctx.children],
+        *[(c.id, c.updated_at) for c in ctx.child_calendars.values()],
         ctx.locale,
         shown.date_param if shown else None,
         *[u.date_param for u in upcoming[:1]],  # a series page moves on as time passes

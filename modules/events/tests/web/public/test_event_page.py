@@ -223,3 +223,33 @@ async def test_child_of_hidden_parent_names_no_parent(public_locales_client, fx)
     html = got.text
     parent = fx.slug(fx.draft_parent)
     assert parent not in html and parent.title() not in html
+
+
+async def test_a_sub_event_on_another_public_calendar_shows_its_own(public_locales_client, fx):
+    """The page lists a child with its own calendar's name and colour, and compares its zone with
+    that calendar's default, not the parent's."""
+    from sm_events.core.tenancy import tenant_scope
+    from sm_events.models import Calendar, Visibility
+
+    from tests.support.calendars import seed_event
+
+    with tenant_scope("default"):
+        async with public_locales_client.db_state.session_factory() as s:
+            other = Calendar(
+                slug="other-cal", name="Other Cal", owner_id="o", visibility=Visibility.PUBLIC,
+                color="#ff0000", default_timezone="America/New_York",
+            )  # fmt: skip
+            s.add(other)
+            await s.flush()
+            conf = (await s.execute(select(Event).where(Event.id == fx.conf.id))).scalar_one()
+            await seed_event(
+                s, other, title="Side", slug="side-session", status="published",
+                parent_id=conf.id, timezone="America/New_York",
+            )  # fmt: skip
+            await s.commit()
+    got = props(await get(public_locales_client, f"/events/{fx.slug(fx.conf)}"))
+    side = next(i for i in got["sub_events"] if i["url"] == "/events/side-session")
+    assert side["calendar"]["slug"] == "other-cal" and side["calendar"]["color"] == "#ff0000"
+    assert side["show_timezone"] is False  # New York on a New York calendar
+    talk = next(i for i in got["sub_events"] if i["url"] == f"/events/{fx.slug(fx.talk)}")
+    assert talk["calendar"]["slug"] == fx.pub.slug

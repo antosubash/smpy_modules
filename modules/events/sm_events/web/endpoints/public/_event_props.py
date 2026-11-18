@@ -98,14 +98,15 @@ def _sub_items(ctx: EventContext) -> list[PublicListItem]:
     items: list[PublicListItem] = []
     for child in ctx.children:
         texts = ctx.child_texts.get(child.id)
-        if not texts:
+        calendar = ctx.child_calendars.get(child.calendar_id)
+        if not texts or calendar is None:
             continue
         items.append(
             make_item(
                 key=str(child.id),
                 event=child,
                 text=pick_text(texts, ctx.locale, locales.default()),
-                calendar=ctx.calendar,
+                calendar=calendar,
                 category=None,
                 locale=ctx.locale,
                 default_locale=locales.default(),
