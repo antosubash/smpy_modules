@@ -191,6 +191,12 @@ serialised only by `_head.safe_json_ld` (Python) and `utils/jsonLd.ts`; the desc
 from `content/richtext_tree.py`, never injected. Constants live in `core/constants/` (`public.py` for
 the public surface). **Production must set the host's `public_base_url`:** without it canonical, `og:url`,
 `hreflang`, feed and sitemap URLs follow the client's `Host` header (the response then varies on `Host`).
+**`sm_events.contracts.cards` and the blocks' `/api/events/public/*` routes are the public
+projection too.** Both start from the public gate, the contract pins the named tenant twice (a
+card's `id` is for a consumer's own lookup and is never rendered publicly), and the blocks
+(`pagebuilder-blocks.ts`, only that file and `ui/blocks/` import pagebuilder) reference calendars
+by slug and fetch at request time, storing no snapshot: a calendar that stopped being public
+shows nothing. Their bounds are constants (`docs/blocks.md` pins them with a test).
 `make worker` serves the `events` queue; scheduled publishing needs beat, which
 enumerates tenants under the framework's `all_tenants()` and then gives each
 tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
@@ -228,8 +234,11 @@ that imports `sm_events`.
 **Newsletter content and test sends.** Email HTML is produced only by
 `sm_newsletter.content.render`. Rich text is re-serialised from an allow-list at
 save and again at render. Card and media lookups go through
-`news.contracts.articles` and `pagebuilder.contracts.cards` only
-(`content/integrations/` is the one package that imports them, guarded). A
+`news.contracts.articles`, `pagebuilder.contracts.cards` and `sm_events.contracts.cards` only
+(`content/integrations/` is the one package that imports them, guarded). An event card
+is a snapshot of a published event of a public calendar (the contract is the public gate);
+scheduling freezes the render, so a later unpublish never changes a scheduled email, and the
+event's id is never printed. A
 settings write that changes the SMTP host, port, security or username clears the
 stored password. Campaign writes are guarded by an integer `revision`
 (`expected_revision`, 409 `stale`), and every campaign request re-checks the

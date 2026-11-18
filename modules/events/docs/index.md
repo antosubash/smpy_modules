@@ -414,7 +414,7 @@ Later delivery remains:
 | 4 (this release) | Public pages, calendar slug redirects, public ICS, JSON-LD and sitemap |
 | 5 | Private feed tokens and `.ics` upload |
 | 6 | Extension registry, plugin guide and records date-field source |
-| 7 | Pagebuilder blocks and newsletter card |
+| 7 (this release) | Pagebuilder blocks and newsletter card |
 | 8 | Reminders |
 | 9 | Registration through records |
 | 10 | External ICS subscriptions |
@@ -422,3 +422,8 @@ Later delivery remains:
 ## Feeds and import
 
 [Private feed links](feeds.md) and [Importing an .ics file](import.md).
+
+## Blocks and cards
+
+[Pagebuilder blocks and the card contract](blocks.md): the `UpcomingEvents` and `EventsCalendar` blocks,
+their anonymous routes and bounds, and `sm_events.contracts.cards` for newsletter.
