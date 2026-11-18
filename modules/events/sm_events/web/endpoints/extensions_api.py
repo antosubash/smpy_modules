@@ -64,5 +64,7 @@ async def set_sources(
     viewer = source_viewer_from(request, who)
     if viewer is None:  # unreachable behind ``CalendarOwner``, which needs a signed-in user
         raise TenantRequired
-    await source_entries.write_entries(db, bound_tenant(), viewer, calendar, body.sources)
+    await source_entries.write_entries(
+        db, bound_tenant(), viewer, calendar, body.sources, body.expected
+    )
     return await out(db, request, who, calendar)

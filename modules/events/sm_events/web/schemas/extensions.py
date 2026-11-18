@@ -17,6 +17,8 @@ class CalendarSourceIn(BaseModel):
 
 
 class SourcesIn(BaseModel):
+    expected: Annotated[str, Field(max_length=64)]
+    """The ``sources_version`` of the calendar as the caller read it (``""`` if none was shown)."""
     sources: Annotated[list[CalendarSourceIn], Field(max_length=constants.SOURCES_IN_MAX)]
 
 

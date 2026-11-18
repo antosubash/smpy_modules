@@ -32,7 +32,9 @@ def desk(monkeypatch):
 
 
 async def write(db, cal, *incoming):
-    return await source_entries.write_entries(db, "default", VIEWER, cal, list(incoming))
+    return await source_entries.write_entries(
+        db, "default", VIEWER, cal, list(incoming), source_entries.version(cal.sources)
+    )
 
 
 def test_reads_legacy_strings():
@@ -169,3 +171,19 @@ def test_shown_hides_settings_without_the_right(desk):
     ]
     full = source_entries.shown(raw, with_settings=True)
     assert full[0]["settings"] == {"field": "x"} and full[0]["label_key"] == "acme.fake"
+
+
+async def test_a_stale_version_is_refused(db, desk):
+    from sm_events.core.errors import Stale
+
+    cal = (await seed_calendars(db))["P"]
+    with pytest.raises(Stale):
+        await source_entries.write_entries(db, "default", VIEWER, cal, [In("acme:plain")], "old")
+    assert cal.sources == []
+
+
+def test_the_version_follows_the_stored_entries_not_their_spelling():
+    assert source_entries.version(["a:b"]) == source_entries.version(
+        [{"id": "a:b", "settings": {}}]
+    )
+    assert source_entries.version([]) != source_entries.version(["a:b"])

@@ -21,8 +21,14 @@ def plugins(monkeypatch):
     registry.reset_registry()
 
 
-def put(client, cid, sources, headers=OWNER):
-    return client.put(f"{BASE}/{cid}/sources", json={"sources": sources}, headers=headers)
+async def put(client, cid, sources, headers=OWNER, expected=None):
+    """``expected`` defaults to the version a GET would have just shown this caller."""
+    if expected is None:
+        got = await client.get(f"{BASE}/{cid}", headers=headers)
+        expected = got.json().get("sources_version", "") if got.status_code == 200 else ""
+    return await client.put(
+        f"{BASE}/{cid}/sources", json={"sources": sources, "expected": expected}, headers=headers
+    )
 
 
 async def test_list_sources_excludes_builtin(client):
@@ -128,7 +134,7 @@ async def test_put_needs_csrf(csrf_client):
         BASE, json={"name": "T"}, headers={**OWNER, "X-CSRF-Token": token}
     )
     url = f"{BASE}/{made.json()['id']}/sources"
-    body = {"sources": [{"id": "acme:plain"}]}
+    body = {"sources": [{"id": "acme:plain"}], "expected": made.json()["sources_version"]}
     refused = await csrf_client.put(url, json=body, headers=OWNER)
     assert refused.status_code == 403 and "CSRF" in refused.json()["detail"]
     ok = await csrf_client.put(url, json=body, headers={**OWNER, "X-CSRF-Token": token})
@@ -139,14 +145,11 @@ async def test_put_needs_csrf(csrf_client):
 async def test_tenant_isolation(multi_client):
     a = as_user("o", V, "events.edit", tenant="a")
     b = as_user("o", V, "events.edit", M, tenant="b")
-    cid = (await multi_client.post(BASE, json={"name": "A's"}, headers=a)).json()["id"]
-    got = await multi_client.put(
-        f"{BASE}/{cid}/sources", json={"sources": [{"id": "acme:plain"}]}, headers=b
-    )
+    made = (await multi_client.post(BASE, json={"name": "A's"}, headers=a)).json()
+    cid, body = made["id"], {"sources": [{"id": "acme:plain"}], "expected": made["sources_version"]}
+    got = await multi_client.put(f"{BASE}/{cid}/sources", json=body, headers=b)
     assert got.status_code == 404
-    ok = await multi_client.put(
-        f"{BASE}/{cid}/sources", json={"sources": [{"id": "acme:plain"}]}, headers=a
-    )
+    ok = await multi_client.put(f"{BASE}/{cid}/sources", json=body, headers=a)
     assert ok.status_code == 200
     assert (await multi_client.get(f"{BASE}/{cid}", headers=b)).status_code == 404
 
@@ -203,3 +206,25 @@ async def test_type_schema_and_defaults(client, monkeypatch):
         "level": "intro",
     }
     assert talk["json_schema"]["required"] == ["speaker"] and talk["builtin"] is False
+
+
+async def test_a_stale_write_is_refused_and_loses_nothing(client):
+    cid = (await make(client))["id"]
+    first = (await client.get(f"{BASE}/{cid}", headers=OWNER)).json()
+    version = first["sources_version"]
+    mine = await put(client, cid, [{"id": "acme:plain"}], expected=version)
+    assert mine.status_code == 200 and mine.json()["sources_version"] != version
+    theirs = await put(client, cid, [{"id": "acme:desk"}], headers=MANAGER, expected=version)
+    assert (theirs.status_code, theirs.json()["code"]) == (409, "stale")
+    kept = (await client.get(f"{BASE}/{cid}", headers=OWNER)).json()["sources"]
+    assert [s["id"] for s in kept] == ["acme:plain"]
+    again = await put(client, cid, [{"id": "acme:plain"}], expected=mine.json()["sources_version"])
+    assert again.status_code == 200
+
+
+async def test_the_version_is_required_and_only_managers_see_it(client):
+    cid = (await make(client))["id"]
+    missing = await client.put(f"{BASE}/{cid}/sources", json={"sources": []}, headers=OWNER)
+    assert missing.status_code == 422
+    await grant(client, cid, "sv", "view")
+    assert (await client.get(f"{BASE}/{cid}", headers=SV)).json()["sources_version"] == ""

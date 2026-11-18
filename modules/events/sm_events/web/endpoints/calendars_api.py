@@ -42,6 +42,7 @@ Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 def _render(cal: Calendar, rights: CalendarRights, names: dict[str, str | None]) -> CalendarOut:
     return CalendarOut.model_validate(cal).model_copy(
         update={
+            "sources_version": source_entries.version(cal.sources) if rights.own else "",
             "sources": [
                 CalendarSourceOut(**entry)
                 for entry in source_entries.shown(cal.sources, with_settings=rights.own)

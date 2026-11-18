@@ -74,6 +74,7 @@ def _respond(
     *,
     truncated: bool = False,
     filename: str | None = None,
+    degraded: bool = False,
 ) -> Response:
     headers: dict[str, str] = {}
     if filename is not None:
@@ -82,7 +83,13 @@ def _respond(
         headers[TRUNCATED_HEADER] = "1"
         _log.info("events: a public feed was cut at its caps (%s)", request.url.path)
     return machine_response(
-        request, settings, body, media_type=constants.ICS_MEDIA_TYPE, kind="feed", headers=headers
+        request,
+        settings,
+        body,
+        media_type=constants.ICS_MEDIA_TYPE,
+        kind="feed",
+        headers=headers,
+        degraded=degraded,
     )
 
 
@@ -155,7 +162,13 @@ def calendar_feed_router(locale: str) -> APIRouter:
             now=now,
             extra=plug.events,
         )
-        return _respond(request, settings, body, truncated=read.truncated or plug.truncated)
+        return _respond(
+            request,
+            settings,
+            body,
+            truncated=read.truncated or plug.truncated,
+            degraded=plug.degraded,
+        )
 
     @router.api_route(f"/{constants.SEGMENT_CALENDAR}/{{calendar}}.ics", methods=_METHODS)
     async def calendar_feed(
@@ -198,7 +211,13 @@ def calendar_feed_router(locale: str) -> APIRouter:
             now=now,
             extra=plug.events,
         )
-        return _respond(request, settings, body, truncated=read.truncated or plug.truncated)
+        return _respond(
+            request,
+            settings,
+            body,
+            truncated=read.truncated or plug.truncated,
+            degraded=plug.degraded,
+        )
 
     return router
 

@@ -87,6 +87,8 @@ class CalendarOut(BaseModel):
     owner_name: str | None = None
     default_timezone: str
     sources: list[CalendarSourceOut] = []
+    sources_version: str = ""
+    """What a write to the sources must send back; empty for one who cannot manage them."""
     created_at: datetime
     updated_at: datetime | None
     deleted_at: datetime | None

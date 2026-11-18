@@ -39,6 +39,8 @@ __all__ = ["PluginFeed", "plugin_feed", "plugin_vevents"]
 class PluginFeed:
     events: list[icalendar.Event]
     truncated: bool
+    degraded: bool = False
+    """A source failed, timed out or was skipped: the file must not be cached."""
 
 
 def _stamp(item: Occurrence) -> datetime:
@@ -114,4 +116,5 @@ async def plugin_feed(
     )
     events = plugin_vevents(ran.items, absolute=absolute)
     cut = len(events) > room
-    return PluginFeed(events[:room], cut or ran.truncated)
+    bad = any(s.status not in ("ok", "truncated") for s in ran.statuses)
+    return PluginFeed(events[:room], cut or ran.truncated, bad)

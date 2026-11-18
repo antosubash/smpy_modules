@@ -14,6 +14,7 @@ names it from here.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections.abc import Sequence
@@ -33,6 +34,7 @@ from sm_events.calendar.extension_types import (
 )
 from sm_events.calendar.plugin_isolation import run_isolated
 from sm_events.core import constants
+from sm_events.core.errors import Stale
 from sm_events.core.errors_extensions import (
     BuiltinSource,
     DuplicateSource,
@@ -49,6 +51,7 @@ __all__ = [
     "settings_of",
     "shown",
     "source_calendar",
+    "version",
     "write_entries",
 ]
 
@@ -167,12 +170,16 @@ async def write_entries(
     viewer: SourceViewer,
     calendar: Calendar,
     incoming: Sequence[Any],
+    expected: str,
 ) -> list[SourceEntry]:
     """Validate ``incoming`` (``CalendarSourceIn``: ``id`` and ``settings``) and store it
     on ``calendar``; the caller has already checked the right to change what the
-    calendar's audience sees. Raises :class:`BuiltinSource`, :class:`DuplicateSource`,
+    calendar's audience sees. ``expected`` is the ``sources_version`` the caller read: another
+    write since is :class:`Stale`. Raises :class:`BuiltinSource`, :class:`DuplicateSource`,
     :class:`TooManySources`, :class:`UnknownSource`, a ``RequestValidationError`` for
     settings that do not fit, or :class:`SourceUnavailable`."""
+    if expected != version(calendar.sources):
+        raise Stale
     ids = [item.id for item in incoming]
     if constants.SOURCE_EVENTS in ids:
         raise BuiltinSource
@@ -202,6 +209,13 @@ async def write_entries(
     calendar.sources = dump(entries)
     await db.flush()
     return entries
+
+
+def version(raw: Any) -> str:
+    """A token for the stored entries: the caller sends it back with a write, which is refused
+    (``stale``) when somebody wrote since, so two managers never overwrite each other."""
+    canonical = json.dumps(dump(read(raw)), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
 def shown(raw: Any, *, with_settings: bool) -> list[dict[str, Any]]:

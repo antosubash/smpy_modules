@@ -128,7 +128,7 @@ async def public_page(db: Any, **query: Any) -> OccurrencePage:
     locale = query["locale"]
     texts = await public_texts(db, {i.event_id for i in page.items if i.event_id})
     shown = [p for item in page.items if (p := _public(item, texts, locale)) is not None]
-    return OccurrencePage(items=shown, truncated=page.truncated)
+    return OccurrencePage(items=shown, truncated=page.truncated, sources=page.sources)
 
 
 def api_router() -> APIRouter:
@@ -160,6 +160,7 @@ def api_router() -> APIRouter:
             page.model_dump_json(exclude={"sources"}).encode(),
             media_type=constants.JSON_MEDIA_TYPE,
             kind="api",
+            degraded=any(st.status not in ("ok", "truncated") for st in page.sources),
         )
 
     return router
