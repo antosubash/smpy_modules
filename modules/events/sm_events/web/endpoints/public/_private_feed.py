@@ -170,6 +170,7 @@ async def _serve(request: Request, token: str) -> tuple[Response, TokenRow] | No
             row = await lookup(db, token)
         if row is None or not valid_tenant(row.tenant_id):
             return None
+        THROTTLE.promote(token)  # a real link: its window leaves the pool junk can flood
         with tenant_scope(row.tenant_id):
             async with factory() as db:
                 access = await resolve(app, db, request, row, host_tenant=host_tenant(request))

@@ -252,3 +252,17 @@ async def test_a_failing_touch_still_serves(monkeypatch):
 
         monkeypatch.setattr(resolve_module, "finalize_session", broken)
         assert (await http.get(world.path)).status_code == 200
+
+
+async def test_junk_tokens_cannot_free_a_real_links_throttle(monkeypatch):
+    from sm_events.feeds.tokens.throttle import TokenThrottle
+
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    small = TokenThrottle(limit=2, window=600, max_keys=3)
+    monkeypatch.setattr(_private_feed, "THROTTLE", small)
+    async with private_http() as http:
+        world = await seed_world(http)
+        assert [(await http.get(world.path)).status_code for _ in range(2)] == [200, 200]
+        for i in range(20):  # junk far beyond the pool
+            assert (await http.get(feed_path(f"evf_{i:043d}"))).status_code == 404
+        assert (await http.get(world.path)).status_code == 429
