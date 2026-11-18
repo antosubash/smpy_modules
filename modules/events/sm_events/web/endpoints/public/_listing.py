@@ -136,24 +136,28 @@ async def upcoming(
     now: datetime,
     calendar_id: uuid.UUID | None,
     category_id: uuid.UUID | None,
+    window_days: int = constants.MAX_RANGE_DAYS,
+    limit: int | None = None,
 ) -> list[PublicListItem]:
-    """Every upcoming public occurrence in the window, as list items."""
+    """The upcoming public occurrences in the next ``window_days``, as list items; with a
+    ``limit``, only the first that many are enriched (the read itself is bounded by the window)."""
     page = await public_read(
         db,
         tenant=bound_tenant(),
         start=now,
-        end=now + timedelta(days=constants.MAX_RANGE_DAYS),
+        end=now + timedelta(days=window_days),
         calendar_ids=frozenset({calendar_id}) if calendar_id else None,
         category_ids=frozenset({category_id}) if category_id else None,
         locale=locale,
     )
-    ids = {i.event_id for i in page.items if i.event_id}
+    occurrences = page.items if limit is None else page.items[:limit]
+    ids = {i.event_id for i in occurrences if i.event_id}
     events = await _events(db, ids)
     texts = await public_texts(db, ids)
     cals = await _calendars(db)
     cats = {c.id: c for c in await public_categories(db)}
     items: list[PublicListItem] = []
-    for occ in page.items:
+    for occ in occurrences:
         event = events.get(occ.event_id) if occ.event_id else None
         calendar = cals.get(occ.calendar_id)
         if event is None or calendar is None or not texts.get(event.id):

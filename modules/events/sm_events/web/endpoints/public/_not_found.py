@@ -38,6 +38,8 @@ async def _suggestions(db: Any, *, locale: str) -> list[dict[str, Any]]:
         now=_clock.now(),
         calendar_id=None,
         category_id=None,
+        window_days=constants.NOT_FOUND_WINDOW_DAYS,
+        limit=constants.NOT_FOUND_SUGGESTIONS,
     )
     return [item.model_dump(mode="json") for item in items[: constants.NOT_FOUND_SUGGESTIONS]]
 

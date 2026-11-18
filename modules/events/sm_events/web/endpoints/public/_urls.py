@@ -28,7 +28,6 @@ from sm_events.core import constants, locales
 from sm_events.core.tenancy import TenancyMode, mode_of
 
 __all__ = [
-    "public_key",
     "absolute",
     "api_path",
     "calendar_ics_path",
@@ -40,6 +39,7 @@ __all__ = [
     "index_path",
     "prefix",
     "public_base_url",
+    "public_key",
     "site_title",
     "sitemap_path",
     "use",

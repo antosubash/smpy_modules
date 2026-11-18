@@ -104,3 +104,41 @@ async def test_with_a_tenant_the_page_is_the_same_404(public_multi_client):
     assert acme.status_code == none.status_code == 404
     assert acme.json()["props"] == none.json()["props"]
     assert acme.headers["cache-control"] == none.headers["cache-control"] == "no-store"
+
+
+async def test_the_404_reads_a_short_window_and_a_handful_of_events(
+    public_locales_client, monkeypatch
+):
+    """Any random slug costs the same few statements: the occurrences read covers weeks, not a
+    year, and only the offered suggestions are enriched."""
+    from datetime import timedelta
+
+    from sm_events.core import constants
+    from sm_events.web.endpoints.public import _listing
+
+    from tests.support.public import seed_public
+
+    await seed_public(public_locales_client)
+    spans: list[timedelta] = []
+    real = _listing.public_read
+
+    async def spy(db, **query):
+        spans.append(query["end"] - query["start"])
+        return await real(db, **query)
+
+    monkeypatch.setattr(_listing, "public_read", spy)
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, *rest):
+        statements.append(statement)
+
+    engine = public_locales_client.db_state.engine.sync_engine
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        got = await public_locales_client.get("/events/no-such-slug-at-all", headers=INERTIA)
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert got.status_code == 404
+    assert len(got.json()["props"]["suggestions"]) <= constants.NOT_FOUND_SUGGESTIONS
+    assert spans == [timedelta(days=constants.NOT_FOUND_WINDOW_DAYS)]
+    assert len(statements) <= 16, len(statements)
