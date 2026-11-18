@@ -2,8 +2,8 @@
  *  would. Never shipped (the wheel excludes `*-test-support.tsx`), and it imports vitest. */
 import { type Ref, useImperativeHandle } from 'react';
 import { type Mock, vi } from 'vitest';
-import type { Range } from '../time/range';
-import type { CreateSlot, GridHandle, GridProps, OccurrenceChange } from '../types';
+import type { Range } from './time/range';
+import type { CreateSlot, GridHandle, GridProps, OccurrenceChange } from './types';
 
 type Handle = Record<keyof GridHandle, Mock>;
 const makeHandle = (): Handle => ({

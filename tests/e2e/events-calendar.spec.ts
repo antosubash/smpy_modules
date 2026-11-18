@@ -212,8 +212,15 @@ test('a writer without publish cannot drag a published event, and is told why', 
   await expect(target).toBeVisible();
   await expect(target.getByRole('img', { name: /Locked/ })).toBeVisible();
   const { column } = await gridSize(writer);
+  const writes: string[] = [];
+  writer.on('request', (request) => {
+    if (request.method() !== 'GET') writes.push(`${request.method()} ${request.url()}`);
+  });
   await dragBy(writer, target, column, 0);
-  await writer.waitForTimeout(500);
+  // A locked chip is not draggable: the drag sends nothing and the event stays put.
+  await writer.waitForLoadState('networkidle');
+  expect(writes).toEqual([]);
+  await expect(target.getByRole('img', { name: /Locked/ })).toBeVisible();
   expect((await apiEvent(page, oneOff.id)).start_local).toBe(`${day}T10:00`);
   await target.click();
   await expect(writer.getByTestId('calendar-detail')).toContainText(

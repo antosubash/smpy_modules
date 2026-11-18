@@ -1,11 +1,12 @@
 import { expect, type Locator, type Page } from '@playwright/test';
-
+import { type EventSeed, postCalendar, postEvent, ZONE } from './events-seed';
 import { moduleCsrfHeader, uniqueSlug } from './helpers';
 
 /** Seeds for events-calendar.spec.ts: everything is made through the API with unique names. */
 
 const CSRF_VIEW = '/admin/events/calendars';
-export const ZONE = 'Europe/Vienna';
+
+export { ZONE };
 
 export type Seeded = { id: string; title: string; revision: number };
 
@@ -27,45 +28,20 @@ export async function seedCalendar(
   page: Page,
   { visibility = 'internal', color = '#2563eb', zone = ZONE, label = 'Cal' } = {},
 ): Promise<{ id: string; name: string }> {
-  const headers = await moduleCsrfHeader(page, CSRF_VIEW);
-  const name = `${label} ${uniqueSlug('c')}`;
-  const res = await page.request.post('/api/events/calendars', {
-    headers,
-    data: { name, color, description: null, default_timezone: zone, visibility },
+  const { id, name } = await postCalendar(page, {
+    name: `${label} ${uniqueSlug('c')}`,
+    visibility,
+    color,
+    zone,
   });
-  expect(res.status(), await res.text()).toBe(201);
-  return { id: ((await res.json()) as { id: string }).id, name };
+  return { id, name };
 }
 
-type EventSeed = {
-  calendar: string;
-  title: string;
-  start: string; // YYYY-MM-DDTHH:MM, or YYYY-MM-DD when allDay
-  end: string;
-  allDay?: boolean;
-  rrule?: string;
-  zone?: string;
-};
+type SeedInput = Omit<EventSeed, 'calendar'> & { calendar: string };
 
-export async function seedEvent(page: Page, seed: EventSeed): Promise<Seeded> {
-  const headers = await moduleCsrfHeader(page, CSRF_VIEW);
-  const res = await page.request.post('/api/events/events', {
-    headers,
-    data: {
-      calendar_id: seed.calendar,
-      times: {
-        all_day: seed.allDay ?? false,
-        timezone: seed.zone ?? ZONE,
-        start: seed.start,
-        end: seed.end,
-      },
-      rrule: seed.rrule ?? null,
-      texts: { en: { title: seed.title } },
-    },
-  });
-  expect(res.status(), await res.text()).toBe(201);
-  const body = (await res.json()) as { id: string; revision: number };
-  return { id: body.id, title: seed.title, revision: body.revision };
+export async function seedEvent(page: Page, seed: SeedInput): Promise<Seeded> {
+  const { id, revision } = await postEvent(page, seed);
+  return { id, title: seed.title, revision };
 }
 
 /** Draft -> in review -> published, as the admin (who holds events.publish). */

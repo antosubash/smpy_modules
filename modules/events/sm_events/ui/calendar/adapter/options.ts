@@ -21,9 +21,8 @@ export function localeFor(code: string | undefined): LocaleInput | 'en' {
 
 const LOCALE_OPTIONS = new Map<string, { locale: string; locales?: LocaleInput[] }>();
 
-/** One stable object per language: FullCalendar re-reads `locales` whenever the array's
- *  identity changes, and each re-read fires `datesSet` again, which re-renders the shell,
- *  which builds a new array: an endless loop (React error 185) in German. */
+/** One stable object per language: a new `locales` array on every render makes FullCalendar
+ *  re-read it and fire `datesSet` again, which re-renders the shell without end. */
 export function localeOptions(code: string | undefined): {
   locale: string;
   locales?: LocaleInput[];
