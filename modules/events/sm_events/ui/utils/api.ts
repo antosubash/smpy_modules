@@ -16,6 +16,9 @@ export class ApiError extends Error {
     public readonly field: string | null = null,
     /** The 422's `msg` per dotted `loc` (`extra.speaker`): a plugin's section shows its own. */
     public readonly messages: Record<string, string> = {},
+    /** A plugin's short code per dotted `loc` (`mappings.0.field` -> `field_missing`), when it
+     *  gave one: the 422's `type` is `value_error.<code>`. */
+    public readonly codes: Record<string, string> = {},
   ) {
     super(code);
   }
@@ -142,6 +145,17 @@ function messagesOf(body: ErrorBody): Record<string, string> {
   return out;
 }
 
+function codesOf(body: ErrorBody): Record<string, string> {
+  if (!Array.isArray(body?.detail)) return {};
+  const out: Record<string, string> = {};
+  for (const item of body.detail as { loc?: unknown; type?: unknown }[]) {
+    if (!Array.isArray(item?.loc) || typeof item.type !== 'string') continue;
+    const code = item.type.startsWith('value_error.') ? item.type.slice('value_error.'.length) : '';
+    if (code) out[item.loc.filter((part) => part !== 'body' && part !== 'query').join('.')] = code;
+  }
+  return out;
+}
+
 export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> {
   const result = await apiFetch<T>(url, init);
   if (result.ok) return result.data;
@@ -154,6 +168,7 @@ export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> 
     result.status === 429 && Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : null,
     typeof body?.field === 'string' ? body.field : null,
     result.status === 422 ? messagesOf(body) : {},
+    result.status === 422 ? codesOf(body) : {},
   );
 }
 

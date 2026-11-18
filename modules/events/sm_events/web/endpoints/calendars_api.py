@@ -8,7 +8,7 @@ the caller may not see is a 404, and one they see but may not change a 403.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from simple_module_core.resources import ResourcePrincipal
@@ -16,11 +16,12 @@ from simple_module_db.deps import get_db
 from simple_module_hosting.resource_deps import resource_principal
 
 from sm_events.calendar import calendars as service
-from sm_events.calendar.plugins import source_entries
+from sm_events.calendar.plugins import source_entries, source_view
 from sm_events.core.access import CalendarEdit, CalendarOwner, CalendarView
 from sm_events.core.access.rights import CalendarRights, calendar_rights, calendar_rights_many
 from sm_events.core.constants import OWNER_NOT_ALLOWED_CODE, OWNER_NOT_ALLOWED_DETAIL
 from sm_events.core.errors import Invalid
+from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Calendar
 from sm_events.web.endpoints.deps import get_settings, require_edit, require_manage, require_view
 from sm_events.web.schemas.calendars import (
@@ -33,20 +34,23 @@ from sm_events.web.schemas.calendars import (
 from sm_events.web.schemas.extensions import CalendarSourceOut
 from sm_events.web.services.members import active_member
 from sm_events.web.services.owners import owner_names
+from sm_events.web.services.source_viewer import source_viewer_from
 
 router = APIRouter(prefix="/calendars", tags=["calendars"], dependencies=[require_view])
 
 Principal = Annotated[ResourcePrincipal, Depends(resource_principal)]
 
 
-def _render(cal: Calendar, rights: CalendarRights, names: dict[str, str | None]) -> CalendarOut:
+def _render(
+    cal: Calendar,
+    rights: CalendarRights,
+    names: dict[str, str | None],
+    sources: list[dict[str, Any]],
+) -> CalendarOut:
     return CalendarOut.model_validate(cal).model_copy(
         update={
             "sources_version": source_entries.version(cal.sources) if rights.own else "",
-            "sources": [
-                CalendarSourceOut(**entry)
-                for entry in source_entries.shown(cal.sources, with_settings=rights.own)
-            ],
+            "sources": [CalendarSourceOut(**entry) for entry in sources],
             "owner_name": names.get(cal.owner_id),
             "can_edit": rights.edit_calendar,
             "can_own": rights.own,
@@ -56,11 +60,30 @@ def _render(cal: Calendar, rights: CalendarRights, names: dict[str, str | None])
     )
 
 
+async def _sources(
+    db, request: Request, who: ResourcePrincipal, cal: Calendar, rights: CalendarRights
+) -> list[dict[str, Any]]:
+    """What the reader may see of the calendar's sources: settings only for a manager, and then
+    only as far as each source says they may see them."""
+    return await source_view.shown_for(
+        db,
+        bound_tenant(),
+        source_viewer_from(request, who),
+        cal,
+        with_settings=rights.own,
+    )
+
+
 async def out(
     db, request: Request, who: ResourcePrincipal, cal: Calendar, *, trashed: bool = False
 ) -> CalendarOut:
     rights = await calendar_rights(db, who, cal, include_deleted=trashed)
-    return _render(cal, rights, await owner_names(request, db, [cal.owner_id]))
+    return _render(
+        cal,
+        rights,
+        await owner_names(request, db, [cal.owner_id]),
+        await _sources(db, request, who, cal, rights),
+    )
 
 
 @router.get("")
@@ -70,7 +93,10 @@ async def list_calendars(
     rows = await service.list_calendars(db, who, trashed=trashed)
     rights = await calendar_rights_many(db, who, rows, include_deleted=trashed)
     names = await owner_names(request, db, [row.owner_id for row in rows])
-    return [_render(row, rights[row.id], names) for row in rows]
+    return [
+        _render(row, rights[row.id], names, await _sources(db, request, who, row, rights[row.id]))
+        for row in rows
+    ]
 
 
 @router.post("", status_code=201, dependencies=[require_edit])

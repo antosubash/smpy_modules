@@ -85,7 +85,33 @@ exclusive), a `key` unique within the answer, a plain-text `title`, and optional
 calendar. An optional `async check_settings(sctx, settings)` raises
 `SourceSettingsError(loc, message)` for a settings value the model cannot judge; it runs
 when an admin saves. `SourceError("some_code")` from `occurrences` becomes that code in the
-source's status instead of the generic `raised`.
+source's status instead of the generic `raised`. A reader who may see why gets a code (`field_missing`, `field_changed`, `reindexing`
+in records); nobody else is told, so a source stays quiet for what the viewer may not know exists.
+
+### Settings a manager may not fully see
+
+Whoever manages a calendar sees and saves its source settings, but may not be allowed to read
+everything they name (records: a mapping to a record type they cannot read would tell them the
+type exists). Two optional hooks let a source keep that to itself; both run on a connection of
+their own and a failure shows `{}` (nothing the plugin cannot vouch for is shown):
+
+* `async view_settings(sctx, settings) -> SettingsView(settings, problems)`: the settings as
+  `sctx.viewer` may see them (a redacted copy; the stored ones are untouched) and the
+  `SettingsProblem(loc, code, message)`s they may be told about. The calendar API returns both
+  to managers only; a source without the hook shows its settings as stored.
+* `async restore_settings(sctx, submitted, stored) -> RestoredSettings(settings, preserved)`:
+  before a save is validated, put back from `stored` what `view_settings` hid (the client sent a
+  placeholder; it never learns or alters the content). Raise `SourceSettingsError` for a forged
+  placeholder, with the message and code of an unknown value so it is no oracle.
+  `preserved` lists the paths put back; `check_settings` receives them as `sctx.preserved` and
+  must not judge them again.
+
+`SourceSettingsError(loc, message, code)` takes an optional short `code`; the 422 carries it as
+`type: "value_error.<code>"` and the Sources dialog hands it to your settings section as `codes`
+so it words the reason in the reader's language. An entry whose plugin is not installed shows no
+settings, and saving it with `{}` keeps what is stored. Records is the worked example: a hidden
+mapping is `{"hidden": true, "token": "h<index>"}`, kept on save, and a mapping to a missing
+type looks exactly like one to an unreadable type.
 
 ### What the runner does around your call
 

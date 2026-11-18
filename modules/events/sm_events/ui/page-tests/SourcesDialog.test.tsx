@@ -106,6 +106,7 @@ it("enabling shows the plugin's section, or a JSON fallback, or nothing", async 
   expect(received?.calendar.id).toBe('c1');
   expect(Object.keys(received ?? {}).sort()).toEqual([
     'calendar',
+    'codes',
     'errors',
     'onChange',
     'settings',
@@ -165,6 +166,39 @@ it('a 422 on the settings lands on the section, by field', async () => {
   expect(dialog().querySelector('[data-testid="desk-error"]')?.textContent).toBe(
     'That is not allowed',
   );
+  await view.unmount();
+});
+
+it('a 422 carries the plugin code per path, and stored problems show on open', async () => {
+  const stored = {
+    id: 'acme:desk',
+    settings: { field: 'x' },
+    installed: true,
+    label_key: null,
+    problems: [{ loc: ['field'], code: 'field_missing', message: 'Stored problem' }],
+  };
+  const { view } = await open(withSources([stored]), {
+    [`PUT ${API}/c1/sources`]: () =>
+      Response.json(
+        {
+          detail: [
+            {
+              loc: ['body', 'sources', 0, 'settings', 'field'],
+              msg: 'Not allowed',
+              type: 'value_error.field_not_date',
+            },
+          ],
+        },
+        { status: 422 },
+      ),
+  });
+  // what the server said was wrong with what is stored is there before any save
+  expect(received?.errors.field).toBe('Stored problem');
+  expect(received?.codes.field).toBe('field_missing');
+  await click(button('Save', dialog()));
+  await flush();
+  expect(received?.errors.field).toBe('Not allowed');
+  expect(received?.codes.field).toBe('field_not_date');
   await view.unmount();
 });
 

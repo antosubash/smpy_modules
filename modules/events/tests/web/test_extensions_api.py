@@ -68,6 +68,7 @@ async def test_put_round_trip_and_calendar_out(client):
         "settings": {"field": "x", "count": 2},
         "installed": True,
         "label_key": "acme.fake",
+        "problems": [],
     }
     again = await client.get(f"{BASE}/{cid}", headers=OWNER)
     assert again.json()["sources"] == [entry]
@@ -122,7 +123,9 @@ async def test_not_installed_entry_shown_and_kept(client):
 
     await run(client, seed)
     shown = (await client.get(f"{BASE}/{cid}", headers=OWNER)).json()["sources"]
-    assert shown == [{"id": "gone:thing", "settings": {}, "installed": False, "label_key": None}]
+    assert shown == [
+        {"id": "gone:thing", "settings": {}, "installed": False, "label_key": None, "problems": []}
+    ]
     kept = await put(client, cid, [{"id": "gone:thing"}, {"id": "acme:plain"}])
     assert [s["id"] for s in kept.json()["sources"]] == ["gone:thing", "acme:plain"]
     assert (await put(client, cid, [{"id": "gone:thing", "settings": {"a": 1}}])).status_code == 422

@@ -14,7 +14,10 @@ from sm_events.models.enums import DEFAULT_EVENT_TYPE
 TYPES = [
     "EventType",
     "NoExtra",
+    "RestoredSettings",
     "SettingsContext",
+    "SettingsProblem",
+    "SettingsView",
     "Source",
     "SourceCalendar",
     "SourceContext",

@@ -6,6 +6,8 @@ export type CalendarSource = {
   settings: Record<string, unknown>;
   installed: boolean;
   label_key: string | null;
+  /** What is wrong with the stored settings that this reader may be told. */
+  problems?: { loc: (string | number)[]; code: string; message: string }[];
 };
 export type Calendar = {
   id: string;

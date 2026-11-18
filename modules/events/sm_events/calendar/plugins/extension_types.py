@@ -94,12 +94,46 @@ class SourceContext:
     db: AsyncSession
 
 
+SettingsPath = tuple[str | int, ...]
+
+
 @dataclass(frozen=True)
 class SettingsContext:
     tenant_id: str
     viewer: SourceViewer
     calendar: SourceCalendar
     db: AsyncSession
+    preserved: tuple[SettingsPath, ...] = ()
+    """Paths ``restore_settings`` filled in from what is stored (content the caller could not
+    see): ``check_settings`` must not judge them again as if the caller had submitted them."""
+
+
+@dataclass(frozen=True)
+class SettingsProblem:
+    """Something wrong with stored settings that the reader may be told: ``loc`` is the path under
+    the settings, ``code`` a short lowercase code the UI words, ``message`` the English fallback."""
+
+    loc: SettingsPath
+    code: str
+    message: str
+
+
+@dataclass(frozen=True)
+class SettingsView:
+    """What ``view_settings`` answers: the settings as this reader may see them, and the problems
+    this reader may be told about."""
+
+    settings: dict[str, Any]
+    problems: tuple[SettingsProblem, ...] = ()
+
+
+@dataclass(frozen=True)
+class RestoredSettings:
+    """What ``restore_settings`` answers: the settings with what was hidden put back, and the
+    paths it put back (see :attr:`SettingsContext.preserved`)."""
+
+    settings: dict[str, Any]
+    preserved: tuple[SettingsPath, ...] = ()
 
 
 class Source(Protocol):
@@ -107,7 +141,15 @@ class Source(Protocol):
     are the only ones called for an anonymous read, with ``viewer=None``; the default
     for a source is not public, and a public source must return only what is public
     in its own module. An optional ``async check_settings(sctx, settings)`` may raise
-    :class:`SourceSettingsError`."""
+    :class:`SourceSettingsError`.
+
+    **Settings are shown to whoever manages the calendar, who may not be allowed to see all of
+    what they name.** Two more optional hooks let a source keep that to itself:
+    ``async view_settings(sctx, settings) -> SettingsView`` returns the settings as
+    ``sctx.viewer`` may see them (a redacted copy; the default is unchanged) and the problems they
+    may be told about; ``async restore_settings(sctx, submitted, stored) -> RestoredSettings``
+    puts back, from ``stored``, what ``view_settings`` hid, before the settings are validated and
+    stored. Both run on a connection of their own, like every plugin call."""
 
     id: str
     label_key: str
@@ -152,12 +194,15 @@ class SourceError(Exception):
 
 
 class SourceSettingsError(Exception):
-    """Raised by ``check_settings``; ``loc`` is the path under the entry's ``settings``."""
+    """Raised by ``check_settings`` (or ``restore_settings``); ``loc`` is the path under the entry's
+    ``settings``."""
 
-    def __init__(self, loc: tuple[str | int, ...], message: str) -> None:
+    def __init__(self, loc: tuple[str | int, ...], message: str, code: str | None = None) -> None:
         super().__init__(message)
         self.loc = loc
         self.message = message
+        self.code = code
+        """A short lowercase code the UI words in the reader's language; optional."""
 
 
 class SourceStatus(BaseModel):

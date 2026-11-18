@@ -104,7 +104,9 @@ async def test_trash_excluded(db):
 async def test_unknown_type_or_field_is_empty(db):
     await make_type(db)
     assert (await read(db, "nope")).hits == []
-    assert (await read(db, field="nope")).hits == []
+    with pytest.raises(DatedQueryError) as caught:  # a readable type that lacks the field
+        await read(db, field="nope")
+    assert caught.value.reason == "field_missing"
     assert (await read(db, "nope", who=None, locale="en")).hits == []
 
 

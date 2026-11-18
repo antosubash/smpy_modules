@@ -37,6 +37,7 @@ from sm_records.integrations.events.settings import (
     caller_of,
     check_settings,
 )
+from sm_records.integrations.events.visibility import restore_settings, view_settings
 
 __all__ = ["RecordDatesSource"]
 
@@ -57,6 +58,14 @@ def _window(
     first, last = start.astimezone(tz), end.astimezone(tz)
     hi = last.date() if last.time() == datetime.min.time() else last.date() + _ONE_DAY
     return first.date() - back, max(hi, first.date() + _ONE_DAY)
+
+
+def _code(exc: DatedQueryError) -> str:
+    """The status code for a field that cannot be asked for: only someone who may read the type
+    gets here (the contract answers an empty page for anyone else), so they may be told."""
+    if exc.reason in ("reindexing", "field_missing"):
+        return exc.reason
+    return "field_changed"
 
 
 def _title(hit: DatedHit) -> str:
@@ -96,6 +105,14 @@ class RecordDatesSource:
     async def check_settings(self, sctx: SettingsContext, settings: RecordDatesSettings) -> None:
         await check_settings(sctx, settings)
 
+    async def view_settings(self, sctx: SettingsContext, settings: dict[str, Any]):
+        return await view_settings(sctx, settings)
+
+    async def restore_settings(
+        self, sctx: SettingsContext, submitted: dict[str, Any], stored: dict[str, Any]
+    ):
+        return await restore_settings(sctx, submitted, stored)
+
     async def occurrences(
         self, ctx: SourceContext, start: datetime, end: datetime
     ) -> list[SourceOccurrence]:
@@ -134,9 +151,7 @@ class RecordDatesSource:
                     limit=min(wanted - len(items), MAX_DATED_BATCH),
                 )
             except DatedQueryError as exc:
-                raise SourceError(
-                    "reindexing" if exc.reason == "reindexing" else "field_changed"
-                ) from None
+                raise SourceError(_code(exc)) from None
             items.extend(_item(hit, mapping, ctx) for hit in page.hits)
         return items
 
@@ -159,5 +174,5 @@ class RecordDatesSource:
                 locale=ctx.locale,
                 limit=1,
             )
-        except DatedQueryError:
-            raise SourceError("field_changed") from None
+        except DatedQueryError as exc:
+            raise SourceError(_code(exc)) from None
