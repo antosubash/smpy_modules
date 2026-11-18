@@ -34,8 +34,11 @@ from tests.support.public import INERTIA, seed_public, tenant_header
 from tests.web.public.leaks import (
     HIDDEN,
     HIDDEN_CALENDARS,
+    IGNORED_HEADERS,
     LOCALES,
+    MISSING,
     assert_absent,
+    fingerprint,
     surfaces,
 )
 
@@ -94,24 +97,57 @@ async def test_hidden_calendar_404(public_locales_client, fx, hidden):
             assert "etag" not in got.headers
 
 
+VARIANTS = (INERTIA, {}, {"Accept": "application/json"})
+"""An in-app visit (the page's JSON), a browser (HTML) and a client that asks for JSON."""
+
+
+def _missing_url(url: str, slug: str) -> str:
+    return url.replace(slug, MISSING)
+
+
 @pytest.mark.parametrize("locale", LOCALES)
 @pytest.mark.parametrize("hidden", [*HIDDEN, "secret_talk", "draft_parent"])
 async def test_not_found_indistinguishable(public_locales_client, fx, hidden, locale):
-    """A hidden event's address answers exactly as a slug that never existed: status, props,
-    and every cache header. Nothing tells a visitor which drafts exist."""
-    missing = await public_locales_client.get(
-        _urls.event_path("no-such-slug", locale), headers=INERTIA
-    )
-    slug = fx.slug(
-        fx.hidden[hidden], locale if f"{fx.hidden[hidden].id}:{locale}" in fx.slugs else "en"
-    )
-    got = await public_locales_client.get(_urls.event_path(slug, locale), headers=INERTIA)
-    assert got.status_code == missing.status_code == 404
-    assert got.json()["component"] == missing.json()["component"]
-    assert got.json()["props"] == missing.json()["props"]
-    for header in ("cache-control", "vary", "content-type", "content-language"):
-        assert got.headers.get(header) == missing.headers.get(header), header
-    assert "etag" not in got.headers and "etag" not in missing.headers
+    """A hidden event's address answers exactly as a slug that never existed, on every surface
+    that has one (page and ``.ics``) and for every kind of client: the same status, the same
+    body bytes and the same headers. Nothing tells a visitor which drafts exist."""
+    event = fx.hidden[hidden]
+    for surface in surfaces(fx, locale):
+        if surface.kind != "page":
+            continue
+        have = f"{event.id}:{locale}" in fx.slugs
+        if hidden in ("secret_talk", "draft_parent") and surface.name != "event page":
+            continue
+        slug = fx.slug(event, locale if have else "en")
+        url = (
+            surface.url(fx, locale, hidden)
+            if hidden in HIDDEN
+            else _urls.event_path(slug, locale)
+            if surface.name == "event page"
+            else None
+        )
+        assert url is not None
+        for headers in VARIANTS:
+            got = await public_locales_client.get(url, headers=headers)
+            gone = await public_locales_client.get(_missing_url(url, slug), headers=headers)
+            assert got.status_code == 404, (surface.name, url, headers)
+            assert fingerprint(got, slug) == fingerprint(gone, MISSING), (surface.name, headers)
+            assert "etag" not in got.headers
+
+
+@pytest.mark.parametrize("hidden", HIDDEN_CALENDARS)
+async def test_hidden_calendar_indistinguishable(public_locales_client, fx, hidden):
+    calendar = {"internal": fx.internal, "private": fx.private, "trashed": fx.gone}[hidden]
+    for locale in LOCALES:
+        for build in (_urls.calendar_path, _urls.calendar_ics_path):
+            url = build(calendar.slug, locale)
+            for headers in VARIANTS:
+                got = await public_locales_client.get(url, headers=headers)
+                gone = await public_locales_client.get(
+                    url.replace(calendar.slug, "no-such-calendar"), headers=headers
+                )
+                assert got.status_code == 404
+                assert fingerprint(got, calendar.slug) == fingerprint(gone, "no-such-calendar")
 
 
 async def test_conditional_get_needs_visibility(public_locales_client, fx):
@@ -128,20 +164,47 @@ async def test_conditional_get_needs_visibility(public_locales_client, fx):
 
 
 async def test_signed_in_manager_sees_public_only(public_locales_client, fx):
-    """The viewer never widens the answer: a signed-in manager gets the anonymous 404 for
-    every hidden event (the headers differ only in being private)."""
+    """The viewer never widens the answer: a signed-in manager gets the anonymous answer from
+    every surface, byte for byte (an Inertia page: its props), and only the cache headers differ."""
     manager = as_user("m", "events.view", "events.manage", "events.publish")
-    for surface in surfaces(fx, "en"):
-        if surface.kind != "page":
-            continue
-        for hidden in HIDDEN:
-            url = surface.url(fx, "en", hidden)
-            anon = await public_locales_client.get(url, headers=INERTIA)
-            signed = await public_locales_client.get(url, headers=INERTIA | manager)
-            assert signed.status_code == anon.status_code == 404, (surface.name, hidden)
-            a, b = anon.json(), signed.json()  # an Inertia page's props, or the JSON envelope
-            assert b.get("props", b).keys() == a.get("props", a).keys()
-            assert signed.headers["cache-control"] == "no-store"
+    cache_headers = {"cache-control", "etag", "vary"}
+    for locale in LOCALES:
+        for surface in surfaces(fx, locale):
+            urls = (
+                [surface.url(fx, locale, h) for h in HIDDEN]
+                if surface.kind == "page"
+                else [surface.url(fx, locale, None)]
+            )
+            for url in urls:
+                anon = await public_locales_client.get(url, headers=INERTIA)
+                signed = await public_locales_client.get(url, headers=INERTIA | manager)
+                assert signed.status_code == anon.status_code, (surface.name, url)
+                a, b = anon.json() if _is_json_page(anon) else None, None
+                if a is not None:
+                    b = signed.json()
+                    assert b["props"] == a["props"], (surface.name, url)
+                    assert b["component"] == a["component"]
+                else:
+                    assert signed.content == anon.content, (surface.name, url)
+                kept = {
+                    k: v
+                    for k, v in anon.headers.items()
+                    if k not in IGNORED_HEADERS | cache_headers
+                }
+                got = {
+                    k: v
+                    for k, v in signed.headers.items()
+                    if k not in IGNORED_HEADERS | cache_headers
+                }
+                assert got == kept, (surface.name, url)
+            plain = urls[0]
+            assert (await public_locales_client.get(plain, headers=manager)).status_code == (
+                await public_locales_client.get(plain)
+            ).status_code
+
+
+def _is_json_page(response) -> bool:
+    return "x-inertia" in response.headers
 
 
 _PUBLIC_CODE = Path(__file__).resolve().parents[3] / "sm_events"
@@ -206,16 +269,3 @@ async def test_other_tenant_absent_everywhere(public_multi_client):
             assert nobody.status_code == 404, ("no tenant", surface.name)
             assert nobody.headers["cache-control"] == "no-store"
     assert mine.slug(mine.one_off) != theirs.slug(theirs.one_off)
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="the event page is a stub until Task 13; remove this marker when it lands",
-)
-async def test_a_public_event_is_not_the_404(public_locales_client, fx):
-    """The control the table above lacks: its 404s prove nothing while every route is one.
-    Once the page exists this must pass, and the strict xfail forces the marker out."""
-    got = await public_locales_client.get(
-        _urls.event_path(fx.slug(fx.one_off), "en"), headers=INERTIA
-    )
-    assert got.status_code == 200

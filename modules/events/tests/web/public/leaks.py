@@ -71,6 +71,7 @@ def surfaces(fx: PublicFixture, locale: str) -> list[Surface]:
             lambda f, loc, _: _urls.event_path("no-such-event", loc),
             status=404,
         ),
+        Surface("sitemap", "listing", lambda f, loc, _: _urls.sitemap_path()),
         Surface("occurrences api", "listing", lambda f, loc, _: _api_url(loc)),
         Surface(
             "all calendars feed", "listing", lambda f, loc, _: _urls.calendar_ics_path(None, loc)
@@ -91,3 +92,37 @@ def assert_absent(body: str, fx: PublicFixture, names: tuple[str, ...] = ()) -> 
             assert slug is None or slug not in body, (name, locale, "slug")
         assert event.uid not in body, (name, "uid")
         assert fx.slugs[f"{event.id}:en"].title() not in body, (name, "title")
+
+
+# What may differ between two answers to different requests: the clock, request ids, the length
+# of a body that echoes the requested address (normalised away below) and cookies.
+IGNORED_HEADERS = frozenset({"date", "content-length", "x-correlation-id", "set-cookie", "server"})
+MISSING = "no-such-slug"
+
+ROUTE_SURFACES: dict[str, str] = {
+    "/{prefix}/sitemap.xml": "sitemap",
+    "/{prefix}/api/occurrences": "occurrences api",
+    "/{prefix}/calendar.ics": "all calendars feed",
+    "/{prefix}/c/{{calendar}}.ics": "calendar feed",
+    "/{prefix}/c/{{calendar}}": "calendar page",
+    "/{prefix}/": "index",
+    "/{prefix}/{{slug}}.ics": "event ics",
+    "/{prefix}/{{slug}}": "event page",
+}
+"""Every ``GET`` route under the public prefix and the :class:`Surface` that covers it (the
+meta-test in ``test_leaks_routes.py`` fails on a route that is not here, and on a name that is
+not a surface). ``{prefix}`` is the mounted prefix of a language; the sitemap and the API exist
+on the default language's only. A redirect-only route is named ``"redirect"``."""
+
+REDIRECT_ONLY = "redirect"
+
+
+def fingerprint(response, *echoed: str) -> tuple[int, bytes, dict[str, str]]:
+    """Status, body and headers of an answer, with each ``echoed`` string (the requested slug,
+    which an error page may repeat in its ``url``) replaced by a placeholder, so two answers to
+    different addresses compare byte for byte."""
+    body = response.content
+    for text in echoed:
+        body = body.replace(text.encode(), b"<echo>")
+    headers = {k: v for k, v in response.headers.items() if k not in IGNORED_HEADERS}
+    return response.status_code, body, headers
