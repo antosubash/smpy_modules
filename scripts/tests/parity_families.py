@@ -13,6 +13,7 @@ crypto families in ``parity_crypto.py``; both are appended below.
 from __future__ import annotations
 
 from parity_crypto import CRYPTO_FAMILIES
+from parity_public import PUBLIC_FAMILIES
 from parity_support import Copy, Family
 from parity_tenancy import TENANCY_FAMILIES
 
@@ -33,18 +34,6 @@ FAMILIES: tuple[Family, ...] = (
             Copy(f"{EVENTS}/web/endpoints/public/_cache.py"),
         ),
         shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key"),
-    ),
-    Family(
-        "public cache-control (pagebuilder, news)",
-        (
-            Copy(f"{PB}/web/public_cache.py", {"PagebuilderSettings": "Settings"}),
-            Copy(f"{NEWS}/web/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
-        ),
-        shared=("cache_control", "etag_for"),
-        differ={
-            "etag_for": "A page's chrome also changes with the site layout and the nav list, "
-            "so pagebuilder digests layout_updated_at and nav as well; an article has neither.",
-        },
     ),
     Family(
         "slug redirects",
@@ -88,11 +77,6 @@ FAMILIES: tuple[Family, ...] = (
         },
     ),
     Family(
-        "content locales: resolve (pagebuilder, news)",
-        (Copy(f"{PB}/core/locales.py"), Copy(f"{NEWS}/core/locales.py")),
-        shared=("resolve",),
-    ),
-    Family(
         "slugify (TypeScript)",
         (
             Copy(
@@ -122,16 +106,8 @@ FAMILIES: tuple[Family, ...] = (
             ),
         ),
         differ={
-            "safeJsonLd": "Events' serialiser escapes more characters than news' and pagebuilder's.",
+            "safeJsonLd": "Events' serialiser escapes more characters than the other two.",
         },
-    ),
-    Family(
-        "public head injection (Python)",
-        (
-            Copy(f"{NEWS}/web/endpoints/public/_head.py"),
-            Copy(f"{EVENTS}/web/endpoints/public/_head.py"),
-        ),
-        shared=("_CLOSE_HEAD", "_EXISTING_TITLE", "_tag", "_alternate_links", "inject"),
     ),
     Family(
         "CSRF token sharing (Python)",
@@ -307,5 +283,6 @@ FAMILIES: tuple[Family, ...] = (
         },
     ),
     *CRYPTO_FAMILIES,
+    *PUBLIC_FAMILIES,
     *TENANCY_FAMILIES,
 )

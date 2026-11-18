@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sm_events.core.constants import MODULE_NAME
+from sm_events.core.constants.names import MODULE_NAME
 
 DEFAULT_PUBLIC_PREFIX = "/events"
 PUBLIC_PREFIX_PATTERN = r"^[a-z0-9-]+(?:/[a-z0-9-]+)*$"
@@ -59,6 +59,7 @@ PRODID = "-//simple-module//events//EN"
 SEGMENT_API = "api"
 SEGMENT_CALENDAR_FEED = "calendar"
 SEGMENT_CALENDAR = "c"
+#: Reserved now so no slug can take it; PR 5 serves the private per-user feed links here.
 SEGMENT_PRIVATE_FEED = "feed"
 SEGMENT_SITEMAP = "sitemap"
 RESERVED_SLUGS = (

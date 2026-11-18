@@ -187,7 +187,8 @@ route-table test fails otherwise. Feeds are built only in `feeds/` with `icalend
 through `feeds/sanitize.py`, reading rows through the gate, never the occurrences read. JSON-LD is
 serialised only by `_head.safe_json_ld` (Python) and `utils/jsonLd.ts`; the description is rendered
 from `content/richtext_tree.py`, never injected. Constants live in `core/constants/` (`public.py` for
-the public surface).
+the public surface). **Production must set the host's `public_base_url`:** without it canonical, `og:url`,
+`hreflang`, feed and sitemap URLs follow the client's `Host` header (the response then varies on `Host`).
 `make worker` serves the `events` queue; scheduled publishing needs beat, which
 enumerates tenants under the framework's `all_tenants()` and then gives each
 tenant its own session and `tenant_scope`, one savepoint per event. A scheduled

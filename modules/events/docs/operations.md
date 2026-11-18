@@ -14,8 +14,9 @@
 Anonymous pages are `public` and revalidate with a weak `ETag`, only when no tenant was picked by
 anything request-specific and the host is single-tenant. Otherwise they are `private`, and `Vary`
 names `Cookie` and the tenant header. A signed-in visitor's page is `private, no-store`. Every
-response that names the origin adds `Host` to `Vary` until the host's `public_base_url` is set; set
-it on a single-tenant production host (the startup log warns). The framework sends a fresh session
+response that names the origin adds `Host` to `Vary` until the host's `public_base_url` is set. **Production must
+set it** on a single-tenant host (the startup log warns): without it, canonical, `og:url`, `hreflang`, feed
+and sitemap URLs follow the client's `Host` header, which anyone can choose. The framework sends a fresh session
 cookie on every anonymous response, so a CDN will not cache these pages until that is fixed
 upstream; browsers and private caches do.
 
