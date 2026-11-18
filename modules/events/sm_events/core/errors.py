@@ -238,9 +238,11 @@ class ImportFailure(Exception):  # noqa: N818 - not an HTTP error
     """An import step that cannot go on. Carries a failure ``code`` and nothing else: a
     library's message can echo the file, so it is never kept."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, bound: str | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.bound = bound
+        """Which limit tripped (``"line_length"``), never a value from the file."""
 
 
 def install_exception_handlers(app: FastAPI) -> None:

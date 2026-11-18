@@ -23,8 +23,11 @@ __all__ = [
     "IMPORT_MAX_DEPTH",
     "IMPORT_MAX_EVENTS",
     "IMPORT_MAX_EVENT_BYTES",
+    "IMPORT_MAX_EXDATES",
     "IMPORT_MAX_LINE",
+    "IMPORT_MAX_LINES",
     "IMPORT_MAX_OVERRIDES",
+    "IMPORT_MAX_PARAMS",
     "IMPORT_MAX_PROPERTIES",
     "IMPORT_MAX_TIMEZONES",
     "IMPORT_MIN_BYTES",
@@ -56,6 +59,11 @@ IMPORT_MAX_DEPTH: Final = 3
 IMPORT_MAX_TIMEZONES: Final = 100
 IMPORT_MAX_PROPERTIES: Final = 500
 IMPORT_MAX_LINE: Final = 65_536
+IMPORT_MAX_LINES: Final = 1_000_000
+"""Physical lines in a file (a 20 MiB file of empty lines would otherwise cost a list each)."""
+IMPORT_MAX_PARAMS: Final = 20
+IMPORT_MAX_EXDATES: Final = 1000
+"""``EXDATE`` values one event may carry before it is skipped (``too_many_overrides``)."""
 IMPORT_MAX_EVENT_BYTES: Final = 262_144
 IMPORT_MAX_OVERRIDES: Final = 730
 IMPORT_DESCRIPTION_MAX: Final = 20_000
