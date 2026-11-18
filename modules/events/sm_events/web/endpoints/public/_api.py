@@ -30,7 +30,7 @@ from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
 from sm_events.web.endpoints.deps import get_settings
 from sm_events.web.endpoints.public import _urls
-from sm_events.web.endpoints.public._errors import PublicErrorRoute
+from sm_events.web.endpoints.public._errors import PublicApiRoute
 from sm_events.web.endpoints.public._respond import machine_response
 from sm_events.web.schemas.public import PublicOccurrenceParams
 
@@ -103,7 +103,7 @@ async def public_page(db: Any, **query: Any) -> OccurrencePage:
 
 
 def api_router() -> APIRouter:
-    router = APIRouter(route_class=PublicErrorRoute)
+    router = APIRouter(route_class=PublicApiRoute)
 
     @router.api_route(
         f"/{constants.SEGMENT_API}/occurrences", methods=sorted(constants.PUBLIC_METHODS)

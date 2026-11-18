@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from sm_events.content.texts import apply_texts
@@ -153,7 +154,10 @@ async def test_alternates_only_public_texts(public_locales_client, fx_partial):
         {"locale": "x-default", "url": f"http://test/events/{fx.slug(fx.one_off)}"},
     ]
     only_en = props(await get(public_locales_client, f"/events/{fx.slug(fx.conf)}"))
-    assert only_en["alternates"] == []
+    assert only_en["alternates"] == [  # its own language and x-default, so a crawler knows
+        {"locale": "en", "url": f"http://test/events/{fx.slug(fx.conf)}"},
+        {"locale": "x-default", "url": f"http://test/events/{fx.slug(fx.conf)}"},
+    ]
     de = props(await get(public_locales_client, f"/de/events/{fx.slug(fx.one_off, 'de')}"))
     assert de["locale"] == "de" and de["canonical_url"].endswith(
         f"/de/events/{fx.slug(fx.one_off, 'de')}"
@@ -253,3 +257,40 @@ async def test_a_sub_event_on_another_public_calendar_shows_its_own(public_local
     assert side["show_timezone"] is False  # New York on a New York calendar
     talk = next(i for i in got["sub_events"] if i["url"] == f"/events/{fx.slug(fx.talk)}")
     assert talk["calendar"]["slug"] == fx.pub.slug
+
+
+async def _description_meta(client, path, **headers):
+    html = (await client.get(path, headers=headers)).text
+    found = re.search(r'<meta name="description" content="([^"]*)">', html)
+    return found.group(1) if found else None
+
+
+async def test_an_event_without_text_gets_a_generated_description(public_locales_client, fx):
+    """No summary, description or SEO text: the head still has a one-line description (date,
+    place, calendar), in the page's language and escaped like any meta tag."""
+    plain = await _description_meta(public_locales_client, f"/events/{fx.slug(fx.talk)}")
+    assert plain and "Pub" in plain and "·" in plain, plain
+    german = await _description_meta(
+        public_locales_client, f"/de/events/{fx.slug(fx.one_off, 'de')}"
+    )
+    assert german and re.search(r"\d\d\.\d\d\.\d{4}", german), german
+    assert "<" not in plain and "<" not in german
+
+
+async def test_an_authored_description_is_not_replaced(public_locales_client, fx):
+    async with public_locales_client.db_state.session_factory() as s:
+        row = (
+            (
+                await s.execute(
+                    select(EventText).where(
+                        EventText.event_id == fx.talk.id, EventText.locale == "en"
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        row.summary = "Hand written"
+        await s.commit()
+    got = await _description_meta(public_locales_client, f"/events/{fx.slug(fx.talk)}")
+    assert got == "Hand written"

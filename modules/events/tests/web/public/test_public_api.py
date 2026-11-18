@@ -109,6 +109,23 @@ async def test_bounds(public_locales_client, fx):
     assert (await public_locales_client.get(f"{API}?start=2026-01-01T00:00:00Z")).status_code == 422
 
 
+async def test_a_bad_query_is_the_json_envelope(public_locales_client, fx):
+    """Missing and garbage parameters answer ``{"detail", "code"}`` with ``no-store``, not the
+    host's HTML 422 page."""
+    for query in (
+        "",
+        "start=x&end=y",
+        "start=2026-01-01T00:00:00Z",
+        f"{YEAR}&calendar=not-a-uuid",
+        f"{YEAR}&category=1",
+    ):
+        got = await public_locales_client.get(f"{API}?{query}")
+        assert got.status_code == 422, query
+        assert got.headers["content-type"].startswith("application/json"), query
+        assert got.json() == {"detail": constants.INVALID_QUERY_DETAIL, "code": "invalid_query"}
+        assert got.headers["cache-control"] == "no-store", query
+
+
 async def test_truncated_is_serialised(public_locales_client, fx, monkeypatch):
     monkeypatch.setattr(constants, "MAX_OCCURRENCES", 3)
     got = await public_locales_client.get(f"{API}?{YEAR}")

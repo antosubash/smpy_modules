@@ -1,12 +1,15 @@
 // @vitest-environment happy-dom
 
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, beforeAll, expect, it } from 'vitest';
 import { TimezoneToggle } from '../calendar/TimezoneToggle';
 import { EventPlace } from '../public/EventPlace';
 import { LanguageSwitch } from '../public/LanguageSwitch';
 import { ItemRow } from '../public/UpcomingList';
+import { loadCatalogue, PageLocale } from '../utils/PageLocale';
 import { item } from './public-support';
-import { mount } from './test-dom';
+import { mount, ready } from './test-dom';
+
+beforeAll(() => loadCatalogue('de'));
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -62,4 +65,36 @@ it('the zone switch offers only "my time" when there is no calendar time to offe
     />,
   );
   expect(view.all('button').map((b) => b.textContent)).toEqual(['My time Europe/Vienna']);
+});
+
+it('a title in another language than the page carries a visible, labelled marker', async () => {
+  const view = await mount(
+    <PageLocale locale="de">
+      <ItemRow locale="de" item={item({ lang: 'en', title: 'Concert' })} />
+    </PageLocale>,
+  );
+  await ready(view, 'li');
+  const badge = view.find('span[role=img]');
+  expect(badge?.textContent).toBe('en');
+  expect(badge?.getAttribute('aria-label')).toBe('auf Englisch');
+  expect(view.find('a')?.getAttribute('lang')).toBe('en'); // the link still goes to the page that exists
+  const same = await mount(<ItemRow locale="en" item={item()} />);
+  expect(same.find('span[role=img]')).toBeNull();
+});
+
+it('a multi-line address keeps its line breaks', async () => {
+  const view = await mount(
+    <EventPlace
+      place={{
+        mode: 'in_person',
+        venue_name: 'Hall',
+        address: 'Main Street 1\n1010 Vienna',
+        online_url: null,
+        latitude: null,
+        longitude: null,
+      }}
+    />,
+  );
+  const paragraph = view.find('p.whitespace-pre-line');
+  expect(paragraph?.textContent).toContain('Main Street 1\n1010 Vienna');
 });

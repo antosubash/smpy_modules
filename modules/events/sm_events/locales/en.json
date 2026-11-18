@@ -565,7 +565,8 @@
       "all_day": "All day",
       "online": "Online",
       "hybrid": "In person and online",
-      "view_event": "View event"
+      "view_event": "View event",
+      "in_language": "in {language}"
     },
     "subscribe": {
       "title": "Subscribe",
