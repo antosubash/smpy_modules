@@ -22,7 +22,6 @@ import logging
 import re
 import uuid
 from collections import Counter
-from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal
 
@@ -41,9 +40,10 @@ from sm_events.core.errors import (
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.importing.fence import fenced
-from sm_events.feeds.importing.mapper import Mapped, MappedItem, map_calendar
+from sm_events.feeds.importing.mapper import Mapped, map_calendar
 from sm_events.feeds.importing.scan import scan, sniff
-from sm_events.models import Calendar, Category, Event, EventImport, EventImportItem
+from sm_events.feeds.importing.verdicts import existing_uids, item_row
+from sm_events.models import Calendar, Category, EventImport
 from sm_events.web.schemas._fields import strip_unsafe
 
 __all__ = [
@@ -155,56 +155,6 @@ async def _categories(db: Any, default_locale: str) -> dict[str, uuid.UUID]:
     return found
 
 
-async def _existing(
-    db: Any, calendar_id: uuid.UUID, uids: Sequence[str]
-) -> dict[str, tuple[uuid.UUID, int, bool]]:
-    """``{uid: (event id, revision, trashed)}`` for the calendar's events, trash included."""
-    found: dict[str, tuple[uuid.UUID, int, bool]] = {}
-    for start in range(0, len(uids), constants.IMPORT_UID_CHUNK):
-        chunk = list(uids[start : start + constants.IMPORT_UID_CHUNK])
-        stmt = (
-            select(Event.id, Event.uid, Event.revision, Event.is_deleted)
-            .where(
-                Event.tenant_id == bound_tenant(),  # type: ignore[arg-type]
-                Event.calendar_id == calendar_id,  # type: ignore[arg-type]
-                Event.uid.in_(chunk),  # type: ignore[attr-defined]
-            )
-            .execution_options(include_deleted=True)
-        )
-        for row in await db.execute(stmt):
-            found[row.uid] = (row.id, row.revision, bool(row.is_deleted))
-    return found
-
-
-def _row(
-    imp: EventImport, seq: int, item: MappedItem, existing: dict[str, tuple[uuid.UUID, int, bool]]
-) -> EventImportItem:
-    verdict, reason, event_id, revision = "skip", item.skip, None, None
-    if item.event is not None:
-        held = existing.get(item.uid)
-        if held is None:
-            verdict, reason = "new", None
-        elif held[2]:
-            reason = "uid_in_trash"
-        else:
-            verdict, reason, event_id, revision = "update", None, held[0], held[1]
-    return EventImportItem(
-        import_id=imp.id,
-        seq=seq,
-        uid=item.uid[: constants.UID_MAX],
-        verdict=verdict,
-        reason=reason,
-        notes=list(item.notes),
-        title=item.title,
-        starts_at=item.starts_at if verdict != "skip" else None,
-        all_day=item.all_day,
-        recurring=item.recurring,
-        existing_event_id=event_id,
-        expected_revision=revision,
-        payload=item.event.model_dump(mode="json") if verdict != "skip" and item.event else {},
-    )
-
-
 async def _fail(
     db: Any, imp: EventImport, owner: str, now: datetime, failure: ImportFailure
 ) -> str:
@@ -253,10 +203,10 @@ async def parse_step(
         logger.warning("events: import %s could not be mapped (%s)", imp.id, type(exc).__name__)
         return await _fail(db, imp, owner, now, ImportFailure("import_failed", "mapping"))  # type: ignore[return-value]
     uids = [i.uid for i in mapped.items if i.event is not None]
-    existing = await _existing(db, imp.calendar_id, uids)
+    existing = await existing_uids(db, imp.calendar_id, uids)
     counts: Counter[str] = Counter()
     reasons: Counter[str] = Counter()
-    rows = [_row(imp, n, item, existing) for n, item in enumerate(mapped.items, start=1)]
+    rows = [item_row(imp, n, item, existing) for n, item in enumerate(mapped.items, start=1)]
     for row in rows:
         counts[row.verdict] += 1
         reasons.update([row.reason] if row.reason else [])
