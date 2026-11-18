@@ -17,7 +17,6 @@
  */
 
 import * as React from 'react';
-import { vi } from 'vitest';
 
 // `@simple-module-py/ui` is published compiled against a global `React`, and
 // happy-dom gives us no `window.React` — the same line the review's own
@@ -120,16 +119,16 @@ export async function settle(): Promise<void> {
 }
 
 /** Wait until `selector` is on screen: a page that loads its language lazily renders nothing
- *  until the chunk arrives. */
-export async function ready(view: Mounted, selector: string): Promise<void> {
-  await act(async () => {
-    await vi.waitFor(
-      () => {
-        if (!view.find(selector)) throw new Error(`${selector} not rendered yet`);
-      },
-      { timeout: 25000 },
-    );
-  });
+ *  until the chunk arrives. Polls with a short `act` each round, so React can commit the retry
+ *  (waiting inside one `act` would hold the update back). */
+export async function ready(view: Mounted, selector: string, timeoutMs = 25000): Promise<void> {
+  const until = Date.now() + timeoutMs;
+  while (!view.find(selector)) {
+    if (Date.now() > until) throw new Error(`${selector} not rendered in ${timeoutMs} ms`);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+  }
 }
 
 export { act };
