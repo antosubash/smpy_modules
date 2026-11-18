@@ -26,6 +26,18 @@ function allDayText(o: Occurrence, locale: string | undefined): string {
 
 /** Whether the range runs over the autumn change, where the end's clock reads earlier than
  *  (or the same as) the start's: "2:30 – 2:00 AM" for half an hour. */
+/** The time in a chip: the start only. On a repeated hour the offset says which pass it is;
+ *  the full range stays in the popover. */
+export function chipTime(o: Occurrence, timeZone: string, locale: string | undefined): string {
+  const ambiguous = readsBackwards(o, timeZone);
+  return new Intl.DateTimeFormat(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    ...(ambiguous ? { timeZoneName: 'short' as const } : {}),
+    timeZone,
+  }).format(instantDate(o.start));
+}
+
 export function readsBackwards(o: Occurrence, timeZone: string): boolean {
   const wall = (iso: string) =>
     Temporal.Instant.from(iso).toZonedDateTimeISO(timeZone).toPlainDateTime();

@@ -4,7 +4,7 @@ import type { EventInput } from '@fullcalendar/react';
 import { Temporal } from 'temporal-polyfill';
 import { readableOn } from '../../utils/contrast';
 import type { Occurrence } from '../../utils/types-events';
-import { readsBackwards, timeText as timeRangeText } from '../time/format';
+import { chipTime, readsBackwards } from '../time/format';
 import { DEFAULT_CREATE_MINUTES, SLOT_MINUTES } from '../time/range';
 import { addDays, dateIn, isNonexistent } from '../time/zones';
 import type {
@@ -90,7 +90,7 @@ export function chipFor<T>(
   // The library's own range text cannot tell the two passes of a repeated hour apart.
   const text =
     timeZone && !occurrence.all_day && readsBackwards(occurrence, timeZone)
-      ? timeText && timeRangeText(occurrence, timeZone, locale)
+      ? timeText && chipTime(occurrence, timeZone, locale)
       : timeText;
   return render(occurrence, text);
 }
