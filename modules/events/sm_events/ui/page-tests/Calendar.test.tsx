@@ -3,7 +3,6 @@
 import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { fakeGrid } from '../calendar/test-support/FakeGrid';
-import type { CalendarProps } from '../calendar/types';
 import { ApiError } from '../utils/api';
 import {
   buttonNamed,
@@ -14,7 +13,7 @@ import {
   pageOf,
 } from './calendar-support';
 import { flush } from './support';
-import { act, click, mount } from './test-dom';
+import { click } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 vi.mock('../calendar/adapter/FullCalendarGrid', () => import('../calendar/test-support/FakeGrid'));
