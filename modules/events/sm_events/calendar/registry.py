@@ -15,9 +15,9 @@ from __future__ import annotations
 import inspect
 import re
 import threading
-from typing import Any
+from typing import Any, get_args
 
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretBytes, SecretStr
 
 from sm_events.calendar.extension_types import EventType, Source
 from sm_events.core import constants
@@ -87,11 +87,44 @@ def _check_id(kind: str, ident: Any, namespace: str | None) -> str:
     return ident
 
 
-def _check_model(label: str, model: Any, *, forbid_extra: bool) -> None:
+KEEP_SECRETS_ELSEWHERE = (
+    "source settings are stored in the clear, so a secret-typed field is refused; keep the secret "
+    "in your own module's settings (sealed there) and name it from the settings here"
+)
+
+
+def _is_secret(annotation: Any, metadata: tuple[Any, ...], seen: set[Any]) -> bool:
+    """Whether a field holds a secret: pydantic's ``SecretStr``/``SecretBytes`` (anywhere in its
+    type, lists and unions included, or in a nested model), or records' ``SealedSecret`` (a
+    serializer named ``seal_secret``)."""
+    if any(getattr(getattr(m, "func", None), "__name__", "") == "seal_secret" for m in metadata):
+        return True
+    if isinstance(annotation, type):
+        if issubclass(annotation, SecretStr | SecretBytes):
+            return True
+        if issubclass(annotation, BaseModel) and annotation not in seen:
+            seen.add(annotation)
+            return any(
+                _is_secret(f.annotation, tuple(f.metadata), seen)
+                for f in annotation.model_fields.values()
+            )
+    return any(
+        _is_secret(arg, (*metadata, *getattr(arg, "__metadata__", ())), seen)
+        for arg in get_args(annotation)
+    )
+
+
+def _check_model(label: str, model: Any, *, forbid_extra: bool, secrets: bool = False) -> None:
     if not (isinstance(model, type) and issubclass(model, BaseModel)):
         raise InvalidExtension(f"{label}: must be a pydantic BaseModel subclass, got {model!r}")
     if forbid_extra and model.model_config.get("extra") != "forbid":
         raise InvalidExtension(f"{label}: the model must set extra='forbid'")
+    if secrets:
+        for name, info in model.model_fields.items():
+            if _is_secret(info.annotation, tuple(info.metadata), {model}):
+                raise InvalidExtension(
+                    f"{label}: field {name!r} is a secret. {KEEP_SECRETS_ELSEWHERE}"
+                )
     try:
         model.model_json_schema()
     except Exception as exc:
@@ -115,7 +148,7 @@ def _check_source(source: Any, label: str, *, builtin: bool = False) -> None:
         raise InvalidExtension(f"{label}: icon must match [a-z0-9-]{{1,40}} or None")
     model = getattr(source, "settings_model", None)
     if model is not None:
-        _check_model(f"{label}: settings_model", model, forbid_extra=False)
+        _check_model(f"{label}: settings_model", model, forbid_extra=False, secrets=True)
     read = getattr(source, "occurrences", None)
     if builtin:  # the internal protocol: an async generator over the read's own context
         if not inspect.isasyncgenfunction(read):

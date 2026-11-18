@@ -149,3 +149,35 @@ async def test_tenant_isolation(multi_client):
     )
     assert ok.status_code == 200
     assert (await multi_client.get(f"{BASE}/{cid}", headers=b)).status_code == 404
+
+
+async def test_each_calendar_returns_only_its_own_settings(client):
+    a = (await make(client, name="A"))["id"]
+    b = (await make(client, name="B"))["id"]
+    await put(client, a, [{"id": "acme:desk", "settings": {"field": "only-a"}}])
+    await put(client, b, [{"id": "acme:desk", "settings": {"field": "only-b"}}])
+    listed = (await client.get(BASE, headers=OWNER)).json()
+    by_name = {c["name"]: c["sources"][0]["settings"]["field"] for c in listed}
+    assert by_name == {"A": "only-a", "B": "only-b"}
+    assert "only-a" not in (await client.get(f"{BASE}/{b}", headers=OWNER)).text
+
+
+async def test_settings_are_stored_bounded(client):
+    cid = (await make(client))["id"]
+    big = await put(client, cid, [{"id": "acme:desk", "settings": {"field": "x" * 20_000}}])
+    assert big.status_code == 422
+    assert (await client.get(f"{BASE}/{cid}", headers=OWNER)).json()["sources"] == []
+
+
+@pytest.mark.unbound_tenant
+async def test_another_tenants_settings_never_shown(multi_client):
+    a = as_user("o", V, "events.edit", tenant="a")
+    b = as_user("o", V, "events.edit", M, tenant="b")
+    cid = (await multi_client.post(BASE, json={"name": "A"}, headers=a)).json()["id"]
+    await multi_client.put(
+        f"{BASE}/{cid}/sources",
+        json={"sources": [{"id": "acme:desk", "settings": {"field": "tenant-a-only"}}]},
+        headers=a,
+    )
+    assert "tenant-a-only" not in (await multi_client.get(BASE, headers=b)).text
+    assert (await multi_client.get(f"{BASE}/{cid}", headers=b)).status_code == 404

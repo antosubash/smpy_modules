@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Annotated
 
 import pytest
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, SecretBytes, SecretStr
 from sm_events.calendar import extensions, registry
 from sm_events.contracts.extensions import EventType, NoExtra
 
@@ -165,3 +166,57 @@ def test_frozen_after_load():
         registry.add_source(Src(), namespace="acme")
     with pytest.raises(registry.RegistryFrozenError):
         registry.add_type(talk(), namespace="acme")
+
+
+class _Inner(BaseModel):
+    token: SecretStr
+
+
+def _sealed_like():
+    from pydantic import PlainSerializer
+
+    def seal_secret(value):
+        return value
+
+    return Annotated[str | None, PlainSerializer(seal_secret, return_type=str)]
+
+
+def _model(**annotations):
+    return type(
+        "M", (BaseModel,), {"__annotations__": annotations, **dict.fromkeys(annotations)}
+    )
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        _model(key=SecretStr),
+        _model(key=SecretBytes),
+        _model(key=SecretStr | None),
+        _model(keys=list[SecretStr]),
+        _model(inner=_Inner),
+        _model(inner=list[_Inner]),
+        _model(key=_sealed_like()),
+    ],
+)
+def test_secret_typed_settings_are_refused(model):
+    with pytest.raises(registry.InvalidExtension, match="own module's settings"):
+        registry.add_source(source(settings_model=model), namespace="acme")
+
+
+def test_plain_settings_are_accepted():
+    class Fine(BaseModel):
+        name: str = "x"
+        tags: list[str] = []
+
+    registry.add_source(source(settings_model=Fine), namespace="acme")
+
+
+def test_a_secret_in_an_event_types_extra_is_allowed():
+    """Only source settings are stored in the clear in a calendar; ``extra`` is the event's own."""
+
+    class Extra(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        note: str = ""
+
+    registry.add_type(talk(extra_model=Extra), namespace="acme")
