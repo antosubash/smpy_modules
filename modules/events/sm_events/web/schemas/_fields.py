@@ -87,9 +87,8 @@ _URL_BAD = frozenset({"Cc", "Cf", "Zs", "Zl", "Zp"})
 
 
 def http_url(value: str) -> str:
-    """An absolute ``http`` or ``https`` URL with no whitespace or control
-    character in it; anything else (``javascript:``, ``data:``, a relative path)
-    is refused."""
+    """An absolute ``http`` or ``https`` URL with no whitespace, control character, user name
+    or password in it; anything else (``javascript:``, ``data:``, a relative path) is refused."""
     if any(unicodedata.category(ch) in _URL_BAD for ch in value):
         raise ValueError("not a valid http(s) URL")
     try:
@@ -98,6 +97,8 @@ def http_url(value: str) -> str:
         raise ValueError("not a valid http(s) URL") from None
     if parts.scheme.lower() not in _HTTP_SCHEMES or not parts.hostname:
         raise ValueError("only http and https URLs are allowed")
+    if "@" in parts.netloc:  # userinfo is a credential, or a way to disguise the real host
+        raise ValueError("a URL with a user name or password is not allowed")
     return value
 
 

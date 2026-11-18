@@ -12,10 +12,10 @@ from __future__ import annotations
 import html
 import re
 from typing import Final
-from urllib.parse import urlsplit
 
 from sm_events.content.richtext import clean
 from sm_events.core import constants
+from sm_events.web.schemas._fields import http_url as validate_url
 from sm_events.web.schemas._fields import strip_unsafe
 
 __all__ = ["clean_title", "description_html", "http_url", "unescape", "venue"]
@@ -41,27 +41,37 @@ def clean_title(raw: str) -> tuple[str, tuple[str, ...]]:
 
 def venue(raw: str) -> str | None:
     text = _SPACES.sub(" ", strip_unsafe(raw.replace("\n", " "))).strip()
-    return text[: constants.VENUE_MAX] or None
+    return scrub_credentials(text)[: constants.VENUE_MAX] or None
 
 
 def http_url(raw: str | None) -> str | None:
-    """``raw`` if it is a plain http(s) URL of sane length, else ``None``."""
+    """``raw`` if the module's own URL rule (the editor's: http or https, no whitespace, control
+    character or credentials) accepts it and it is of sane length, else ``None``: one rule for what
+    a person types and what a file says."""
     if not raw:
         return None
     text = raw.strip()
     if len(text) > constants.URL_MAX or text != strip_unsafe(text) or " " in text:
         return None
     try:
-        parts = urlsplit(text)
+        return validate_url(text)
     except ValueError:
         return None
-    return text if parts.scheme in ("http", "https") and parts.netloc else None
+
+
+_CREDENTIALS: Final = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@]*@")
+
+
+def scrub_credentials(text: str) -> str:
+    """``scheme://user:pw@host`` as ``scheme://host`` in free text (a place, a description): a file
+    must not make the site publish a credential it happened to hold."""
+    return _CREDENTIALS.sub(r"\1", text)
 
 
 def description_html(plain: str, url: str | None) -> tuple[str, tuple[str, ...]]:
     """The description as sanitised HTML, and the notes (``description_truncated``)."""
     notes: tuple[str, ...] = ()
-    text = strip_unsafe(plain, newlines=True).replace("\r", "")
+    text = scrub_credentials(strip_unsafe(plain, newlines=True).replace("\r", ""))
     if len(text) > constants.IMPORT_DESCRIPTION_MAX:
         text, notes = text[: constants.IMPORT_DESCRIPTION_MAX], ("description_truncated",)
     paragraphs = [p.strip("\n") for p in _BLANK.split(text.strip()) if p.strip()]

@@ -37,7 +37,7 @@ from sqlalchemy.exc import IntegrityError
 from sm_events.calendar.slugs import is_slug_conflict
 from sm_events.calendar.times import to_span
 from sm_events.content import bus, texts
-from sm_events.content.events_write import apply_patch, create_core
+from sm_events.content._core import apply_patch, create_core
 from sm_events.content.guard import Unchanged
 from sm_events.core import constants
 from sm_events.core.access.events import event_rights, require
