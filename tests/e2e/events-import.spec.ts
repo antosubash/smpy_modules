@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, type Page, test } from '@playwright/test';
 
 import { guard, seedCalendar, seedWriter } from './events-calendar-helpers';
+import { shoot } from './events-shots';
 import { login } from './helpers';
 
 /**
@@ -13,7 +14,6 @@ test.skip(process.env.E2E_BUNDLE !== '1', 'the nonce policy exists only in the b
 test.describe.configure({ mode: 'serial' });
 test.use({ viewport: { width: 1280, height: 1000 }, timezoneId: 'America/New_York' });
 
-const SHOTS = '.skill-state/qa/pr5-shots';
 const FIXTURE = readFileSync('tests/e2e/fixtures/events-import.ics');
 const IMPORT = '/admin/events/import';
 let problems: string[] = [];
@@ -45,7 +45,7 @@ async function titles(page: Page, calendar: string): Promise<Record<string, stri
 test('a realistic file goes through preview, import and a second import', async ({ page }) => {
   const cal = await seedCalendar(page, { visibility: 'internal', label: 'Imported' });
   await page.goto(IMPORT);
-  await page.screenshot({ path: `${SHOTS}/03-import-upload.png` });
+  await shoot(page, '03-import-upload');
 
   await upload(page, cal.name, 'term.ics', FIXTURE);
   await expect(page.getByRole('heading', { name: 'Preview' })).toBeVisible();
@@ -54,12 +54,12 @@ test('a realistic file goes through preview, import and a second import', async 
   await expect(table.getByText('Imported choir')).toBeVisible();
   await expect(table.getByText('Imported spring fair')).toBeVisible();
   await expect(table.getByText('Imported board meeting')).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/04-import-preview.png`, fullPage: true });
+  await shoot(page, '04-import-preview', { fullPage: true });
 
   await page.getByRole('button', { name: 'Import as drafts' }).click();
   await expect(page.getByRole('heading', { name: 'Result' })).toBeVisible();
   await expect(page.getByText(/Created [1-9]/)).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/05-import-result.png`, fullPage: true });
+  await shoot(page, '05-import-result', { fullPage: true });
 
   const made = await titles(page, cal.id);
   expect(made['Imported lecture']).toBe('draft 2027-03-10T10:00'); // Vienna time, not New York
@@ -86,7 +86,7 @@ test('a file with too many events is refused with a readable message', async ({ 
   await upload(page, cal.name, 'huge.ics', Buffer.from(body));
   await expect(page.getByText('The import failed')).toBeVisible();
   await expect(page.getByText(/more events than one import takes/)).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/06-import-refused.png`, fullPage: true });
+  await shoot(page, '06-import-refused', { fullPage: true });
 });
 
 test('a user who may only view cannot import; the screen speaks German; fits a phone', async ({
@@ -100,18 +100,16 @@ test('a user who may only view cannot import; the screen speaks German; fits a p
   guard(viewer, problems);
   await login(viewer, { email, password: 'changeme1' });
   const res = await viewer.goto(IMPORT);
-  const blocked =
-    (res?.status() ?? 0) >= 400 || (await viewer.getByLabel('Calendar file (.ics)').count()) === 0;
-  expect(blocked).toBe(true);
-  const api = await viewer.request.get('/api/events/imports');
-  expect([401, 403]).toContain(api.status());
+  expect(res?.status()).toBe(403); // events.manage is required; the unit tests pin the same code
+  await expect(viewer.getByLabel('Calendar file (.ics)')).toHaveCount(0);
+  expect((await viewer.request.get('/api/events/imports')).status()).toBe(403);
   await other.close();
 
   const origin = new URL(page.url()).origin;
   await context.addCookies([{ name: 'locale', value: 'de', url: origin }]);
   await page.goto(IMPORT);
   await expect(page.getByRole('heading', { name: 'Termine importieren' })).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/07-import-de.png` });
+  await shoot(page, '07-import-de');
   await context.addCookies([{ name: 'locale', value: 'en', url: origin }]);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -122,5 +120,5 @@ test('a user who may only view cannot import; the screen speaks German; fits a p
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: `${SHOTS}/08-phone.png` });
+  await shoot(page, '08-phone');
 });

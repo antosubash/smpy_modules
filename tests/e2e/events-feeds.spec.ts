@@ -2,6 +2,7 @@ import { expect, type Page, request, test } from '@playwright/test';
 
 import { guard, seedCalendar, seedEvent } from './events-calendar-helpers';
 import { publishEvent } from './events-seed';
+import { shoot } from './events-shots';
 import { login } from './helpers';
 
 /**
@@ -12,7 +13,6 @@ test.skip(process.env.E2E_BUNDLE !== '1', 'the nonce policy exists only in the b
 test.describe.configure({ mode: 'serial' });
 test.use({ viewport: { width: 1280, height: 1000 } });
 
-const SHOTS = '.skill-state/qa/pr5-shots';
 let problems: string[] = [];
 
 test.beforeEach(async ({ page }) => {
@@ -68,7 +68,7 @@ test('a private link is shown once, serves the published events, and stops when 
   const link = dialog.getByLabel('Private calendar link');
   const url = await link.inputValue();
   expect(url).toMatch(/\/events\/feed\/evf_[A-Za-z0-9_-]{43}\.ics$/);
-  await page.screenshot({ path: `${SHOTS}/01-subscribe-dialog-new-link.png` });
+  await shoot(page, '01-subscribe-dialog-new-link');
 
   // Anonymous: the feed holds the published event and not the draft.
   const feed = await fetchFeed(url);
@@ -84,7 +84,7 @@ test('a private link is shown once, serves the published events, and stops when 
   await expect(reopened.getByText('My phone')).toBeVisible();
   await expect(reopened.getByLabel('Private calendar link')).toHaveCount(0);
   expect(await page.content()).not.toContain(url.split('/').pop()?.replace('.ics', '') ?? 'x');
-  await page.screenshot({ path: `${SHOTS}/02-subscribe-dialog-list.png` });
+  await shoot(page, '02-subscribe-dialog-list');
 
   // A manager also sees everyone's links.
   await reopened.getByRole('button', { name: 'Everyone’s links' }).click();
