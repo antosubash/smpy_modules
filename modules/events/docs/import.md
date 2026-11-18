@@ -57,8 +57,12 @@ edited in the console since the import is not overwritten (`changed_since_previe
 
 ## Rights are re-checked
 
-The importer's calendar and event rights are re-checked per item, and at every slice their current
-permissions narrow the rights stored at the upload. A worker has no request, so the one thing it
-cannot re-check is the importer's *membership of the tenant*; if the importer is deactivated or
-removed, the next slice ends the import as `importer_gone`. Window: at most one slice (45 s).
+In a real Celery worker (`events.run_import`) there is no app, so **no** account, membership or
+permission check runs per slice. It relies on the grants stored at apply time (the importer's
+permissions then) and per-item checks against the database: the calendar's share and owner, trash
+and published-lock. A role, membership or account removed mid-import therefore applies only from the
+next import; the worker finishes the import with the stored grants (at most 24 h, the import's
+lifetime). `importer_gone` and the per-slice narrowing exist in `runner._Slice.narrow` and work only
+when a caller passes an `importer` (`launch.importer_check`, which uses the offline principal); the
+inline (eager) path in `launch.launch` does not pass one today, so that path is not narrowed either.
 Only the person who uploaded an import can see, apply or discard it.
