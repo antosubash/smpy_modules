@@ -132,3 +132,18 @@ def test_the_headless_runtime_is_supported_until_it_fails():
     """Task 9: the stopgap exists, so a worker is supported until it has failed to build."""
     worker_app.reset_worker_app()
     assert worker_app.worker_runtime_supported() is True
+
+
+async def test_public_base_url_follows_the_live_host_settings_not_the_boot_snapshot(world):
+    """A ``host.*`` row saved on the Settings screen reloads ``app.state.host``; the boot
+    snapshot (``app.state.sm.settings``) keeps what it had. Reminders read the live one."""
+    from types import SimpleNamespace
+
+    app, db = world
+    app.state.sm.settings.public_base_url = ""
+    assert (await availability.availability(app, db)).reason == "no_public_base_url"
+    app.state.host = SimpleNamespace(settings=SimpleNamespace(public_base_url=f"{ORIGIN}/"))
+    assert availability.public_base_url(app) == ORIGIN
+    assert await availability.availability(app, db) == Availability(True, None)
+    app.state.host = SimpleNamespace(settings=SimpleNamespace(public_base_url=""))
+    assert (await availability.availability(app, db)).reason == "no_public_base_url"
