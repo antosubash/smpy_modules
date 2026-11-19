@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 PAGE: Final = 100
 MAX_PAGES: Final = 50
-_LIVE: Final = ("pending", "registered")
+_LIVE: Final = ("registered",)  # a pending registration holds no seat: its seat is drift
 
 
 def page_released(count: int) -> None:

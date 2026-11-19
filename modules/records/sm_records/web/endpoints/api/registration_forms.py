@@ -44,6 +44,9 @@ class RegistrationFormRow(SQLModel):
     key: str
     label: str
     enabled: bool
+    double_opt_in: bool
+    """``False``: seats are taken at submit with no confirmation, so anyone can take seats without
+    confirming an address (the event editor warns)."""
     attendees_url: str
 
 
@@ -75,6 +78,7 @@ async def list_registration_forms(
             key=rtype.key,
             label=rtype.label,
             enabled=bool((rtype.public_submissions or {}).get("enabled")),
+            double_opt_in=bool((rtype.public_submissions or {}).get("double_opt_in", True)),
             attendees_url=f"{constants.VIEW_PREFIX}/{rtype.key}",
         )
         for rtype in sorted(await type_service.list_types(db), key=lambda t: t.key)

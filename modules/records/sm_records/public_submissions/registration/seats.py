@@ -114,7 +114,7 @@ async def on_restored(db: Any, rtype: Any, record: Any) -> None:
     if not is_registration(rtype):
         return
     data = record.data or {}
-    if data.get("sm_status") not in _LIVE:
+    if data.get("sm_status") != "registered":  # pending holds no seat, cancelled needs none
         return
     if not available():
         raise SubmissionRefused("event_unavailable", "the events module is not installed")

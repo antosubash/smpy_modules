@@ -181,11 +181,15 @@ async def submit(
     # After the token: only a form this host signed counts against the type's
     # budget, so a flood of forged posts cannot use it up (or mint a counter
     # per invented type key) and lock real visitors out.
-    await abuse.hit(
-        request,
-        abuse.rate_key(tenant, f"type={rtype.key}"),
-        settings.public_submissions_type_rate,
-    )
+    if reg_token is None:
+        # Not for a registration: a per-type budget shared by everyone would let a dozen rotating
+        # addresses lock every genuine registrant out. Its bounds are per IP, per address and the
+        # captcha.
+        await abuse.hit(
+            request,
+            abuse.rate_key(tenant, f"type={rtype.key}"),
+            settings.public_submissions_type_rate,
+        )
     # After the token, so only a form this host signed costs a call to the
     # provider; before anything is read into a record or written.
     await captcha.verify(settings, body.captcha_response, ip)

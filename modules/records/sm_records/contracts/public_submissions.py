@@ -45,8 +45,10 @@ signed token names (never the page, never the request body)."""
 SubmissionKind = Literal["form", "subscription", "registration"]
 
 DEFAULT_PENDING_HOLD_HOURS = 1
-"""An unconfirmed registration holds its seat this long by default: an hour, not a day, so a
-few addresses cannot keep an event's seats away from people for long."""
+"""How long an unconfirmed registration is kept by default (its **pending TTL**): an hour. It holds
+no seat meanwhile (the seat is taken at the confirmation); the record is only personal data of
+someone who has not confirmed, so the retention sweep removes it after this. One constant, used by
+every reader of a stored config that lacks the key."""
 MAX_PENDING_HOLD_HOURS = 168
 
 MAX_NOTIFY_TO = 10

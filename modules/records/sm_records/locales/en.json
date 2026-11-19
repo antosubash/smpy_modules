@@ -845,7 +845,6 @@
         "notice_subject": "Your registration for {title}",
         "notice_full": "{title} on {site} is fully booked, so your registration could not be saved.",
         "notice_closed": "Registration for {title} on {site} is closed, so your registration could not be saved.",
-        "notice_busy": "Many people are registering for {title} on {site} right now, so your registration could not be saved. Please try again later.",
         "notice_why": "You get this email because this address was entered in a registration form on {site}. Nothing was saved."
       }
     },

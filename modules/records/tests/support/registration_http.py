@@ -184,3 +184,41 @@ async def seat_counts(site: Any) -> tuple[int, int]:
 
 def record_url(uuid: str, tail: str = "", key: str = TYPE) -> str:
     return f"/api/records/types/{key}/records/{uuid}{tail}"
+
+
+SECRET = "submissions-test-secret"
+
+
+async def confirm_link_for(site: Any, record: dict) -> str:
+    """A confirm link for ``record``, minted the way the mail does (the host's secret)."""
+    import time
+
+    from sm_records.public_submissions import links
+
+    return links.sign(
+        SECRET,
+        links.CONFIRM,
+        tenant="default",
+        type_key=TYPE,
+        uuid=record["uuid"],
+        nonce=record["data"]["sm_nonce"],
+        exp=int(time.time()) + 3600,
+    )
+
+
+async def confirm_record(site: Any, record: dict):
+    """POST the record's confirm link, as the confirm page does."""
+    return await follow(site, "confirm", await confirm_link_for(site, record))
+
+
+async def register_confirmed(site: Any, address: Any = ADDRESS, **kw: Any):
+    """Register, and confirm if the form is double opt-in (the seat is taken at the confirmation).
+    Returns the registration's own response."""
+    resp = await register(site, address, **kw)
+    assert resp.status_code == 202, resp.text
+    email = address.strip().lower()
+    record = next(r for r in await regs(site) if r["data"]["sm_email"] == email)
+    if record["data"]["sm_status"] == "pending":
+        got = await confirm_record(site, record)
+        assert got.status_code == 200, got.text
+    return resp

@@ -45,7 +45,8 @@ async def test_list_shows_registration_types_the_caller_may_view(reg_site):
     seen = (await reg_site.get(URL, headers=roles(ROLE_EDITOR))).json()
     assert [row["key"] for row in seen] == ["event_registrations", "private_regs"]
     row = seen[0]
-    assert set(row) == {"key", "label", "enabled", "attendees_url"}
+    assert set(row) == {"key", "label", "enabled", "double_opt_in", "attendees_url"}
+    assert row["double_opt_in"] is True
     assert row["enabled"] is True and row["attendees_url"] == f"/admin/records/{TYPE}"
     viewer = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()
     assert [r["key"] for r in viewer] == ["event_registrations"]  # the editor-only one is hidden

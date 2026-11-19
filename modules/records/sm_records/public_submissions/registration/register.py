@@ -42,7 +42,7 @@ from sm_records.public_submissions.definition import (
     page_locale,
 )
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.public_submissions.registration import holds, mail, seats
+from sm_records.public_submissions.registration import mail, seats
 from sm_records.public_submissions.registration.tokens import RegistrationToken
 from sm_records.public_submissions.subscribe import normalise
 from sm_records.public_submissions.tokens import host_secret, ip_hash
@@ -223,22 +223,22 @@ async def register(
     with checked(verdicts):
         _check(rtype, data, fresh, settings)
         await lock_type(db, rtype)
-        pending = await holds.expire_pending(db, rtype, token, settings)
+        # A seat is taken at submit only where nothing later can attach it (single opt-in); on a
+        # double opt-in form it is taken at the confirmation, so a submit never moves a count.
+        takes_seat = fresh["sm_status"] == REGISTERED
         existing = await _live_registration(db, rtype, email, token)
         if existing is not None:
-            # Same locks and reads as a new registration: an idempotent admit for its own seat.
-            await integration.admit(
-                db,
-                tenant_id=tenant,
-                event_id=token.event_id,
-                occurrence_key=token.occurrence_key,
-                target=rtype.key,
-                holder=existing.uuid,
-            )
+            if takes_seat:  # the same locks and reads as a new one: an idempotent admit
+                await integration.admit(
+                    db,
+                    tenant_id=tenant,
+                    event_id=token.event_id,
+                    occurrence_key=token.occurrence_key,
+                    target=rtype.key,
+                    holder=existing.uuid,
+                )
             was_pending = (existing.data or {}).get("sm_status") == PENDING
             outcome = ("registration" if was_pending else "already", existing)
-        elif fresh["sm_status"] == PENDING and len(pending) >= holds.pending_cap(avail.capacity):
-            outcome = ("busy", None)
         else:
             try:
                 record = await record_service.create_record(
@@ -250,17 +250,18 @@ async def register(
                     actor=None,
                     system=fresh,
                 )
-                given = await integration.admit(
-                    db,
-                    tenant_id=tenant,
-                    event_id=token.event_id,
-                    occurrence_key=token.occurrence_key,
-                    target=rtype.key,
-                    holder=record.uuid,
-                    locale=lang,
-                )
-                if not given.admitted:
-                    raise _Declined(given.code or "event_unavailable")
+                if takes_seat:
+                    given = await integration.admit(
+                        db,
+                        tenant_id=tenant,
+                        event_id=token.event_id,
+                        occurrence_key=token.occurrence_key,
+                        target=rtype.key,
+                        holder=record.uuid,
+                        locale=lang,
+                    )
+                    if not given.admitted:
+                        raise _Declined(given.code or "event_unavailable")
                 outcome = ("registration", record)
             except ValidationFailed as exc:
                 raise SubmissionRefused("invalid", exc.detail, errors=exc.errors) from exc

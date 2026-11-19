@@ -35,6 +35,7 @@ from urllib.parse import urlsplit
 from simple_module_core.mail import MailMessage, MailSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.contracts.public_submissions import DEFAULT_PENDING_HOLD_HOURS
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links, strings
@@ -110,7 +111,9 @@ def message(
     """The mail for ``record`` with its links minted now."""
     data = record.data or {}
     pending = data.get("sm_status") == _PENDING
-    hold = int((rtype.public_submissions or {}).get("pending_hold_hours") or ttl_hours)
+    hold = int(
+        (rtype.public_submissions or {}).get("pending_hold_hours") or DEFAULT_PENDING_HOLD_HOURS
+    )
     exp = int((time.time() if now is None else now) + min(ttl_hours, hold) * 3600)
     claims = {
         "tenant": rtype.tenant_id,

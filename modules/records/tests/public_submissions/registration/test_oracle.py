@@ -99,7 +99,7 @@ async def test_full_event_one_answer_for_everyone(reg_site):
         reg_site
     )  # fillers are confirmed at once, so the cap on holds is not in play
     await mint(reg_site, event)
-    for n in range(10):
+    for n in range(11):  # p holds no seat (pending), c holds one: eleven more fill twelve
         await register(reg_site, f"fill{n}@example.org", event=event, consent=True)
     got = await attempts(reg_site, event, consent=True)
     shapes = {shape(r) for r in got.values()}
@@ -108,16 +108,21 @@ async def test_full_event_one_answer_for_everyone(reg_site):
 
 
 async def test_a_race_for_the_last_seat_is_neutral_too(reg_site, monkeypatch):
-    """Full between the availability read and the admit: still the one 202, and a mail says so."""
+    """Single opt-in: full between the availability read and the admit: still the one 202."""
     from sm_records.public_submissions.registration import register as module
 
+    await single_opt_in(reg_site)
     event = await seed_event(reg_site.db_state, uid="r@x", registration_capacity=1)
     await mint(reg_site, event)  # tokens come from an open event
-    await register(reg_site, "holder@example.org", event=event)
+    await register(reg_site, "holder@example.org", event=event, consent=True)
     monkeypatch.setattr(module, "_availability_refusal", lambda state: None)  # the stale read
     before = len(reg_site.outbox.sent)
-    new = await register(reg_site, "new@example.org", event=event, token=TOKENS["new"])
-    dup = await register(reg_site, "holder@example.org", event=event, token=TOKENS["p"])
+    new = await register(
+        reg_site, "new@example.org", event=event, token=TOKENS["new"], consent=True
+    )
+    dup = await register(
+        reg_site, "holder@example.org", event=event, token=TOKENS["p"], consent=True
+    )
     assert shape(new) == shape(dup) and new.status_code == 202
     sent = {m.to: m for m in reg_site.outbox.sent[before:]}
     assert "new@example.org" in sent and "confirm" not in reg_links(sent["new@example.org"])

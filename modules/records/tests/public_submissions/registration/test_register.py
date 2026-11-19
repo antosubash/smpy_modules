@@ -23,6 +23,7 @@ from tests.support.registration_http import (
     register,
     regs,
     seed_event,
+    single_opt_in,
 )
 from tests.support.submissions_http import JSON, SUBMISSIONS
 
@@ -66,9 +67,7 @@ async def test_registers_pending(reg_site, mails):
     )
     assert data["sm_consent_at"] and data["sm_confirmed_at"] is None and len(data["sm_nonce"]) == 32
     assert data["sm_cancelled_at"] is None
-    seat_rows, counters = await seats(reg_site)
-    assert [uuid.UUID(s.holder).hex for s in seat_rows] == [record["uuid"]]
-    assert counters[0].taken == 1
+    assert await seats(reg_site) == ([], [])  # pending: no seat until it is confirmed
     assert mails == [(record["uuid"], "Open day", "registration")]
 
 
@@ -119,12 +118,15 @@ async def test_refusal_codes(reg_site, mails, changes, code):
 
 
 async def test_full_is_refused_and_leaves_no_record(reg_site, mails):
+    """Single opt-in (the seat is taken at submit): a full event refuses everyone alike."""
+    await single_opt_in(reg_site)
     event = await seed_event(reg_site.db_state, uid="one@x", registration_capacity=1)
     first, second = [
         (await load_registration(reg_site, event)).json()["definition"]["token"] for _ in range(2)
     ]  # both loaded while a seat was free
-    assert (await register(reg_site, "a@example.org", event=event, token=first)).status_code == 202
-    resp = await register(reg_site, "b@example.org", event=event, token=second)
+    ok = await register(reg_site, "a@example.org", event=event, token=first, consent=True)
+    assert ok.status_code == 202
+    resp = await register(reg_site, "b@example.org", event=event, token=second, consent=True)
     assert (resp.status_code, resp.json()["code"]) == (409, "registration_full")
     items = await regs(reg_site)
     assert [r["data"]["sm_email"] for r in items] == ["a@example.org"]
@@ -155,7 +157,7 @@ async def test_duplicate_same_answer(reg_site, mails):
     assert (
         (first.status_code, first.text) == (second.status_code, second.text) == (202, '{"ok":true}')
     )
-    assert len(await regs(reg_site)) == 1 and len((await seats(reg_site))[0]) == 1
+    assert len(await regs(reg_site)) == 1 and (await seats(reg_site))[0] == []  # no seat yet
     assert len(mails) == 2  # a pending duplicate is sent its confirmation again
 
 
@@ -177,7 +179,7 @@ async def test_same_address_other_occurrence(reg_site, mails):
     other = await seed_event(reg_site.db_state, uid="two@x")
     assert (await register(reg_site)).status_code == 202
     assert (await register(reg_site, event=other)).status_code == 202
-    assert len(await regs(reg_site)) == 2 and len((await seats(reg_site))[0]) == 2
+    assert len(await regs(reg_site)) == 2 and (await seats(reg_site))[0] == []
 
 
 async def test_cross_tenant_and_form_tokens_are_expired(reg_site, mails):
