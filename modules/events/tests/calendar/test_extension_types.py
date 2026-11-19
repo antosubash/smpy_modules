@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 from pydantic import ValidationError
-from sm_events.calendar.plugins import extension_types
+from sm_events.calendar.plugins import extension_types, registration_types
 from sm_events.contracts import extensions
 from sm_events.core import constants
 from sm_events.models.enums import DEFAULT_EVENT_TYPE
@@ -80,12 +80,30 @@ def test_builtin_type_is_the_models_default():
     assert constants.BUILTIN_TYPE == DEFAULT_EVENT_TYPE
 
 
+REGISTRATION_TYPES = [
+    "Registrant",
+    "RegistrationContext",
+    "RegistrationProvider",
+    "RegistrationTargetError",
+    "RegistrationTargetInfo",
+]
+
+
 def test_contract_surface():
     expected = sorted(
-        [*TYPES, "Registrar", "RegistryFrozenError", "ITEM_MAX_DAYS", "ITEM_TITLE_MAX"]
+        [
+            *TYPES,
+            *REGISTRATION_TYPES,
+            "Registrar",
+            "RegistryFrozenError",
+            "ITEM_MAX_DAYS",
+            "ITEM_TITLE_MAX",
+        ]
     )
     assert sorted(extensions.__all__) == expected
     for name in TYPES:
         assert getattr(extensions, name) is getattr(extension_types, name)
+    for name in REGISTRATION_TYPES:
+        assert getattr(extensions, name) is getattr(registration_types, name)
     assert extensions.Registrar and extensions.RegistryFrozenError
     assert extensions.ITEM_MAX_DAYS == 366 and extensions.ITEM_TITLE_MAX == 300

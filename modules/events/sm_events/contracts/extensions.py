@@ -1,10 +1,11 @@
 """The plugin-facing surface: the only module a plugin imports from ``sm_events``.
 
 A package that ships ``events_extensions.py`` (with ``def register(registry)``) puts
-its own dates on a calendar (a :class:`Source`) and adds event types (an
-:class:`EventType`). ``registry`` is a :class:`Registrar`: ``add_source`` and
-``add_type`` only, ids namespaced ``<entry-point name>:<name>``. Everything a plugin
-needs is here.
+its own dates on a calendar (a :class:`Source`), adds event types (an
+:class:`EventType`) and, if it owns the people of a registration, a
+:class:`RegistrationProvider`. ``registry`` is a :class:`Registrar`: ``add_source``,
+``add_type`` and ``add_registration_provider`` only, ids namespaced
+``<entry-point name>:<name>``. Everything a plugin needs is here.
 
 **Settings are not secret.** A source's ``settings_model`` is stored in the clear on the
 calendar and
@@ -32,6 +33,13 @@ from sm_events.calendar.plugins.extension_types import (
     SourceViewer,
 )
 from sm_events.calendar.plugins.extensions import Registrar
+from sm_events.calendar.plugins.registration_types import (
+    Registrant,
+    RegistrationContext,
+    RegistrationProvider,
+    RegistrationTargetError,
+    RegistrationTargetInfo,
+)
 from sm_events.calendar.plugins.registry import RegistryFrozenError
 from sm_events.core import constants
 
@@ -45,7 +53,12 @@ __all__ = [
     "ITEM_TITLE_MAX",
     "EventType",
     "NoExtra",
+    "Registrant",
     "Registrar",
+    "RegistrationContext",
+    "RegistrationProvider",
+    "RegistrationTargetError",
+    "RegistrationTargetInfo",
     "RegistryFrozenError",
     "RestoredSettings",
     "SettingsContext",

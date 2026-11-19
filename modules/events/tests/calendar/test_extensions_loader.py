@@ -77,7 +77,11 @@ def test_registrar_exposes_only_registration():
     assert not hasattr(r, "freeze")
     assert not hasattr(r, "reset_registry")
     assert not hasattr(r, "register_builtin_source")
-    assert {n for n in dir(r) if not n.startswith("_")} == {"add_source", "add_type"}
+    assert {n for n in dir(r) if not n.startswith("_")} == {
+        "add_source",
+        "add_type",
+        "add_registration_provider",
+    }
 
 
 def test_namespace_is_the_entry_point_name(monkeypatch):

@@ -19,6 +19,7 @@ from collections.abc import Callable
 
 from sm_events.calendar.plugins import registry
 from sm_events.calendar.plugins.extension_types import EventType, Source
+from sm_events.calendar.plugins.registration_types import RegistrationProvider
 from sm_events.core import constants
 
 __all__ = ["Registrar", "load_extensions"]
@@ -48,6 +49,9 @@ class Registrar:
 
     def add_type(self, etype: EventType) -> None:
         registry.add_type(etype, namespace=self._namespace)
+
+    def add_registration_provider(self, provider: RegistrationProvider) -> None:
+        registry.add_registration_provider(provider, namespace=self._namespace)
 
 
 def _plugins() -> list[tuple[str, str]]:

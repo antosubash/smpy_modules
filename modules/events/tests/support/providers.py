@@ -1,0 +1,62 @@
+"""A fake registration provider and a way to install it (PR 9's seam), like ``sources.install``."""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
+
+from sm_events.calendar.plugins import extensions, registry
+from sm_events.contracts.extensions import (
+    Registrant,
+    RegistrationContext,
+    RegistrationProvider,
+    RegistrationTargetError,
+    RegistrationTargetInfo,
+)
+
+PROVIDER_ID = "records:registration"
+KNOWN_TARGET = "event-registrations"
+
+
+async def _check(ctx: RegistrationContext, target: str) -> RegistrationTargetInfo:
+    if target != KNOWN_TARGET:
+        raise RegistrationTargetError("unknown form")
+    return RegistrationTargetInfo(
+        label="Event registrations",
+        admin_url="/admin/records/event-registrations",
+        attendees_url="/admin/records/event-registrations?filter=x",
+    )
+
+
+async def _recipients(ctx: RegistrationContext, holders: Sequence[str]) -> Mapping[str, Registrant]:
+    return {h: Registrant(email=f"{h}@example.com", name=h, locale="en") for h in holders}
+
+
+def provider(
+    check: Callable[..., Any] = _check,
+    recipients: Callable[..., Any] = _recipients,
+    ident: str = PROVIDER_ID,
+) -> RegistrationProvider:
+    return RegistrationProvider(
+        id=ident, label_key="records.registration", check_target=check, recipients=recipients
+    )
+
+
+async def slow(ctx: RegistrationContext, target: str) -> RegistrationTargetInfo:
+    await asyncio.sleep(10)
+    raise AssertionError("unreachable")
+
+
+def install_provider(monkeypatch, *providers: RegistrationProvider) -> None:
+    """A registry holding the built-ins plus ``providers`` (namespaced by their own id), frozen on
+    first read. Call ``registry.reset_registry()`` (the ``fresh_registry`` fixture does)."""
+    registry.reset_registry()
+    real = list(extensions._BUILTIN_LOADERS)
+
+    def plugins() -> None:
+        for each in providers:
+            registry.add_registration_provider(each, namespace=each.id.split(":", 1)[0])
+
+    monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", [*real, plugins])
+    monkeypatch.setattr(extensions, "_plugins", list)

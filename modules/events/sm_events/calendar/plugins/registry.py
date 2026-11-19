@@ -1,4 +1,4 @@
-"""The source and event-type registry (process-global, frozen once).
+"""The source, event-type and registration-provider registry (process-global, frozen once).
 
 Registration normally goes through :func:`sm_events.calendar.plugins.extensions.load_extensions`,
 which registers the built-ins, then every installed package's ``events_extensions``,
@@ -16,11 +16,13 @@ import threading
 from typing import Any
 
 from sm_events.calendar.plugins.extension_types import EventType, Source
+from sm_events.calendar.plugins.registration_types import RegistrationProvider
 from sm_events.calendar.plugins.registry_checks import (
     DuplicateExtension,
     InvalidExtension,
     InvalidExtensionId,
     _check_id,
+    _check_provider,
     _check_source,
     _check_type,
 )
@@ -31,6 +33,7 @@ __all__ = [
     "InvalidExtension",
     "InvalidExtensionId",
     "RegistryFrozenError",
+    "add_registration_provider",
     "add_source",
     "add_type",
     "all_types",
@@ -43,6 +46,8 @@ __all__ = [
     "plugin_sources",
     "register_builtin_source",
     "register_builtin_type",
+    "registration_provider",
+    "registration_providers",
     "reset_registry",
 ]
 
@@ -53,6 +58,7 @@ class RegistryFrozenError(RuntimeError): ...
 lock = threading.RLock()
 _sources: dict[str, Source] = {}
 _types: dict[str, EventType] = {}
+_providers: dict[str, RegistrationProvider] = {}
 _builtin_source: Any = None
 _frozen = False
 _loading = False
@@ -87,6 +93,20 @@ def add_type(etype: EventType, *, namespace: str) -> None:
         if etype.id in _types:
             raise DuplicateExtension(f"{label} is already registered")
         _types[etype.id] = etype
+
+
+def add_registration_provider(provider: RegistrationProvider, *, namespace: str) -> None:
+    """A plugin's registration provider (the module that owns the registrants): its id is
+    ``<namespace>:<name>``. Events works with none installed."""
+    label = _label("registration provider", provider, namespace)
+    _check_provider(provider, label)
+    _check_id("registration provider", provider.id, namespace)
+    with lock:
+        if _frozen:
+            raise RegistryFrozenError(f"registry is frozen; cannot register {label}")
+        if provider.id in _providers:
+            raise DuplicateExtension(f"{label} is already registered")
+        _providers[provider.id] = provider
 
 
 def register_builtin_source(source: Any) -> None:
@@ -152,6 +172,16 @@ def all_types() -> dict[str, EventType]:
     return dict(_types)
 
 
+def registration_provider(provider_id: str) -> RegistrationProvider | None:
+    ensure_loaded()
+    return _providers.get(provider_id)
+
+
+def registration_providers() -> list[RegistrationProvider]:
+    ensure_loaded()
+    return [_providers[key] for key in sorted(_providers)]
+
+
 def is_frozen() -> bool:
     return _frozen
 
@@ -168,6 +198,7 @@ def reset_registry() -> None:
     with lock:
         _sources.clear()
         _types.clear()
+        _providers.clear()
         _builtin_source = None
         _frozen = False
         _loading = False
