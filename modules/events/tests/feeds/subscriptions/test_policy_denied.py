@@ -16,11 +16,21 @@ ALWAYS_DENIED = [
     "168.63.129.16",  # Azure wireserver, a public-looking address
     "192.0.0.192",  # Oracle
     "fd00:ec2::254", "fd00:ec2::1",  # AWS IPv6 service range, inside unique-local
+    "fd00:c1::a9fe:a9fe", "fd20:ce::254",  # Oracle and GCP IPv6 metadata
+    "fd12:3456::a9fe:a9fe", "fd99::7f00:1", "fdab::6464:64c8",  # the structural rule: embeds a denied IPv4
     "::ffff:169.254.169.254", "::ffff:100.100.100.200", "::ffff:127.0.0.1", "::ffff:168.63.129.16",
     "64:ff9b::a9fe:a9fe", "64:ff9b::6464:64c8", "2002:a9fe:a9fe::", "2002:6464:64c8::",
     "::169.254.169.254",
 ]  # fmt: skip
-PRIVATE = ["10.1.2.3", "172.16.5.5", "192.168.1.1", "100.64.0.1", "fd12::1", "::ffff:10.0.0.1"]
+PRIVATE = [
+    "10.1.2.3",
+    "172.16.5.5",
+    "192.168.1.1",
+    "100.64.0.1",
+    "fd12::1",
+    "fd12:3456::1",
+    "::ffff:10.0.0.1",
+]
 PUBLIC = ["93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946"]
 
 

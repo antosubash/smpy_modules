@@ -79,3 +79,6 @@ the address; it is never taken from a request. The worker applies it at every fe
 redirect hop together with the setting above, and the setting being off always wins. If the saver
 later loses `events.manage` the flag stays until the address is edited; the status screen shows
 managers which subscriptions use internal addresses.
+
+The list of refused addresses is best-effort (providers add endpoints; a unique-local address that
+embeds a metadata IPv4 is refused too). Turn the switch on only for trusted networks.

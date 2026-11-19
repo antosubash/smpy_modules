@@ -80,15 +80,34 @@ ALWAYS_DENIED: Final = tuple(
         "100.100.100.200/32",  # Alibaba Cloud metadata, inside CGNAT
         "168.63.129.16/32",  # Azure wireserver and host agent (a public-looking address)
         "192.0.0.192/32",  # Oracle Cloud metadata
+        "fd00:c1::/32",  # Oracle Cloud IPv6 metadata (fd00:c1::a9fe:a9fe), inside fc00::/7
+        "fd20:ce::254/128",  # Google Cloud IPv6 metadata server, inside fc00::/7
         "fd00:ec2::/32",  # AWS IPv6 metadata (fd00:ec2::254) and its service range, inside fc00::/7
     )
 )
-"""Never reachable: not publicly, not with the intranet switch. Loopback, link-local, multicast
+"""Never reachable: not publicly, not with the intranet switch. Best-effort: providers add
+endpoints, so :func:`address_allowed` also refuses a unique-local address that embeds one of the
+IPv4 metadata addresses, and the operations docs tell operators the switch is for trusted
+networks only. Loopback, link-local, multicast
 and the cloud providers' metadata and control endpoints, including those that sit inside the
 ranges the switch opens. Embedded IPv4 forms of these are refused too (:func:`address_allowed`).
 The server's *own* addresses on its private interfaces are not listed: the plan does not rule
 them out, so with the switch on a subscription can reach a service on this host's private
 address, like any other internal host (see the setting's description)."""
+
+_EMBEDDED_DENIED: Final = tuple(
+    ipaddress.ip_network(n)
+    for n in (
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "100.100.100.200/32",
+        "168.63.129.16/32",
+        "192.0.0.192/32",
+    )
+)
+"""IPv4 ranges a unique-local IPv6 address may not carry in its low 32 bits: providers build their
+IPv6 metadata addresses by embedding 169.254.169.254 (``fd00:c1::a9fe:a9fe``)."""
+_UNIQUE_LOCAL: Final = ipaddress.ip_network("fc00::/7")
 
 # What the intranet switch adds (after ALWAYS_DENIED is applied): the private ranges.
 _PRIVATE: Final = tuple(
@@ -182,6 +201,10 @@ def address_allowed(ip: IPAddress, *, allow_private: bool) -> bool:
     """
     if any(ip in net for net in ALWAYS_DENIED if net.version == ip.version):
         return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip in _UNIQUE_LOCAL:
+        low = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+        if any(low in net for net in _EMBEDDED_DENIED):
+            return False
     if isinstance(ip, ipaddress.IPv6Address):
         embedded = _embedded_ipv4(ip)
         if embedded and not all(
