@@ -2,6 +2,7 @@
 
 import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import type { PublicEventProps } from '../public/types';
 import { loadCatalogue } from '../utils/PageLocale';
 import { item } from './public-support';
 import { NO_REGISTRATION } from './support';
@@ -9,7 +10,6 @@ import { mount, ready } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 const { default: PublicEvent } = await import('../../pages/PublicEvent');
-import type { PublicEventProps } from '../public/types';
 
 function props(overrides: Partial<PublicEventProps> = {}): PublicEventProps {
   return {
