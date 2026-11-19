@@ -11,9 +11,8 @@ value that came from an event or a visitor is reduced to one line without contro
 separator characters before it is used anywhere, the subject doubly so and bounded.
 
 **Links.** The confirm and cancel links are records' own (``public_base_url``, the tenant in the
-token). The event's page and ``.ics`` are on the host's public base URL on a single-tenant host;
-on a multi-tenant host a tenant's public origin is a property of the request, so they use the submit
-request's ``Origin``, which the abuse guard has already accepted as this host's.
+token). The event's page and ``.ics`` come from :mod:`.origin`: configuration only, never a request
+header, and absent (not guessed) when no trusted origin is known.
 
 **After the commit, never the outbox**, like the newsletter's confirmation: the links need the
 host's ``secret_key``, which only the web process has, held in the task's closure. A claim per
@@ -37,18 +36,18 @@ from simple_module_core.mail import MailMessage, MailSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import TenancyMode, mode_of
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links, strings
 from sm_records.public_submissions.confirmation import recipient_key
 from sm_records.public_submissions.delivery import SessionFactory, load
 from sm_records.public_submissions.mail import template
 from sm_records.public_submissions.mail_runner import queue, ui_locale
+from sm_records.public_submissions.registration.origin import event_base
 from sm_records.public_submissions.sending import send_all
 from sm_records.public_submissions.tokens import host_secret, public_base_url
 from sm_records.records.services._common import utcnow
 
-__all__ = ["RegistrationDue", "event_base_url", "message", "queue_registration_mail"]
+__all__ = ["RegistrationDue", "message", "queue_registration_mail"]
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +67,6 @@ class RegistrationDue:
     base_url: str
     locale: str
     attempt: str
-    event_base: str
     event: Any
 
 
@@ -80,20 +78,6 @@ def _line(value: Any) -> str:
     """One line: whitespace collapsed, control, direction and separator characters gone."""
     kept = "".join(ch for ch in str(value or "") if unicodedata.category(ch) not in _DROPPED)
     return " ".join(kept.split())
-
-
-def _multi_tenant(app: Any) -> bool:
-    return mode_of(app) is TenancyMode.MULTI
-
-
-def event_base_url(request: Any) -> str:
-    """Where the event's page and ``.ics`` are: the submit request's accepted ``Origin`` on a
-    multi-tenant host, else the host's ``public_base_url``."""
-    if _multi_tenant(request.app):
-        parts = urlsplit(request.headers.get("origin") or "")
-        if parts.scheme in ("http", "https") and parts.netloc:
-            return f"{parts.scheme}://{parts.netloc}"
-    return public_base_url(request.app)
 
 
 def _ics_path(event: Any) -> str:
@@ -147,10 +131,12 @@ def message(
         when=f"{_text('when', locale)} {_line(event.when_text)}",
         place=f"\n{_text('place', locale)} {place}" if place else "",
         online=f"\n{_text('online', locale)} {online}" if online else "",
-        page_label=_text("page", locale),
-        page_link=f"{event_base}{event.page_path}",
-        ics_label=_text("ics", locale),
-        ics_link=f"{event_base}{_ics_path(event)}",
+        page_block=(
+            f"{_text('page', locale)}\n{event_base}{event.page_path}\n\n" if event_base else ""
+        ),
+        ics_block=(
+            f"{_text('ics', locale)}\n{event_base}{_ics_path(event)}\n\n" if event_base else ""
+        ),
         confirm_block="".join(blocks),
         cancel_label=_text("cancel", locale),
         cancel_link=links.url(base_url, links.CANCEL, cancel, locale),
@@ -166,6 +152,7 @@ def message(
 
 async def _send(
     secret: str,
+    app: Any,
     db: AsyncSession,
     sender: MailSender,
     due: RegistrationDue,
@@ -186,7 +173,7 @@ async def _send(
         due.event,
         secret=secret,
         base_url=due.base_url,
-        event_base=due.event_base,
+        event_base=await event_base(app, rtype.tenant_id, db),
         locale=strings.catalogue_locale(data.get("sm_locale"), due.locale),
         ttl_hours=settings.public_submissions_confirm_ttl_hours,
     )
@@ -215,7 +202,6 @@ async def queue_registration_mail(
         base_url=public_base_url(app),
         locale=ui_locale(app),
         attempt=uuid.uuid4().hex,
-        event_base=event_base_url(request),
         event=event,
     )
-    await queue(db, app, due, partial(_send, host_secret(app)), durable=False)
+    await queue(db, app, due, partial(_send, host_secret(app), app), durable=False)

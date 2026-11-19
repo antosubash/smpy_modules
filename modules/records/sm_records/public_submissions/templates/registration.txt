@@ -3,13 +3,7 @@ $intro
 $title
 $when$place$online
 
-$page_label
-$page_link
-
-$ics_label
-$ics_link
-
-$confirm_block$cancel_label
+$page_block$ics_block$confirm_block$cancel_label
 $cancel_link
 
 $why
