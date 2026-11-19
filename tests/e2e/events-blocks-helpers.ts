@@ -1,5 +1,6 @@
-import { expect, type Page } from '@playwright/test';
+import { type Browser, expect, type Page } from '@playwright/test';
 import { addDays, wednesday } from './events-calendar-helpers';
+import { guardPublic } from './events-public-helpers';
 import {
   type CreatedEvent,
   occurrencesOf,
@@ -7,6 +8,7 @@ import {
   postEvent,
   publishEvent,
   setOverride,
+  uploadSiteImage,
 } from './events-seed';
 import { makePage, moduleCsrfHeader, uniqueSlug } from './helpers';
 
@@ -19,12 +21,16 @@ export type BlocksSeed = {
   library: { id: string; slug: string; name: string };
   staff: { id: string; name: string };
   market: { id: string; slug: string; name: string };
+  newYork: { id: string; slug: string; name: string };
   writing: Seeded & { deTitle: string };
   poetry: Seeded;
   call: Seeded;
   draft: Seeded;
   hidden: Seeded;
   stall: Seeded;
+  east: Seeded;
+  /** The media-library path the poetry event's image is. */
+  image: string;
   /** Every event id the seed made: none may appear in anything public. */
   ids: string[];
   soon: string;
@@ -51,6 +57,8 @@ export async function seedBlocks(page: Page): Promise<BlocksSeed> {
   const library = await calendar(page, 'Library programme', 'public');
   const staff = await calendar(page, 'Staff only', 'internal');
   const market = await calendar(page, 'Seasonal market', 'public');
+  const newYork = await calendar(page, 'Studio East', 'public', 'America/New_York');
+  const image = await uploadSiteImage(page);
   const start = wednesday(1);
   const soon = addDays(new Date().toISOString().slice(0, 10), 2);
 
@@ -73,6 +81,7 @@ export async function seedBlocks(page: Page): Promise<BlocksSeed> {
   const poetry = await published(page, {
     calendar: library.id,
     title: 'Poetry night',
+    image,
     start: `${addDays(start, 1)}T19:00`,
     end: `${addDays(start, 1)}T21:00`,
     venue: 'Reading room',
@@ -82,6 +91,13 @@ export async function seedBlocks(page: Page): Promise<BlocksSeed> {
     title: 'Transatlantic call',
     start: `${addDays(start, 2)}T14:00`,
     end: `${addDays(start, 2)}T15:00`,
+    zone: 'America/New_York',
+  });
+  const east = await published(page, {
+    calendar: newYork.id,
+    title: 'East coast reading',
+    start: `${addDays(start, 2)}T11:00`,
+    end: `${addDays(start, 2)}T12:00`,
     zone: 'America/New_York',
   });
   const draft = await postEvent(page, {
@@ -107,13 +123,16 @@ export async function seedBlocks(page: Page): Promise<BlocksSeed> {
     library,
     staff: { id: staff.id, name: staff.name },
     market,
+    newYork,
     writing: { id: writing.id, revision, title: 'Writing circle', deTitle: 'Schreibkreis' },
     poetry,
     call,
     draft: { id: draft.id, revision: draft.revision, title: 'Budget planning (draft)' },
     hidden,
     stall,
-    ids: [writing.id, poetry.id, call.id, draft.id, hidden.id, stall.id],
+    east,
+    image,
+    ids: [writing.id, poetry.id, call.id, draft.id, hidden.id, stall.id, east.id],
     soon,
   };
 }
@@ -190,4 +209,14 @@ export async function setVisibility(page: Page, id: string, visibility: 'public'
     data: { visibility },
   });
   expect(res.ok(), await res.text()).toBeTruthy();
+}
+
+/** A visitor who has not seen the page yet (no HTTP cache): the answer a block's route gives now.
+ *  A repeat visitor may see the previous answer for the route's short cache (60 s at most). */
+export async function freshVisitor(browser: Browser, problems: string[], url: string) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  guardPublic(page, problems);
+  await page.goto(url);
+  return { page, close: () => context.close() };
 }

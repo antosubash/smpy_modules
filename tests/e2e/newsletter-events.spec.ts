@@ -12,7 +12,7 @@
 import { expect, test } from '@playwright/test';
 
 import { addDays, wednesday } from './events-calendar-helpers';
-import { postCalendar, postEvent, publishEvent, slugOf } from './events-seed';
+import { postCalendar, postEvent, publishEvent, slugOf, uploadSiteImage } from './events-seed';
 import { shoot } from './events-shots';
 import { login, moduleCsrfHeader } from './helpers';
 import { eventCard, setBody } from './newsletter-campaign';
@@ -44,11 +44,17 @@ test.describe('Newsletter event card', () => {
 
   test('pick, preview, schedule, unpublish and refresh', async ({ page, baseURL }) => {
     test.setTimeout(240_000);
+    // The editor's picker once logged `NaN is an invalid value for the css style property top`.
+    const nan: string[] = [];
+    page.on('console', (m) => {
+      if (/NaN/.test(m.text())) nan.push(m.text());
+    });
     const day = wednesday(2);
     const listKey = `e2e_events_${rand}`;
     let campaignId = 0;
     let event = { id: '', revision: 0 };
     let slug = '';
+    let image = '';
     const hiddenIds: string[] = [];
 
     await test.step('setup: a list with one reader, a public event and some that are not', async () => {
@@ -64,6 +70,7 @@ test.describe('Newsletter event card', () => {
       ]);
       expect(job.created).toBe(1);
 
+      image = await uploadSiteImage(page);
       const calendars = {
         public: await postCalendar(page, { name: 'Open studio programme', visibility: 'public' }),
         internal: await postCalendar(page, { name: 'Studio staff', visibility: 'internal' }),
@@ -74,6 +81,7 @@ test.describe('Newsletter event card', () => {
         end: `${day}T11:30`,
         description: '<p>Meet the makers and see the new kiln.</p>',
         venue: 'Studio 3, Kiln Lane',
+        image,
       };
       const made = await postEvent(page, { ...seed, title: 'Open studio day' });
       event = { id: made.id, revision: await publishEvent(page, made) };
@@ -121,7 +129,9 @@ test.describe('Newsletter event card', () => {
         has: page.getByRole('button', { name: /Open studio day/ }),
       });
       await expect(hits.getByRole('button')).toHaveCount(1); // not the draft, the staff event or last year's
-      await expect(hits).toContainText(/10:00/);
+      // The server words the time, so the picker names the zone the email does.
+      await expect(hits).toContainText(/10:00 AM.{1,3}11:30 AM (CET|CEST)/);
+      await expect(hits).not.toContainText('GMT');
       await shoot(page, '06-newsletter-card-picker');
       await hits.getByRole('button').click();
       await expect
@@ -132,6 +142,28 @@ test.describe('Newsletter event card', () => {
           return c.body[0]?.props?.source_id;
         })
         .toBe(event.id);
+    });
+
+    await test.step('a forged card cannot be saved: it must link only into the site', async () => {
+      const current = await (
+        await page.request.get(`/api/newsletter/campaigns/${campaignId}`)
+      ).json();
+      const card = current.body[0];
+      for (const change of [
+        { url: 'https://evil.example/' },
+        { ics_url: 'mailto:a@evil.example' },
+        { image_url: 'https://evil.example/x.png' },
+      ]) {
+        const forged = await page.request.patch(`/api/newsletter/campaigns/${campaignId}`, {
+          headers: await csrf(page),
+          data: {
+            expected_revision: current.revision,
+            body: [{ ...card, props: { ...card.props, ...change } }],
+          },
+        });
+        expect(forged.status(), JSON.stringify(change)).toBe(422);
+        expect((await forged.json()).code).toBe('invalid_body');
+      }
     });
 
     await test.step('the preview names the time in the event zone and the zone', async () => {
@@ -176,6 +208,12 @@ test.describe('Newsletter event card', () => {
         `${baseURL}/events/${slug}.ics`,
       ]);
       expect(sent).toMatch(/10:00 AM.{1,3}11:30 AM (CET|CEST)/);
+      // Nothing in the email points off the site: every address is on the tenant's origin.
+      const addresses = [...sent.matchAll(/(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
+      expect(addresses.length).toBeGreaterThan(3);
+      for (const address of addresses)
+        expect(address.startsWith(`${baseURL}/`), address).toBe(true);
+      expect(sent).toContain(`<img src="${baseURL}${image}"`);
       for (const id of hiddenIds) expect(sent + mine[0].text).not.toContain(id);
       expect([...(sent + mine[0].text).matchAll(UUID)].map((m) => m[0])).toEqual([]);
       expect(sent).not.toContain('Open draft rehearsal');
@@ -215,5 +253,7 @@ test.describe('Newsletter event card', () => {
       const search = await page.request.get('/api/newsletter/cards/events?q=Open');
       expect((await search.json()).map((h: { title: string }) => h.title)).toEqual([]);
     });
+
+    expect(nan).toEqual([]);
   });
 });

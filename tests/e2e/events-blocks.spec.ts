@@ -1,8 +1,9 @@
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import {
   type BlocksSeed,
   blockPage,
   calendarBlock,
+  freshVisitor,
   seedBlocks,
   setVisibility,
   unpublishEvent,
@@ -28,6 +29,7 @@ let seed: BlocksSeed;
 let both: { slug: string; id: number };
 let listOnly: { slug: string; id: number };
 let market: { slug: string; id: number };
+let malformed: { slug: string; id: number };
 let problems: string[] = [];
 
 test.beforeAll(async ({ browser }) => {
@@ -45,6 +47,8 @@ test.beforeAll(async ({ browser }) => {
     upcoming({ calendars: [{ slug: seed.market.slug }], heading: 'At the market' }),
     calendarBlock({ calendars: [{ slug: seed.market.slug }] }),
   ]);
+  // A selection saved as a plain string must mean nothing, never every public calendar.
+  malformed = await blockPage(admin, [upcoming({ calendars: 'team', heading: 'Unreadable' })]);
   await admin.close();
 });
 
@@ -85,6 +89,15 @@ test('the editor offers both blocks, translated, and only public calendars', asy
   expect(labels).toContain(seed.community.name);
   expect(labels).toContain(seed.library.name);
   expect(labels).not.toContain(seed.staff.name);
+  // The count field says what it refuses, and clamps nothing silently.
+  const count = page.getByRole('spinbutton', { name: 'Number of events' }).locator('visible=true');
+  const refusal = page.getByText('Enter a whole number from 1 to 20.').locator('visible=true');
+  for (const bad of ['0', '-3', '99', '2.7']) {
+    await count.fill(bad);
+    await expect(refusal).toBeVisible();
+  }
+  await count.fill('6');
+  await expect(refusal).toHaveCount(0);
   await shoot(page, '01-editor-upcoming-block');
 });
 
@@ -97,6 +110,16 @@ test('the list shows public published events in the event clock, and nothing hid
   await expect(events.getByRole('link', { name: 'Poetry night' })).toBeVisible();
   await expect(events.getByRole('link', { name: 'Transatlantic call' })).toBeVisible();
   await expect(events).toContainText('Seminar room');
+  // The calendars are in two zones, so every timed item names its own.
+  await expect(events.getByText(/\(America\/New_York\)/).first()).toBeVisible();
+  await expect(events.getByText(/\(Europe\/Vienna\)/).first()).toBeVisible();
+  await expect(events.getByRole('link', { name: 'East coast reading' })).toBeVisible();
+  // An image of this site loads under the page's policy (the guard fails on a CSP message).
+  const image = events.locator('img').first();
+  await expect(image).toHaveAttribute('src', seed.image);
+  await expect
+    .poll(() => image.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
   await expect(events).toContainText('Cancelled');
   // Each on its own clock: 10:00 in Vienna, 14:00 in New York.
   await expect(
@@ -143,9 +166,28 @@ test('the calendar block is read-only and shows only the chosen calendar', async
   await expect(grid.getByText(/Library programme/)).toHaveCount(0); // not a chosen calendar
   await expect(grid.getByText(seed.community.name)).toBeVisible(); // the filter names the one
   await page.getByRole('button', { name: 'List', exact: true }).click();
-  await expect(grid.getByText('Writing circle').first()).toBeVisible();
+  // The series starts a week or more ahead, which may be next month: step forward until it shows.
+  const circle = grid.getByText('Writing circle').first();
+  for (let step = 0; step < 2; step++) {
+    const seen = await circle.waitFor({ state: 'visible', timeout: 3000 }).then(
+      () => true,
+      () => false,
+    );
+    if (seen) break;
+    await grid.getByRole('button', { name: 'Next' }).click();
+  }
+  await expect(circle).toBeVisible();
   await expect(grid).not.toContainText('Poetry night');
   await shoot(page, '03-public-calendar-block', { fullPage: true });
+});
+
+test('a selection that cannot be read shows nothing, never every calendar', async ({ page }) => {
+  await page.goto(`/p/${malformed.slug}`);
+  await expect(page.getByRole('heading', { name: 'What is on' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('region', { name: 'Unreadable' })).toHaveCount(0);
+  await expect(page.locator('body')).not.toContainText('Poetry night');
+  await expect(page.locator('body')).not.toContainText('Writing circle');
 });
 
 test('the German page reads in German', async ({ page }) => {
@@ -194,16 +236,6 @@ test('no event id appears in the document, the page data or any response', async
   }
 });
 
-/** A visitor who has not seen the page yet (no HTTP cache): the answer a block's route gives now.
- *  A repeat visitor may see the previous answer for the route's short cache (60 s at most). */
-async function freshVisitor(browser: Browser, url: string) {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  guardPublic(page, problems);
-  await page.goto(url);
-  return { page, close: () => context.close() };
-}
-
 test('unpublishing an event removes it on the next load: nothing is stored in the page', async ({
   page,
   browser,
@@ -217,7 +249,7 @@ test('unpublishing an event removes it on the next load: nothing is stored in th
   await login(admin);
   await unpublishEvent(admin, seed.poetry);
   await admin.close();
-  const next = await freshVisitor(browser, url);
+  const next = await freshVisitor(browser, problems, url);
   await expect(next.page.getByRole('region', { name: 'Next up' })).toBeVisible();
   await expect(next.page.locator('body')).not.toContainText('Poetry night');
   await next.close();
@@ -232,7 +264,7 @@ test('a calendar made internal empties its blocks without an error', async ({ pa
   await login(admin);
   await setVisibility(admin, seed.market.id, 'internal');
   await admin.close();
-  const next = await freshVisitor(browser, url);
+  const next = await freshVisitor(browser, problems, url);
   await expect(next.page.getByRole('heading', { name: 'What is on' })).toBeVisible();
   await expect(next.page.getByRole('region', { name: 'At the market' })).toHaveCount(0);
   await expect(next.page.locator('[data-events-calendar]')).toHaveCount(0);
