@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 
 import pytest
@@ -65,31 +66,74 @@ async def test_statement_count_does_not_grow_with_follows(db, db_state):
     assert small <= 30
 
 
-async def test_prefilters_are_served_by_indexes(db, db_state):
-    await _seed(db, 3, 2)
+async def test_the_window_statement_reads_only_the_window(db, db_state):
+    """With real volumes (5,000 followed one-offs spread over a week, statistics gathered), the
+    one-off prefilter is served by the window index and touches a handful of rows, not every
+    event and not every follow."""
+    from sm_events.models import Event, EventFollow
+
+    cals = await world(db)
+    cal = cals["U"]
+    events = [
+        Event(
+            calendar_id=cal.id, uid=f"{i}@x", starts_at=TEN + timedelta(minutes=2 * i - 5000),
+            ends_at=TEN + timedelta(minutes=2 * i - 4999), timezone="UTC", status="published",
+        )
+        for i in range(5000)
+    ]  # fmt: skip
+    db.add_all(events)
+    await db.flush()
+    db.add_all(
+        EventFollow(event_id=e.id, user_id="u", lead_minutes=60, locale="en") for e in events
+    )
+    await db.commit()
+    async with db_state.engine.connect() as conn:
+        await conn.exec_driver_sql("ANALYZE events_event")
+        await conn.exec_driver_sql("ANALYZE events_follow")
+        await conn.commit()
+    seen, stop = _record(db_state.engine)
+    try:
+        got, _ = await candidates.candidates(db, now=NOW)
+    finally:
+        stop()
+    await db.rollback()
+    assert len(got) == 8  # the window is 16 minutes wide: eight starts, two minutes apart
+    one_off = next(
+        (s, p)
+        for s, p in seen
+        if "events_follow" in s and "events_event" in s and "rrule IS NULL" in s
+    )
+    async with db_state.engine.connect() as conn:
+        rows = await conn.exec_driver_sql("EXPLAIN (ANALYZE, COSTS OFF) " + one_off[0], one_off[1])
+        plan = "\n".join(r[0] for r in rows)
+        await conn.rollback()
+    assert "ix_events_event_start" in plan, plan
+    assert "Seq Scan" not in plan, plan
+    touched = [int(n) for n in re.findall(r"actual time=[\d.]+\.\.[\d.]+ rows=(\d+)", plan)]
+    assert max(touched) <= 20, plan  # never thousands: the window, not the table
+
+
+async def test_the_series_statement_is_served_by_the_follow_index(db, db_state):
+    """A series is found by walking one lead's follows through their index, never a table scan
+    (the cost per tick is one narrow expansion per followed series, by design)."""
+    cals = await _seed(db, 3, 2)
     await db.commit()
     seen, stop = _record(db_state.engine)
     try:
         await candidates.candidates(db, now=NOW)
     finally:
         stop()
-    await db.rollback()  # no open transaction may hold a lock the DDL below waits for
-    ours = [(s, p) for s, p in seen if "events_follow" in s and "events_event" in s]
-    assert ours, "no prefilter statement was captured"
-    plans = []
+    await db.rollback()
+    series = next(
+        (s, p)
+        for s, p in seen
+        if "events_follow" in s and "rrule IS NOT NULL" in s and "DISTINCT" in s
+    )
     async with db_state.engine.connect() as conn:
-        # On three rows the planner prefers any index to the one the statement is written for
-        # (``status = 'published'``; the older calendar-first range index, which can only scan a
-        # tenant's whole slice for a time window): take those away, and forbid seq scans, in
-        # a transaction that is rolled back. What is left is what the statements can be served by.
-        await conn.exec_driver_sql("DROP INDEX ix_events_event_publish_due, ix_events_event_range")
         await conn.exec_driver_sql("SET LOCAL enable_seqscan = off")
-        for statement, params in ours:
-            rows = await conn.exec_driver_sql("EXPLAIN " + statement, params)
-            plans.append("\n".join(r[0] for r in rows))
+        rows = await conn.exec_driver_sql("EXPLAIN " + series[0], series[1])
+        plan = "\n".join(r[0] for r in rows)
         await conn.rollback()
-    text = "\n".join(plans)
-    assert "ix_events_event_start" in text  # one-offs: the window, not every event
-    assert "ix_events_follow_lead" in text  # series: one lead's follows, not every follow
-    assert "Seq Scan on events_follow" not in text
-    assert "Seq Scan on events_event" not in text
+    assert "ix_events_follow_lead" in plan, plan
+    assert "Seq Scan on events_follow" not in plan, plan
+    assert cals
