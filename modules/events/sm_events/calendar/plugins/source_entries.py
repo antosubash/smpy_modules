@@ -215,7 +215,7 @@ async def write_entries(
     if expected != version(calendar.sources):
         raise Stale
     ids = [item.id for item in incoming]
-    if constants.SOURCE_EVENTS in ids:
+    if constants.SOURCE_EVENTS in ids or constants.SOURCE_SUBSCRIPTIONS in ids:
         raise BuiltinSource
     if len(set(ids)) != len(ids):
         raise DuplicateSource

@@ -211,6 +211,7 @@ export type Occurrence = {
   event_id: string | null;
   original_start: string | null;
   event_status: string | null;
+  origin_label?: string | null;
 };
 export type OccurrencePage = {
   items: Occurrence[];

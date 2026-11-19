@@ -40,6 +40,9 @@ class Occurrence(BaseModel):
     event_id: uuid.UUID | None = None
     original_start: datetime | None = None
     event_status: str | None = None
+    origin_label: str | None = None
+    """Where an external entry comes from (a subscription's label, plain text); ``None`` for
+    this module's own events."""
 
 
 class PluginOccurrence(Occurrence):

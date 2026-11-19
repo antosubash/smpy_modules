@@ -32,6 +32,8 @@ __all__ = [
     "SOURCE_SUBSCRIPTIONS",
     "SUBSCRIPTIONS_PER_CALENDAR",
     "SUBSCRIPTIONS_PER_TENANT",
+    "SUBSCRIPTIONS_SOURCE_ICON",
+    "SUBSCRIPTIONS_SOURCE_LABEL_KEY",
     "SUBSCRIPTION_CODE_MAX",
     "SUBSCRIPTION_COLOR_PATTERN",
     "SUBSCRIPTION_DELETED_KEPT_DAYS",
@@ -74,6 +76,8 @@ __all__ = [
 
 SOURCE_SUBSCRIPTIONS: Final = "subscriptions"
 """The built-in read source's id (never stored in ``events_calendar.sources``)."""
+SUBSCRIPTIONS_SOURCE_LABEL_KEY: Final = "events.subscriptions.source"
+SUBSCRIPTIONS_SOURCE_ICON: Final = "rss"
 
 REFRESH_SUBSCRIPTIONS: Final = "events.refresh_subscriptions"
 REFRESH_SUBSCRIPTION: Final = "events.refresh_subscription"

@@ -3,7 +3,7 @@ calendar files built from a few properties."""
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from sm_events.core.clock import utcnow
@@ -63,3 +63,26 @@ async def seed_subscription(db: Any, calendar: Calendar, **fields: Any) -> Subsc
     db.add(sub)
     await db.flush()
     return sub
+
+
+async def seed_item(db: Any, sub: Subscription, uid: str, start: datetime, **fields: Any) -> Any:
+    """An ``ExternalItem`` inserted directly (a one-off of one hour unless told otherwise)."""
+    from sm_events.models import ExternalItem
+
+    end = fields.pop("ends_at", start + timedelta(hours=1))
+    values: dict[str, Any] = {
+        "subscription_id": sub.id,
+        "uid": uid,
+        "all_day": False,
+        "starts_at": start,
+        "ends_at": end,
+        "timezone": "UTC",
+        "span_start": start,
+        "span_end": end,
+        "title": uid,
+        "content_hash": "0" * 64,
+        "seen_generation": 1,
+    }
+    item = ExternalItem(**{**values, **fields})
+    db.add(item)
+    return item
