@@ -200,3 +200,68 @@ describe('RemindMe cap message', () => {
     await view.unmount();
   });
 });
+
+describe('RemindMe pins', () => {
+  it('offers only the lead times the server allows', async () => {
+    const { view } = await open({
+      [`GET ${STATUS}`]: { available: true, leads: [60, 1440] },
+      [`GET ${FOLLOW}`]: follow(),
+    });
+    await click(control());
+    const ids = [...document.querySelectorAll<HTMLElement>('[role="checkbox"]')].map((b) =>
+      b.id.replace(/^.*-/, ''),
+    );
+    expect(ids).toEqual(['60', '1440']);
+    await view.unmount();
+  });
+
+  it('says once that no mail will come, following or not', async () => {
+    const noAccess = /cannot be sent for this event/;
+    const { view } = await open({
+      [`GET ${FOLLOW}`]: follow({ leads: [60], deliverable: false, code: 'reminders_no_access' }),
+    });
+    const once = () =>
+      [...(view.host.querySelectorAll('[role="status"]') ?? [])].filter((n) =>
+        noAccess.test(n.textContent ?? ''),
+      ).length;
+    expect(once()).toBe(1);
+    await click(control());
+    expect(once()).toBe(1);
+    await view.unmount();
+    const second = await open({
+      [`GET ${FOLLOW}`]: follow({ deliverable: false, code: 'reminders_no_access' }),
+    });
+    expect(
+      [...second.view.host.querySelectorAll('[role="status"]')].filter((n) =>
+        noAccess.test(n.textContent ?? ''),
+      ).length,
+    ).toBe(0); // not following, panel closed: the control alone
+    await click(control());
+    expect(
+      [...document.querySelectorAll('[role="status"]')].filter((n) =>
+        noAccess.test(n.textContent ?? ''),
+      ).length,
+    ).toBe(1);
+    await second.view.unmount();
+  });
+
+  it('shows the next due time in the viewer zone and names both zones', async () => {
+    const before = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      const { view } = await open({
+        [`GET ${FOLLOW}`]: follow({ leads: [60], next_due: { '60': '2026-07-01T09:00:00Z' } }),
+      });
+      await click(control());
+      const text = view.host.textContent ?? '';
+      expect(text).toContain('5:00'); // 09:00 UTC is 05:00 in New York, not 9:00
+      expect(text).not.toContain('9:00 AM');
+      expect(text).toContain("browser's time zone (America/New_York)");
+      expect(text).toContain("event's zone is Europe/Vienna");
+      await view.unmount();
+    } finally {
+      if (before === undefined) delete process.env.TZ;
+      else process.env.TZ = before;
+    }
+  });
+});
