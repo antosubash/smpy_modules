@@ -80,7 +80,7 @@ async def cancel(
 
     outcome = await transition(db, rtype, record, derive, settings=settings, lock=True)
     if outcome.wrote and seats.available():
-        await seats.integration().release(db, tenant_id=rtype.tenant_id, holders=[record.uuid])
+        await seats.release(db, tenant_id=rtype.tenant_id, holders=[record.uuid])
     return outcome.wrote
 
 

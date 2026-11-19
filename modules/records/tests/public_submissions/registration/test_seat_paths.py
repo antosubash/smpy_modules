@@ -247,3 +247,28 @@ async def test_non_registration_untouched(reg_site):
     finally:
         sa_event.remove(engine, "before_cursor_execute", spy)
     assert not [s for s in seen if "events_registration" in s]
+
+
+async def test_a_busy_release_is_try_again_everywhere(reg_site, monkeypatch):
+    """``SeatsBusy`` from events is a 409 on every records path that releases, never a 500, and
+    nothing is half-done (the record keeps its state)."""
+    from sm_events.contracts import registration as contract
+    from sm_events.core.errors_registration import SeatsBusy
+
+    await register(reg_site, "a@example.org")
+    (record,) = await regs(reg_site)
+
+    async def busy(*_a, **_k):
+        raise SeatsBusy
+
+    monkeypatch.setattr(contract, "release", busy)
+    monkeypatch.setattr(contract, "release_target", busy)
+    for call in (
+        reg_site.post(record_url(record["uuid"], "/submission/cancel"), **A),
+        reg_site.delete(record_url(record["uuid"]), **A),
+        reg_site.delete(f"/api/records/types/{TYPE}?confirm_record_count=1", **A),
+    ):
+        got = await call
+        assert got.status_code == 409, got.text
+    (still,) = await regs(reg_site)
+    assert still["data"]["sm_status"] == "pending" and await seat_counts(reg_site) == (1, 1)

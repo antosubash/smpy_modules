@@ -89,11 +89,16 @@ async def reconcile(factory: Callable[[], Any], *, page: int = PAGE, pages: int 
             holders = [h.holder for h in held]
             live = await _live_holders(session, types, holders)
             stale = [h for h in holders if h not in live]
-            freed = (
-                await seats.integration().release(session, tenant_id=bound_tenant(), holders=stale)
-                if stale
-                else 0
-            )
+            try:
+                freed = (
+                    await seats.release(session, tenant_id=bound_tenant(), holders=stale)
+                    if stale
+                    else 0
+                )
+            except seats.SeatsBusy:  # events was busy: this page next sweep, nothing half-done
+                await events.rollback(session)
+                logger.info("records: seat reconciliation found events busy; next sweep")
+                return released
             await events.commit(session)
         except BaseException:
             await events.rollback(session)

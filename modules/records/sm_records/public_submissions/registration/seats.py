@@ -25,8 +25,10 @@ from typing import Any
 
 from sm_records.contracts.public_submissions import KIND_REGISTRATION
 from sm_records.public_submissions.errors import SubmissionRefused
+from sm_records.records.services.errors import Conflict
 
 __all__ = [
+    "SeatsBusy",
     "available",
     "integration",
     "is_registration",
@@ -34,6 +36,8 @@ __all__ = [
     "on_restored",
     "on_trashed",
     "on_type_purged",
+    "release",
+    "release_target",
 ]
 
 logger = logging.getLogger(__name__)
@@ -64,6 +68,30 @@ def available() -> bool:
 _LIVE = ("pending", "registered")
 
 
+class SeatsBusy(Conflict):
+    """Events could not settle a release within its bounded restarts (``seats_busy``): nothing was
+    changed, and the answer is "try again" (a 409), never a 500."""
+
+    code = "seats_busy"
+
+
+async def release(db: Any, *, tenant_id: str, holders: Sequence[str]) -> int:
+    """Free these holders' seats; :class:`SeatsBusy` (the request rolls back) if events is busy."""
+    module = integration()
+    try:
+        return await module.release(db, tenant_id=tenant_id, holders=holders)
+    except module.SeatsBusy as exc:
+        raise SeatsBusy("the seats are busy; try again") from exc
+
+
+async def release_target(db: Any, *, tenant_id: str, target: str) -> int:
+    module = integration()
+    try:
+        return await module.release_target(db, tenant_id=tenant_id, target=target)
+    except module.SeatsBusy as exc:
+        raise SeatsBusy("the seats are busy; try again") from exc
+
+
 async def on_trashed(db: Any, pairs: Sequence[tuple[Any, Any]]) -> None:
     """A record of a registration type went to the trash (single, cascade, bulk, spam, retention):
     its seat is freed, in the trashing transaction. Cancelled records hold none (a release of a
@@ -75,7 +103,7 @@ async def on_trashed(db: Any, pairs: Sequence[tuple[Any, Any]]) -> None:
     if not held or not available():
         return
     for tenant, holders in held.items():
-        await integration().release(db, tenant_id=tenant, holders=holders)
+        await release(db, tenant_id=tenant, holders=holders)
 
 
 async def on_restored(db: Any, rtype: Any, record: Any) -> None:
@@ -109,10 +137,10 @@ async def on_purged(db: Any, rtype: Any, uuids: Sequence[str]) -> None:
     freed at the trash is not freed twice; one left by a record trashed before seats followed
     trashes, or on a host that had no events then, goes now)."""
     if is_registration(rtype) and uuids and available():
-        await integration().release(db, tenant_id=rtype.tenant_id, holders=list(uuids))
+        await release(db, tenant_id=rtype.tenant_id, holders=list(uuids))
 
 
 async def on_type_purged(db: Any, rtype: Any) -> None:
     """A registration type is being deleted with all its records: free every seat of its form."""
     if is_registration(rtype) and available():
-        await integration().release_target(db, tenant_id=rtype.tenant_id, target=rtype.key)
+        await release_target(db, tenant_id=rtype.tenant_id, target=rtype.key)
