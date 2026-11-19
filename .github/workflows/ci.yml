@@ -732,9 +732,20 @@ jobs:
           uv run --no-sync python scripts/set_setting.py file_storage \
             fs_root_path "$RUNNER_TEMP/files"
 
+      # The events reminders mail through a sender that really delivers (the console one
+      # only logs, and reminders then report themselves unavailable): the mail module's SMTP
+      # backend, pointed at a local sink. Before the host and the worker start: both read it.
+      - name: Mail sink and settings (events reminders)
+        run: |
+          nohup uv run --no-sync python -m aiosmtpd -n -l 127.0.0.1:1025 \
+            > "$RUNNER_TEMP/smtp-sink.log" 2>&1 &
+          uv run --no-sync python scripts/set_setting.py mail \
+            backend smtp smtp_host 127.0.0.1 smtp_port 1025 smtp_tls false \
+            smtp_from reminders@example.org
+
       # One worker on the queues `make worker` serves (images, newsletter,
       # events, celery) and one beat: never two schedulers. The events queue carries
-      # events.publish_due, events.run_import and events.janitor.
+      # events.publish_due, events.run_import, events.janitor and events.reminders.
       - name: Start host, worker and beat
         run: |
           nohup uv run --no-sync --project host uvicorn main:app --app-dir host \
@@ -746,13 +757,13 @@ jobs:
 
       # Waits for /health/live itself, then 3 min for the image and 4 for the
       # campaign.
-      - name: Smoke (image pipeline, campaign dispatch)
+      - name: Smoke (image pipeline, campaign dispatch, event reminder)
         run: uv run --no-sync python scripts/bg_tasks_smoke.py --base-url http://127.0.0.1:8000
 
       - name: Host, worker and beat logs
         if: ${{ failure() }}
         run: |
-          for name in host worker beat; do
+          for name in host worker beat smtp-sink; do
             echo "::group::$name.log"
             cat "$RUNNER_TEMP/$name.log" || true
             echo "::endgroup::"

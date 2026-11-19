@@ -61,7 +61,9 @@ sync-module-deps:
 # optional while SM_BG_TASKS_TASK_ALWAYS_EAGER=true runs tasks inline. `worker`
 # also serves the `newsletter` queue (the hourly suppression reconcile) and the
 # `events` queue (`events.publish_due`, scheduled publishing every minute; `events.run_import`, a
-# slice of an `.ics` import; `events.janitor`, hourly cleanup of imports and revoked links). Run
+# slice of an `.ics` import; `events.janitor`, hourly cleanup of imports and revoked links;
+# `events.reminders`, the reminder mails every minute, which also needs a mail sender that
+# delivers and `beat`). Run
 # from the repo root; PYTHONPATH=host makes host/worker.py importable as
 # `worker`, and the root .env stays the single source of settings. One queue
 # set per target, so the heavy and GPU work can run on other machines.
