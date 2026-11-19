@@ -1,9 +1,15 @@
 /** Routed fetch with the framework's real Request/CSRF behavior intact. */
+import type { ReactNode } from 'react';
 import { vi } from 'vitest';
 import { act } from './test-dom';
 
 export type Call = { url: string; method: string; body: unknown; headers: Headers };
 type Handler = (call: Call) => unknown;
+
+/** A JSON body parsed, a multipart one (an upload) kept as the raw text. */
+function parseBody(raw: string, type: string | null): unknown {
+  return type?.includes('multipart/form-data') ? raw : JSON.parse(raw);
+}
 
 export function stubFetch(routes: Record<string, Handler | unknown>): Call[] {
   const calls: Call[] = [];
@@ -17,7 +23,7 @@ export function stubFetch(routes: Record<string, Handler | unknown>): Call[] {
       const call = {
         url: url.pathname + url.search,
         method: request.method,
-        body: raw ? JSON.parse(raw) : null,
+        body: raw ? parseBody(raw, request.headers.get('content-type')) : null,
         headers: request.headers,
       };
       calls.push(call);
@@ -42,7 +48,9 @@ export function calendar(overrides = {}) {
     owner_id: 'u1',
     owner_name: 'Olga Owner',
     default_timezone: 'Europe/Vienna',
+    default_reminder_minutes: null,
     sources: [],
+    sources_version: 'v1',
     created_at: '2026-11-17T12:00:00Z',
     updated_at: null,
     deleted_at: null,
@@ -64,9 +72,18 @@ function Head() {
   return null;
 }
 
+function Link({ href, children, ...rest }: { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  );
+}
+
 export function inertiaMock() {
   return {
     Head,
+    Link,
     usePage: () => ({ url: '/admin/events/calendars', props: {} }),
     router: { visit: vi.fn(), on: vi.fn() },
   };
@@ -100,3 +117,85 @@ export async function submit() {
   });
   await flush();
 }
+
+/** A row of the events list, as `GET /api/events/events` returns it. */
+export function eventItem(overrides = {}) {
+  return {
+    id: 'e1',
+    calendar_id: 'c1',
+    parent_id: null,
+    type: 'event',
+    status: 'draft' as const,
+    scheduled: false,
+    cancelled: false,
+    all_day: false,
+    timezone: 'Pacific/Auckland',
+    starts_at: '2026-06-30T22:00:00Z',
+    ends_at: '2026-06-30T23:00:00Z',
+    start_local: '2026-07-01T10:00',
+    end_local: '2026-07-01T11:00',
+    rrule: null,
+    category_id: null,
+    venue_name: null,
+    revision: 4,
+    publish_at: null,
+    published_at: null,
+    trashed: false,
+    can_write: true,
+    can_publish: false,
+    locked: false,
+    title: 'Concert',
+    lang: 'en',
+    ...overrides,
+  };
+}
+
+export const category = { id: 'k1', slug: 'talks', names: { en: 'Talks' }, color: null };
+
+/** An event as `GET /api/events/events/{id}` returns it. */
+export function eventDetail(overrides = {}) {
+  const { title: _title, lang: _lang, ...item } = eventItem();
+  return {
+    ...item,
+    timezone: 'Europe/Vienna',
+    uid: 'u@simple-module-events',
+    recurrence_until: null,
+    publish_at_local: null,
+    attendance_mode: 'in_person' as const,
+    address: null,
+    online_url: null,
+    latitude: null,
+    longitude: null,
+    organiser: null,
+    image: null,
+    registration_url: null,
+    extra: {},
+    created_at: '2026-06-01T10:00:00Z',
+    updated_at: null,
+    texts: {
+      en: {
+        slug: 'concert',
+        title: 'Concert',
+        summary: null,
+        description: '<p>Doors at <strong>nine</strong></p>',
+        seo_title: null,
+        seo_description: null,
+        noindex: false,
+      },
+    },
+    overrides: [],
+    sub_events: [],
+    ...overrides,
+  };
+}
+
+/** What a route handler returns for a 4xx/5xx: the module's `{detail, code}` envelope. */
+export const refusal = (status: number, code: string, detail = 'Refused') =>
+  Response.json({ detail, code }, { status });
+
+/** A FastAPI 422: one `loc` per bad field. */
+export const unprocessable = (...locs: string[][]) =>
+  Response.json(
+    { detail: locs.map((loc) => ({ loc: ['body', ...loc], msg: 'bad', type: 'x' })) },
+    { status: 422 },
+  );

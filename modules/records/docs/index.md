@@ -17,6 +17,7 @@ Start with the document that matches what you are trying to do.
 | An operator installing, configuring or running it | [operations.md](operations.md) |
 | A developer extending or modifying the module | [architecture.md](architecture.md), [code-layout.md](code-layout.md) |
 | Anyone wondering what it costs at scale | [performance.md](performance.md) |
+| A developer showing records' dates on an events calendar | the README's "Showing records' dates on an events calendar" |
 
 ### [user-guide.md](user-guide.md) — for administrators
 

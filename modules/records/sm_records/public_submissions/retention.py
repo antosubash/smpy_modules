@@ -55,19 +55,16 @@ from typing import Any, Final
 from simple_module_core.leases import lease
 from sqlalchemy import select
 
-from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
-from sm_records.core.tenancy import bound_tenant, tenant_scope
+from sm_records.core.tenancy import tenant_scope
 from sm_records.core.tenancy._cross_tenant import read_all
-from sm_records.models import RecordType, tables_for
+from sm_records.models import RecordType
+from sm_records.public_submissions.registration.reconcile import reconcile
 from sm_records.public_submissions.retention_deliveries import prune_deliveries
-from sm_records.public_submissions.retention_rules import PENDING, days_for, still_due
-from sm_records.records.index.query import Filter, FilterOp, filtered
+from sm_records.public_submissions.retention_purge import _due, _purge_one
 from sm_records.records.services._common import utcnow
-from sm_records.records.services._lock import lock_type
 from sm_records.records.services.errors import Conflict, NotFound
-from sm_records.records.services.records import hard_delete_record, soft_delete_record
 from sm_records.records.services.types import get_type, list_types
 
 __all__ = ["LEASE_NAME", "LEASE_TTL", "LeaseLost", "Swept", "sweep"]
@@ -92,6 +89,8 @@ class Swept:
     purged: int = 0
     skipped: int = 0
     deliveries: int = 0
+    seats: int = 0
+    """Seats reconciliation freed (registration forms; ``0`` without events)."""
     tenants: list[str] = field(default_factory=list)
 
 
@@ -130,48 +129,6 @@ async def _tenants(factory: Any) -> list[str]:
         return sorted(str(tenant) for tenant in rows.scalars().all())
     finally:
         await session.close()
-
-
-def _due(rtype: RecordType, now: datetime, limit: int, skip: set[str]) -> Any:
-    """The uuids that *may* be due, trash included, or ``None`` when the type
-    keeps everything. A superset for a list — a pending window starts no
-    earlier than the record — that :func:`.retention_rules.still_due` narrows under the lock."""
-    config = rtype.public_submissions or {}
-    cls = tables_for(rtype).record
-    days = days_for(config)
-    if config.get("kind") not in (KIND_FORM, KIND_SUBSCRIPTION) or days <= 0:
-        return None
-    stmt = select(cls.uuid).where(
-        cls.type_id == rtype.id,
-        cls.tenant_id == bound_tenant(),
-        cls.created_at < now - timedelta(days=days),
-    )
-    if config.get("kind") == KIND_SUBSCRIPTION:
-        pending = [Filter("sm_status", FilterOp.EQ, PENDING)]
-        stmt = filtered(stmt, rtype, list(rtype.fields or []), pending)
-    if skip:
-        stmt = stmt.where(cls.uuid.not_in(sorted(skip)))
-    return stmt.order_by(cls.id).limit(limit).execution_options(include_deleted=True)
-
-
-async def _purge_one(session: Any, rtype: RecordType, uuid: str, run: _Run) -> bool:
-    """Delete ``uuid`` if it is still due under the lock; ``False`` when it
-    is not (or has gone)."""
-    await lock_type(session, rtype)
-    cls = tables_for(rtype).record
-    stmt = (
-        select(cls)
-        .where(cls.uuid == uuid, cls.type_id == rtype.id, cls.tenant_id == bound_tenant())
-        .with_for_update()
-        .execution_options(include_deleted=True, populate_existing=True)
-    )
-    record = (await session.execute(stmt)).scalars().first()
-    if record is None or not still_due(rtype, record, run.now):
-        return False
-    if not record.is_deleted:
-        await soft_delete_record(session, rtype, record, settings=run.settings)
-    await hard_delete_record(session, rtype, record)
-    return True
 
 
 async def _sweep_type(run: _Run, key: str, swept: Swept) -> None:
@@ -227,6 +184,7 @@ async def _sweep_tenant(run: _Run, swept: Swept) -> None:
         await session.close()
     for key in keys:
         await _sweep_type(run, key, swept)
+    swept.seats += await reconcile(run.session)
     days = run.settings.public_submissions_delivery_retention_days
     # No type inventory goes in: pruning looks each record up itself, at prune
     # time, and renews the lease (``run.keep``) before every commit.

@@ -32,6 +32,7 @@ async def test_create_appends_the_kinds_system_fields(client):
         "double_opt_in": True,
         "retention_days": 365,
         "pending_purge_days": 30,
+        "pending_hold_hours": 1,
     }
 
 

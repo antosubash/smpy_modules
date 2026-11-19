@@ -101,7 +101,10 @@ async def load_event(
     db: Any, who: ResourcePrincipal, event_id: uuid.UUID, *, trashed: bool = False
 ) -> tuple[Event, EventRights]:
     """The event and the caller's rights on it. ``NotFound`` for a missing event,
-    another tenant's, or one the caller may not see (drafts included)."""
+    another tenant's, or one the caller may not see (drafts included). A trashed
+    event (``trashed=True``) is also ``NotFound`` to anyone without the write right on
+    its calendar: a published one is visible to a viewer while alive, and answering
+    them 403 on its trash would show that it exists."""
     stmt = select(Event).where(Event.id == event_id)
     if trashed:
         stmt = stmt.where(Event.is_deleted.is_(True)).execution_options(include_deleted=True)
@@ -109,6 +112,6 @@ async def load_event(
     if event is None:
         raise NotFound
     rights = await event_rights(db, who, event)
-    if not rights.view:
+    if not rights.view or (trashed and not rights.write):
         raise NotFound
     return event, rights

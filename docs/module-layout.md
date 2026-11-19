@@ -38,8 +38,9 @@ file has).
 | `pages/` | the host's page glob; real Inertia pages only (`scripts/check_rules.py`) |
 | `locales/` | the framework's i18n registry |
 | `index.ts` | `package.json` `exports` (pagebuilder's `main` until 0.0.17, so its moved-path stubs stay reachable); the module's public TS surface. A sibling imports `@simple-module-py/<module>`, never a file inside the package; `scripts/check_ts_imports.py` refuses a deep or cross-module relative import (#337) |
-| `pagebuilder-blocks.ts` | pagebuilder's `puck-blocks.ts` glob (`*/*/pagebuilder-blocks.ts`) |
+| `pagebuilder-blocks.ts` | pagebuilder's `puck-blocks.ts` glob (`*/*/pagebuilder-blocks.ts`); news, images, records and events each ship one |
 | `images_extensions.py`, `images-steps.ts` | a plugin's file that another module imports or globs by name |
+| `events_extensions.py`, `events-extensions.ts` | events' loader (`calendar/plugins/extensions.py`) and its `ui/extensions/load.ts` glob (`*/*/events-extensions.ts`); records' lives beside an `integrations/events/` package that is the only code importing `sm_events` |
 | `contracts/` | other modules: the only import path they may use |
 
 **Nothing else.** In images that leaves four Python files, two TS files and
@@ -125,6 +126,7 @@ The TS/TSX lives inside the package, next to the Python:
 | `ui/components/<feature>/` | components, grouped by the same features as the Python |
 | `ui/components/` (top) | only what every feature uses (`ConfirmDialog`, the layout) |
 | `ui/hooks/`, `ui/utils/` | hooks and plain TS. `ui/utils/i18n.ts` derives `keys` from `locales/en.json` |
+| `ui/<feature>/` (events: `ui/calendar/`) | a frontend feature that is more than components: `adapter/` (the only place the third-party library is imported), `console/` (writes and dialogs), `data/` (fetching and cache), `time/` (zone conversion), with its tests beside the source |
 | `ui/page-tests/` | page-level tests, `test-dom.tsx` and shared test support. Not shipped in the wheel |
 
 A component's unit test sits beside it (`Foo.test.tsx`). Test helpers never
@@ -149,7 +151,14 @@ tests/
 A new test goes in the folder of the feature it exercises; a test of an
 area's top-level code sits at the top of that area's folder.
 
-**Parity exceptions.** `tests/pg_support.py` and the tenancy helpers are
+**Lease-and-slice runners stay parallel.** events' `feeds/importing/` (`fence.py`, `janitor.py`,
+`launch.py`, `runner.py`) follows newsletter's `imports/` design (a lease claim, leased slices,
+a janitor that relaunches lost work) with the same file names. They are not a parity family
+(each differs in states and rights), so a change to the lease or slice rules in one is made in the
+other in the same PR, or the difference is written down in that module's docs.
+
+**Parity exceptions.** `tests/pg_support.py`, the tenancy helpers and the worker
+runtime (`core/worker.py`, events and newsletter) are
 copies kept identical across modules by `scripts/tests/test_helper_parity.py`
 (`parity_tenancy.py`, `parity_families.py`). Those checks compare paths and
 path depth, so `pg_support.py` stays at the tests root. When a module moves its
@@ -201,6 +210,6 @@ Do it in small PRs, one module at a time, each containing only moves:
 | records | 6 | 10 | 0 | follows this layout |
 | analytics | 2 | 8 | 0 | follows this layout |
 | newsletter | 4 | 13 | 0 | follows this layout |
-| events | 2 | 7 | 0 | follows this layout |
+| events | 4 | 11 | 0 | follows this layout (`feeds/` for ICS output, private tokens and `feeds/importing/` for the .ics import, `integrations/` for optional neighbours) |
 
 Update this table when a module moves.

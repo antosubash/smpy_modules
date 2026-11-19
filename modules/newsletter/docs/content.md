@@ -123,19 +123,44 @@ that serves the system-scope logo explicitly (404 when there is none).
 
 ## Cards
 
-Article and page cards are **snapshotted when inserted**, server side:
+Article, page and event cards are **snapshotted when inserted**, server side:
 `POST /api/newsletter/cards/snapshot {kind, source_id}` returns the props, read
-through `news.contracts.articles` or `pagebuilder.contracts.cards` and nothing
-else. The email then renders from the snapshot, so a later edit or unpublish of
+through `news.contracts.articles`, `pagebuilder.contracts.cards` or
+`sm_events.contracts.cards` and nothing else. The email then renders from the snapshot, so a later edit or unpublish of
 the article does not change a draft until the editor presses Refresh
 (`POST /api/newsletter/campaigns/{id}/cards/refresh {block_id,
 expected_revision}`). A source that is now unpublished, trashed or gone answers
 `409 card_source_gone` and the snapshot is kept.
 
-`news` and `pagebuilder` are optional extras. `content/integrations/` is the only
-package that imports them, each import deferred and guarded; a capability is
+### Event cards
+
+`EventCard` is its own block (its source id is the event's UUID and it carries times, a place and
+an `.ics` link). The picker (`GET /api/newsletter/cards/events?q=`) offers only **upcoming events
+the public could see**: published, on a public calendar, in the campaign's tenant. A draft, an
+internal or private event or a trashed one cannot be searched or snapshotted (`404`). The
+snapshot of a series is its next occurrence, and Refresh rolls it forward to the next one when the
+date has passed; a one-off keeps its date. An event that is no longer public, or a series with
+nothing left, is `409 card_source_gone` and the snapshot is kept.
+
+**What is frozen.** The card is what the event said when it was inserted or last refreshed.
+Scheduling renders the email once and freezes that render, and the worker never renders, so
+making the event private, cancelling it or trashing it afterwards changes nothing in an email that
+is already scheduled. It changes a draft only when Refresh is pressed.
+
+**When** is formatted in the event's own timezone with its abbreviation (`CEST`, untranslated),
+in the render's language (the host's default language, like the footer's): `Wednesday, July 1,
+2026, 10:00 AM–11:30 AM CEST`; across a DST change each time carries its own zone; an all-day
+event is its date, or `first – last` with the last day inclusive. The email shows the image
+(when it is an allowed address), a "Cancelled" badge, the title, the when and place lines, the
+excerpt, "Read more" and, unless cancelled, "Add to calendar" (the event's `.ics`). Every link is
+the campaign tenant's public origin plus the card's site-relative path. Text is escaped, direction
+controls are removed, and **the event's id is never printed**.
+
+`news`, `pagebuilder` and `events` are optional extras. `content/integrations/` is the only
+package that imports them (news and pagebuilder contracts, and `sm_events.contracts.cards`), each
+import deferred and guarded; a capability is
 available only when the package imports *and* the module is mounted. When one is
-missing, the editor still defines both card blocks (an existing card stays
+missing, the editor still defines every card block (an existing card stays
 visible, deletable and rendered from its snapshot) but moves them to a hidden
 palette category, disables the picker and Refresh with a note, and the server
 answers the card, media and refresh routes with `409 integration_unavailable`.

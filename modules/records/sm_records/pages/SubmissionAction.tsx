@@ -3,7 +3,7 @@ import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useState } from 'react';
 
-type Action = 'confirm' | 'unsubscribe';
+type Action = 'confirm' | 'unsubscribe' | 'cancel';
 
 type Copy = Record<string, string>;
 
@@ -13,7 +13,7 @@ interface Props {
   token: string;
   /** The subscriber's language (`l` in the link), already one records ships. */
   locale: string;
-  /** `POST` target: `/api/records/submissions/{confirm|unsubscribe}`. */
+  /** `POST` target: `/api/records/submissions/{confirm|unsubscribe|cancel}`. */
   endpoint: string;
   /** Every string, in `locale`, from the server (`public_submissions_views.py`). */
   copy: Copy;

@@ -825,6 +825,28 @@
         "expiry": "Dieser Link gilt bis {expires}. Wenn Sie sich nicht angemeldet haben, ignorieren Sie diese E-Mail: Es passiert nichts, und Sie hören nicht wieder von uns.",
         "why": "Sie erhalten diese E-Mail, weil diese Adresse in einem Anmeldeformular auf {site} eingegeben wurde.",
         "unsubscribe": "Später umentschieden? Hier abmelden:"
+      },
+      "registration": {
+        "subject_pending": "Bestätigen Sie Ihre Anmeldung zu {title}",
+        "subject_registered": "Ihre Anmeldung zu {title}",
+        "intro_pending": "Jemand, hoffentlich Sie, hat diese Adresse auf {site} für {title} angemeldet. Bitte bestätigen Sie, dass Sie das waren.",
+        "intro_registered": "Sie sind auf {site} für {title} angemeldet.",
+        "when": "Wann:",
+        "place": "Wo:",
+        "online": "Online:",
+        "page": "Die Veranstaltungsseite:",
+        "ics": "In den Kalender eintragen:",
+        "confirm": "Anmeldung bestätigen:",
+        "expiry": "Dieser Link gilt bis {expires}. Wenn Sie sich nicht angemeldet haben, ignorieren Sie diese E-Mail: Der Platz wird von selbst wieder frei.",
+        "cancel": "Sie können nicht kommen? Melden Sie sich hier ab:",
+        "why": "Sie erhalten diese E-Mail, weil diese Adresse auf {site} in ein Anmeldeformular eingetragen wurde.",
+        "intro_already": "Sie sind bereits für {title} auf {site} angemeldet. Weiter ist nichts nötig.",
+        "subject_already": "Sie sind bereits für {title} angemeldet",
+        "notice_subject": "Ihre Anmeldung zu {title}",
+        "notice_full": "{title} auf {site} ist ausgebucht, daher konnte Ihre Anmeldung nicht gespeichert werden.",
+        "notice_closed": "Die Anmeldung zu {title} auf {site} ist geschlossen, daher konnte Ihre Anmeldung nicht gespeichert werden.",
+        "notice_busy": "Für {title} auf {site} melden sich gerade viele Personen an, daher konnte Ihre Anmeldung nicht gespeichert werden. Bitte versuchen Sie es später noch einmal.",
+        "notice_why": "Sie erhalten diese E-Mail, weil diese Adresse auf {site} in ein Anmeldeformular eingetragen wurde. Es wurde nichts gespeichert."
       }
     },
     "landing": {
@@ -843,6 +865,12 @@
         "intro": "Klicken Sie auf die Schaltfläche, um diesen Newsletter nicht mehr zu erhalten.",
         "button": "Abmelden",
         "done": "Sie sind abgemeldet. Sie erhalten diesen Newsletter nicht mehr."
+      },
+      "cancel": {
+        "title": "Anmeldung stornieren",
+        "intro": "Drücken Sie die Schaltfläche, um Ihre Anmeldung zu stornieren und Ihren Platz freizugeben.",
+        "button": "Anmeldung stornieren",
+        "done": "Ihre Anmeldung ist storniert."
       }
     },
     "block": {
@@ -900,6 +928,35 @@
         "links": "Zu viele Links",
         "manual": "Von Hand markiert"
       }
+    }
+  },
+  "events": {
+    "source": {
+      "label": "Datensätze mit Datum"
+    },
+    "settings": {
+      "mapping": "Zuordnung {n}",
+      "type": "Datensatztyp",
+      "field": "Datumsfeld",
+      "end": "Endfeld (optional)",
+      "choose": "Auswählen…",
+      "none": "Keines",
+      "duration": "Dauer, wenn ein Datensatz kein Ende hat (Minuten)",
+      "color": "Farbe (optional)",
+      "add": "Zuordnung hinzufügen",
+      "remove": "Entfernen",
+      "load_failed": "Die Datensatztypen konnten nicht geladen werden.",
+      "hint": "Zeigt veröffentlichte Datensätze mit einem Datum. Wer welchen Datensatz sieht, richtet sich nach den Zugriffsregeln des Datensatztyps.",
+      "hidden": "Eine Zuordnung, die Sie nicht sehen können. Ihr Datensatztyp existiert nicht, oder Sie dürfen ihn nicht lesen.",
+      "field_gone": "{field} (nicht mehr verfügbar)",
+      "error_field_missing": "Dieses Feld gibt es im Datensatztyp nicht mehr. Wählen Sie ein anderes Feld oder entfernen Sie die Zuordnung.",
+      "error_field_not_date": "Dieses Feld ist kein indiziertes Datums- oder Datum-Zeit-Feld mehr. Wählen Sie ein anderes Feld oder entfernen Sie die Zuordnung.",
+      "error_type_unavailable": "Dieser Datensatztyp existiert nicht, oder Sie dürfen ihn nicht lesen.",
+      "error_end_same": "Das Ende muss ein anderes Feld sein.",
+      "error_end_kind": "Das Ende muss ein indiziertes Feld derselben Art wie der Beginn sein."
+    },
+    "detail": {
+      "open_record": "Datensatz öffnen"
     }
   }
 }

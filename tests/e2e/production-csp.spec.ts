@@ -38,6 +38,27 @@ test.describe('Production CSP', () => {
     await page.waitForLoadState('networkidle');
     await page.goto('/admin/images/');
     await page.waitForLoadState('networkidle');
+    // FullCalendar draws its grid under the nonce policy.
+    await page.goto('/admin/events/');
+    await expect(page.getByTestId('calendar-title')).not.toBeEmpty();
+    await page.waitForLoadState('networkidle');
+
+    expect(violations).toEqual([]);
+  });
+
+  test('the public events pages and their grid break no policy', async ({ page }) => {
+    const violations: string[] = [];
+    page.on('console', (message) => {
+      if (message.text().includes('Content Security Policy')) violations.push(message.text());
+    });
+    page.on('pageerror', (error) => violations.push(String(error)));
+
+    // Anonymous: the list, then the read-only grid, which loads FullCalendar's lazy chunk.
+    await page.goto('/events/');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.goto('/events/?view=calendar');
+    await expect(page.getByTestId('calendar-title')).not.toBeEmpty();
+    await page.waitForLoadState('networkidle');
 
     expect(violations).toEqual([]);
   });

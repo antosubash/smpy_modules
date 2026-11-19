@@ -60,11 +60,21 @@ def _extra_metadata() -> list[Any]:
     :mod:`tests.support.app_harness` for why its table has to exist even though this
     module's ``Base`` never declares it.
     """
+    out: list[Any] = []
     try:
         from permissions.models import Base as PermissionsBase
+
+        out.append(PermissionsBase.metadata)
     except ImportError:  # pragma: no cover - exercised only without `permissions`
-        return []
-    return [PermissionsBase.metadata]
+        pass
+    try:  # the optional events extra: registration seats live in its tables (PR 9)
+        from sharing.models import Base as SharingBase
+        from sm_events.models import Base as EventsBase
+
+        out += [EventsBase.metadata, SharingBase.metadata]
+    except ImportError:  # pragma: no cover - records without events
+        pass
+    return out
 
 
 async def make_db_state() -> Any:

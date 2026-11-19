@@ -18,6 +18,7 @@ from sm_records.contracts.schemas import RecordRead, record_read
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
 from sm_records.public_submissions import actions
+from sm_records.public_submissions.registration import cancel as registration_cancel
 from sm_records.records.services import records as record_service
 from sm_records.web.deps import (
     actor,
@@ -110,3 +111,20 @@ async def unsubscribe_subscriber(
     record = await record_service.get_record(db, rtype, uuid)
     record = await actions.unsubscribe(db, rtype, record, settings=settings)
     return record_read(rtype, record)
+
+
+@router.post("/cancel", response_model=RecordRead)
+async def cancel_registration(
+    uuid: str,
+    request: Request,
+    rtype: RecordType = Depends(load_type),
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
+) -> RecordRead:
+    """Cancel a registration: it is kept as ``cancelled`` and its seat is freed. What the
+    registrant's own cancel link does; idempotent."""
+    check_type_roles(request, rtype)
+    actions.require_registration(rtype)
+    record = await record_service.get_record(db, rtype, uuid)
+    await registration_cancel.cancel(db, rtype, record, settings=settings)
+    return record_read(rtype, await record_service.get_record(db, rtype, uuid))

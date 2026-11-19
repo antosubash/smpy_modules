@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CardSnapshot } from '../../utils/types';
+import type { CardSnapshot, EventCardSnapshot } from '../../utils/types';
 import { applySnapshot } from './CardPicker';
 
 const snapshot: CardSnapshot = {
@@ -11,6 +11,27 @@ const snapshot: CardSnapshot = {
   image_url: '',
   url: '/p/spring',
   locale: 'en',
+  snapshot_at: '2026-11-01T00:00:00Z',
+};
+
+const eventSnapshot: EventCardSnapshot = {
+  id: 'server-id',
+  source_id: '3f2c6c1e-8f4e-4a45-9d0e-0a5b8f6f1c11',
+  title: 'Open day',
+  excerpt: '',
+  image_url: '',
+  url: '/events/open-day',
+  ics_url: '/events/open-day.ics',
+  locale: 'en',
+  starts_at: '2026-07-01T08:00:00Z',
+  ends_at: '2026-07-01T09:00:00Z',
+  all_day: false,
+  start_date: null,
+  end_date: null,
+  timezone: 'Europe/Vienna',
+  attendance_mode: 'in_person',
+  place: '',
+  cancelled: false,
   snapshot_at: '2026-11-01T00:00:00Z',
 };
 
@@ -52,6 +73,29 @@ describe('applySnapshot', () => {
     });
     expect(applySnapshot(puck, 'h1', 'page', snapshot)).toBe(false);
     expect(applySnapshot(puck, 'a1', 'page', snapshot)).toBe(false);
+    expect(puck.dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('applySnapshot for an event', () => {
+  it('replaces an EventCard, keeping its id', () => {
+    const puck = fakePuck({ e1: { type: 'EventCard', index: 1 } });
+    expect(applySnapshot(puck, 'e1', 'event', eventSnapshot)).toBe(true);
+    expect(puck.dispatch).toHaveBeenCalledWith({
+      type: 'replace',
+      destinationIndex: 1,
+      destinationZone: 'root:default-zone',
+      data: { type: 'EventCard', props: { ...eventSnapshot, id: 'e1' } },
+    });
+  });
+
+  it('refuses an ArticleCard, and an event snapshot never lands on a page card', () => {
+    const puck = fakePuck({
+      a1: { type: 'ArticleCard', index: 0 },
+      p1: { type: 'PageCard', index: 1 },
+    });
+    expect(applySnapshot(puck, 'a1', 'event', eventSnapshot)).toBe(false);
+    expect(applySnapshot(puck, 'p1', 'event', eventSnapshot)).toBe(false);
     expect(puck.dispatch).not.toHaveBeenCalled();
   });
 });

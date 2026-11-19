@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.public_submissions import (
+    KIND_REGISTRATION,
     KIND_SUBSCRIPTION,
     MAX_CONSENT_TEXT_LEN,
     PublicSubmissionsConfig,
@@ -24,12 +25,21 @@ from sm_records.contracts.public_submissions import (
 from sm_records.core._text import has_nul
 from sm_records.core.constants import LOCALE_PATTERN
 from sm_records.models import RecordType
+from sm_records.public_submissions.registration import seats
 from sm_records.public_submissions.spec import SUBMITTABLE_TYPES, is_system
 from sm_records.records.services._common import record_count
 from sm_records.records.services._lock import lock_type
 from sm_records.records.services.errors import Conflict, ValidationFailed
 
-__all__ = ["FIELD", "check_change", "default_display", "kind_of", "parse", "settle"]
+__all__ = [
+    "FIELD",
+    "check_available",
+    "check_change",
+    "default_display",
+    "kind_of",
+    "parse",
+    "settle",
+]
 
 FIELD = "public_submissions"
 _LOCALE_RE = re.compile(LOCALE_PATTERN)
@@ -55,6 +65,16 @@ def parse(raw: Any) -> dict[str, Any] | None:
     return config.model_dump(mode="json")
 
 
+def check_available(config: dict[str, Any] | None) -> None:
+    """A registration form needs the events module (it holds the seats): refused while it is not
+    installed, on create and on the write that gives a type the kind. A stored registration type
+    is left alone when events goes away; only its seats stop being managed."""
+    if (config or {}).get("kind") == KIND_REGISTRATION and not seats.available():
+        raise _refuse(
+            "events_unavailable: registration needs the events module, which is not installed"
+        )
+
+
 def kind_of(rtype: RecordType | None, changes: dict[str, Any] | None = None) -> str | None:
     """The kind a write leaves the type with — the sent config's, else the
     stored one's. They cannot disagree once :func:`check_change` has run."""
@@ -64,9 +84,13 @@ def kind_of(rtype: RecordType | None, changes: dict[str, Any] | None = None) -> 
 
 
 def default_display(config: dict[str, Any] | None, display_field: str | None) -> str | None:
-    """A newsletter type lists its subscribers by address unless told otherwise."""
-    if display_field is None and config and config["kind"] == KIND_SUBSCRIPTION:
-        return "sm_email"
+    """A newsletter lists its subscribers by address, and a registration type its registrants
+    by name, unless told otherwise."""
+    if display_field is None and config:
+        if config["kind"] == KIND_SUBSCRIPTION:
+            return "sm_email"
+        if config["kind"] == KIND_REGISTRATION:
+            return "sm_name"
     return display_field
 
 
@@ -90,15 +114,17 @@ async def check_change(db: AsyncSession, rtype: RecordType, changes: dict[str, A
             f"type {rtype.key!r} accepts {before} submissions; that cannot be turned "
             "off or changed once set — delete the type instead"
         )
-    if before is None and after == KIND_SUBSCRIPTION:
+    if before is None and after == KIND_REGISTRATION:
+        check_available(config)
+    if before is None and after in (KIND_SUBSCRIPTION, KIND_REGISTRATION):
         # Under the type's lock, which every record write takes first: a
         # record created between this count and the commit would be a
         # subscriber with no address.
         await lock_type(db, rtype)
         if await record_count(db, rtype, include_deleted=True):
             raise Conflict(
-                "only a type with no records can become a newsletter list: every "
-                "subscriber needs an address, and the records already stored have none"
+                "only a type with no records can become a newsletter list or a registration "
+                "form: every record needs an address, and the records already stored have none"
             )
     return before is None and after is not None
 
@@ -114,9 +140,11 @@ def _check_consent(config: dict[str, Any]) -> None:
             )
         if has_nul(text):
             raise _refuse(f"consent text ({locale}) must not contain NUL characters")
-    no_opt_in = config["kind"] == KIND_SUBSCRIPTION and not config["double_opt_in"]
+    no_opt_in = (
+        config["kind"] in (KIND_SUBSCRIPTION, KIND_REGISTRATION) and not config["double_opt_in"]
+    )
     if no_opt_in and not consent["required"]:
-        raise _refuse("a newsletter without double opt-in has to require consent")
+        raise _refuse("without double opt-in the form has to require consent")
     if consent["required"] and not any(text.strip() for text in consent["text"].values()):
         raise _refuse("required consent needs the text the visitor agrees to")
 

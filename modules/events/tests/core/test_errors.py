@@ -6,6 +6,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sm_events.core import errors
+from sm_events.core import errors_registration as reg_errors
 from sm_events.core.errors import install_exception_handlers
 
 CASES = [
@@ -25,6 +26,21 @@ CASES = [
     (errors.NotRecurring, 422, "not_recurring"),
     (errors.NotAnOccurrence, 422, "not_an_occurrence"),
     (errors.DescriptionTooLong, 422, "description_too_long"),
+    (errors.SlugReserved, 422, "slug_reserved"),
+    # PR 5: private feeds and the import.
+    (errors.TokenLimit, 409, "token_limit"),
+    (errors.ImportBusy, 409, "import_busy"),
+    (errors.ImportTenantBusy, 409, "import_busy_tenant"),
+    (errors.ImportState, 409, "import_state"),
+    (errors.ImportTooLarge, 413, "import_too_large"),
+    (errors.IcsInvalid, 422, "ics_invalid"),
+    (errors.PrivateFeedsUnavailable, 503, "private_feeds_unavailable"),
+    # PR 9: registration.
+    (reg_errors.InvalidRegistration, 422, "invalid_registration"),
+    (reg_errors.RegistrationUnavailable, 422, "registration_unavailable"),
+    (reg_errors.UnknownRegistrationTarget, 422, "unknown_registration_target"),
+    (reg_errors.RegistrationsOrphaned, 409, "registrations_orphaned"),
+    (reg_errors.RegistrationHasSeats, 409, "registration_has_seats"),
 ]
 
 EXTRA_CODES = [
@@ -62,3 +78,87 @@ def test_alternative_codes_keep_status(cls, code):
     assert exc.code == code
     assert exc.status_code == 422
     assert exc.detail
+
+
+async def test_stale_carries_the_current_revision_in_a_header_not_the_body():
+    app = FastAPI()
+    install_exception_handlers(app)
+
+    @app.get("/boom")
+    async def boom():
+        raise errors.Stale(7)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as http:
+        got = await http.get("/boom")
+    assert got.status_code == 409
+    assert set(got.json()) == {"detail", "code"}
+    assert got.headers["x-current-revision"] == "7"
+
+
+def test_import_failure_carries_a_code_only():
+    """Not an HTTP error: a parse step raises it, and the row keeps its code, never a message."""
+    failure = errors.ImportFailure("too_many_events")
+    assert failure.code == "too_many_events"
+    assert not isinstance(failure, errors.EventsError)
+    assert str(failure) == "too_many_events"
+
+
+def _extension_cases():
+    from sm_events.core import errors_extensions as ext
+
+    return [
+        (ext.UnknownSource, 422, "unknown_source"),
+        (ext.BuiltinSource, 422, "builtin_source"),
+        (ext.DuplicateSource, 422, "duplicate_source"),
+        (ext.TooManySources, 422, "too_many_sources"),
+        (ext.ExtraTooLarge, 422, "extra_too_large"),
+        (ext.TypeNotInstalled, 422, "type_not_installed"),
+        (ext.SourceUnavailable, 503, "source_unavailable"),
+    ]
+
+
+@pytest.mark.parametrize(("cls", "status", "code"), _extension_cases())
+async def test_extension_codes(cls, status, code):
+    app = FastAPI()
+    install_exception_handlers(app)
+
+    @app.get("/x")
+    async def raiser():
+        raise cls()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        response = await client.get("/x")
+    assert response.status_code == status
+    assert response.json() == {"detail": cls.detail, "code": code}
+
+
+def _reminder_cases():
+    from sm_events.core import errors_reminders as rem
+
+    return [
+        (rem.FollowLimit, 409, "follow_limit"),
+        (rem.NotPublished, 409, "not_published"),
+        (rem.InvalidLead, 422, "invalid_lead"),
+        (rem.RemindersUnavailable, 503, "reminders_unavailable"),
+    ]
+
+
+@pytest.mark.parametrize(("cls", "status", "code"), _reminder_cases())
+async def test_reminder_codes(cls, status, code):
+    app = FastAPI()
+    install_exception_handlers(app)
+
+    @app.get("/x")
+    async def raiser():
+        raise cls()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        response = await client.get("/x")
+    assert response.status_code == status
+    assert response.json() == {"detail": cls.detail, "code": code}
+
+
+def test_registration_unavailable_is_503_on_a_timeout():
+    assert reg_errors.RegistrationUnavailable().status_code == 422
+    exc = reg_errors.RegistrationUnavailable(timed_out=True)
+    assert (exc.status_code, exc.code) == (503, "registration_unavailable")

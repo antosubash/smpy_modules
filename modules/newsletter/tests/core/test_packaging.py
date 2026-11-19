@@ -16,6 +16,8 @@ def test_extras_and_floors() -> None:
     extras = project["optional-dependencies"]
     assert extras["news"] == ["simple_module_news>=0.0.16,<0.1"]
     assert extras["pagebuilder"] == ["simple_module_pagebuilder>=0.0.16,<0.1"]
+    assert extras["events"] == ["simple_module_events>=0.0.16,<0.1"]
+    assert "babel>=2.12,<3" in project["dependencies"]
     assert "aiosmtplib>=3.0,<6" in project["dependencies"]
     assert "email-validator>=2.1" in project["dependencies"]
     assert "aiosmtpd>=1.4.6" in extras["dev"]

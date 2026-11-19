@@ -20,7 +20,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
+from sm_records.contracts.public_submissions import (
+    KIND_FORM,
+    KIND_REGISTRATION,
+    KIND_SUBSCRIPTION,
+)
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType
@@ -37,6 +41,7 @@ __all__ = [
     "mark_not_spam",
     "mark_spam",
     "require_form",
+    "require_registration",
     "require_subscription",
     "resend",
     "unsubscribe",
@@ -57,6 +62,11 @@ def require_form(rtype: RecordType) -> None:
 def require_subscription(rtype: RecordType) -> None:
     if (rtype.public_submissions or {}).get("kind") != KIND_SUBSCRIPTION:
         raise SubmissionRefused("wrong_kind", f"type {rtype.key!r} is not a newsletter list")
+
+
+def require_registration(rtype: RecordType) -> None:
+    if (rtype.public_submissions or {}).get("kind") != KIND_REGISTRATION:
+        raise SubmissionRefused("wrong_kind", f"type {rtype.key!r} is not a registration form")
 
 
 async def resend(

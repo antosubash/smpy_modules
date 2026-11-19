@@ -33,6 +33,9 @@ CODES: dict[str, int] = {
     "no_recipients": 409,
     "not_pending": 409,
     "link_expired": 410,
+    "registration_full": 409,
+    "registration_closed": 409,
+    "event_unavailable": 409,
 }
 """Every code and its status — what ``docs/api-reference.md`` lists."""
 

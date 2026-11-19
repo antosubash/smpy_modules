@@ -1,0 +1,81 @@
+"""The runner's edges: duplicate pairs, and a timeout inside a query on a shared connection."""
+
+from __future__ import annotations
+
+from sm_events.models import Calendar
+
+from tests.calendar.test_plugin_runner import (
+    Call,
+    FakeSource,
+    calendars,
+    entry,
+    item,
+    ok,
+    one,
+    run,
+    status,
+)
+
+
+async def test_the_same_pair_twice_gives_each_item_once(db):
+    """Two calls for one source on one calendar (it was listed twice): no item is doubled."""
+    cal = (await calendars(db))["I"]
+    src = FakeSource(behave=ok(item("same")))
+    result = await run(db, [Call(cal, entry(), src), Call(cal, entry(), src)])
+    assert len(result.items) == 1 and len(result.statuses) == 2
+
+
+async def test_a_timeout_inside_a_query_never_leaves_an_unusable_session(db, monkeypatch):
+    """The shared-connection fallback: a statement cancelled by the timeout either leaves the
+    session usable, or is reported as a broken session so the caller stops using it."""
+    from sm_events.core import constants
+    from sqlalchemy import select as sa_select
+    from sqlalchemy import text
+
+    monkeypatch.setattr(constants, "SOURCE_TIMEOUT_SECONDS", 0.3)
+    monkeypatch.setattr(constants, "SOURCE_MIN_SLICE_SECONDS", 0.01)
+
+    async def slow(ctx, start, end):
+        await ctx.db.execute(
+            text(
+                "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 6000000) "
+                "SELECT count(*) FROM n"
+            )
+        )
+        return []
+
+    result = await one(db, FakeSource(behave=slow))
+    assert status(result) in (("timeout", None), ("failed", "session"))
+    if status(result) == ("timeout", None):
+        assert (await db.execute(sa_select(Calendar))).scalars().all()  # still usable
+
+
+async def test_a_source_can_name_why_it_failed(db):
+    """``SourceError`` carries a short code the status shows; anything else is ``raised``."""
+    import pytest
+    from sm_events.contracts.extensions import SourceError
+
+    async def broken(ctx, start, end):
+        raise SourceError("field_changed")
+
+    cal = (await calendars(db))["I"]
+    result = await run(db, [Call(cal, entry("acme:fake"), FakeSource(behave=broken))])
+    assert (result.statuses[0].status, result.statuses[0].code) == ("failed", "field_changed")
+    for bad in ("", "Has Space", "x" * 40, "ünï"):
+        with pytest.raises(ValueError):
+            SourceError(bad)
+
+
+async def test_the_shared_fallback_tolerates_a_session_with_no_transaction_yet(db):
+    """A fresh in-memory session has begun nothing: the fallback must not read that as the plugin
+    having opened a transaction of its own."""
+    from sm_events.calendar.plugins.plugin_isolation import run_isolated
+    from sqlalchemy import text
+
+    assert db.sync_session.get_transaction() is None
+
+    async def read(session):
+        return (await session.execute(text("SELECT 7"))).scalar_one()
+
+    assert await run_isolated(db, 1.0, read) == 7
+    assert await run_isolated(db, 1.0, read) == 7  # and again, now that one is open

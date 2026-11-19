@@ -52,6 +52,8 @@ from sm_records.public_submissions.definition import (
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.mail_runner import queue_notification
 from sm_records.public_submissions.patterns import check_patterns
+from sm_records.public_submissions.registration import check as registration_check
+from sm_records.public_submissions.registration.register import NAME_KEY, register
 from sm_records.public_submissions.tokens import TokenError, host_secret, ip_hash, verify_form
 from sm_records.records.services import records as record_service
 from sm_records.records.services._payload import field_defs
@@ -169,7 +171,13 @@ async def submit(
             "records.public_submissions.honeypot_dropped", extra={"type_key": type_key[:100]}
         )
         return
-    rtype = await _check_token(request, db, type_key, body, settings)
+    reg_token = None
+    if registration_check.is_registration_token(body.token):
+        rtype, reg_token = await registration_check.check_token(
+            request, db, type_key, body, settings
+        )
+    else:
+        rtype = await _check_token(request, db, type_key, body, settings)
     # After the token: only a form this host signed counts against the type's
     # budget, so a flood of forged posts cannot use it up (or mint a counter
     # per invented type key) and lock real visitors out.
@@ -183,7 +191,8 @@ async def submit(
     await captcha.verify(settings, body.captcha_response, ip)
     sent = dict(body.data)
     newsletter = rtype.public_submissions.get("kind") == KIND_SUBSCRIPTION
-    address = sent.pop(EMAIL_KEY, None) if newsletter else None
+    address = sent.pop(EMAIL_KEY, None) if newsletter or reg_token is not None else None
+    name = sent.pop(NAME_KEY, None) if reg_token is not None else None
     data = visitor_data(rtype, sent)
     if (rtype.public_submissions.get("consent") or {}).get("required") and not body.consent:
         raise SubmissionRefused(
@@ -194,6 +203,9 @@ async def submit(
     # Off the event loop, under one deadline for the whole submission; the
     # write below validates with these verdicts instead of matching again.
     verdicts = await check_patterns(rtype, data)
+    if reg_token is not None:
+        await register(request, db, rtype, data, address, name, reg_token, body, settings, verdicts)
+        return
     if newsletter:
         await subscribe.signup(request, db, rtype, data, address, body, settings, verdicts)
         return

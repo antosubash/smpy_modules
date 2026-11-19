@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Smoke-test images and newsletter through a real broker, worker and beat (#339).
+"""Smoke-test images, newsletter and events reminders through a real broker, worker and beat (#339).
 
 Every e2e spec runs Celery eager (``tests/e2e/start-test-server.sh``), so the
 path production uses - task arguments serialised onto Redis, queue routing, a
@@ -22,7 +22,14 @@ started (it caches them), and the bootstrap admin must exist. CI's
 
     uv run python scripts/bg_tasks_smoke.py --base-url http://127.0.0.1:8000
 
-Exits 0 when both settle, 1 with the last state seen otherwise.
+3. follow an event that starts in 16 minutes with the 15-minute lead, and wait until the
+   ``events.reminders`` beat (every minute) has mailed it exactly once (the Delivery card's
+   counts: one ``sent``, nothing failed or unfinished). It needs a mail sender that really
+   delivers, so CI points the mail module's SMTP backend at a local ``aiosmtpd`` sink, and the
+   host's ``SM_PUBLIC_BASE_URL`` for the links; the headless worker app builds from the same
+   environment (``SM_SECRET_KEY``, ``SM_DATABASE_URL``).
+
+Exits 0 when all settle, 1 with the last state seen otherwise.
 """
 
 from __future__ import annotations
@@ -231,12 +238,15 @@ def _timed(label: str, run: Callable[[], dict[str, Any]]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from bg_tasks_smoke_events import reminder_sent
+
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--email", default="admin@example.com")
     parser.add_argument("--password", default="changeme1")
     parser.add_argument("--image-timeout", type=float, default=180)
     parser.add_argument("--campaign-timeout", type=float, default=240)
+    parser.add_argument("--reminder-timeout", type=float, default=240)
     args = parser.parse_args(argv)
 
     with httpx.Client(base_url=args.base_url, timeout=30) as client:
@@ -247,6 +257,7 @@ def main(argv: list[str] | None = None) -> int:
                 "image pipeline settled", lambda: image_settles(client, csrf, args.image_timeout)
             )
             _timed("campaign sent", lambda: campaign_sends(client, csrf, args.campaign_timeout))
+            _timed("reminder sent", lambda: reminder_sent(client, csrf, args.reminder_timeout))
         except SmokeError as exc:
             print(f"FAIL {exc}", file=sys.stderr, flush=True)
             return 1

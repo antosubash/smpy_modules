@@ -25,7 +25,11 @@ from sm_records.records.index._fixed import RESERVED_FIELD_KEYS
 
 _RULES = (
     Path(__file__).resolve().parents[2]
-    / "sm_records" / "ui" / "components" / "typeeditor" / "rules.ts"
+    / "sm_records"
+    / "ui"
+    / "components"
+    / "typeeditor"
+    / "rules.ts"
 )
 _IO = Path(__file__).resolve().parents[2] / "sm_records" / "ui" / "utils" / "io.ts"
 
