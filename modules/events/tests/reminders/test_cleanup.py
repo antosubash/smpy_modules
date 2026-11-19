@@ -11,10 +11,11 @@ import pytest
 from simple_module_core.events import EventBus
 from simple_module_core.tenant_events import TenantDeleted
 from simple_module_core.user_events import UserDeleted
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Calendar, EventFollow, ReminderSent
 from sm_events.module import EventsModule
-from sm_events.reminders import cleanup, limits
+from sm_events.reminders import cleanup
 from sqlalchemy import delete, select
 from sqlalchemy.exc import OperationalError
 from tenants.contracts.events import MembershipRemoved

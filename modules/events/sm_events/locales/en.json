@@ -946,10 +946,8 @@
       "none_chosen": "Choose at least one time, or stop reminding.",
       "next_due": "{lead}: next reminder {when}",
       "too_late": "{lead}: too late for the next occurrence",
-      "no_coming": "{lead}: no coming occurrence",
       "unavailable": "Reminders are not available on this site right now.",
       "time_zone": "Times are shown in your browser's time zone ({zone}); the event's zone is {event_zone}.",
-      "reason_note": "Why: {reason}",
       "see_list": "See your reminders"
     },
     "leads": {
@@ -971,7 +969,6 @@
       "reason_no_public_base_url": "The site's public address is not set, so links in the mail would be wrong.",
       "reason_no_mail_transport": "No mail transport is configured.",
       "reason_console_mail": "Mail is set to the console backend, which only logs: nothing reaches an inbox.",
-      "reason_worker_access_unavailable": "The background worker cannot work out who may still be reminded.",
       "defaults": "Suggested reminder times: {leads}",
       "settings": "Change the reminder settings",
       "counts_title": "Last {days} days, everyone (counts only, never who)",

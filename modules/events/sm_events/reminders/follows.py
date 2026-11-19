@@ -13,9 +13,10 @@ is decided when a reminder falls due, from current state, so nothing here stores
 rights or of the event's content.
 
 A follow request names the **whole set** of leads for one event and replaces the caller's: the
-empty set unfollows. At most :data:`~sm_events.reminders.limits.FOLLOWS_PER_USER` distinct events
-per user; a user's writes are serialised on Postgres by an advisory lock, so two requests cannot
-both slip past the limit. Nothing here commits: the caller's request session does.
+empty set unfollows. At most :data:`~sm_events.core.constants.reminders_limits.FOLLOWS_PER_USER`
+distinct events per user; a user's writes are serialised on Postgres by an advisory lock, so
+two requests cannot both slip past the limit. Nothing here commits: the caller's request
+session does.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from sqlalchemy.exc import IntegrityError
 from sm_events.calendar.slugs import is_slug_conflict
 from sm_events.core import constants
 from sm_events.core.access.events import visible_events
+from sm_events.core.constants.reminders_limits import FOLLOWS_PER_USER
 from sm_events.core.errors import NotFound
 from sm_events.core.errors_reminders import FollowLimit, NotPublished
 from sm_events.core.settings import EventsSettings
@@ -43,7 +45,6 @@ from sm_events.models.enums import EventStatus
 from sm_events.models.reminders import FOLLOW_CONSTRAINT
 from sm_events.reminders import candidates, due
 from sm_events.reminders import leads as lead_rules
-from sm_events.reminders.limits import FOLLOWS_PER_USER
 
 __all__ = [
     "FollowState",

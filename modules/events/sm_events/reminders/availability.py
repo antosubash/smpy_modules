@@ -8,10 +8,10 @@ the reason (the codes are :data:`~sm_events.core.constants.AVAILABILITY_REASONS`
 2. ``no_public_base_url``: the host's ``public_base_url`` is unset, so links would be relative;
 3. ``no_mail_transport``: nothing (sender or resolver) is installed in this process;
 4. ``console_mail``: the sender only logs (``delivers_email`` is false);
-5. ``worker_access_unavailable``: a worker cannot work out who may still be reminded.
 
-Whether a beat is running cannot be seen from here; with none, a follow is accepted and never
-mailed. ``docs/operations.md`` says so.
+This runs in the web process, which cannot see two things: whether a beat is running (with
+none, a follow is accepted and never mailed), and whether the worker's headless app can be built
+(the beat finds out, sends nothing, and logs it). ``docs/operations.md`` says so.
 """
 
 from __future__ import annotations
@@ -22,12 +22,11 @@ from typing import Any
 from simple_module_core.mail import mail_transport_installed, resolve_mail_sender
 
 from sm_events.core import constants
-from sm_events.reminders import worker_app
-from sm_events.reminders.base_url import public_base_url
+from sm_events.core.host_settings import public_base_url
 
-__all__ = ["Availability", "availability", "public_base_url"]
+__all__ = ["Availability", "availability"]
 
-_DISABLED, _NO_URL, _NO_TRANSPORT, _CONSOLE, _NO_WORKER = constants.AVAILABILITY_REASONS
+_DISABLED, _NO_URL, _NO_TRANSPORT, _CONSOLE = constants.AVAILABILITY_REASONS
 
 
 @dataclass(frozen=True)
@@ -49,6 +48,4 @@ async def availability(app: Any, db: Any) -> Availability:
         return _refused(_NO_TRANSPORT)
     if not (await resolve_mail_sender(db)).delivers_email:
         return _refused(_CONSOLE)
-    if not worker_app.worker_runtime_supported():
-        return _refused(_NO_WORKER)
     return Availability(True, None)

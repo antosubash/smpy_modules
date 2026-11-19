@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from sm_events.reminders import limits
+from sm_events.core.constants import reminders_limits as limits
 
 
 def test_catchup_covers_every_lead():
@@ -40,13 +40,12 @@ def test_constants_name_the_states_and_codes():
 
     assert constants.REMINDER_STATES == ("claimed", "sending", "sent", "failed")
     assert constants.REMINDER_SEND_FAILED == "send_failed"
-    assert constants.REMINDER_SEND_TIMEOUT == "send_timeout"
+    assert constants.REMINDER_CODE_SEND_TIMEOUT == "send_timeout"
     assert constants.AVAILABILITY_REASONS == (
         "disabled",
         "no_public_base_url",
         "no_mail_transport",
         "console_mail",
-        "worker_access_unavailable",
     )
     assert constants.REMINDERS_URL == "/admin/events/reminders"
     assert constants._PAGE_REMINDERS == "Events/Reminders"

@@ -6,7 +6,7 @@ import re
 from datetime import timedelta
 from pathlib import Path
 
-from sm_events.reminders import limits
+from sm_events.core.constants import reminders_limits as limits
 
 DOC = Path(__file__).resolve().parents[2] / "docs" / "reminders.md"
 ROW = re.compile(r"^\| `([A-Z_]+)` \| ([^|]+?) \|", re.MULTILINE)

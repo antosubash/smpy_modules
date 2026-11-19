@@ -18,8 +18,8 @@ from simple_module_core.resources import ResourcePrincipal
 from starlette.requests import Request
 
 from sm_events.core.access.offline import offline_accounts
+from sm_events.core.host_settings import public_base_url
 from sm_events.core.tenancy import TenancyMode, mode_of
-from sm_events.reminders.base_url import public_base_url
 
 __all__ = ["Recipient", "ReminderRuntime", "web_runtime"]
 

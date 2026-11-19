@@ -37,10 +37,10 @@ from simple_module_db import all_tenants as unscoped
 from simple_module_db import finalize_session
 from sqlalchemy import delete, select
 
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import bound_tenant, tenant_scope, valid_tenant
 from sm_events.core.user_ids import user_match
 from sm_events.models import EventFollow, ReminderSent
-from sm_events.reminders import limits
 
 __all__ = [
     "delete_member_data",

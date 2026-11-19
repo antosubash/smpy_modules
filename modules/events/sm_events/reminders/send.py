@@ -39,8 +39,8 @@ from typing import Any
 from simple_module_core.mail import MailMessage, MailSender
 
 from sm_events.core import constants
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.reminders import claim as ledger
-from sm_events.reminders import limits
 from sm_events.reminders.candidates import Candidate
 from sm_events.reminders.recipients import Eligibility
 from sm_events.reminders.runtime import Recipient
@@ -99,7 +99,7 @@ async def _transport(
             sender.send(message), timeout=limits.REMINDER_SEND_TIMEOUT.total_seconds()
         )
     except TimeoutError:
-        code = constants.REMINDER_SEND_TIMEOUT
+        code = constants.REMINDER_CODE_SEND_TIMEOUT
     except Exception as exc:  # the class only: a relay's reply can quote the address
         code = constants.REMINDER_SEND_FAILED
         logger.warning(
@@ -111,7 +111,7 @@ async def _transport(
         budget.failures_in_row = 0
         counts.sent += 1
         return
-    if code == constants.REMINDER_SEND_TIMEOUT:
+    if code == constants.REMINDER_CODE_SEND_TIMEOUT:
         logger.warning(
             "events: reminder send timed out tenant=%s event=%s user=%s",
             tenant_id, c.event_id, c.user_id,

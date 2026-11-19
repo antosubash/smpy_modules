@@ -27,11 +27,11 @@ from simple_module_db import all_tenants as unscoped
 from sqlalchemy import delete, distinct, or_, select
 
 from sm_events.core import constants
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import all_tenants, tenant_scope, valid_tenant
 from sm_events.feeds.tokens.cleanup import sweep_revoked
 from sm_events.models import EventImport, EventImportItem, FeedToken, ReminderSent
 from sm_events.reminders import cleanup as reminder_cleanup
-from sm_events.reminders import limits
 
 __all__ = ["janitor_async"]
 

@@ -35,11 +35,15 @@ from sqlalchemy import exists, func, or_, select
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters
 from sm_events.calendar.occurrences import occurrences
 from sm_events.core import constants
+from sm_events.core.constants.reminders_limits import (
+    MAX_LEAD_MINUTES,
+    REMINDER_CANDIDATES_MAX,
+    REMINDER_LEADS,
+)
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Event, EventFollow, OccurrenceOverride
 from sm_events.models.enums import EventStatus
 from sm_events.reminders import due
-from sm_events.reminders.limits import MAX_LEAD_MINUTES, REMINDER_CANDIDATES_MAX, REMINDER_LEADS
 
 __all__ = ["CHUNK", "Candidate", "candidates", "next_starts"]
 

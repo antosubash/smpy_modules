@@ -159,7 +159,6 @@ describe('Reminders page', () => {
     ['no_public_base_url', 'public address'],
     ['no_mail_transport', 'No mail transport'],
     ['console_mail', 'console backend'],
-    ['worker_access_unavailable', 'background worker'],
   ])('has a sentence for the reason %s', async (reason, words) => {
     stubFetch({
       [`GET ${MINE}`]: page([]),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.reminders import limits
+from sm_events.core.constants import reminders_limits as limits
 
 from tests.support.access import grant
 from tests.support.calendars import BASE, OWNER, SE, SV, VIEWER, make

@@ -24,9 +24,10 @@ the request (:mod:`sm_events.reminders.access`), never silently.
 
 **Fail closed.** No provisioned secret key (the worker would have to *create* the deployment's
 session key to build the app; it refuses instead), a failed build, an unreadable overlay: each
-answers ``None``, :func:`worker_runtime_supported` turns false for :data:`RETRY_SECONDS` (so
-``availability`` says ``worker_access_unavailable`` and the tick sends nothing), the failure is
-logged once by exception class, and the build is not retried inside that window (no crash loop).
+answers ``None``, :func:`worker_runtime_supported` turns false for :data:`RETRY_SECONDS` (the
+tick sends nothing and logs it; the web process cannot see this, so the page never says so), the
+failure is logged once by exception class, and the build is not retried inside that window (no
+crash loop).
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
-from sm_events.reminders import limits
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.reminders.runtime import ReminderRuntime, web_runtime
 
 __all__ = [

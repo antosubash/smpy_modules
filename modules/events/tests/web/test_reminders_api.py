@@ -6,8 +6,8 @@ import uuid
 
 import pytest
 from simple_module_core.mail import reset_mail_sender
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.models import EventFollow
-from sm_events.reminders import limits
 from sqlalchemy import func, select
 
 from tests.reminders.support import make_ready, seed_http

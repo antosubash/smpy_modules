@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 from simple_module_core.mail import reset_mail_sender
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import tenant_scope
 from sm_events.module import EventsModule
-from sm_events.reminders import limits
 from sm_events.web.endpoints import reminders_api
 from sqlalchemy import select
 

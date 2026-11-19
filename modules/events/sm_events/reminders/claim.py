@@ -46,11 +46,11 @@ from simple_module_db import finalize_session
 from sqlalchemy import select, update
 from sqlalchemy.dialects import postgresql, sqlite
 
+from sm_events.core.constants.reminders_limits import REMINDER_CLAIM_LEASE
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Event, ReminderSent
 from sm_events.models.enums import EventStatus
 from sm_events.reminders.candidates import Candidate
-from sm_events.reminders.limits import REMINDER_CLAIM_LEASE
 
 __all__ = ["Claim", "begin_send", "claim", "mark_failed", "mark_sent"]
 

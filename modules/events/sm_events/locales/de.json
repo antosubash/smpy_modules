@@ -946,10 +946,8 @@
       "none_chosen": "Wähle mindestens einen Zeitpunkt oder beende die Erinnerung.",
       "next_due": "{lead}: nächste Erinnerung {when}",
       "too_late": "{lead}: zu spät für den nächsten Termin",
-      "no_coming": "{lead}: kein kommender Termin",
       "unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
       "time_zone": "Zeiten in der Zeitzone deines Browsers ({zone}); die Zeitzone der Veranstaltung ist {event_zone}.",
-      "reason_note": "Grund: {reason}",
       "see_list": "Deine Erinnerungen ansehen"
     },
     "leads": {
@@ -971,7 +969,6 @@
       "reason_no_public_base_url": "Die öffentliche Adresse der Website ist nicht gesetzt, daher wären Links in der E-Mail falsch.",
       "reason_no_mail_transport": "Es ist kein Mailversand eingerichtet.",
       "reason_console_mail": "Der Mailversand steht auf Konsole und schreibt nur ins Protokoll: Nichts erreicht ein Postfach.",
-      "reason_worker_access_unavailable": "Der Hintergrunddienst kann nicht feststellen, wer noch erinnert werden darf.",
       "defaults": "Vorgeschlagene Erinnerungszeiten: {leads}",
       "settings": "Erinnerungseinstellungen ändern",
       "counts_title": "Letzte {days} Tage, alle zusammen (nur Zahlen, nie wer)",

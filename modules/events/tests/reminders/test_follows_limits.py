@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.errors_reminders import FollowLimit, InvalidLead
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import EventFollow
-from sm_events.reminders import follows, limits
+from sm_events.reminders import follows
 from sqlalchemy import func, select
 
 from tests.pg_support import USING_POSTGRES

@@ -42,10 +42,11 @@ from sqlalchemy import distinct, select
 
 from sm_events.core import constants, public_prefix
 from sm_events.core.access.events import visible_events
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import all_tenants, bound_tenant, tenant_scope
 from sm_events.models import Calendar, Event, EventFollow, EventText
-from sm_events.reminders import candidates, limits, recipients, send
+from sm_events.reminders import candidates, recipients, send
 from sm_events.reminders.links import Links
 from sm_events.reminders.message import build_message
 from sm_events.reminders.runtime import Recipient, ReminderRuntime

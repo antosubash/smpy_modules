@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.errors_reminders import InvalidLead
 from sm_events.core.settings import EventsSettings
 from sm_events.models import Calendar
-from sm_events.reminders import leads, limits
+from sm_events.reminders import leads
 
 
 def test_validate():

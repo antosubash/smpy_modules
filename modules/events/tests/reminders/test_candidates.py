@@ -7,9 +7,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from sm_events.calendar.times import localize
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import OccurrenceOverride
-from sm_events.reminders import candidates, limits
+from sm_events.reminders import candidates
 
 from tests.reminders.support import bulk_follows, follow_row, published, world
 from tests.support.calendars import seed_event, seed_series

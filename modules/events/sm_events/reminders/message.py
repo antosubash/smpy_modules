@@ -28,12 +28,12 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 from simple_module_core.mail import MailMessage
 
+from sm_events.core.constants.reminders_limits import REMINDER_LEADS, REMINDER_SUBJECT_MAX
 from sm_events.core.text_safety import strip_unsafe
 from sm_events.core.web_urls import is_web_url
 from sm_events.models import Calendar, Event, EventText
 from sm_events.reminders import formatting, strings
 from sm_events.reminders import links as link_builder
-from sm_events.reminders.limits import REMINDER_LEADS, REMINDER_SUBJECT_MAX
 from sm_events.web.services.events_out import pick_title
 
 __all__ = ["build_message", "clean_subject"]
@@ -48,7 +48,7 @@ def _one_line(value: str | None) -> str:
 
 def clean_subject(value: str) -> str:
     """One line: whitespace collapsed, control, direction and separator characters gone, at most
-    :data:`~sm_events.reminders.limits.REMINDER_SUBJECT_MAX` characters."""
+    :data:`~sm_events.core.constants.reminders_limits.REMINDER_SUBJECT_MAX` characters."""
     return _one_line(value)[:REMINDER_SUBJECT_MAX].strip()
 
 

@@ -18,12 +18,12 @@ from sqlalchemy import case, func, select
 
 from sm_events.core import constants
 from sm_events.core.access.events import visible_events
+from sm_events.core.constants.reminders_limits import MINE_PAGE_MAX
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
 from sm_events.core.user_ids import canonical_user_id
 from sm_events.models import Calendar, Event, EventFollow, EventText
 from sm_events.reminders import candidates
-from sm_events.reminders.limits import MINE_PAGE_MAX
 from sm_events.web.services.events_out import pick_title
 
 __all__ = ["MineCalendar", "MineItem", "MinePage", "my_reminders"]

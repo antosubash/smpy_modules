@@ -11,15 +11,8 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useEffect, useId, useRef, useState } from 'react';
 import { keys, useT } from '../utils/i18n';
 import { leadLabel, leadsSummary } from './leadText';
+import { AVAILABILITY_REASONS } from './reasons';
 import { useFollow } from './useFollow';
-
-const REASONS: Record<string, string> = {
-  disabled: keys.events.reminders.delivery.reason_disabled,
-  no_public_base_url: keys.events.reminders.delivery.reason_no_public_base_url,
-  no_mail_transport: keys.events.reminders.delivery.reason_no_mail_transport,
-  console_mail: keys.events.reminders.delivery.reason_console_mail,
-  worker_access_unavailable: keys.events.reminders.delivery.reason_worker_access_unavailable,
-};
 
 export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: string }) {
   const { t, locale } = useT();
@@ -40,7 +33,9 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
     return (
       <p className="text-xs text-muted-foreground" data-testid="remind-unavailable">
         {t(copy.unavailable)}
-        {state.reason && REASONS[state.reason] ? ` ${t(REASONS[state.reason])}` : ''}
+        {state.reason && AVAILABILITY_REASONS[state.reason]
+          ? ` ${t(AVAILABILITY_REASONS[state.reason])}`
+          : ''}
       </p>
     );
   }

@@ -1,7 +1,7 @@
 """The links in a reminder: built from the host's configured origin, never from a request.
 
 ``base_url`` is the host's ``public_base_url``
-(:func:`~sm_events.reminders.base_url.public_base_url`); a relative, missing or non-web one is
+(:func:`~sm_events.core.host_settings.public_base_url`); a relative, missing or non-web one is
 refused (``ValueError``) so a reminder is never sent with a link that points nowhere or somewhere
 a visitor chose. ``availability`` already reports
 ``no_public_base_url`` before anything is built.

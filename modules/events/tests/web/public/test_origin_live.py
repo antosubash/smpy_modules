@@ -33,7 +33,7 @@ async def test_one_function_for_both_readers_and_it_follows_the_live_settings():
 
 
 async def test_the_reminders_read_the_same_value():
-    from sm_events.reminders.base_url import public_base_url
+    from sm_events.core.host_settings import public_base_url
 
     app, state = await build_app()
     try:
