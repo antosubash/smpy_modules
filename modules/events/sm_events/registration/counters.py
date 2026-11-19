@@ -78,13 +78,17 @@ async def recount(db: Any, tenant: str, counter_ids: Sequence[int], now: datetim
         )
 
 
-async def lock_counters(db: Any, tenant: str, keys: Sequence[tuple[uuid.UUID, str]]) -> list[int]:
-    """The row locks of these occurrences' counters, in ascending id (one order for everybody)."""
-    ids: list[int] = []
+async def lock_counters(
+    db: Any, tenant: str, keys: Sequence[tuple[uuid.UUID, str]]
+) -> list[tuple[int, uuid.UUID, str]]:
+    """Lock these occurrences' counter rows, in ascending id (one order for everybody), and say
+    which ones exist: ``(id, event_id, occurrence_key)``. A key with no counter row is absent: no
+    seat of it may be touched, because nothing holds its lock."""
+    found: list[tuple[int, uuid.UUID, str]] = []
     for start in range(0, len(keys), _KEYS_PER_STATEMENT):
         pairs = list(keys[start : start + _KEYS_PER_STATEMENT])
-        found = await db.execute(
-            select(COUNT.c.id)
+        rows = await db.execute(
+            select(COUNT.c.id, COUNT.c.event_id, COUNT.c.occurrence_key)
             .where(
                 COUNT.c.tenant_id == tenant,
                 tuple_(COUNT.c.event_id, COUNT.c.occurrence_key).in_(pairs),
@@ -92,5 +96,5 @@ async def lock_counters(db: Any, tenant: str, keys: Sequence[tuple[uuid.UUID, st
             .order_by(COUNT.c.id)
             .with_for_update()
         )
-        ids.extend(found.scalars().all())
-    return sorted(set(ids))
+        found.extend((i, e, k) for i, e, k in rows.all())
+    return sorted(found)
