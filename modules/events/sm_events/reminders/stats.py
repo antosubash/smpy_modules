@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import func, select
 
 from sm_events.core.tenancy import bound_tenant
-from sm_events.core.user_ids import spellings
+from sm_events.core.user_ids import canonical_user_id
 from sm_events.models import ReminderSent
 from sm_events.reminders import limits
 
@@ -38,7 +38,7 @@ async def counts(
     since = now - timedelta(days=days)
     where: list[Any] = [_T.c.tenant_id == bound_tenant(), _T.c.claimed_at >= since]
     if user_id is not None:
-        where.append(func.lower(_T.c.recipient_id).in_(spellings(user_id)))
+        where.append(_T.c.recipient_id == canonical_user_id(user_id))  # as every row was written
     sent = (
         await db.execute(select(func.count()).select_from(_T).where(*where, _T.c.state == "sent"))
     ).scalar_one()

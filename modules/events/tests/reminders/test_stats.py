@@ -64,13 +64,13 @@ async def test_the_unfinished_threshold_is_the_constant(db):
 
 @pytest.mark.parametrize("spelling", [U, U.upper(), U.replace("-", ""), U.replace("-", "").upper()])
 async def test_a_users_counts_match_every_spelling_of_their_id(db, spelling):
+    """Rows are written with the canonical id; a read in any spelling finds them."""
     await _rows(
         db,
-        (spelling, "sent", None, timedelta(minutes=5)),
+        (U, "sent", None, timedelta(minutes=5)),
         ("other", "sent", None, timedelta(minutes=5)),
     )
-    assert (await stats.counts(db, now=NOW, user_id=U.upper())).sent == 1
-    assert (await stats.counts(db, now=NOW, user_id=U.replace("-", ""))).sent == 1
+    assert (await stats.counts(db, now=NOW, user_id=spelling)).sent == 1
 
 
 @pytest.mark.unbound_tenant

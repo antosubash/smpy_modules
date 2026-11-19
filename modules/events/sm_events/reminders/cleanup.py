@@ -35,10 +35,10 @@ from typing import Any
 
 from simple_module_db import all_tenants as unscoped
 from simple_module_db import finalize_session
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 
 from sm_events.core.tenancy import bound_tenant, tenant_scope, valid_tenant
-from sm_events.core.user_ids import spellings
+from sm_events.core.user_ids import user_match
 from sm_events.models import EventFollow, ReminderSent
 from sm_events.reminders import limits
 
@@ -70,7 +70,7 @@ async def _run(
 def _by_user(user_id: Any, *, tenant: str | None = None) -> list[Any]:
     out = []
     for table, column in ((_F, _F.c.user_id), (_L, _L.c.recipient_id)):
-        stmt = delete(table).where(func.lower(column).in_(spellings(user_id)))
+        stmt = delete(table).where(user_match(column, user_id))
         out.append(stmt if tenant is None else stmt.where(table.c.tenant_id == tenant))
     return out
 

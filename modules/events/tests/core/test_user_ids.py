@@ -42,8 +42,11 @@ def test_spellings_cover_every_form_a_row_could_hold(given):
     assert str(ID) in found and ID.hex in found
 
 
-def test_spellings_of_a_plain_id():
-    assert set(user_ids.spellings("Alice")) == {"alice"}
+@pytest.mark.parametrize("plain", ["Alice", "bob", "a-b", "ab", "auth0|X", "{x}"])
+def test_a_plain_id_has_exactly_one_spelling(plain):
+    """Only a UUID has alternative spellings; any other id is itself and nothing else."""
+    assert user_ids.spellings(plain) == (plain,)
+    assert user_ids.canonical_user_id(plain) == plain
 
 
 @pytest.mark.parametrize("stored", [str(ID), str(ID).upper(), ID.hex, ID.hex.upper()])
