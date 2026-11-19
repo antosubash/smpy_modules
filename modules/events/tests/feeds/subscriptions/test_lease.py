@@ -85,7 +85,8 @@ async def test_release_clears_the_lease(db, sub):
 
 
 @pytest.mark.skipif(not USING_POSTGRES, reason="needs two real connections")
-async def test_two_workers_one_fetch(db_state, db):
+async def test_two_workers_one_fetch(db_state, db, monkeypatch):
+    monkeypatch.setattr(constants, "SUBSCRIPTION_MAX_CONCURRENT_FETCHES", 1000)
     cal = await seed_calendar(db)
     ids = [
         (await seed_subscription(db, cal, label=f"s{n}", next_fetch_at=NOW)).id for n in range(20)
@@ -104,3 +105,48 @@ async def test_two_workers_one_fetch(db_state, db):
     first, second = await asyncio.gather(worker("a"), worker("b"))
     assert first | second == set(ids)
     assert first & second == set()
+
+
+async def test_an_install_wide_cap_on_simultaneous_fetches(db, monkeypatch):
+    """Excess work waits: with the cap reached, a due subscription is not claimed."""
+    monkeypatch.setattr(constants, "SUBSCRIPTION_MAX_CONCURRENT_FETCHES", 2)
+    cal = await seed_calendar(db)
+    subs = [await seed_subscription(db, cal, label=f"s{n}", next_fetch_at=NOW) for n in range(4)]
+    assert await lease.claim(db, subs[0].id, owner="a", now=NOW)
+    assert await lease.claim(db, subs[1].id, owner="a", now=NOW)
+    assert await lease.claim(db, subs[2].id, owner="a", now=NOW) is False  # cap reached
+    later = NOW + constants.SUBSCRIPTION_LEASE + timedelta(seconds=1)
+    assert await lease.claim(db, subs[2].id, owner="a", now=later)  # the others' leases ended
+
+
+async def test_a_plain_session_without_the_framework_listeners_holds_the_lease(db_state, db):
+    """PR 8's lesson: the claim must hold on a bare ``AsyncSession`` (no listeners, no
+    ``RequestSession``): the UPDATE itself is the lock, and it commits."""
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    sub = await seed_subscription(db, await seed_calendar(db), next_fetch_at=NOW)
+    sid = sub.id
+    await db.commit()
+    async with AsyncSession(db_state.engine, expire_on_commit=False) as plain:
+        assert await lease.claim(plain, sid, owner="plain", now=NOW)
+        await plain.commit()
+    async with AsyncSession(db_state.engine, expire_on_commit=False) as other:
+        assert await lease.claim(other, sid, owner="other", now=NOW) is False
+    row = (await db.execute(select(Subscription.lease_owner))).scalar_one()
+    assert row == "plain"
+
+
+@pytest.mark.skipif(not USING_POSTGRES, reason="needs real concurrent connections")
+async def test_one_subscription_is_claimed_once_by_many_concurrent_sessions(db_state, db):
+    sub = await seed_subscription(db, await seed_calendar(db), next_fetch_at=NOW)
+    sid = sub.id
+    await db.commit()
+
+    async def claim(n: int) -> bool:
+        async with db_state.session_factory() as session:
+            won = await lease.claim(session, sid, owner=f"w{n}", now=NOW)
+            await session.commit()
+            return won
+
+    results = await asyncio.gather(*(claim(n) for n in range(12)))
+    assert results.count(True) == 1

@@ -54,6 +54,7 @@ __all__ = [
     "SUBSCRIPTION_LIMIT_CODE",
     "SUBSCRIPTION_LIMIT_DETAIL",
     "SUBSCRIPTION_MAX_BACKOFF",
+    "SUBSCRIPTION_MAX_CONCURRENT_FETCHES",
     "SUBSCRIPTION_MAX_FAILURES",
     "SUBSCRIPTION_MAX_REDIRECTS",
     "SUBSCRIPTION_MAX_REFRESH_MINUTES",
@@ -131,6 +132,10 @@ SUBSCRIPTION_TICK_FETCHES: Final = 20
 SUBSCRIPTION_TICK_BYTES: Final = 50 * 1024 * 1024
 SUBSCRIPTION_TICK_SECONDS: Final = 45
 SUBSCRIPTION_LEASE: Final = timedelta(minutes=2)
+SUBSCRIPTION_MAX_CONCURRENT_FETCHES: Final = 8
+"""Install-wide ceiling on subscriptions leased (so being fetched) at once, whatever the number of
+beats and workers; the excess waits for the next tick. Counted in the claim's own statement, so
+it can overshoot by at most the number of claims racing at that instant."""
 
 # Limits (Ruling 23).
 SUBSCRIPTIONS_PER_CALENDAR: Final = 10
