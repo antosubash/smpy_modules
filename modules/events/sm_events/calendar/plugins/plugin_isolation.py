@@ -85,6 +85,7 @@ async def _run_shared[T](db: Any, timeout: float, call: Callable[[Any], Awaitabl
     on the caller's session. A timeout that leaves the session needing a rollback (it fired
     inside a statement) is :class:`SessionBroken`: the caller must stop using it."""
     await db.flush()
+    await db.connection()  # begin the transaction if none is open yet, so "root" exists to compare
     root = db.sync_session.get_transaction()
     blocked = _block(db)
     flushed: list[bool] = []

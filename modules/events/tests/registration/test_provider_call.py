@@ -17,17 +17,9 @@ from sm_events.core import constants
 from sm_events.core.errors_registration import RegistrationUnavailable, UnknownRegistrationTarget
 from sm_events.models import Calendar
 from sm_events.registration import provider_call
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from tests.support.providers import KNOWN_TARGET, provider, slow
-
-
-@pytest.fixture
-async def db(db):
-    """A session with its transaction begun, as every request's is when it reaches a provider (the
-    in-memory fallback of the plugin runner compares transactions before and after)."""
-    await db.execute(text("SELECT 1"))
-    return db
 
 
 async def test_check_target_answers(db):
