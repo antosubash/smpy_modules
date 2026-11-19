@@ -72,6 +72,8 @@ class Candidate:
     lead: int
     user_id: str
     locale: str
+    moved_from: datetime | None = None
+    """Where this occurrence was before it was moved, when it was."""
 
     @property
     def due(self) -> datetime:
@@ -182,6 +184,11 @@ async def _followers(
     return rows[:limit], int(total)  # type: ignore[return-value]
 
 
+def _moved_from(occ: Occurrence) -> datetime | None:
+    original = occ.original_start
+    return original if original is not None and original != occ.start else None
+
+
 async def candidates(
     db: Any, *, now: datetime, cap: int = REMINDER_CANDIDATES_MAX
 ) -> tuple[list[Candidate], int]:
@@ -222,6 +229,7 @@ async def candidates(
                         lead,
                         user_id,
                         locale,
+                        _moved_from(occ),
                     )
                 )
     found.sort(key=lambda c: (c.due, c.event_id, c.user_id))

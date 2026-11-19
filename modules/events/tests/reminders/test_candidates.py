@@ -147,6 +147,10 @@ async def test_moved_into_window(db):
     # The regular instance at TEN and the one moved into it: two occurrences, two keys.
     assert keys == [f"{event.id}:20260701T100000Z", f"{event.id}:20260708T100000Z"]
     assert {c.start for c in got} == {TEN}
+    # Only the moved one says where it came from; the regular instance does not.
+    by_key = {c.occurrence_key: c.moved_from for c in got}
+    assert by_key[f"{event.id}:20260708T100000Z"] == datetime(2026, 7, 8, 10, tzinfo=UTC)
+    assert by_key[f"{event.id}:20260701T100000Z"] is None
 
 
 async def test_moved_out_of_window_not_at_old_time(db):
