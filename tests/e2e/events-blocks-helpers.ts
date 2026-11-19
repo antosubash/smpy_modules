@@ -178,7 +178,7 @@ export async function blockPage(
     text('Join us for readings, workshops and the odd market. Everyone is welcome.'),
     ...blocks,
   ];
-  const id = await makePage(page, { slug, publish: true, blocks: content });
+  const id = await makePage(page, { slug, publish: true, blocks: content, name: title });
   if (german) {
     const headers = await moduleCsrfHeader(page, '/pagebuilder/');
     const twin = await page.request.post(`/api/pagebuilder/pages/${id}/translations`, {

@@ -178,6 +178,8 @@ test('the calendar block is read-only and shows only the chosen calendar', async
   }
   await expect(circle).toBeVisible();
   await expect(grid).not.toContainText('Poetry night');
+  // Keep the keyboard-only skip link out of the picture.
+  await page.addStyleTag({ content: '.pb-skip { display: none !important; }' });
   await shoot(page, '03-public-calendar-block', { fullPage: true });
 });
 

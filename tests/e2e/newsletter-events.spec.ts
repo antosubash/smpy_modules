@@ -29,7 +29,7 @@ import {
 
 const rand = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const subscriber = `reader-${rand}@example.org`;
-const subject = `Open studio newsletter ${rand}`;
+const subject = "What's on in December";
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 
 test.describe('Newsletter event card', () => {
@@ -50,7 +50,7 @@ test.describe('Newsletter event card', () => {
       if (/NaN/.test(m.text())) nan.push(m.text());
     });
     const day = wednesday(2);
-    const listKey = `e2e_events_${rand}`;
+    const listKey = 'members';
     let campaignId = 0;
     let event = { id: '', revision: 0 };
     let slug = '';
@@ -62,7 +62,7 @@ test.describe('Newsletter event card', () => {
       await configureNewsletter(page, cleanup, { baseURL: baseURL ?? '' });
       const created = await page.request.post('/api/newsletter/lists', {
         headers: await csrf(page),
-        data: { key: listKey, label: `Studio friends ${rand}` },
+        data: { key: listKey, label: 'Members' },
       });
       expect(created.status(), await created.text()).toBe(201);
       const job = await importViaApi(page, listKey, [
@@ -105,8 +105,8 @@ test.describe('Newsletter event card', () => {
 
     await test.step('a campaign with a card for another event, then the picker swaps it', async () => {
       const decoy = await postEvent(page, {
-        calendar: (await postCalendar(page, { name: 'Decoy programme', visibility: 'public' })).id,
-        title: 'Decoy lecture',
+        calendar: (await postCalendar(page, { name: 'Lecture series', visibility: 'public' })).id,
+        title: 'Winter lecture',
         start: `${addDays(day, 1)}T18:00`,
         end: `${addDays(day, 1)}T19:00`,
       });
@@ -114,7 +114,7 @@ test.describe('Newsletter event card', () => {
       await page.goto('/admin/newsletter/');
       await page.getByRole('button', { name: 'New campaign' }).click();
       const dialog = page.getByRole('dialog', { name: 'New campaign' });
-      await dialog.getByLabel('Name').fill(`Events campaign ${rand}`);
+      await dialog.getByLabel('Name').fill('December programme');
       await dialog.getByLabel('Newsletter list').selectOption(listKey);
       await dialog.getByRole('button', { name: 'Create', exact: true }).click();
       await page.waitForURL(/\/admin\/newsletter\/campaigns\/\d+$/);
@@ -176,7 +176,11 @@ test.describe('Newsletter event card', () => {
         'href',
         new RegExp(`^${baseURL}/events/${slug}\\.ics$`),
       );
+      // A tall window, so the card's text under its image is in the picture too.
+      const size = page.viewportSize();
+      await page.setViewportSize({ width: 1280, height: 1900 });
       await shoot(page, '07-newsletter-preview');
+      if (size) await page.setViewportSize(size);
     });
 
     let sent = '';
@@ -194,6 +198,14 @@ test.describe('Newsletter event card', () => {
       const mine = (await outbox(page)).filter((m) => m.subject === subject);
       expect(mine.map((m) => m.to)).toEqual([subscriber]);
       sent = mine[0].html;
+      if (process.env.E2E_SHOTS_DIR) {
+        const mail = await page.context().newPage();
+        await mail.setViewportSize({ width: 800, height: 1400 });
+        await mail.setContent(sent);
+        await mail.waitForLoadState('load');
+        await shoot(mail, '08-newsletter-email', { fullPage: true });
+        await mail.close();
+      }
       expect(sent).toContain('Open studio day');
       // Click tracking rewrote the links: each one redirects to the campaign tenant's own address.
       const tracked = [...sent.matchAll(/href="([^"]*\/newsletter\/c\/[^"]+)"/g)].map((m) => m[1]);
