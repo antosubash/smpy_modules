@@ -745,7 +745,8 @@ jobs:
 
       # One worker on the queues `make worker` serves (images, newsletter,
       # events, celery) and one beat: never two schedulers. The events queue carries
-      # events.publish_due, events.run_import, events.janitor and events.reminders.
+      # events.publish_due, events.run_import, events.janitor, events.reminders and
+      # events.refresh_subscriptions (covered by the Python suite: its fetch needs an https feed).
       - name: Start host, worker and beat
         run: |
           nohup uv run --no-sync --project host uvicorn main:app --app-dir host \

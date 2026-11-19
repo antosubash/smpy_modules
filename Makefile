@@ -63,7 +63,8 @@ sync-module-deps:
 # `events` queue (`events.publish_due`, scheduled publishing every minute; `events.run_import`, a
 # slice of an `.ics` import; `events.janitor`, hourly cleanup of imports and revoked links;
 # `events.reminders`, the reminder mails every minute, which also needs a mail sender that
-# delivers and `beat`). Run
+# delivers and `beat`; `events.refresh_subscriptions`, the external calendars every minute, which
+# also needs a secret key the worker can read: `SM_SECRET_KEY` or the stored one). Run
 # from the repo root; PYTHONPATH=host makes host/worker.py importable as
 # `worker`, and the root .env stays the single source of settings. One queue
 # set per target, so the heavy and GPU work can run on other machines.
