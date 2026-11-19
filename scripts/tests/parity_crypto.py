@@ -120,4 +120,14 @@ CRYPTO_FAMILIES: tuple[Family, ...] = (
         ),
         shared=("_current_secret", "_dotenv_secret", "explicit_secret"),
     ),
+    Family(
+        "stored-secret crypto: worker secret",
+        (
+            Copy("modules/newsletter/sm_newsletter/core/secret.py", {"sm_newsletter": "MODULE"}),
+            Copy("modules/events/sm_events/core/secret.py", {"sm_events": "MODULE"}),
+        ),
+        # A worker builds no app: the secret comes from the environment, the located `.env`,
+        # then the stored `host.secret_key` row, and a worker never creates one.
+        shared=None,
+    ),
 )
