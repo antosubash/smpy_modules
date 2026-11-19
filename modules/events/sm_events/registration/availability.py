@@ -82,6 +82,9 @@ class Availability:
     opens_at: datetime | None
     closes_at: datetime | None
     event: RegistrationEvent | None
+    taken: int | None = None
+    """Seats taken, when the event has a capacity. For the provider only (it derives public
+    *states* from it); never shown as a number on a page unless the event chose to show seats."""
     capacity: int | None = None
     """The event's seat limit (``None``: unlimited, or unavailable). For the provider's own
     bounds (how many unconfirmed holds one occurrence may carry); not for a public page."""
@@ -229,4 +232,5 @@ async def describe(
             closes_at=event.registration_closes_at,
             event=await registration_event(db, event, found.occurrence, lang),
             capacity=event.registration_capacity,
+            taken=taken if event.registration_capacity is not None else None,
         )

@@ -123,3 +123,36 @@ def test_one_pending_ttl_for_every_reader():
     assert window_for(
         {"kind": "registration", "retention_days": 0, "pending_hold_hours": 5}
     ) == timedelta(hours=5)
+
+
+async def test_single_opt_in_shows_states_never_a_count(reg_site):
+    """V1: a single opt-in form takes its seat at submit, so a public integer would move when an
+    unknown address registers: it shows ``few_left`` (a threshold) instead."""
+    await single_opt_in(reg_site)
+    event = await seed_event(
+        reg_site.db_state, uid="v@x", registration_capacity=10, registration_show_seats=True
+    )
+    tokens = [await token(reg_site, event) for _ in range(4)]
+    first = (await load_registration(reg_site, event)).json()["availability"]
+    assert first["seats_left"] is None and first["few_left"] is False
+    await register(reg_site, "a@example.org", event=event, token=tokens[0], consent=True)
+    after = (await load_registration(reg_site, event)).json()["availability"]
+    assert after == first  # one seat taken: no threshold crossed, so nothing visible moved
+    for n in range(1, 4):
+        await register(reg_site, f"s{n}@example.org", event=event, token=tokens[n], consent=True)
+    for n in range(4, 8):
+        t = await token(reg_site, event)
+        await register(reg_site, f"s{n}@example.org", event=event, token=t, consent=True)
+    low = (await load_registration(reg_site, event)).json()["availability"]
+    assert low["few_left"] is True and low["seats_left"] is None and low["state"] == "open"
+    assert not any(isinstance(v, int) and not isinstance(v, bool) for v in low.values())
+
+
+async def test_double_opt_in_shows_the_exact_number_only_when_the_event_says_so(reg_site):
+    shown = await seed_event(
+        reg_site.db_state, uid="w@x", registration_capacity=10, registration_show_seats=True
+    )
+    hidden = await seed_event(reg_site.db_state, uid="h@x", registration_capacity=10)
+    assert (await load_registration(reg_site, shown)).json()["availability"]["seats_left"] == 10
+    got = (await load_registration(reg_site, hidden)).json()["availability"]
+    assert got["seats_left"] is None and got["few_left"] is False
