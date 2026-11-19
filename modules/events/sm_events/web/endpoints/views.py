@@ -45,6 +45,10 @@ async def calendars_page(request: Request, inertia: InertiaDep) -> InertiaRespon
             "user_id": str(request.state.user.id),
             "content_locales": list(get_settings(request).content_locales),
             "public_prefix": _urls.prefix(),
+            "can_publish": grants(held, constants.PERM_PUBLISH),
+            "subscription_defaults": {
+                "refresh_minutes": get_settings(request).subscription_refresh_minutes
+            },
         },
     )
 

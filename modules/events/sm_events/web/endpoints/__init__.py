@@ -28,6 +28,7 @@ def build_api_router() -> APIRouter:
         registrations_api,
         reminders_api,
         shares_api,
+        subscriptions_api,
     )
 
     router = APIRouter(dependencies=[Depends(bind_admin)])
@@ -43,6 +44,7 @@ def build_api_router() -> APIRouter:
         registrations_api.router,
         occurrences_api.router,
         reminders_api.router,
+        subscriptions_api.router,
     ):
         router.include_router(sub)
     return router

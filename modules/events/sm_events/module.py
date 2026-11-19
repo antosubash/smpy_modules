@@ -116,11 +116,15 @@ class EventsModule(ModuleBase):
         """The share dialog's user picker, per signed-in user: it is a search of
         the user directory, so it gets a budget of its own rather than the
         host's general ``rate_limit_authenticated``. So do the reminder follow writes."""
-        from sm_events.web.endpoints import reminders_api, shares_api
+        from sm_events.web.endpoints import reminders_api, shares_api, subscriptions_api
 
         registry.add_regex(
             shares_api.PATH_PATTERN,
             RateLimitRule(shares_api.RATE, key="user", methods=frozenset({"GET"})),
+        )
+        registry.add_regex(
+            subscriptions_api.PATH_PATTERN,
+            RateLimitRule(subscriptions_api.RATE, key="user", methods=frozenset({"POST"})),
         )
         registry.add_regex(
             reminders_api.PATH_PATTERN,

@@ -62,6 +62,9 @@ __all__ = [
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_CODE",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_DETAIL",
     "SUBSCRIPTION_REFRESH_NOW_SECONDS",
+    "SUBSCRIPTION_REFRESH_RATE",
+    "SUBSCRIPTION_STATE_CONFLICT_CODE",
+    "SUBSCRIPTION_STATE_CONFLICT_DETAIL",
     "SUBSCRIPTION_STATUSES",
     "SUBSCRIPTION_STATUS_MAX",
     "SUBSCRIPTION_STORE_CHUNK",
@@ -82,6 +85,9 @@ SUBSCRIPTIONS_SOURCE_ICON: Final = "rss"
 
 REFRESH_SUBSCRIPTIONS: Final = "events.refresh_subscriptions"
 REFRESH_SUBSCRIPTION: Final = "events.refresh_subscription"
+
+SUBSCRIPTION_STATE_CONFLICT_CODE: Final = "subscription_paused"
+SUBSCRIPTION_STATE_CONFLICT_DETAIL: Final = "Resume this subscription before refreshing it"
 
 SUBSCRIPTION_STATUSES: Final = ("pending", "ok", "error", "paused", "disabled")
 
@@ -125,6 +131,9 @@ SUBSCRIPTION_MAX_REFRESH_MINUTES: Final = 1440
 SUBSCRIPTION_MAX_BACKOFF: Final = timedelta(hours=24)
 SUBSCRIPTION_MAX_FAILURES: Final = 10
 SUBSCRIPTION_REFRESH_NOW_SECONDS: Final = 300
+SUBSCRIPTION_REFRESH_RATE: Final = "6/minute"
+"""Per signed-in user, on every subscription's refresh route (the per-subscription floor is
+``SUBSCRIPTION_REFRESH_NOW_SECONDS``)."""
 SUBSCRIPTION_DELETED_KEPT_DAYS: Final = 30
 
 # The beat (Ruling 15).
@@ -171,6 +180,7 @@ URL_REFUSAL_DETAIL: Final = {
     "url_userinfo": "The address must not contain a user name or password",
     "url_port": "That port is not allowed",
     "url_unreachable": "That address cannot be used",
+    "url_own_feed": "That is this site's own calendar feed, which cannot be subscribed to",
 }
 
 # What a feed may hold.
@@ -192,6 +202,7 @@ code."""
 # Why a fetch failed: stored in ``error_code``, shown translated, never a message.
 SUBSCRIPTION_FAILURE_CODES: Final = (
     *dict.fromkeys(URL_REFUSAL_CODES.values()),
+    "url_own_feed",
     "url_unreadable",
     "too_many_redirects",
     "insecure_redirect",
