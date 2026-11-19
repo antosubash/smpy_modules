@@ -8,7 +8,8 @@
 The second step of a key rotation (``docs/secret-key-rotation.md``): with the
 new key in ``SM_SECRET_KEY`` and the old one in ``SM_SECRET_KEY_PREVIOUS``,
 this rewrites ai's provider keys, billing's Stripe secrets, newsletter's SMTP
-password and records' CAPTCHA secret so they open under the new key alone. It
+password, records' CAPTCHA secret and events' subscription addresses (a column,
+every tenant's rows) so they open under the new key alone. It
 also upgrades the 0.0.15 ``enc:v1:`` format to ``enc:v2:``, and encrypts a
 secret stored in the clear unless ``--no-seal-plaintext`` is given.
 
@@ -31,7 +32,9 @@ import asyncio
 import sys
 
 import reencrypt_support as rs
+import sqlalchemy as sa
 from headless_settings import headless_settings
+from simple_module_db import all_tenants, mark_written
 from simple_module_db.stored_settings import settings_table_clause, settings_table_exists
 from simple_module_hosting.app_builder import create_app
 from sqlalchemy import and_, or_, select
@@ -58,9 +61,72 @@ async def _rows(session) -> tuple[list[rs.Row], list[rs.Row]]:
     return targets, others
 
 
+def _column_table(package: str, table: str, column: str):
+    """A bare table clause: the module's models are not imported here. The framework still
+    scopes a Core statement by table *name*, so the tenant and soft-delete columns it names are
+    declared; the run is platform-wide (``all_tenants``) and reads the trash too
+    (``include_deleted``), because a deleted row must not keep a secret the old key opens."""
+    return sa.table(
+        table, sa.column("tenant_id"), sa.column("is_deleted"), sa.column("id"), sa.column(column)
+    )
+
+
+async def _column_rows(session) -> list[rs.ColumnRow]:
+    """Every sealed column value of every tenant, for the tables that exist."""
+    present = await session.run_sync(
+        lambda sync: set(sa.inspect(sync.connection()).get_table_names())
+    )
+    found: list[rs.ColumnRow] = []
+    with all_tenants():
+        for package, columns in rs.COLUMN_TARGETS.items():
+            for table, column in columns:
+                if table not in present:  # a database older than the module
+                    continue
+                t = _column_table(package, table, column)
+                result = await session.execute(
+                    select(t.c.tenant_id, t.c.id, t.c[column]).execution_options(
+                        include_deleted=True
+                    )
+                )
+                found += [
+                    rs.ColumnRow(package, table, column, tenant, row_id, value or "")
+                    for tenant, row_id, value in result.all()
+                ]
+    return found
+
+
+async def _apply_columns(session, plans: list[rs.Plan]) -> bool:
+    """Each column rewrite is a compare-and-set on the value it read."""
+    with all_tenants():
+        for plan in plans:
+            row = plan.row
+            t = _column_table(row.package, row.table, row.column)
+            result = await session.execute(
+                t.update()
+                .where(
+                    and_(
+                        t.c.tenant_id == row.tenant_id,
+                        t.c.id == row.row_id,
+                        t.c[row.column] == row.value,
+                    )
+                )
+                .values({row.column: plan.new_value})
+                .execution_options(include_deleted=True)
+            )
+            if result.rowcount != 1:
+                return False
+        mark_written(session)  # DML on a bare table: the ORM never sees it
+    return True
+
+
 async def _apply(session, plans: list[rs.Plan]) -> bool:
     """Every rewrite, compare-and-set; ``False`` (rolled back) if any lost a race."""
     table = settings_table_clause()
+    columns = [plan for plan in plans if isinstance(plan.row, rs.ColumnRow)]
+    plans = [plan for plan in plans if isinstance(plan.row, rs.Row)]
+    if not await _apply_columns(session, columns):
+        await session.rollback()
+        return False
     for plan in plans:
         row = plan.row
         result = await session.execute(
@@ -92,11 +158,15 @@ async def run(*, dry_run: bool, seal_plaintext: bool) -> int:
                 print("Nothing to re-encrypt (no settings table yet).")
                 return 0
             targets, others = await _rows(session)
+            column_rows = await _column_rows(session)
             try:
                 # Once, before planning: one "cannot run" line, not a per-row raise.
                 rs.check_secret()
                 rs.check_previous()
                 plans = [rs.plan_row(row, seal_plaintext=seal_plaintext) for row in targets]
+                plans += [
+                    rs.plan_column_row(row, seal_plaintext=seal_plaintext) for row in column_rows
+                ]
             except RuntimeError as exc:
                 print(f"cannot run: {exc}", file=sys.stderr)
                 return 1

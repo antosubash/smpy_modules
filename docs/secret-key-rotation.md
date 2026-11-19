@@ -1,15 +1,16 @@
 # Rotating `SM_SECRET_KEY`
 
 `SM_SECRET_KEY` (the host's `secret_key`) does two jobs. It signs things — the
-session cookie and a handful of links and tokens — and four modules encrypt the
+session cookie and a handful of links and tokens — and five modules encrypt the
 credentials they store with a key derived from it:
 
-| Module | Settings encrypted at rest |
+| Module | Encrypted at rest |
 |---|---|
 | ai | `chat_api_key`, `embedding_api_key` |
 | billing | `stripe_secret_key`, `stripe_webhook_secret` |
 | newsletter | `smtp_password` |
 | records | `public_submissions_captcha_secret` |
+| events | the subscription address, column `events_subscription.url_enc` (every tenant's rows, not a setting) |
 
 They are stored `enc:v2:<Fernet token>`, each module under its own key (HKDF-SHA256
 of the secret, with the module's package as the info string). Since 0.0.16 every
@@ -96,15 +97,17 @@ Unlike `SM_SECRET_KEY` there is no database fallback: previous keys exist only w
    A host built from the published modules, without this repo's `scripts/`,
    re-enters each credential instead: the AI page, billing's connection screen,
    newsletter's SMTP password, and records' CAPTCHA secret on the Settings
-   screen. A save always writes the current format under the current key.
+   screen; events' subscription addresses are re-entered in each calendar's
+   Subscriptions dialog. A save always writes the current format under the current key.
 
 5. **Restart** again, so no process holds a value it decrypted before step 4.
 
 6. **Remove `SM_SECRET_KEY_PREVIOUS`** everywhere, and **restart** once more.
    Anything the script did not re-encrypt is now unreadable: the modules say so
    (ai's `AiKeyUnreadableError`, billing's `BillingKeyUnreadableError`,
-   newsletter's `smtp_password_unreadable`, records' `503 captcha_unavailable`),
-   naming the field, never the value.
+   newsletter's `smtp_password_unreadable`, records' `503 captcha_unavailable`,
+   events' subscription `url_unreadable`, which disables that subscription until
+   its address is entered again), naming the field, never the value.
 
 ## Formats
 

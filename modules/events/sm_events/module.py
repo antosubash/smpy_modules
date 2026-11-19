@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import importlib.resources
+import weakref
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -53,6 +54,26 @@ class EventsModule(ModuleBase):
             EventsSettings,
             lambda defaults: EventsServices(settings=self.settings or defaults),
         )
+        self._install_secret(app)
+
+    @staticmethod
+    def _install_secret(app: FastAPI) -> None:
+        """The running app's secret wins over the environment for the stored-secret crypto (hosts
+        may inject it through ``create_app(settings=...)``). Resolved lazily, because
+        ``app.state.sm`` is assigned after this phase, and through a weakref, because the
+        provider is process-global and must not keep a discarded app alive."""
+        from sm_events.core import crypto
+
+        app_ref = weakref.ref(app)
+
+        def live_secret() -> str:
+            live_app = app_ref()
+            if live_app is None:
+                return ""
+            sm = getattr(live_app.state, "sm", None)
+            return getattr(getattr(sm, "settings", None), "secret_key", "") or ""
+
+        crypto.set_secret_provider(live_secret)
 
     def register_exception_handlers(self, app: FastAPI) -> None:
         from sm_events.core.errors import install_exception_handlers
