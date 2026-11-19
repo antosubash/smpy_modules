@@ -54,13 +54,18 @@ test('the source filter leaves the records out', async ({ page }) => {
   await enable(page, s);
   await page.goto(calendarUrl(s.calendar.id, 'month', s.day));
   await expect(chip(page, 'Grant report due')).toBeVisible();
-  const own = page.getByRole('group', { name: 'Sources' }).getByLabel('Events', { exact: true });
-  await own.check();
+  // No filter is every box checked: unchecking the records is how only the calendar's events stay.
+  const sources = page.getByRole('group', { name: 'Sources' });
+  const own = sources.getByLabel('Events', { exact: true });
+  const records = sources.getByLabel('Records with a date');
+  await expect(own).toBeChecked();
+  await expect(records).toBeChecked();
+  await records.uncheck();
   await expect(page).toHaveURL(/source=events/);
   await expect(chip(page, 'Kick-off meeting')).toBeVisible();
   await expect(chip(page, 'Grant report due')).toHaveCount(0);
   await shoot(page, '03-source-filter');
-  await own.uncheck();
+  await records.check();
   await expect(chip(page, 'Grant report due')).toBeVisible();
 });
 
