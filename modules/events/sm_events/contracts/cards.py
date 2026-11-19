@@ -38,11 +38,10 @@ from sqlmodel import col
 
 from sm_events.content.cards import EventCard, cards_for
 from sm_events.contracts import mounted
-from sm_events.core import constants
+from sm_events.core import clock, constants
 from sm_events.core.access.public import public_events
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Event, EventText
-from sm_events.web.endpoints.public import _clock
 
 __all__ = ["MAX_EVENT_SEARCH_LIMIT", "EventCard", "get_event_card", "mounted", "search_events"]
 
@@ -87,7 +86,7 @@ async def get_event_card(
         try:
             rows = list((await session.execute(stmt)).scalars().all())
             cards = await cards_for(
-                session, rows, tenant_id=tenant_id, locale=locale, now=_clock.now()
+                session, rows, tenant_id=tenant_id, locale=locale, now=clock.now()
             )
         except MissingTenantError:
             return None
@@ -113,7 +112,7 @@ async def search_events(
     if not isinstance(pattern, str):
         raise ValueError(f"pattern must be a str, got {type(pattern).__name__}")
     with tenant_scope(tenant_id):
-        now = _clock.now()
+        now = clock.now()
         titled = select(col(EventText.event_id)).where(
             col(EventText.tenant_id) == tenant_id,
             col(EventText.title).ilike(pattern, escape=_ESCAPE),

@@ -8,9 +8,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from simple_module_db import MissingTenantError, like_contains_pattern
 from sm_events.contracts import cards as contract
+from sm_events.core import clock
 from sm_events.core.tenancy import TenantIsolationError, tenant_scope
 from sm_events.models import Calendar, Visibility
-from sm_events.web.endpoints.public import _clock
 from sqlalchemy import event as sa_event
 
 from tests.support.access import seed_calendars
@@ -22,7 +22,7 @@ ANY = like_contains_pattern("")
 
 @pytest.fixture(autouse=True)
 def _now(monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: NOW)
+    monkeypatch.setattr(clock, "now", lambda: NOW)
 
 
 def utc(*args: int) -> datetime:

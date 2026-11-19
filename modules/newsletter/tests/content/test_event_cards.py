@@ -9,9 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 from simple_module_db import finalize_session
+from sm_events.core import clock
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Calendar, Visibility
-from sm_events.web.endpoints.public import _clock
 from sm_newsletter.campaigns import drafts
 from sm_newsletter.content import cards
 from sm_newsletter.content.blocks import EventCardProps, dump_body, parse_body
@@ -42,7 +42,7 @@ def utc(*args: int) -> datetime:
 
 @pytest.fixture(autouse=True)
 def _now(monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: utc(2026, 7, 1, 7))
+    monkeypatch.setattr(clock, "now", lambda: utc(2026, 7, 1, 7))
 
 
 async def _campaign(db_state, db, *blocks) -> SimpleNamespace:
@@ -155,7 +155,7 @@ async def test_refresh_rolls_series_forward(db_state, db, monkeypatch):
     eid = await seed_event(db_state, T, slug="weekly", **WEEKLY)
     c, props = await _with_card(db_state, db, eid)
     assert props["starts_at"].startswith("2026-07-01T08:00") and "date=2026-07-01" in props["url"]
-    monkeypatch.setattr(_clock, "now", lambda: utc(2026, 7, 1, 12))  # that one is over
+    monkeypatch.setattr(clock, "now", lambda: utc(2026, 7, 1, 12))  # that one is over
     refreshed = await _refresh(db, c, props["id"])
     card = refreshed.body[1]["props"]
     assert card["id"] == props["id"]
@@ -166,7 +166,7 @@ async def test_refresh_rolls_series_forward(db_state, db, monkeypatch):
 async def test_refresh_one_off_keeps_date(db_state, db, monkeypatch):
     eid = await seed_event(db_state, T)
     c, props = await _with_card(db_state, db, eid)
-    monkeypatch.setattr(_clock, "now", lambda: utc(2026, 8, 1))  # long over
+    monkeypatch.setattr(clock, "now", lambda: utc(2026, 8, 1))  # long over
     refreshed = await _refresh(db, c, props["id"])
     assert refreshed.body[1]["props"]["starts_at"] == props["starts_at"]
 
@@ -192,7 +192,7 @@ async def test_refresh_gone_keeps_snapshot(db_state, db, monkeypatch, how):
     elif how == "draft":
         await change_event(db_state, T, eid, status="draft")
     else:  # the series' last occurrence is over
-        monkeypatch.setattr(_clock, "now", lambda: utc(2026, 9, 1))
+        monkeypatch.setattr(clock, "now", lambda: utc(2026, 9, 1))
     with pytest.raises(CardSourceGone):
         await _refresh(db, c, props["id"])
     await db.rollback()

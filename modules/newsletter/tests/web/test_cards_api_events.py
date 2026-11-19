@@ -10,8 +10,8 @@ from types import SimpleNamespace
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sm_events.core import clock
 from sm_events.models import Visibility
-from sm_events.web.endpoints.public import _clock
 from sm_newsletter.core import constants
 
 from tests.support.app import build_app
@@ -27,7 +27,7 @@ NOW = datetime(2026, 7, 1, 7, tzinfo=UTC)
 
 @pytest.fixture(autouse=True)
 def _now(monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: NOW)
+    monkeypatch.setattr(clock, "now", lambda: NOW)
 
 
 @pytest_asyncio.fixture

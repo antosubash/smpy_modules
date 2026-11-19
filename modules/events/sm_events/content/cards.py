@@ -64,14 +64,13 @@ class EventCard(BaseModel):
     end_date: date | None
     """All-day only, in the event's timezone; ``end_date`` is exclusive."""
     timezone: str
-    occurrence_start: datetime | None
-    """A series' card: the original start of the occurrence it shows (what ``path`` names)."""
     attendance_mode: str
     venue_name: str
     address: str
     image_url: str
     """An absolute http(s) address as stored, else ``""``."""
     path: str
+    """A series' card: ``?date=`` in it names the occurrence the card shows."""
     ics_path: str
     """Site-relative, locale-prefixed except for the default language."""
     locale: str
@@ -139,7 +138,6 @@ def _card(
         start_date=first,
         end_date=after,
         timezone=event.timezone,
-        occurrence_start=item.original_start if item else None,
         attendance_mode=event.attendance_mode,
         venue_name=event.venue_name or "",
         address=event.address or "",

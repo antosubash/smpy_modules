@@ -31,14 +31,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from sm_events.content.public_read import category_by_slug, public_categories, valid_slug
-from sm_events.core import constants, locales
+from sm_events.core import clock, constants, locales
 from sm_events.core.access.public import public_calendars
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bind_public, bound_tenant
 from sm_events.core.timezones import effective
 from sm_events.models import Calendar, CalendarRedirect
 from sm_events.web.endpoints.deps import get_settings
-from sm_events.web.endpoints.public import _clock
 from sm_events.web.endpoints.public._api import occurrences_response
 from sm_events.web.endpoints.public._errors import PublicApiRoute
 from sm_events.web.endpoints.public._listing import category_name, upcoming
@@ -164,7 +163,7 @@ def blocks_router() -> APIRouter:
             db,
             locale=query.locale,
             default_locale=locales.default(),
-            now=_clock.now(),
+            now=clock.now(),
             calendar_ids=None if chosen is None else [c.id for c in chosen],
             category_id=category.id if category else None,
             limit=query.count,

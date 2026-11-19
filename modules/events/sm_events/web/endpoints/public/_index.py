@@ -21,13 +21,13 @@ from sqlmodel import col
 
 from sm_events.content import calendar_redirects
 from sm_events.content.public_read import calendar_by_slug, category_by_slug, public_categories
-from sm_events.core import constants, locales
+from sm_events.core import clock, constants, locales
 from sm_events.core.access.public import public_calendars
 from sm_events.core.settings import EventsSettings
 from sm_events.core.timezones import effective
 from sm_events.models import Calendar, Category
 from sm_events.web.endpoints.deps import get_settings
-from sm_events.web.endpoints.public import _cache, _clock, _head, _urls
+from sm_events.web.endpoints.public import _cache, _head, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
 from sm_events.web.endpoints.public._listing import (
     category_name,
@@ -108,7 +108,7 @@ async def _render(
         db,
         locale=locale,
         default_locale=locales.default(),
-        now=_clock.now(),
+        now=clock.now(),
         calendar_ids=[calendar.id] if calendar else None,
         category_id=category.id if category else None,
     )

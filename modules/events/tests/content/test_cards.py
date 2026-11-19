@@ -59,7 +59,6 @@ async def test_one_off_card_fields(db):
         start_date=None,
         end_date=None,
         timezone="Europe/Vienna",
-        occurrence_start=None,
         attendance_mode="hybrid",
         venue_name="Hall 1",
         address="Main St 2",
@@ -124,7 +123,6 @@ async def test_series_next_occurrence(db):
     assert card is not None
     # 10:00 Vienna on 2026-07-01 is 08:00Z: in progress at ``now``, so it counts.
     assert card.starts_at == utc(2026, 7, 1, 8)
-    assert card.occurrence_start == utc(2026, 7, 1, 8)
     assert card.path == "/events/weekly?date=2026-07-01"
     assert card.ics_path == "/events/weekly.ics"
     later = await _card(db, series, now=utc(2026, 7, 1, 9, 30))
@@ -157,7 +155,6 @@ async def test_series_skips_and_moves(db):
     card = await _card(db, series)
     assert card is not None
     assert (card.starts_at, card.ends_at) == (utc(2026, 7, 2, 12), utc(2026, 7, 2, 13))
-    assert card.occurrence_start == utc(2026, 7, 1, 8)
     assert card.path == "/events/weekly?date=2026-07-01"  # the original date keeps naming it
 
 

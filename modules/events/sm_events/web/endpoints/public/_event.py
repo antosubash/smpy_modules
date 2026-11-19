@@ -16,10 +16,10 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_events.content.public_read import event_by_slug, resolve_event_redirect
-from sm_events.core import constants
+from sm_events.core import clock, constants
 from sm_events.core.settings import EventsSettings
 from sm_events.web.endpoints.deps import get_settings
-from sm_events.web.endpoints.public import _cache, _clock, _head, _urls
+from sm_events.web.endpoints.public import _cache, _head, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
 from sm_events.web.endpoints.public._event_context import load_context, validator_parts
 from sm_events.web.endpoints.public._event_props import build_props, description_for_head
@@ -80,7 +80,7 @@ def event_router(locale: str) -> APIRouter:
             return await missing()
         upcoming = (
             next_occurrences(
-                event, ctx.overrides, now=_clock.now(), limit=constants.NEXT_OCCURRENCES
+                event, ctx.overrides, now=clock.now(), limit=constants.NEXT_OCCURRENCES
             )
             if event.rrule and shown is None
             else []

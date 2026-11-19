@@ -115,7 +115,6 @@ async def test_event_card_maps_the_contract(monkeypatch, db):
             start_date=None,
             end_date=None,
             timezone="Europe/Vienna",
-            occurrence_start=start,
             attendance_mode="hybrid",
             venue_name="Hall 1",
             address="Main St 2",
