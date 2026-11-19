@@ -11,6 +11,8 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Final
 
+from sm_events.core.constants.imports import IMPORT_FAILURE_CODES
+
 __all__ = [
     "DNS_POOL_SIZE",
     "DNS_TIMEOUT_SECONDS",
@@ -26,6 +28,7 @@ __all__ = [
     "REFRESH_SUBSCRIPTIONS",
     "REFRESH_TOO_SOON_CODE",
     "REFRESH_TOO_SOON_DETAIL",
+    "SCAN_FAILURE_CODES",
     "SOURCE_SUBSCRIPTIONS",
     "SUBSCRIPTIONS_PER_CALENDAR",
     "SUBSCRIPTIONS_PER_TENANT",
@@ -38,6 +41,7 @@ __all__ = [
     "SUBSCRIPTION_FAILURE_CODES",
     "SUBSCRIPTION_FETCH_SECONDS",
     "SUBSCRIPTION_ID_MAX",
+    "SUBSCRIPTION_ITEMS_MAX",
     "SUBSCRIPTION_ITEM_LOCATION_MAX",
     "SUBSCRIPTION_ITEM_TITLE_MAX",
     "SUBSCRIPTION_ITEM_URL_MAX",
@@ -57,6 +61,8 @@ __all__ = [
     "SUBSCRIPTION_REFRESH_NOW_SECONDS",
     "SUBSCRIPTION_STATUSES",
     "SUBSCRIPTION_STATUS_MAX",
+    "SUBSCRIPTION_STORE_CHUNK",
+    "SUBSCRIPTION_TENANT_ITEMS_MAX",
     "SUBSCRIPTION_TICK_BYTES",
     "SUBSCRIPTION_TICK_FETCHES",
     "SUBSCRIPTION_TICK_SECONDS",
@@ -158,6 +164,22 @@ URL_REFUSAL_DETAIL: Final = {
     "url_unreachable": "That address cannot be used",
 }
 
+# What a feed may hold.
+SUBSCRIPTION_ITEMS_MAX: Final = 5000
+"""Events kept per subscription (the scanner already refuses a file with more VEVENTs)."""
+SUBSCRIPTION_TENANT_ITEMS_MAX: Final = 50_000
+"""Events kept per tenant across every subscription: more fails the fetch (``too_many_events``)
+and keeps what was there."""
+SUBSCRIPTION_STORE_CHUNK: Final = 500
+
+SCAN_FAILURE_CODES: Final = tuple(
+    code
+    for code in IMPORT_FAILURE_CODES
+    if code not in ("import_failed", "importer_gone", "rights_expired")
+)
+"""The scanner's and mapper's whole-file failures (PR 5): a subscription fails with the same
+code."""
+
 # Why a fetch failed: stored in ``error_code``, shown translated, never a message.
 SUBSCRIPTION_FAILURE_CODES: Final = (
     *dict.fromkeys(URL_REFUSAL_CODES.values()),
@@ -172,9 +194,7 @@ SUBSCRIPTION_FAILURE_CODES: Final = (
     "too_large",
     "unsupported_encoding",
     "unexpected_content_type",
-    "ics_encoding",
-    "ics_invalid",
-    "too_many_events",
+    *SCAN_FAILURE_CODES,
     "internal",
 )
 

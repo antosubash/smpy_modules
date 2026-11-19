@@ -18,7 +18,7 @@ from sm_events.core import constants
 from sm_events.core.text_safety import strip_unsafe
 from sm_events.web.schemas._fields import http_url as validate_url
 
-__all__ = ["clean_title", "description_html", "http_url", "unescape", "venue"]
+__all__ = ["clean_line", "clean_title", "description_html", "http_url", "unescape", "venue"]
 
 _ESCAPE: Final = re.compile(r"\\(.)", re.DOTALL)
 _SPACES: Final = re.compile(r"\s+")
@@ -31,9 +31,15 @@ def unescape(text: str) -> str:
     return _ESCAPE.sub(lambda m: "\n" if m.group(1) in "nN" else m.group(1), text)
 
 
+def clean_line(raw: str, max_len: int) -> str:
+    """One clean line of at most ``max_len`` characters: control, direction and invisible
+    characters removed, whitespace collapsed, cut. Empty when nothing is left."""
+    return _SPACES.sub(" ", strip_unsafe(raw.replace("\n", " "))).strip()[:max_len]
+
+
 def clean_title(raw: str) -> tuple[str, tuple[str, ...]]:
     """One clean line of at most 300 characters, or the placeholder (noted ``untitled``)."""
-    title = _SPACES.sub(" ", strip_unsafe(raw.replace("\n", " "))).strip()
+    title = clean_line(raw, constants.TITLE_MAX + 1)
     if len(title) > constants.TITLE_MAX:
         return title[: constants.TITLE_MAX], ("title_truncated",)
     if title:
