@@ -67,12 +67,29 @@ class _Delivers:
         raise AssertionError("an API test sent mail")
 
 
+API_USERS = {
+    uid: (f"{uid}@example.com", uid.title(), True) for uid in ("u", "z", "w", "m", "sv", "se", "o")
+}
+API_ROLES = {
+    "u": ("viewer",), "z": ("viewer",), "w": ("viewer",), "sv": ("viewer",), "se": ("viewer",),
+    "o": ("editor",), "m": ("manager",),
+}  # fmt: skip
+
+
+def install_api_directory(app: Any) -> None:
+    """The users the API tests act as, known to the directory the send-time check reads."""
+    from tests.support.directory import Directory
+
+    app.state.user_directory = Directory(dict(API_USERS), dict(API_ROLES))
+
+
 def make_ready(app: Any, monkeypatch: Any) -> None:
     """Everything reminders need to be available: a base URL, a delivering sender and a worker
     runtime. Each test breaks what it wants to break."""
     from simple_module_core.mail import install_mail_sender
     from sm_events.reminders import worker_app
 
+    install_api_directory(app)
     app.state.sm.settings.public_base_url = ORIGIN
     install_mail_sender(_Delivers())
     monkeypatch.setattr(worker_app, "worker_runtime_supported", lambda: True)

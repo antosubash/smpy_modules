@@ -23,6 +23,7 @@ from simple_module_core.mail import mail_transport_installed, resolve_mail_sende
 
 from sm_events.core import constants
 from sm_events.reminders import worker_app
+from sm_events.reminders.base_url import public_base_url
 
 __all__ = ["Availability", "availability", "public_base_url"]
 
@@ -33,12 +34,6 @@ _DISABLED, _NO_URL, _NO_TRANSPORT, _CONSOLE, _NO_WORKER = constants.AVAILABILITY
 class Availability:
     available: bool
     reason: str | None
-
-
-def public_base_url(app: Any) -> str:
-    """The host's ``public_base_url`` without a trailing slash; ``""`` when unset."""
-    host = getattr(getattr(app.state, "sm", None), "settings", None)
-    return str(getattr(host, "public_base_url", "") or "").strip().rstrip("/")
 
 
 def _refused(reason: str) -> Availability:

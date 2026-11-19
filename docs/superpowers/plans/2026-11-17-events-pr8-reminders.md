@@ -69,7 +69,8 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
    - 404 `not_found`, so an invisible event cannot be followed or probed, and an invisible event and a missing one answer the same;
    - a writer who sees an unpublished event gets 409 `not_published`. They can see it anyway, so nothing leaks.
 
-   While reminders are unavailable (Ruling 9), every write is 503 `reminders_unavailable`, so nobody is promised mail that cannot arrive. Reads still answer.
+   While reminders are unavailable (Ruling 9), every write that would start or change reminders is 503 `reminders_unavailable`, so nobody is promised mail that cannot arrive. Reads still answer, and stopping never fails: `DELETE`, and `PUT` with an empty set, succeed.
+   - *Amended (decision 2): the sentence used to say "every write". Why: a user must always be able to stop following, or an outage strands follows that resume when mail comes back.*
 8. **Limits.** `FOLLOWS_PER_USER = 200` distinct followed events per user per tenant; one more is 409 `follow_limit`. Re-saving an event already followed does not count again. The follow routes get `RateLimitRule("30/minute", key="user")`.
 9. **Availability is one function**, `reminders/availability.py: async def availability(app, db) -> Availability(available: bool, reason: str | None)`. It checks in this order:
    - `disabled`: the setting is off;
@@ -117,7 +118,7 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
     - the event is in `visible_events(principal, include_unpublished=False)`, through one query per user over that user's candidate event ids.
 
     Any exception in the resolver denies the whole tenant for that tick and is logged by exception class. Because the check reads current state on every tick, a share removed, a visibility narrowed, a role edited, a user disabled or a membership ended stops reminders from the next tick. Cleanup (Ruling 27) only tidies rows.
-18. ★ **The offline principal in a worker: a headless app, gated by a parity test.** A Celery worker builds no app, so it has no user directory, no membership store and no permission registry (PR 5 open point 1). `reminders/runtime.py` defines:
+18. ★ **The offline principal in a worker: a headless app, gated by "never more than a request".** A Celery worker builds no app, so it has no user directory, no membership store and no permission registry (PR 5 open point 1; upstream simple_module_python #1005). `reminders/runtime.py` defines:
 
     ```python
     class ReminderRuntime(Protocol):
@@ -125,17 +126,12 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
         async def recipients(self, db, *, tenant_id: str, user_ids: Collection[str]) -> dict[str, Recipient]: ...
     ```
 
-    - `web_runtime(app)` is the live app. Tests and eager runs use it. It goes through PR 5's offline principal, extended to a batch and to returning the directory user (Task 8).
-    - `worker_runtime()` first probes the framework for an offline resolver (`principal_for`, PR 5 Task 3 Step 0). If there is one, it wraps it.
-    - Otherwise (the stopgap) it builds the host's app with the framework's own `simple_module_hosting.create_app(merge_host_settings())`, once per worker process. It never starts the lifespan, rebuilds after `REMINDER_RUNTIME_TTL = 600 s` (so a changed `public_base_url` is picked up), and replays the permissions module's DB role overlay at most once per tick.
-    - Grant sources get a minimal Starlette `Request` whose scope carries that app.
-
-    Task 9 is a **gate**: the parity test must show that the worker runtime grants exactly what a request principal holds for every PR 5 fixture, including:
-    - a permission removed from a role on the permissions screen;
-    - a deactivated user;
-    - a removed member.
-
-    If parity cannot be shown, `worker_runtime_supported()` returns false. Ruling 9 then reports `worker_access_unavailable`, so nothing is sent and the control is hidden, and the upstream issue (open point 1) becomes the blocker. The cost (one app build per worker process, measured in Task 9) is documented.
+    - `web_runtime(app)` is the live app (tests, eager runs, and the request-side check below). It goes through PR 5's offline principal, extended to a batch (`offline_accounts`).
+    - `worker_runtime(db)` probes the framework for an offline resolver first (none exists in 0.0.44). Otherwise it builds the host's app with the framework's own `create_app(merge_host_settings())`, **without its lifespan**, once per worker process and again after `REMINDER_RUNTIME_TTL = 600 s`, and replays the DB role overlay through the permissions module's own `PermissionService.load_all_into_registry` once per call (one per tick). It never provisions a secret key (no key: refuse), and any failure answers `None`, turns `worker_runtime_supported()` false for 60 s and is logged once by class.
+    - **The gate is "never more than":** the worker's principal must never grant more than a request principal for the same user, on every fixture (users x calendars x event states), and where it cannot establish a right it grants none. It can grant less: a user whose only right is the membership role (`tenant:<role>`, no public read, #1005) gets no reminder. That is a documented limit, never a silent one.
+    - **Told, not silent:** the same send-time check runs in the *request* (`reminders/access.py`, through the live app) when a follow is read or written and for each row of "My reminders". When it would refuse the user, the follow is still stored but the response carries `deliverable: false` and the code `reminders_no_access` ("Reminders cannot be sent for this event with your current access"), so nobody waits for mail that will never come.
+    - *Amended (decision 1): the gate used to be "grants exactly what a request principal holds", with a fall back to `worker_access_unavailable` when parity failed. Why: parity cannot hold while #1005 is open (the membership role is unreadable), but "never more" is what matters for safety; the narrower grant is fail-closed and is now reported to the affected user.*
+    - Measured on the demo host: the first build takes about 16 s and 200 MB, then nothing for the TTL. Web and worker images must be installed identically.
 19. **Links** use `runtime.public_base_url`, the host setting:
     - The event link is the console URL (PR 3's calendar deep link at the occurrence's date if PR 3 has one, else PR 2's `/admin/events/edit/{id}`, which a viewer opens read-only).
     - It becomes PR 4's public `event_path(slug, locale, date)` when the calendar is `public` **and** the host is single-tenant. On a multi-tenant host a tenant's public origin is a request property (PR 4 `configured_origin` is `""` there), so the console link is used.

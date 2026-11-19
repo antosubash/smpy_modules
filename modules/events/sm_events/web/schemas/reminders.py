@@ -23,6 +23,11 @@ class FollowOut(BaseModel):
     """What "Remind me" preselects on this event's calendar."""
     next_due: dict[int, datetime | None]
     """Per chosen lead, when its next reminder is due (``null``: too late for the next one)."""
+    deliverable: bool = True
+    """False when the send-time check would refuse this user for this event (their rights are
+    not ones a worker can read). The follow is kept; no mail would come."""
+    code: str | None = None
+    """``reminders_no_access`` while ``deliverable`` is false."""
 
 
 class StatusOut(BaseModel):
@@ -47,6 +52,7 @@ class MineItemOut(BaseModel):
     calendar: MineCalendarOut
     leads: list[int]
     next_start: datetime | None
+    deliverable: bool = True
 
 
 class MinePageOut(BaseModel):

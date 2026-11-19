@@ -21,6 +21,7 @@ __all__ = [
     "NOT_PUBLISHED_CODE",
     "NOT_PUBLISHED_DETAIL",
     "OCCURRENCE_KEY_MAX",
+    "REMINDERS_NO_ACCESS_CODE",
     "REMINDERS_UNAVAILABLE_CODE",
     "REMINDERS_UNAVAILABLE_DETAIL",
     "REMINDERS_URL",
@@ -69,6 +70,8 @@ NOT_PUBLISHED_CODE: Final = "not_published"
 NOT_PUBLISHED_DETAIL: Final = "Only a published event can be followed for reminders"
 INVALID_LEAD_CODE: Final = "invalid_lead"
 INVALID_LEAD_DETAIL: Final = "That is not one of the allowed reminder times"
+REMINDERS_NO_ACCESS_CODE: Final = "reminders_no_access"
+"""Not an error: rides in a follow's body when the send-time check would refuse this user."""
 REMINDERS_UNAVAILABLE_CODE: Final = "reminders_unavailable"
 REMINDERS_UNAVAILABLE_DETAIL: Final = "Reminders cannot be delivered on this site right now"
 

@@ -163,7 +163,8 @@
     "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben. Beende zuerst eine.",
     "not_published": "Nur veröffentlichte Veranstaltungen können erinnern.",
     "invalid_lead": "Wähle einen der angebotenen Erinnerungszeitpunkte.",
-    "reminders_unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar."
+    "reminders_unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
+    "reminders_no_access": "Für diese Veranstaltung können mit deinen aktuellen Zugriffsrechten keine Erinnerungen gesendet werden."
   },
   "categories": {
     "title": "Kategorien",

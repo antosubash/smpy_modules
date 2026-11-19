@@ -15,7 +15,7 @@ never refused.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from simple_module_core.resources import ResourcePrincipal
@@ -25,7 +25,7 @@ from sm_events.core import constants
 from sm_events.core.clock import utcnow
 from sm_events.core.errors import NotFound
 from sm_events.core.errors_reminders import RemindersUnavailable
-from sm_events.reminders import follows, leads, limits, mine
+from sm_events.reminders import access, follows, leads, limits, mine
 from sm_events.reminders.availability import availability
 from sm_events.web.endpoints.deps import Principal, get_settings, require_manage, require_view
 from sm_events.web.schemas.reminders import (
@@ -60,9 +60,20 @@ async def caller(who: Principal) -> ResourcePrincipal:
 Caller = Annotated[ResourcePrincipal, Depends(caller)]
 
 
-def _out(state: follows.FollowState) -> FollowOut:
+async def _out(
+    request: Request,
+    db: Any,
+    who: ResourcePrincipal,
+    event_id: uuid.UUID,
+    state: follows.FollowState,
+) -> FollowOut:
+    ok = event_id in await access.deliverable(request.app, db, who, {event_id})
     return FollowOut(
-        leads=list(state.leads), defaults=list(state.defaults), next_due=state.next_due
+        leads=list(state.leads),
+        defaults=list(state.defaults),
+        next_due=state.next_due,
+        deliverable=ok,
+        code=None if ok else constants.REMINDERS_NO_ACCESS_CODE,
     )
 
 
@@ -84,7 +95,7 @@ async def get_follow(
     state = await follows.get_follow(
         db, who, event_id, settings=get_settings(request), now=utcnow()
     )
-    return _out(state)
+    return await _out(request, db, who, event_id, state)
 
 
 @router.put(EVENT_FOLLOW)
@@ -103,7 +114,7 @@ async def put_follow(
         settings=settings,
         now=utcnow(),
     )
-    return _out(state)
+    return await _out(request, db, who, event_id, state)
 
 
 @router.delete(EVENT_FOLLOW, status_code=204)
@@ -135,6 +146,7 @@ async def my_reminders(
         settings=get_settings(request),
         now=utcnow(),
     )
+    ok = await access.deliverable(request.app, db, who, {i.event_id for i in found.items})
     return MinePageOut(
         items=[
             MineItemOut(
@@ -146,6 +158,7 @@ async def my_reminders(
                 ),
                 leads=list(i.leads),
                 next_start=i.next_start,
+                deliverable=i.event_id in ok,
             )
             for i in found.items
         ],

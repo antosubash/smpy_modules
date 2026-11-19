@@ -101,5 +101,7 @@ def janitor() -> dict[str, int]:
 def forget_parent_runtime(**_: Any) -> None:
     """A prefork child must not reuse its parent's engine."""
     from sm_events.core.worker import reset_worker_runtime
+    from sm_events.reminders.worker_app import reset_worker_app
 
     reset_worker_runtime()
+    reset_worker_app()

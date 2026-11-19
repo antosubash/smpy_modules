@@ -163,7 +163,8 @@
     "follow_limit": "You already follow the most events reminders allow. Stop following one first.",
     "not_published": "Only published events can send reminders.",
     "invalid_lead": "Choose one of the reminder times offered.",
-    "reminders_unavailable": "Reminders are not available on this site right now."
+    "reminders_unavailable": "Reminders are not available on this site right now.",
+    "reminders_no_access": "Reminders cannot be sent for this event with your current access."
   },
   "categories": {
     "title": "Categories",

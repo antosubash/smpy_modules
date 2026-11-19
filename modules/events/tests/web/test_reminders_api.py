@@ -50,10 +50,18 @@ async def test_round_trip(world):
     url = follow_url(ids["pub"]["I"])
     got = await client.get(url, headers=U)
     assert got.status_code == 200, got.text
-    assert got.json() == {"leads": [], "defaults": [60], "next_due": {}}
+    assert got.json() == {
+        "leads": [], "defaults": [60], "next_due": {}, "deliverable": True, "code": None,
+    }  # fmt: skip
     put = await client.put(url, json={"leads": [60, 15]}, headers=U)
     assert put.status_code == 200, put.text
-    assert put.json() == {"leads": [15, 60], "defaults": [60], "next_due": {"15": None, "60": None}}
+    assert put.json() == {
+        "leads": [15, 60],
+        "defaults": [60],
+        "next_due": {"15": None, "60": None},
+        "deliverable": True,
+        "code": None,
+    }
     assert (await client.get(url, headers=U)).json()["leads"] == [15, 60]
     assert await _count(client, "u") == 2  # committed, not just flushed
     assert (await client.put(url, json={"leads": [1440]}, headers=U)).json()["leads"] == [1440]

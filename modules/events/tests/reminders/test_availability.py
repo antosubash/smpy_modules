@@ -128,6 +128,7 @@ async def test_public_base_url_is_trimmed(world):
     assert availability.public_base_url(app) == ""
 
 
-def test_the_stub_says_no_until_the_worker_runtime_lands():
-    """Task 9 replaces the stub; until then nothing is promised."""
-    assert worker_app.worker_runtime_supported() is False
+def test_the_headless_runtime_is_supported_until_it_fails():
+    """Task 9: the stopgap exists, so a worker is supported until it has failed to build."""
+    worker_app.reset_worker_app()
+    assert worker_app.worker_runtime_supported() is True
