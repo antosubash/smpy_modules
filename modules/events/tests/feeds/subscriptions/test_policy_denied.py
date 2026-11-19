@@ -17,7 +17,7 @@ ALWAYS_DENIED = [
     "192.0.0.192",  # Oracle
     "fd00:ec2::254", "fd00:ec2::1",  # AWS IPv6 service range, inside unique-local
     "fd00:c1::a9fe:a9fe", "fd20:ce::254",  # Oracle and GCP IPv6 metadata
-    "fd12:3456::a9fe:a9fe", "fd99::7f00:1", "fdab::6464:64c8",  # the structural rule: embeds a denied IPv4
+    "fd12:3456::a9fe:a9fe", "fd99::7f00:1", "fdab::6464:64c8",  # structural rule
     "::ffff:169.254.169.254", "::ffff:100.100.100.200", "::ffff:127.0.0.1", "::ffff:168.63.129.16",
     "64:ff9b::a9fe:a9fe", "64:ff9b::6464:64c8", "2002:a9fe:a9fe::", "2002:6464:64c8::",
     "::169.254.169.254",
