@@ -46,12 +46,16 @@ class MineCalendarOut(BaseModel):
 
 
 class MineItemOut(BaseModel):
-    event_id: uuid.UUID
-    title: str
-    lang: str
-    calendar: MineCalendarOut
-    leads: list[int]
-    next_start: datetime | None
+    follow_id: uuid.UUID
+    """The handle ``DELETE /reminders/follows/{follow_id}`` takes."""
+    hidden: bool = False
+    """An event the caller can no longer see: every field below is then empty."""
+    event_id: uuid.UUID | None = None
+    title: str | None = None
+    lang: str | None = None
+    calendar: MineCalendarOut | None = None
+    leads: list[int] = []
+    next_start: datetime | None = None
     deliverable: bool = True
 
 
@@ -59,7 +63,7 @@ class MinePageOut(BaseModel):
     items: list[MineItemOut]
     total: int
     hidden: int
-    """Followed events the caller can no longer see: counted, never named."""
+    """Followed events the caller can no longer see; each is an opaque row after the others."""
     page: int
     page_size: int
 

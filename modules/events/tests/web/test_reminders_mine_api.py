@@ -57,7 +57,7 @@ async def test_mine_lists_only_the_callers_own_visible_follows(world):
     assert item["event_id"] == ids["pub"]["U"] and item["leads"] == [15, 60]
     assert item["title"] == "Pub U" and item["lang"] == "en"
     assert set(item["calendar"]) == {"id", "name", "color"}
-    assert "user_id" not in str(got)
+    assert "user_id" not in str(got) and item["hidden"] is False and item["follow_id"]
     # A manager sees their own follows only: someone else's are neither listed nor counted.
     manager = (await client.get(f"{BASE}/reminders/mine", headers=MGR)).json()
     assert (manager["total"], manager["hidden"], manager["items"]) == (0, 0, [])
@@ -69,8 +69,17 @@ async def test_mine_lists_only_the_callers_own_visible_follows(world):
         await drop_share(db, cal, "sv")
         await db.commit()
     hidden = (await client.get(f"{BASE}/reminders/mine", headers=SV)).json()
-    assert (hidden["total"], hidden["hidden"], hidden["items"]) == (0, 1, [])
+    assert (hidden["total"], hidden["hidden"]) == (1, 1)
+    (opaque,) = hidden["items"]
+    assert opaque["hidden"] is True and opaque["follow_id"]
+    assert {k for k, v in opaque.items() if v not in (None, [], False)} == {"follow_id", "hidden"}
     assert "Pub P" not in str(hidden) and ids["pub"]["P"] not in str(hidden)
+    # The handle removes it, once, and only for its owner.
+    gone = f"{BASE}/reminders/follows/{opaque['follow_id']}"
+    assert (await client.delete(gone, headers=U)).status_code == 404  # not u's follow
+    assert (await client.delete(gone, headers=SV)).status_code == 204
+    assert (await client.delete(gone, headers=SV)).status_code == 404
+    assert (await client.get(f"{BASE}/reminders/mine", headers=SV)).json()["total"] == 0
 
 
 @pytest.mark.parametrize("query", ["page=0", "page=-1", "page_size=0", "page_size=101", "page=x"])
@@ -112,6 +121,7 @@ async def test_every_route_goes_through_the_one_ownership_dependency():
         "put_follow",
         "delete_follow",
         "my_reminders",
+        "delete_follow_by_id",
         "delivery",
     }
 
@@ -125,6 +135,10 @@ def test_follow_writes_are_rate_limited_per_user():
     for method in ("PUT", "DELETE"):
         rule = rates.match(method, path)
         assert rule is not None and rule.key == "user" and rule.rate == limits.FOLLOW_RATE
+    by_id = f"{BASE}/reminders/follows/abc"
+    rule = rates.match("DELETE", by_id)
+    assert rule is not None and rule.key == "user" and rule.rate == limits.FOLLOW_RATE
+    assert rates.match("GET", by_id) is None
     assert rates.match("GET", path) is None
     assert rates.match("PUT", f"{path}/x") is None
 

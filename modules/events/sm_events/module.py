@@ -105,6 +105,10 @@ class EventsModule(ModuleBase):
             reminders_api.PATH_PATTERN,
             RateLimitRule(reminders_api.RATE, key="user", methods=frozenset({"PUT", "DELETE"})),
         )
+        registry.add_regex(
+            reminders_api.BY_ID_PATTERN,
+            RateLimitRule(reminders_api.RATE, key="user", methods=frozenset({"DELETE"})),
+        )
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
         """Private feed links go when their user, membership or tenant does. A worker builds no

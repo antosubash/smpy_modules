@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from sm_events.models import EventFollow, EventText
 from sm_events.reminders import limits, mine
 from sqlalchemy import update
@@ -42,11 +44,21 @@ async def test_lists_visible_only_and_counts_hidden(db):
     # The share goes: the follow stays, but the event is counted, never named.
     await drop_share(db, cals["P"], "sv")
     got = await _page(db, VIEW_SHARE)
-    assert got.hidden == 1 and got.total == 1
-    assert [i.title for i in got.items] == ["Open day"]
+    assert got.hidden == 1 and got.total == 2  # the hidden one still counts: it is the user's
+    assert [i.title for i in got.items] == ["Open day", None]  # visible first, then the opaque row
+    opaque = got.items[1]
+    assert opaque.hidden is True
+    assert (opaque.event_id, opaque.calendar, opaque.lang, opaque.next_start) == (
+        None,
+        None,
+        None,
+        None,
+    )
+    assert opaque.leads == () and opaque.follow_id is not None
     assert "Secret board" not in repr(got)
     assert str(secret.id) not in repr(got)
     item = got.items[0]
+    assert item.hidden is False and item.follow_id is not None
     assert item.event_id == open_event.id and item.leads == (15, 60)
     assert (item.calendar.name, item.calendar.color) == (cals["U"].name, cals["U"].color)
 
@@ -72,7 +84,8 @@ async def test_unpublished_trashed_and_trashed_calendar_are_hidden(db):
     await db.delete(gone)
     await db.flush()
     got = await _page(db)
-    assert [i.title for i in got.items] == ["Kept"] and got.hidden == 2
+    assert [i.title for i in got.items] == ["Kept", None, None] and got.hidden == 2
+    assert [i.hidden for i in got.items] == [False, True, True]
 
 
 async def test_paging_bounds(db):
@@ -155,3 +168,59 @@ async def test_next_start_for_a_series_and_a_yearly_one(db):
     got = {i.title: i.next_start for i in (await _page(db)).items}
     assert got["Weekly"] == datetime(2026, 7, 1, 10, tzinfo=UTC)
     assert got["Xmas"] == datetime(2026, 12, 24, 10, tzinfo=UTC)
+
+
+async def test_hidden_rows_page_after_the_visible_ones(db):
+    cals = await world(db)
+    hidden = [await published(db, cals["P"], title=f"H{i}") for i in range(3)]
+    shown = [await published(db, cals["U"], title=f"S{i}") for i in range(3)]
+    for event in hidden + shown:
+        db.add(follow_row(event, user="w"))
+    await db.flush()
+    pages = [await _page(db, OTHER, page=n, size=2) for n in (1, 2, 3)]
+    assert [[i.hidden for i in p.items] for p in pages] == [
+        [False, False],
+        [False, True],
+        [True, True],
+    ]
+    assert all(p.total == 6 and p.hidden == 3 for p in pages)
+    handles = [i.follow_id for p in pages for i in p.items]
+    assert len(set(handles)) == 6
+
+
+async def test_delete_by_follow_id_removes_the_whole_event_for_the_owner_only(db):
+    from sm_events.core.errors import NotFound
+    from sm_events.reminders import follows
+
+    cals = await world(db)
+    event = await published(db, cals["U"], title="Open")
+    for lead in (15, 60):
+        db.add(follow_row(event, user="u", lead=lead))
+    db.add(follow_row(event, user="w", lead=60))
+    await db.flush()
+    page = await _page(db)
+    handle = page.items[0].follow_id
+    with pytest.raises(NotFound) as other:  # someone else's follow id: the missing-id answer
+        await follows.delete_follow_by_id(db, OTHER, handle)
+    with pytest.raises(NotFound) as missing:
+        await follows.delete_follow_by_id(db, OTHER, uuid.uuid4())
+    assert (other.value.code, other.value.detail) == (missing.value.code, missing.value.detail)
+    assert (await _page(db)).total == 1 and (await _page(db, OTHER)).total == 1
+    await follows.delete_follow_by_id(db, U, handle)
+    assert (await _page(db)).total == 0  # both leads went
+    assert (await _page(db, OTHER)).total == 1  # the other user's follow did not
+    with pytest.raises(NotFound):
+        await follows.delete_follow_by_id(db, U, handle)
+
+
+async def test_a_hidden_follow_can_be_removed_and_frees_the_cap(db):
+    from sm_events.reminders import follows
+
+    cals = await world(db)
+    secret = await published(db, cals["P"], title="Secret")
+    db.add(follow_row(secret, user="w"))
+    await db.flush()
+    (row,) = (await _page(db, OTHER)).items
+    assert row.hidden
+    await follows.delete_follow_by_id(db, OTHER, row.follow_id)
+    assert (await _page(db, OTHER)).total == 0

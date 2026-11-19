@@ -247,3 +247,31 @@ async def test_next_due_skips_to_the_following_occurrence_of_a_series(db):
         60: datetime(2026, 7, 1, 9, tzinfo=UTC),
         10080: datetime(2026, 7, 1, 10, tzinfo=UTC),
     }
+
+
+async def test_one_user_in_every_spelling_of_their_id(db):
+    """The id is normalised once when a follow is written: whichever spelling a request carries,
+    it is one person, one set of rows, one count toward the cap."""
+    import uuid
+
+    from sm_events.core.user_ids import canonical_user_id
+
+    from tests.support.access import principal
+
+    uid = uuid.UUID("3f2504e0-4f89-11d3-9a0c-0305e82c3301")
+    forms = [str(uid), str(uid).upper(), uid.hex, uid.hex.upper()]
+    cals = await world(db)
+    event = await published(db, cals["U"])
+    other = await published(db, cals["U"], title="Other")
+    await _set(db, principal(forms[0], "events.view"), event, [60])
+    for form in forms:
+        who = principal(form, "events.view")
+        got = await follows.get_follow(db, who, event.id, settings=SETTINGS, now=NOW)
+        assert got.leads == (60,), form
+    await _set(db, principal(forms[2], "events.view"), event, [15, 60])  # replaces, never adds
+    rows = (await db.execute(select(EventFollow.user_id, EventFollow.lead_minutes))).all()
+    assert sorted(rows) == [(canonical_user_id(uid), 15), (canonical_user_id(uid), 60)]
+    await _set(db, principal(forms[3], "events.view"), other, [60])
+    assert len((await db.execute(select(EventFollow.event_id).distinct())).all()) == 2
+    await follows.delete_follow(db, principal(forms[1], "events.view"), event.id)
+    assert await _rows(db, canonical_user_id(uid)) == [(other.id.hex, 60)]

@@ -37,6 +37,7 @@ from sm_events.core.errors import NotFound
 from sm_events.core.errors_reminders import FollowLimit, NotPublished
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
+from sm_events.core.user_ids import canonical_user_id
 from sm_events.models import Calendar, Event, EventFollow
 from sm_events.models.enums import EventStatus
 from sm_events.models.reminders import FOLLOW_CONSTRAINT
@@ -44,7 +45,14 @@ from sm_events.reminders import candidates, due
 from sm_events.reminders import leads as lead_rules
 from sm_events.reminders.limits import FOLLOWS_PER_USER
 
-__all__ = ["FollowState", "delete_follow", "get_follow", "request_locale", "set_follow"]
+__all__ = [
+    "FollowState",
+    "delete_follow",
+    "delete_follow_by_id",
+    "get_follow",
+    "request_locale",
+    "set_follow",
+]
 
 _F = EventFollow.__table__
 
@@ -71,7 +79,7 @@ def _user(who: ResourcePrincipal) -> str:
     follow nothing."""
     if who.user_id is None or not who.has(constants.PERM_VIEW):
         raise NotFound
-    return who.user_id
+    return canonical_user_id(who.user_id)
 
 
 async def _event(
@@ -241,8 +249,25 @@ async def delete_follow(db: Any, who: ResourcePrincipal, event_id: uuid.UUID) ->
     the usual ``NotFound``, so the route is no probe."""
     if who.user_id is None:
         raise NotFound
-    if await _delete_event_rows(db, who.user_id, event_id):
+    if await _delete_event_rows(db, canonical_user_id(who.user_id), event_id):
         return
     if not who.has(constants.PERM_VIEW):
         raise NotFound
     await _event(db, who, event_id, published_only=False)
+
+
+async def delete_follow_by_id(db: Any, who: ResourcePrincipal, follow_id: uuid.UUID) -> None:
+    """Remove the caller's follow(s) on the event that ``follow_id`` belongs to: the handle the
+    "My reminders" list gives every row, including the opaque row for an event the caller can no
+    longer see. Someone else's follow id and a missing one are the same ``NotFound``."""
+    if who.user_id is None:
+        raise NotFound
+    user_id = canonical_user_id(who.user_id)
+    event_id = (
+        await db.execute(
+            select(_F.c.event_id).where(*_mine(), _F.c.user_id == user_id, _F.c.id == follow_id)
+        )
+    ).scalar_one_or_none()
+    if event_id is None:
+        raise NotFound
+    await _delete_event_rows(db, user_id, event_id)

@@ -44,6 +44,8 @@ router = APIRouter(tags=["reminders"], dependencies=[require_view])
 EVENT_FOLLOW = "/events/{event_id}/follow"
 PATH_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/events/[^/]+/follow$"
 """The follow routes, as the rate-limit rule matches them."""
+BY_ID_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/reminders/follows/[^/]+$"
+"""Removal by follow id."""
 RATE = limits.FOLLOW_RATE
 Page = Annotated[int, Query(ge=1)]
 PageSize = Annotated[int, Query(ge=1, le=limits.MINE_PAGE_MAX)]
@@ -123,6 +125,13 @@ async def delete_follow(event_id: uuid.UUID, who: Caller, db=Depends(get_db)) ->
     return Response(status_code=204)
 
 
+@router.delete("/reminders/follows/{follow_id}", status_code=204)
+async def delete_follow_by_id(follow_id: uuid.UUID, who: Caller, db=Depends(get_db)) -> Response:
+    """Remove the caller's follow behind a "My reminders" row, including an opaque one."""
+    await follows.delete_follow_by_id(db, who, follow_id)
+    return Response(status_code=204)
+
+
 def _default_locale(request: Request) -> str:
     locales = get_settings(request).content_locales
     return locales[0] if locales else "en"
@@ -146,19 +155,24 @@ async def my_reminders(
         settings=get_settings(request),
         now=utcnow(),
     )
-    ok = await access.deliverable(request.app, db, who, {i.event_id for i in found.items})
+    shown = {i.event_id for i in found.items if i.event_id is not None}
+    ok = await access.deliverable(request.app, db, who, shown)
     return MinePageOut(
         items=[
             MineItemOut(
+                follow_id=i.follow_id,
+                hidden=i.hidden,
                 event_id=i.event_id,
                 title=i.title,
                 lang=i.lang,
-                calendar=MineCalendarOut(
+                calendar=None
+                if i.calendar is None
+                else MineCalendarOut(
                     id=i.calendar.id, name=i.calendar.name, color=i.calendar.color
                 ),
                 leads=list(i.leads),
                 next_start=i.next_start,
-                deliverable=i.event_id in ok,
+                deliverable=i.event_id in ok if i.event_id is not None else False,
             )
             for i in found.items
         ],

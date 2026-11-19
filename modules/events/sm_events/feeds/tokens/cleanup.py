@@ -30,7 +30,7 @@ from simple_module_db import all_tenants as unscoped
 from simple_module_db import finalize_session
 from sqlalchemy import delete, func
 
-from sm_events.core import constants
+from sm_events.core import constants, user_ids
 from sm_events.core.tenancy import bound_tenant, tenant_scope, valid_tenant
 from sm_events.models import FeedToken
 
@@ -47,10 +47,8 @@ logger = logging.getLogger(__name__)
 _TABLE = FeedToken.__table__
 
 
-def _spellings(user_id: uuid.UUID | str) -> tuple[str, ...]:
-    """Every way a user id is written (lower case, hyphenated or bare) that a link could hold."""
-    text = str(user_id).lower()
-    return (text, text.replace("-", ""))
+_spellings = user_ids.spellings
+"""Every way a user id is written that a link could hold (see :mod:`sm_events.core.user_ids`)."""
 
 
 async def _run(
