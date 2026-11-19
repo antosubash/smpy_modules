@@ -17,6 +17,7 @@ that is not an occurrence (a skipped date included) are that absence too.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -30,7 +31,7 @@ from sm_events.core.access.public import public_events
 from sm_events.core.clock import utcnow
 from sm_events.core.tenancy import tenant_scope
 from sm_events.core.web_urls import is_web_url
-from sm_events.models import Event, RegistrationCount
+from sm_events.models import Event, EventText, RegistrationCount
 from sm_events.registration import args
 from sm_events.registration.occurrence import ResolvedOccurrence, load_resolved
 from sm_events.reminders import formatting
@@ -40,8 +41,10 @@ __all__ = [
     "Availability",
     "Found",
     "RegistrationEvent",
+    "choose_text",
     "describe",
     "lookup",
+    "make_event",
     "state_of",
 ]
 
@@ -146,12 +149,10 @@ def _online(event: Event) -> str | None:
     return None
 
 
-async def registration_event(
-    db: Any, event: Event, occurrence: ResolvedOccurrence, locale: str
+def make_event(
+    event: Event, occurrence: ResolvedOccurrence, text: EventText, locale: str
 ) -> RegistrationEvent:
-    texts = (await texts_of(db, [event.id]))[event.id]
-    served = {name: text for name, text in texts.items() if name in locales.supported()}
-    text = pick_text(served or texts, locale, locales.default())
+    """The public facts about one occurrence, in the text chosen for the caller's language."""
     return RegistrationEvent(
         event_id=event.id,
         occurrence_key=occurrence.key,
@@ -174,6 +175,20 @@ async def registration_event(
         ics_path=_urls.event_ics_path(text.slug, text.locale),
         lang=text.locale,
     )
+
+
+def choose_text(texts: Mapping[str, EventText], locale: str) -> EventText:
+    """The text to show a reader in ``locale``: theirs, else the site's default language's, among
+    the languages the site serves (a language it does not serve has no page to link to)."""
+    served = {name: text for name, text in texts.items() if name in locales.supported()}
+    return pick_text(served or texts, locale, locales.default())
+
+
+async def registration_event(
+    db: Any, event: Event, occurrence: ResolvedOccurrence, locale: str
+) -> RegistrationEvent:
+    texts = (await texts_of(db, [event.id]))[event.id]
+    return make_event(event, occurrence, choose_text(texts, locale), locale)
 
 
 async def describe(

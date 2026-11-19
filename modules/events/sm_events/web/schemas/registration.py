@@ -8,6 +8,7 @@ row always renders.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sm_events.core import constants
 from sm_events.web.schemas._fields import HttpUrl, SingleLine
 
-__all__ = ["RegistrationIn", "RegistrationOut"]
+__all__ = ["RegistrationCountOut", "RegistrationCountsOut", "RegistrationIn", "RegistrationOut"]
 
 Provider = Annotated[str, Field(min_length=1, max_length=constants.REGISTRATION_PROVIDER_MAX)]
 Target = Annotated[
@@ -57,3 +58,20 @@ class RegistrationOut(BaseModel):
     provider_installed: bool | None
     """``None`` unless the mode is ``builtin``; ``False`` when this host has no such provider:
     the settings are kept as they are and cannot be changed until it is back."""
+
+
+class RegistrationCountOut(BaseModel):
+    """Seats taken at one occurrence. Counts only: who holds them is the provider's business."""
+
+    occurrence_key: str
+    start: datetime | None
+    """``None`` for an occurrence that no longer exists on the calendar (skipped, say) but still
+    holds seats."""
+    start_local: str | None
+    taken: int
+    capacity: int | None
+
+
+class RegistrationCountsOut(BaseModel):
+    items: list[RegistrationCountOut]
+    total: int
