@@ -13,7 +13,7 @@ import { lazyBlock } from '@simple-module-py/pagebuilder';
 import { keys, type Translate, translate } from '../utils/i18n';
 import { calendarsField, loadCalendarOptions, type Option } from './calendarField';
 import { type EventsCalendarProps, HEIGHT_NAMES, minHeight, VIEWS } from './calendarProps';
-import { oneOf, slugsOf } from './limits';
+import { oneOf, selectionOf } from './limits';
 import { localizeFields } from './localizeFields';
 
 const copy = keys.events.blocks;
@@ -70,12 +70,18 @@ export const EventsCalendarBlock = lazyBlock<EventsCalendarProps>(
         ? {
             props: {
               ...props,
-              calendars: slugsOf(props.calendars).map((slug) => ({ slug })),
+              ...(selectionOf(props.calendars).bad
+                ? {}
+                : { calendars: selectionOf(props.calendars).slugs.map((slug) => ({ slug })) }),
               defaultView: oneOf(props.defaultView, VIEWS, 'month'),
               height: oneOf(props.height, HEIGHT_NAMES, 'medium'),
             },
           }
         : { props },
   },
-  (props) => <div aria-busy="true" style={{ minHeight: minHeight(props.height) }} />,
+  (props) => (
+    <div className="container mx-auto px-4 py-4">
+      <div aria-busy="true" style={{ minHeight: minHeight(props.height) }} />
+    </div>
+  ),
 );

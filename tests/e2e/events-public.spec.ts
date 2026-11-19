@@ -47,7 +47,8 @@ test('the list shows public published events only', async ({ page }) => {
 test('the calendar chunk loads only for the grid view, which is read-only', async ({ page }) => {
   const chunks: string[] = [];
   page.on('response', (r) => {
-    if (/FullCalendar|fullcalendar/i.test(r.url()) && r.url().endsWith('.js')) chunks.push(r.url());
+    if (!/FullCalendar|fullcalendar/i.test(r.url()) || !r.url().endsWith('.js')) return;
+    chunks.push(r.url());
   });
   await page.goto('/events/');
   await expect(page.getByRole('link', { name: seed.conference.title })).toBeVisible();
@@ -59,7 +60,9 @@ test('the calendar chunk loads only for the grid view, which is read-only', asyn
     /view=calendar/,
   );
   // The series starts in a later month than "today": open the grid on it, as a copied link would.
-  await page.goto(`/events/?view=calendar&date=${seed.start}`);
+  // The grid shows its calendar's zone only while every calendar on it shares one; other specs
+  // leave public calendars in other zones in this database, so this one opens its own calendar.
+  await page.goto(`/events/c/${seed.pub.slug}?view=calendar&date=${seed.start}`);
   await expect(page.getByTestId('calendar-title')).not.toBeEmpty();
   await page.getByRole('button', { name: 'List', exact: true }).click();
   await expect(page.getByText(seed.weekly.title).first()).toBeVisible();

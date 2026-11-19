@@ -95,6 +95,27 @@ describe('UpcomingEvents', () => {
     expect(view.host.textContent).toContain('Rescheduled');
   });
 
+  it('says the zone of an item the server marked, and only that one', async () => {
+    stubFetch({
+      [UPCOMING]: {
+        items: [
+          item({
+            key: 'a',
+            title: 'East coast reading',
+            show_timezone: true,
+            timezone: 'America/New_York',
+          }),
+          item({ key: 'b', title: 'Local reading', show_timezone: false }),
+        ],
+      },
+    });
+    const view = await mount(render());
+    await ready(view, 'li');
+    const times = view.all('time').map((t) => t.textContent ?? '');
+    expect(times[0]).toContain('(America/New_York)');
+    expect(times[1]).not.toContain('(');
+  });
+
   it('renders text only: markup in a title stays text', async () => {
     stubFetch({ [UPCOMING]: { items: [item({ title: '<img src=x onerror=alert(1)>' })] } });
     const view = await mount(render());
@@ -209,7 +230,7 @@ describe('UpcomingEventsBlock', () => {
       },
     });
     const fields = await resolveFields();
-    expect(fields.calendars.label).toBe('Calendars');
+    expect(fields.calendars.label).toBe('Calendars (up to 10)');
     expect(fields.calendars.arrayFields?.slug.options.map((o) => o.value)).toEqual(['', 'team']);
     expect(fields.calendars.arrayFields?.slug.options[1].label).toBe('Team');
     expect(fields.category.options?.map((o) => o.value)).toEqual(['', 'talks']);
@@ -238,9 +259,20 @@ describe('UpcomingEventsBlock', () => {
     const loaded = resolveData({ props: stored }, { trigger: 'load' }).props;
     expect(loaded.count).toBe(4);
     expect(loaded.layout).toBe('list');
-    expect(loaded.calendars).toEqual([{ slug: 'a' }]);
+    expect(loaded.calendars).toEqual(stored.calendars); // unreadable: kept as it is, never made "all"
     expect((loaded.heading as string).length).toBe(200);
     expect(resolveData({ props: stored }, { trigger: 'force' }).props.count).toBe(4.5);
+  });
+
+  it('summarises a calendar row with text, never a catalogue key', () => {
+    const field = (
+      UpcomingEventsBlock.fields as unknown as Record<
+        string,
+        { getItemSummary: (i: { slug?: string }) => string }
+      >
+    ).calendars;
+    expect(field.getItemSummary({ slug: '' })).toBe('Calendar');
+    expect(field.getItemSummary({ slug: 'team' })).toBe('team');
   });
 
   it('keeps its labels as catalogue keys until pagebuilder resolves them', () => {

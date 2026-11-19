@@ -133,6 +133,7 @@
     "range_too_long": "That date range is too long.",
     "invalid_range": "The end of the range must be after its start.",
     "unknown_category": "That category no longer exists.",
+    "image_off_site": "That image is on another site, and the public pages cannot load it. Use an image from this site's media library.",
     "unknown_type": "This type of event is not supported.",
     "invalid_parent": "The parent must be an event of the same calendar that is not itself a sub-event or a series.",
     "immutable_field": "The calendar and the parent of an event cannot be changed.",
@@ -349,6 +350,7 @@
     "no_category": "No category",
     "organiser": "Organiser",
     "image": "Image address",
+    "image_hint": "Use an image from this site's media library: its address starts with /. An image on another site does not load on the public pages.",
     "registration_url": "Registration link",
     "cancelled": "This event is cancelled",
     "sub_events": "Sub-events",
@@ -852,9 +854,10 @@
     "upcoming": {
       "label": "Upcoming events",
       "heading": "Heading",
-      "calendars": "Calendars",
+      "calendars": "Calendars (up to 10)",
       "category": "Category",
       "count": "Number of events",
+      "count_invalid": "Enter a whole number from 1 to {max}.",
       "layout": "Layout",
       "layout_list": "List",
       "layout_cards": "Cards",
@@ -862,7 +865,7 @@
     },
     "calendar": {
       "label": "Events calendar",
-      "calendars": "Calendars",
+      "calendars": "Calendars (up to 10)",
       "default_view": "Opens as",
       "view_month": "Month",
       "view_week": "Week",
@@ -882,7 +885,8 @@
       "empty": "No upcoming public events. Visitors see nothing here until there are some.",
       "unresolved_one": "{count} chosen calendar is not public or no longer exists.",
       "unresolved_other": "{count} chosen calendars are not public or no longer exist.",
-      "failed": "Events could not be loaded."
+      "failed": "Events could not be loaded.",
+      "selection_unreadable": "The calendar selection could not be read, so nothing is shown. Choose the calendars again."
     }
   },
   "reminders": {

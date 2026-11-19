@@ -542,7 +542,7 @@ itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. Locally,
 (`scripts/e2e_shards.mjs`: one template database copied per shard, each with its
 own host, port and upload directories); `make e2e-bundle` stays serial. The
 `E2E (Playwright)` job merges the shards' reports and is the one status that
-covers all of them. `newsletter.spec.ts` is opt-in with `E2E_NEWSLETTER=1`. It runs only in
+covers all of them. `newsletter.spec.ts` and `newsletter-events.spec.ts` are opt-in with `E2E_NEWSLETTER=1`. It runs only in
 its own CI job, `E2E (newsletter)`, against a non-bundle host with
 `SM_ENVIRONMENT=development` (framework 0.0.42 serves `testing` pages from the Vite dev
 server under the strict production CSP, so the console is blank), because its dispatch hook

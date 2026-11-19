@@ -3,7 +3,7 @@
  *  code, a non-JSON body keeps the status as its code. */
 
 import type { PublicListItem } from '../public/types';
-import { ApiError } from '../utils/api';
+import { publicGet } from '../utils/public-get';
 
 const BASE = '/api/events/public';
 
@@ -28,24 +28,8 @@ export type UpcomingQuery = {
   locale: string;
 };
 
-async function get<T>(path: string, params: URLSearchParams, signal: AbortSignal): Promise<T> {
-  const response = await fetch(`${BASE}${path}?${params.toString()}`, {
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-    signal,
-  });
-  if (!response.ok) {
-    let code = String(response.status);
-    try {
-      const body = (await response.json()) as { code?: string };
-      if (typeof body.code === 'string') code = body.code;
-    } catch {
-      /* a body that is not JSON keeps the status as its code */
-    }
-    throw new ApiError(response.status, code);
-  }
-  return response.json() as Promise<T>;
-}
+const get = <T>(path: string, params: URLSearchParams, signal: AbortSignal) =>
+  publicGet<T>(`${BASE}${path}?${params.toString()}`, signal);
 
 export function fetchBlockCalendars(
   slugs: string[],

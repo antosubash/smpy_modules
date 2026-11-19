@@ -47,6 +47,9 @@ class EventHitOut(BaseModel):
     attendance_mode: str
     place: str
     cancelled: bool
+    when: str = ""
+    """The date and time as the email words them (the event's zone, its abbreviation), so the
+    picker, the preview and the email agree."""
 
 
 class MediaHitOut(BaseModel):

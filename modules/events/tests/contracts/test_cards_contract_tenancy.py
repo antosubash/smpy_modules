@@ -8,9 +8,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from simple_module_db import MissingTenantError, like_contains_pattern
 from sm_events.contracts import cards as contract
+from sm_events.core import clock
 from sm_events.core.tenancy import TenantIsolationError, tenant_scope
 from sm_events.models import Calendar, Visibility
-from sm_events.web.endpoints.public import _clock
 from sqlalchemy import event as sa_event
 
 from tests.support.access import seed_calendars
@@ -22,7 +22,7 @@ ANY = like_contains_pattern("")
 
 @pytest.fixture(autouse=True)
 def _now(monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: NOW)
+    monkeypatch.setattr(clock, "now", lambda: NOW)
 
 
 def utc(*args: int) -> datetime:
@@ -136,3 +136,45 @@ async def test_statement_count_does_not_grow_with_the_events(db_state, db):
         lambda: contract.get_event_card(db, tenant_id="default", event_id=one_event),
     )
     assert single <= first
+
+
+@pytest.mark.unbound_tenant
+async def test_the_contracts_own_tenant_predicate_is_what_pins_the_tenant(db, monkeypatch):
+    """The gate and the tenancy guard each pin the tenant too, so this takes both away: an
+    unpinned gate and a session whose guard waives the filter. Only the contract's explicit
+    ``tenant_id`` predicate is left, and it alone must keep another tenant's event out."""
+    from contextlib import contextmanager
+
+    from simple_module_db.tenancy import all_tenants
+    from sm_events.core.access.events import visible_events
+    from sm_events.core.access.public import ANONYMOUS
+
+    ids = {}
+    for tenant in ("a", "b"):
+        with tenant_scope(tenant):
+            cal = Calendar(slug=tenant, name=tenant, owner_id="o", visibility=Visibility.PUBLIC)
+            db.add(cal)
+            await db.flush()
+            made = await seed_event(
+                db, cal, title="Same title", slug=f"same-{tenant}", status="published",
+                starts_at=utc(2026, 8, 1),
+            )  # fmt: skip
+            ids[tenant] = made.id
+    await db.flush()
+
+    @contextmanager
+    def waived(_tenant):
+        with all_tenants():
+            yield
+
+    monkeypatch.setattr(contract, "tenant_scope", waived)
+    monkeypatch.setattr(
+        contract, "public_events", lambda: visible_events(ANONYMOUS, include_unpublished=False)
+    )
+    unfiltered = await db.execute(contract.public_events())
+    assert len(unfiltered.scalars().all()) == 2  # the harness really is unpinned
+    got = await contract.search_events(db, tenant_id="a", pattern=ANY, limit=50)
+    assert [c.id for c in got] == [ids["a"]]
+    assert await contract.get_event_card(db, tenant_id="a", event_id=ids["b"]) is None
+    mine = await contract.get_event_card(db, tenant_id="a", event_id=ids["a"])
+    assert mine is not None and mine.id == ids["a"]

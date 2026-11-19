@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, model_validator
 from sm_events.core import constants
 from sm_events.core.errors import ImmutableField
 from sm_events.models.enums import ATTENDANCE_MODES, DEFAULT_EVENT_TYPE
-from sm_events.web.schemas._fields import HttpUrl, MultiLine, SingleLine, TimezoneName
+from sm_events.web.schemas._fields import HttpUrl, ImageRef, MultiLine, SingleLine, TimezoneName
 from sm_events.web.schemas.texts import TextIn
 
 LocaleKey = Annotated[str, Field(min_length=1, max_length=constants.LOCALE_MAX)]
@@ -59,7 +59,7 @@ class _Fields(BaseModel):
     longitude: Longitude | None = None
     category_id: uuid.UUID | None = None
     organiser: Organiser | None = None
-    image: HttpUrl | None = None
+    image: ImageRef | None = None
     registration_url: HttpUrl | None = None
 
 

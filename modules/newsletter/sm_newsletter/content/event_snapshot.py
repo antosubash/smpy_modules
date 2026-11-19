@@ -11,41 +11,37 @@ from datetime import datetime
 from typing import Any
 
 from sm_newsletter.content.blocks import EventCardProps
+from sm_newsletter.content.card_text import (
+    EXCERPT_MAX,
+    LOCALE_MAX,
+    PLACE_MAX,
+    TITLE_MAX,
+    fits,
+    strip_bidi,
+)
 from sm_newsletter.content.integrations import EventHit
-from sm_newsletter.content.render.event_card import strip_bidi
-from sm_newsletter.content.urls import check_image, check_link
+from sm_newsletter.content.urls import check_site_image, check_site_path
 from sm_newsletter.core.errors import CardSourceGone
-
-# EventCardProps' bounds; the model validates all the same.
-_TITLE, _EXCERPT, _LOCALE, _PLACE = 300, 1000, 16, 500
 
 
 def _text(value: str, limit: int) -> str:
     return strip_bidi(value)[:limit]
 
 
-def _fits(check: Any, value: str) -> bool:
-    try:
-        check(value)
-    except ValueError:
-        return False
-    return True
-
-
 def event_snapshot_props(hit: EventHit, *, block_id: str, now: datetime) -> dict[str, Any]:
     """The event card's props for ``hit``. A page or calendar address the body would refuse
     cannot be carded (:class:`CardSourceGone`); an image it would refuse is dropped."""
-    if not (_fits(check_link, hit.url) and _fits(check_link, hit.ics_url)):
+    if not (fits(check_site_path, hit.url) and fits(check_site_path, hit.ics_url)):
         raise CardSourceGone()
     props = {
         "id": block_id,
         "source_id": hit.source_id,
-        "title": _text(hit.title, _TITLE),
-        "excerpt": _text(hit.excerpt, _EXCERPT),
-        "image_url": hit.image_url if _fits(check_image, hit.image_url) else "",
+        "title": _text(hit.title, TITLE_MAX),
+        "excerpt": _text(hit.excerpt, EXCERPT_MAX),
+        "image_url": hit.image_url if fits(check_site_image, hit.image_url) else "",
         "url": hit.url,
         "ics_url": hit.ics_url,
-        "locale": hit.locale[:_LOCALE],
+        "locale": hit.locale[:LOCALE_MAX],
         "starts_at": hit.starts_at.isoformat(),
         "ends_at": hit.ends_at.isoformat(),
         "all_day": hit.all_day,
@@ -53,7 +49,7 @@ def event_snapshot_props(hit: EventHit, *, block_id: str, now: datetime) -> dict
         "end_date": hit.end_date.isoformat() if hit.end_date else None,
         "timezone": hit.timezone,
         "attendance_mode": hit.attendance_mode,
-        "place": _text(hit.place, _PLACE),
+        "place": _text(hit.place, PLACE_MAX),
         "cancelled": hit.cancelled,
         "snapshot_at": now.isoformat(),
     }

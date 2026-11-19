@@ -12,35 +12,28 @@ against the campaign tenant's public origin. The event's id (``source_id``) is n
 
 from __future__ import annotations
 
-import re
 from datetime import date, datetime, timedelta
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from babel import Locale, UnknownLocaleError
 from babel.dates import format_date, format_time
 
 from sm_newsletter.content.blocks import EventCardProps
+from sm_newsletter.content.card_text import strip_bidi
 from sm_newsletter.content.render import html as h
 from sm_newsletter.content.render import styles as s
 from sm_newsletter.content.render import text as t
 from sm_newsletter.content.render.types import RenderContext
-from sm_newsletter.content.urls import absolute
+from sm_newsletter.content.urls import absolute, is_site_path
 
 _FALLBACK = "en"
 _SPACES = str.maketrans({"\u202f": " ", "\u00a0": " "})  # CLDR's narrow no-break spaces
-_BIDI = re.compile("[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]")
 _ONE_DAY = timedelta(days=1)
 _CONTENT_WIDTH = s.WIDTH - 64
 _DOT = " · "
 _EN = "\u2013"  # an en dash
 _DASH = f" {_EN} "
-
-
-def strip_bidi(value: str) -> str:
-    """``value`` without direction marks, embeddings, overrides and isolates: they would reorder
-    the text around them in a mail client. Events refuses them in a title, but a snapshot may hold
-    text from before that, so the renderer neutralises them itself."""
-    return _BIDI.sub("", value)
 
 
 def _locale(name: str) -> Locale:
@@ -58,7 +51,24 @@ def _time(value: datetime, locale: Locale) -> str:
     return format_time(value, "short", locale=locale).translate(_SPACES)
 
 
-def when(p: EventCardProps, locale: str) -> str:
+class WhenSource(Protocol):
+    """What the when-line needs: an event card's props, and a search hit, both have it."""
+
+    @property
+    def starts_at(self) -> datetime: ...
+    @property
+    def ends_at(self) -> datetime: ...
+    @property
+    def all_day(self) -> bool: ...
+    @property
+    def start_date(self) -> date | None: ...
+    @property
+    def end_date(self) -> date | None: ...
+    @property
+    def timezone(self) -> str: ...
+
+
+def when(p: WhenSource, locale: str) -> str:
     """The date and time of the card in the event's zone and ``locale``'s language."""
     loc = _locale(locale)
     if p.all_day and p.start_date and p.end_date:
@@ -88,14 +98,21 @@ def place_line(p: EventCardProps, online: str) -> str:
     return p.place
 
 
+def _site(value: str) -> str:
+    """``value`` when it is a path on the site, else ``""``: a body stored before the save-time
+    check, or built without it, never gets an off-site address into an email."""
+    return value if is_site_path(value) else ""
+
+
 def html(p: EventCardProps, ctx: RenderContext) -> str:
-    href = h.url(ctx.content_base, p.url)
+    page, ics, image = _site(p.url), _site(p.ics_url), _site(p.image_url)
+    href = h.url(ctx.content_base, page) if page else ""
     copy = ctx.footer
     title, excerpt = strip_bidi(p.title), strip_bidi(p.excerpt)
     out = ""
-    if p.image_url:
+    if image and href:
         out += (
-            f'<a href="{href}"><img src="{h.url(ctx.content_base, p.image_url)}"'
+            f'<a href="{href}"><img src="{h.url(ctx.content_base, image)}"'
             f' width="{_CONTENT_WIDTH}" alt="{h.inert(title)}"'
             f' style="{s.fluid_image(_CONTENT_WIDTH)}"></a>'
         )
@@ -103,25 +120,31 @@ def html(p: EventCardProps, ctx: RenderContext) -> str:
         out += f'<p style="{s.CARD_BADGE}">{h.inert(copy.cancelled)}</p>'
     if title:
         title_link = f"color:{s.TEXT_COLOR};text-decoration:none"
-        out += (
-            f'<h3 style="{s.CARD_TITLE}">'
-            f'<a href="{href}" style="{title_link}">{h.inert(title)}</a></h3>'
+        shown = (
+            f'<a href="{href}" style="{title_link}">{h.inert(title)}</a>'
+            if href
+            else h.inert(title)
         )
+        out += f'<h3 style="{s.CARD_TITLE}">{shown}</h3>'
     for line in (when(p, ctx.locale), strip_bidi(place_line(p, copy.online))):
         if line:
             out += f'<p style="{s.CARD_META}">{h.inert(line)}</p>'
     if excerpt:
         out += f'<p style="{s.CARD_TEXT}">{h.inert(excerpt)}</p>'
     link = f"{s.CARD_LINK_BASE};{s.accent_link(ctx.branding.accent)}"
-    out += f'<a href="{href}" style="{link}">{h.inert(copy.read_more)}</a>'
-    if not p.cancelled:
-        ics = h.url(ctx.content_base, p.ics_url)
-        out += f' <a href="{ics}" style="{link}">{h.inert(copy.add_to_calendar)}</a>'
-    return out
+    links = []
+    if href:
+        links.append(f'<a href="{href}" style="{link}">{h.inert(copy.read_more)}</a>')
+    if ics and not p.cancelled:
+        ics_href = h.url(ctx.content_base, ics)
+        links.append(f'<a href="{ics_href}" style="{link}">{h.inert(copy.add_to_calendar)}</a>')
+    sep = f' <span style="{s.CARD_SEP}">{_DOT.strip()}</span> '
+    return out + sep.join(links)
 
 
 def text(p: EventCardProps, ctx: RenderContext) -> str:
     base, copy = ctx.content_base, ctx.footer
+    page, ics = _site(p.url), _site(p.ics_url)
     title = t.inert(strip_bidi(p.title))
     if p.cancelled:
         title = f"{t.inert(copy.cancelled)}: {title}" if title else t.inert(copy.cancelled)
@@ -130,8 +153,8 @@ def text(p: EventCardProps, ctx: RenderContext) -> str:
         t.inert(when(p, ctx.locale)),
         t.inert(strip_bidi(place_line(p, copy.online))),
         t.inert(strip_bidi(p.excerpt)),
-        absolute(base, p.url),
+        absolute(base, page) if page else "",
     ]
-    if not p.cancelled:
-        lines.append(f"{t.inert(copy.add_to_calendar)}: {absolute(base, p.ics_url)}")
+    if ics and not p.cancelled:
+        lines.append(f"{t.inert(copy.add_to_calendar)}: {absolute(base, ics)}")
     return "\n".join(line for line in lines if line)

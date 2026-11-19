@@ -87,7 +87,8 @@ it('the source filter sends source params', async () => {
     ),
   );
   const last = fetchOccurrences.mock.calls.at(-1)?.[0];
-  expect(last?.sources).toEqual(['records:dates']);
+  // Every box starts checked: unchecking Deadlines asks for the others.
+  expect(last?.sources).toEqual(['acme:talks']);
   await view.unmount();
 });
 

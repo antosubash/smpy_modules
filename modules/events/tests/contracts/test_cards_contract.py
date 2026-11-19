@@ -10,9 +10,8 @@ from fastapi import FastAPI
 from simple_module_db import like_contains_pattern
 from sm_events import contracts
 from sm_events.contracts import cards as contract
-from sm_events.core import locales
+from sm_events.core import clock, locales
 from sm_events.models import EventText
-from sm_events.web.endpoints.public import _clock
 
 from tests.support.access import seed_calendars
 from tests.support.calendars import seed_event, seed_public_fixture, seed_series
@@ -25,7 +24,7 @@ ANY = like_contains_pattern("")  # every title
 
 @pytest.fixture(autouse=True)
 def _now(monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: NOW)
+    monkeypatch.setattr(clock, "now", lambda: NOW)
 
 
 def utc(*args: int) -> datetime:
@@ -75,7 +74,7 @@ async def _title(db, event_id, locale):
 
 
 async def test_the_public_cast_is_found(db, monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: utc(2026, 4, 1))  # the fixture's series runs
+    monkeypatch.setattr(clock, "now", lambda: utc(2026, 4, 1))  # the fixture's series runs
     fx = await seed_public_fixture(db)
     got = await _search(db, upcoming_only=False, limit=50)
     assert {c.id for c in got} <= {e.id for e in fx.public_events}

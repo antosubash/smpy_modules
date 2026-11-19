@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import { campaignsUrl } from '../ui/components/campaigns/urls';
 import { AudiencePicker } from '../ui/components/editor/AudiencePicker';
 import { CampaignMeta } from '../ui/components/editor/CampaignMeta';
-import { type EditorTab, EditorTabs } from '../ui/components/editor/EditorTabs';
+import { type EditorTab, EditorTabs, editPaneClass } from '../ui/components/editor/EditorTabs';
 import { EditorActionsContext } from '../ui/components/editor/editorActions';
 import { localizeConfig } from '../ui/components/editor/localizeConfig';
 import { PreviewPane } from '../ui/components/editor/PreviewPane';
@@ -215,7 +215,7 @@ export default function CampaignEditor() {
               body={previewBody}
             />
           )}
-          <div className={tab === 'edit' ? 'min-h-0 flex-1' : 'hidden'}>
+          <div className={editPaneClass(tab === 'edit')} inert={tab !== 'edit'}>
             <EditorActionsContext.Provider value={actions}>
               <Puck
                 key={editor.reloadKey}

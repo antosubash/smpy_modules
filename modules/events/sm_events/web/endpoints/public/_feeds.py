@@ -32,7 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.content import calendar_redirects
 from sm_events.content.public_read import calendar_by_slug, event_by_slug, resolve_event_redirect
-from sm_events.core import constants, locales, timezones
+from sm_events.core import clock, constants, locales, timezones
 from sm_events.core.access.public import ANONYMOUS
 from sm_events.core.errors import NotFound
 from sm_events.core.settings import EventsSettings
@@ -41,7 +41,7 @@ from sm_events.feeds.ics_event import FeedEvent
 from sm_events.feeds.plugin_items import PluginFeed, plugin_feed
 from sm_events.feeds.select import FeedRead, component_cost, feed_events, single_event
 from sm_events.web.endpoints.deps import get_settings
-from sm_events.web.endpoints.public import _cache, _clock, _urls
+from sm_events.web.endpoints.public import _cache, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
 from sm_events.web.endpoints.public._respond import machine_response
 
@@ -143,7 +143,7 @@ def calendar_feed_router(locale: str) -> APIRouter:
         db: AsyncSession = Depends(get_db),
         settings: EventsSettings = Depends(get_settings),
     ) -> Response:
-        now = _clock.now()
+        now = clock.now()
         read = await feed_events(
             db,
             calendar_id=None,
@@ -185,7 +185,7 @@ def calendar_feed_router(locale: str) -> APIRouter:
             return _cache.permanent_redirect(
                 request, settings, _urls.calendar_ics_path(moved, locale)
             )
-        now = _clock.now()
+        now = clock.now()
         read = await feed_events(
             db,
             calendar_id=found.id,
@@ -246,7 +246,7 @@ def event_feed_router(locale: str) -> APIRouter:
             default_locale=locales.default(),
             url_for=lambda s, loc: _urls.absolute(request, _urls.event_path(s, loc)),
         )
-        now = _clock.now()
+        now = clock.now()
         body = ics_file(
             read.items,
             name=text.title,

@@ -10,8 +10,8 @@ from types import SimpleNamespace
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sm_events.core import clock
 from sm_events.models import Visibility
-from sm_events.web.endpoints.public import _clock
 from sm_newsletter.core import constants
 
 from tests.support.app import build_app
@@ -27,7 +27,7 @@ NOW = datetime(2026, 7, 1, 7, tzinfo=UTC)
 
 @pytest.fixture(autouse=True)
 def _now(monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: NOW)
+    monkeypatch.setattr(clock, "now", lambda: NOW)
 
 
 @pytest_asyncio.fixture
@@ -61,6 +61,9 @@ async def test_search_events_route(client, built):
     ]
     assert hits[0]["url"] == "/events/open" and hits[0]["ics_url"] == "/events/open.ics"
     assert hits[0]["timezone"] == "Europe/Vienna"
+    # The server words the time (the email's own function), so the picker, the preview and the
+    # email name the same zone: CEST, not the browser's "GMT+2".
+    assert hits[0]["when"] == "Wednesday, July 1, 2026, 10:00 AM\u201311:00 AM CEST"
     assert (await client.get(f"{API}/cards/events?q=autumn", headers=EDIT)).json() == []
 
 
@@ -199,3 +202,43 @@ async def test_multi_tenant_search_pins_bound_tenant():
             assert res.status_code == 404
     finally:
         await state.engine.dispose()
+
+
+async def test_a_forged_event_card_is_refused_and_a_stored_one_never_renders(client, built):
+    """A card that looks like a site event but links elsewhere cannot be saved, and one that got
+    into the table anyway is refused at preview: nothing off-site is ever rendered."""
+    eid = await seed_event(built[1], "default")
+    snap = (
+        await client.post(
+            f"{API}/cards/snapshot", json={"kind": "event", "source_id": str(eid)}, headers=EDIT
+        )
+    ).json()
+    res = await client.post(
+        f"{API}/campaigns", json={"name": "S", "list_type_key": "news"}, headers=EDIT
+    )
+    cid = res.json()["id"]
+    for change in (
+        {"url": "https://evil.example/"},
+        {"ics_url": "mailto:a@evil.example"},
+        {"image_url": "https://evil.example/x.png"},
+    ):
+        forged = {"type": "EventCard", "props": {**snap, **change}}
+        res = await client.patch(
+            f"{API}/campaigns/{cid}",
+            json={"expected_revision": 1, "body": [forged]},
+            headers=EDIT,
+        )
+        assert (res.status_code, res.json()["code"]) == (422, "invalid_body"), change
+        assert "evil" not in res.text
+
+    from sm_newsletter.core.tenancy import tenant_scope
+    from sm_newsletter.models import Campaign
+    from sqlalchemy import update
+
+    forged = {"type": "EventCard", "props": {**snap, "url": "https://evil.example/"}}
+    with tenant_scope("default"):
+        async with built[1].session_factory() as db:
+            await db.execute(update(Campaign).where(Campaign.id == cid).values(body=[forged]))
+            await db.commit()
+    preview = await client.get(f"{API}/campaigns/{cid}/preview", headers=EDIT)
+    assert preview.status_code == 422 and "evil" not in preview.text
