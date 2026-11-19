@@ -25,7 +25,7 @@ from sm_events.core import constants
 from sm_events.core.clock import utcnow
 from sm_events.core.errors import NotFound
 from sm_events.core.errors_reminders import RemindersUnavailable
-from sm_events.reminders import access, follows, leads, limits, mine
+from sm_events.reminders import access, follows, leads, limits, mine, stats
 from sm_events.reminders.availability import availability
 from sm_events.web.endpoints.deps import Principal, get_settings, require_manage, require_view
 from sm_events.web.schemas.reminders import (
@@ -49,6 +49,10 @@ BY_ID_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/reminders/follows/[^/]+$"
 RATE = limits.FOLLOW_RATE
 Page = Annotated[int, Query(ge=1)]
 PageSize = Annotated[int, Query(ge=1, le=limits.MINE_PAGE_MAX)]
+
+
+def _counts(found: stats.Counts) -> DeliveryCounts:
+    return DeliveryCounts(sent=found.sent, failed=found.failed, unfinished=found.unfinished)
 
 
 async def caller(who: Principal) -> ResourcePrincipal:
@@ -180,13 +184,14 @@ async def my_reminders(
         hidden=found.hidden,
         page=found.page,
         page_size=found.page_size,
+        counts=_counts(await stats.counts(db, now=utcnow(), user_id=who.user_id)),
     )
 
 
 @router.get("/reminders/delivery", dependencies=[require_manage])
 async def delivery(request: Request, who: Caller, db=Depends(get_db)) -> DeliveryOut:
-    """Counts for managers; never who. The 30-day figures are wired to the ledger with the beat
-    (until then there is nothing sent to count)."""
+    """The tenant's counts of the last 30 days, for managers: how many were sent, how many failed
+    (by reason) and how many never finished. Counts only: never who was or was not reminded."""
     settings = get_settings(request)
     found = await availability(request.app, db)
     return DeliveryOut(
@@ -195,5 +200,5 @@ async def delivery(request: Request, who: Caller, db=Depends(get_db)) -> Deliver
         reason=found.reason,
         defaults=list(leads.install_defaults(settings)),
         window_days=limits.STATS_WINDOW_DAYS,
-        counts=DeliveryCounts(sent=0, failed={}, unfinished=0),
+        counts=_counts(await stats.counts(db, now=utcnow())),
     )

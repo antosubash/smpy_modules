@@ -59,6 +59,13 @@ class MineItemOut(BaseModel):
     deliverable: bool = True
 
 
+class DeliveryCounts(BaseModel):
+    sent: int
+    failed: dict[str, int]
+    """By stable code (``send_failed``, ``send_timeout``)."""
+    unfinished: int
+
+
 class MinePageOut(BaseModel):
     items: list[MineItemOut]
     total: int
@@ -66,13 +73,8 @@ class MinePageOut(BaseModel):
     """Followed events the caller can no longer see; each is an opaque row after the others."""
     page: int
     page_size: int
-
-
-class DeliveryCounts(BaseModel):
-    sent: int
-    failed: dict[str, int]
-    """By stable code (``send_failed``, ``send_timeout``)."""
-    unfinished: int
+    counts: DeliveryCounts
+    """The caller's own counts for the last 30 days: nobody else's."""
 
 
 class DeliveryOut(BaseModel):

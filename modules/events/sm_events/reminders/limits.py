@@ -10,6 +10,8 @@ __all__ = [
     "FOLLOWS_PER_USER",
     "FOLLOW_RATE",
     "LEDGER_DAYS",
+    "LEDGER_PRUNE_BATCH",
+    "LEDGER_PRUNE_MAX_BATCHES",
     "MAX_LEAD_MINUTES",
     "MINE_PAGE_MAX",
     "MINE_PAGE_SIZE",
@@ -68,4 +70,7 @@ REMINDER_RUNTIME_TTL: Final = timedelta(seconds=600)
 # The message and the ledger (Rulings 25 and 28).
 REMINDER_SUBJECT_MAX: Final = 200
 LEDGER_DAYS: Final = 90
+LEDGER_PRUNE_BATCH: Final = 1000
+LEDGER_PRUNE_MAX_BATCHES: Final = 20
+"""At most 20,000 ledger rows per tenant per janitor pass; the rest waits for the next hour."""
 STATS_WINDOW_DAYS: Final = 30

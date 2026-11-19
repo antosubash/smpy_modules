@@ -197,3 +197,36 @@ async def test_delivery_needs_manage(world):
     client.app.state.sm_events.settings.reminders_enabled = False
     down = (await client.get(f"{BASE}/reminders/delivery", headers=MGR)).json()
     assert (down["enabled"], down["available"], down["reason"]) == (False, False, "disabled")
+
+
+async def test_delivery_counts_come_from_the_ledger_and_name_nobody(world):
+    from datetime import UTC, datetime, timedelta
+
+    from sm_events.core.clock import utcnow
+    from sm_events.models import ReminderSent
+
+    client, ids = world
+    import uuid
+
+    async with client.db_state.session_factory() as db:
+        now = utcnow()
+        for n, (who, state, code, age) in enumerate(
+            [("u", "sent", None, 5), ("w", "sent", None, 9), ("u", "failed", "send_failed", 3),
+             ("w", "sending", None, 30)]
+        ):  # fmt: skip
+            db.add(
+                ReminderSent(
+                    event_id=uuid.UUID(ids["pub"]["U"]), occurrence_key=f"k{n}",
+                    starts_at=datetime(2026, 7, 1, tzinfo=UTC), recipient_id=who, lead_minutes=60,
+                    state=state, code=code, claimed_at=now - timedelta(minutes=age),
+                )
+            )  # fmt: skip
+        await db.commit()
+    got = await client.get(f"{BASE}/reminders/delivery", headers=MGR)
+    assert got.json()["counts"] == {"sent": 2, "failed": {"send_failed": 1}, "unfinished": 1}
+    assert set(got.json()["counts"]) == {"sent", "failed", "unfinished"}
+    assert "recipient" not in got.text and '"w"' not in got.text
+    mine = (await client.get(f"{BASE}/reminders/mine", headers=U)).json()
+    assert mine["counts"] == {"sent": 1, "failed": {"send_failed": 1}, "unfinished": 0}
+    other = (await client.get(f"{BASE}/reminders/mine", headers=as_user("w", V))).json()
+    assert other["counts"] == {"sent": 1, "failed": {}, "unfinished": 1}

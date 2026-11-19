@@ -111,14 +111,17 @@ class EventsModule(ModuleBase):
         )
 
     def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
-        """Private feed links go when their user, membership or tenant does. A worker builds no
+        """Private feed links and reminder follows go when their user, membership or tenant do.
+        A worker builds no
         app (``app`` is ``None``) and has nothing to subscribe: a link whose owner is gone
         serves nothing anyway, so this only removes the rows."""
         if app is None:
             return
         from sm_events.feeds.tokens import cleanup
+        from sm_events.reminders import cleanup as reminder_cleanup
 
         cleanup.subscribe(bus, app)
+        reminder_cleanup.subscribe(bus, app)
 
     def register_body_limits(self, registry: BodyLimitRegistry) -> None:
         """The import upload's body ceiling: the largest file an operator may allow plus 1 MiB of
