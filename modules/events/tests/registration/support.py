@@ -68,3 +68,36 @@ async def moved(db: Any, event: Event, to: datetime, original: datetime = SECOND
 async def taken(db: Any, event: Event, key: str | None, n: int) -> None:
     db.add(RegistrationCount(event_id=event.id, occurrence_key=key or str(event.id), taken=n))
     await db.flush()
+
+
+async def consistent(db: Any) -> dict[tuple[Any, str], int]:
+    """Every counter equals the number of seat rows it counts, and no seat lacks a counter. The
+    check the plan's "counts are derived or kept consistent" asks for: it recomputes from rows.
+    ``{(event_id, key): taken}``."""
+    from sm_events.models import RegistrationSeat
+    from sqlalchemy import func, select
+
+    counters = {
+        (row.event_id, row.occurrence_key): row.taken
+        for row in (
+            await db.execute(select(RegistrationCount).execution_options(populate_existing=True))
+        ).scalars()
+    }
+    seats = {
+        (event_id, key): n
+        for event_id, key, n in (
+            await db.execute(
+                select(
+                    RegistrationSeat.event_id, RegistrationSeat.occurrence_key, func.count()
+                ).group_by(RegistrationSeat.event_id, RegistrationSeat.occurrence_key)
+            )
+        ).all()
+    }
+    for key, n in seats.items():
+        assert counters.get(key) == n, f"counter {counters.get(key)} but {n} seats for {key}"
+    for key, taken in counters.items():
+        assert taken == seats.get(key, 0), (
+            f"counter {taken} but {seats.get(key, 0)} seats for {key}"
+        )
+        assert taken >= 0
+    return counters
