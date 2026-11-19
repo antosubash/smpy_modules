@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType, RevisionEvent
+from sm_records.public_submissions.registration import seats
 from sm_records.records.index._reduce_write import apply_delta
 from sm_records.records.index.reindex import reindex_record
 from sm_records.records.services._common import (
@@ -70,6 +71,8 @@ async def _trash(
         db, record, RevisionEvent.DELETE, limit=settings.revision_limit, actor=actor
     )
     await apply_delta(db, rtype, before=record, after=None, now=now)
+    # Its seat goes in this transaction, after the locks the trash already holds.
+    await seats.on_trashed(db, [(record, rtype)])
 
 
 async def soft_delete_record(
@@ -153,6 +156,8 @@ async def restore_record(
     await still_there(
         db, rtype, record, trashed=True, refusal=f"record {record.uuid} is not in the trash"
     )
+    # A registration comes back only with a seat: refused (nothing changed) when none is free.
+    await seats.on_restored(db, rtype, record)
     record.is_deleted = False
     record.deleted_at = None
     record.deleted_by = None

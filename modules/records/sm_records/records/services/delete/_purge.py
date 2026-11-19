@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core import events
 from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType, tables_for
+from sm_records.public_submissions.registration import seats
 from sm_records.records.index._reduce_write import drop_type_rows
 from sm_records.records.services._common import PurgedRecord, mark_written
 from sm_records.records.services._lock import lock_type
@@ -81,6 +82,7 @@ async def purge_type_records(db: AsyncSession, rtype: RecordType) -> list[Purged
     Order matters: the revision delete reads the document table, so it has to
     run before the documents go.
     """
+    await seats.on_type_purged(db, rtype)
     tables = tables_for(rtype)
     cls = tables.record
     purged = list(

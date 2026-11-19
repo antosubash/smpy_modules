@@ -20,11 +20,21 @@ from __future__ import annotations
 
 import importlib
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 from sm_records.contracts.public_submissions import KIND_REGISTRATION
+from sm_records.public_submissions.errors import SubmissionRefused
 
-__all__ = ["available", "integration", "is_registration"]
+__all__ = [
+    "available",
+    "integration",
+    "is_registration",
+    "on_purged",
+    "on_restored",
+    "on_trashed",
+    "on_type_purged",
+]
 
 logger = logging.getLogger(__name__)
 _WARNED = {"missing": False}
@@ -49,3 +59,60 @@ def available() -> bool:
             logger.info("records: the events module is not installed; registrations hold no seats")
         return False
     return True
+
+
+_LIVE = ("pending", "registered")
+
+
+async def on_trashed(db: Any, pairs: Sequence[tuple[Any, Any]]) -> None:
+    """A record of a registration type went to the trash (single, cascade, bulk, spam, retention):
+    its seat is freed, in the trashing transaction. Cancelled records hold none (a release of a
+    seat that is not there is nothing)."""
+    held: dict[str, list[str]] = {}
+    for record, rtype in pairs:
+        if is_registration(rtype):
+            held.setdefault(rtype.tenant_id, []).append(record.uuid)
+    if not held or not available():
+        return
+    for tenant, holders in held.items():
+        await integration().release(db, tenant_id=tenant, holders=holders)
+
+
+async def on_restored(db: Any, rtype: Any, record: Any) -> None:
+    """A trashed registration is coming back: it takes a seat again **only if one is free** (an
+    organiser's restore skips the window, never the capacity or the event's availability), else the
+    restore is refused (409 ``registration_full`` / ``event_unavailable``) and nothing changes. A
+    cancelled registration holds no seat and needs none."""
+    if not is_registration(rtype):
+        return
+    data = record.data or {}
+    if data.get("sm_status") not in _LIVE:
+        return
+    if not available():
+        raise SubmissionRefused("event_unavailable", "the events module is not installed")
+    given = await integration().admit(
+        db,
+        tenant_id=rtype.tenant_id,
+        event_id=str(data.get("sm_event_id") or ""),
+        occurrence_key=str(data.get("sm_occurrence_key") or ""),
+        target=rtype.key,
+        holder=record.uuid,
+        admin=True,
+    )
+    if not given.admitted:
+        code = given.code or "event_unavailable"
+        raise SubmissionRefused(code, "this registration cannot be restored: " + code)
+
+
+async def on_purged(db: Any, rtype: Any, uuids: Sequence[str]) -> None:
+    """Records of a registration type are being purged: free their seats again (idempotent: a seat
+    freed at the trash is not freed twice; one left by a record trashed before seats followed
+    trashes, or on a host that had no events then, goes now)."""
+    if is_registration(rtype) and uuids and available():
+        await integration().release(db, tenant_id=rtype.tenant_id, holders=list(uuids))
+
+
+async def on_type_purged(db: Any, rtype: Any) -> None:
+    """A registration type is being deleted with all its records: free every seat of its form."""
+    if is_registration(rtype) and available():
+        await integration().release_target(db, tenant_id=rtype.tenant_id, target=rtype.key)

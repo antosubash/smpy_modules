@@ -163,3 +163,24 @@ async def single_opt_in(client: AsyncClient) -> None:
         ),
     )
     assert resp.status_code == 200, resp.text
+
+
+async def seat_counts(site: Any) -> tuple[int, int]:
+    """``(seat rows, sum of counters)``; asserts every counter equals its seat rows."""
+    from collections import Counter
+
+    from sm_events.core.tenancy import tenant_scope
+    from sm_events.models import RegistrationCount, RegistrationSeat
+    from sqlalchemy import select
+
+    with tenant_scope("default"):
+        async with site.db_state.session_factory() as db:
+            seats = list((await db.execute(select(RegistrationSeat))).scalars())
+            counters = list((await db.execute(select(RegistrationCount))).scalars())
+    per = Counter((s.event_id, s.occurrence_key) for s in seats)
+    assert {(c.event_id, c.occurrence_key): c.taken for c in counters if c.taken} == dict(per)
+    return len(seats), sum(c.taken for c in counters)
+
+
+def record_url(uuid: str, tail: str = "", key: str = TYPE) -> str:
+    return f"/api/records/types/{key}/records/{uuid}{tail}"
