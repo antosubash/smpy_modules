@@ -17,7 +17,7 @@ from sm_records.public_submissions import mail_runner
 
 from tests.support.app_harness import ADMIN, field, roles
 from tests.support.public_submissions_support import create
-from tests.support.submissions_http import JSON, SUBMISSIONS
+from tests.support.submissions_http import JSON, SUBMISSIONS, configure
 
 TYPE = "event_registrations"
 PROVIDER = "records:registration"
@@ -86,6 +86,11 @@ async def seed_event(db_state: Any, *, tenant: str = "default", **fields: Any) -
 async def reg_site(site):
     """``site`` with the landing pages, a registration type and one published event."""
     boot.mount_submission_views(site.app)
+    configure(
+        site,
+        public_submissions_rate_per_ip="1000/minute",
+        public_submissions_type_rate="1000/minute",
+    )
     resp = await registration_type(site)
     assert resp.status_code == 201, resp.text
     site.event = await seed_event(site.db_state)  # type: ignore[attr-defined]
