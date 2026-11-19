@@ -140,3 +140,24 @@ test('a user the worker cannot verify is told, and the follow is kept', async ({
   await detail.getByRole('button', { name: 'Reminding: 1 h' }).click();
   await shoot(detail, '04-no-access-message');
 });
+
+test('the Reminders page tells everyone when reminders are unavailable, the reason only managers', async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  await resetReminders(page); // no public address saved: the default host cannot deliver
+  const reader = await readerPage(browser, baseURL as string);
+  try {
+    await reader.page.goto('/admin/events/reminders');
+    const note = reader.page.getByTestId('reminders-unavailable');
+    await expect(note).toContainText('Reminders are not available on this site right now.');
+    await expect(reader.page.locator('body')).not.toContainText('public address is not set');
+    await shoot(reader.page, '04-unavailable', { fullPage: true });
+  } finally {
+    await reader.context.close();
+  }
+  await page.goto('/admin/events/reminders');
+  await expect(page.getByTestId('reminders-unavailable')).toBeVisible();
+  await expect(page.getByText(/public address is not set/)).toBeVisible();
+});

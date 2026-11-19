@@ -177,3 +177,54 @@ describe('Reminders page', () => {
     await view.unmount();
   });
 });
+
+describe('Reminders page availability notice', () => {
+  const STATUS = '/api/events/reminders/status';
+  const NOTICE = 'not available';
+
+  it('tells a non-manager plainly that reminders are unavailable, without the reason', async () => {
+    stubFetch({
+      [`GET ${STATUS}`]: { available: false, leads: [60] },
+      [`GET ${MINE}`]: page([]),
+    });
+    const view = await mount(<Reminders {...props} />);
+    await flush();
+    const note = document.querySelector('[data-testid="reminders-unavailable"]');
+    expect(note?.textContent).toContain(NOTICE);
+    expect(note?.textContent).not.toContain('console');
+    await view.unmount();
+  });
+
+  it('says nothing while reminders can be delivered', async () => {
+    stubFetch({
+      [`GET ${STATUS}`]: { available: true, leads: [60] },
+      [`GET ${MINE}`]: page([]),
+    });
+    const view = await mount(<Reminders {...props} />);
+    await flush();
+    expect(document.querySelector('[data-testid="reminders-unavailable"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('gives a manager the sentence and the reason detail', async () => {
+    stubFetch({
+      [`GET ${STATUS}`]: { available: false, reason: 'console_mail', leads: [60] },
+      [`GET ${MINE}`]: page([]),
+      [`GET ${DELIVERY}`]: {
+        enabled: true,
+        available: false,
+        reason: 'console_mail',
+        defaults: [60],
+        window_days: 30,
+        counts,
+      },
+    });
+    const view = await mount(<Reminders {...props} is_manager />);
+    await flush();
+    expect(document.querySelector('[data-testid="reminders-unavailable"]')?.textContent).toContain(
+      NOTICE,
+    );
+    expect(document.body.textContent).toContain('console backend');
+    await view.unmount();
+  });
+});
