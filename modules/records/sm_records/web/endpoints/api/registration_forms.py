@@ -17,8 +17,8 @@ from sqlmodel import SQLModel
 from sm_records.contracts.public_submissions import KIND_REGISTRATION
 from sm_records.core import constants
 from sm_records.core.settings import RecordsSettings
+from sm_records.public_submissions.registration.access import can_view
 from sm_records.records.services import types as type_service
-from sm_records.records.services._access import role_blocked
 from sm_records.web.deps import (
     actor,
     caller_roles,
@@ -79,7 +79,7 @@ async def list_registration_forms(
         )
         for rtype in sorted(await type_service.list_types(db), key=lambda t: t.key)
         if (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION
-        and not role_blocked(rtype, roles)
+        and can_view(rtype, roles, {constants.PERM_VIEW})  # require_view already held
     ]
 
 

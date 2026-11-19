@@ -28,6 +28,7 @@ from sm_events.web.schemas._fields import SupportedInstant
 from sm_events.web.schemas.events_in import EventCreate, EventPatch, Expected, Revision
 from sm_events.web.schemas.events_out import EventOut, EventPage
 from sm_events.web.services.events_out import render, render_items
+from sm_events.web.services.source_viewer import source_viewer_from
 
 router = APIRouter(prefix="/events", tags=["events"], dependencies=[require_view])
 
@@ -74,9 +75,18 @@ async def create(
     body: EventCreate, request: Request, who: Principal, db=Depends(event_db)
 ) -> EventOut:
     locales = content_locales(request)
-    event = await create_event(db, who, body, locales=locales)
+    event = await create_event(
+        db, who, body, locales=locales, viewer=source_viewer_from(request, who)
+    )
     await db.refresh(event)
-    out = await render(db, who, event, locale=None, default_locale=locales[0])
+    out = await render(
+        db,
+        who,
+        event,
+        locale=None,
+        default_locale=locales[0],
+        viewer=source_viewer_from(request, who),
+    )
     await bus.commit(db)
     return out
 
@@ -90,7 +100,14 @@ async def get_event(
     locale: LocaleQuery = None,
 ) -> EventOut:
     event, _rights = await load_event(db, who, event_id)
-    return await render(db, who, event, locale=locale, default_locale=content_locales(request)[0])
+    return await render(
+        db,
+        who,
+        event,
+        locale=locale,
+        default_locale=content_locales(request)[0],
+        viewer=source_viewer_from(request, who),
+    )
 
 
 @router.patch("/{event_id}")
@@ -98,9 +115,18 @@ async def update(
     event_id: uuid.UUID, body: EventPatch, request: Request, who: Principal, db=Depends(event_db)
 ) -> EventOut:
     locales = content_locales(request)
-    event = await update_event(db, who, event_id, body, locales=locales)
+    event = await update_event(
+        db, who, event_id, body, locales=locales, viewer=source_viewer_from(request, who)
+    )
     await db.refresh(event)
-    out = await render(db, who, event, locale=None, default_locale=locales[0])
+    out = await render(
+        db,
+        who,
+        event,
+        locale=None,
+        default_locale=locales[0],
+        viewer=source_viewer_from(request, who),
+    )
     await bus.commit(db)
     return out
 
@@ -123,6 +149,13 @@ async def restore(
 ) -> EventOut:
     event = await restore_event(db, who, event_id, body.expected_revision)
     await db.refresh(event)
-    out = await render(db, who, event, locale=None, default_locale=content_locales(request)[0])
+    out = await render(
+        db,
+        who,
+        event,
+        locale=None,
+        default_locale=content_locales(request)[0],
+        viewer=source_viewer_from(request, who),
+    )
     await bus.commit(db)
     return out

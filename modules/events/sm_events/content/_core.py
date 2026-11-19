@@ -58,6 +58,7 @@ async def create_core(
     published_at: datetime | None = None,
     note: str | None = None,
     before_history: Callable[[Event], Awaitable[None]] | None = None,
+    viewer: Any = None,
 ) -> Event:
     """Everything :func:`create_event` does after the rights check. The import calls it with
     its own ``uid`` (a file's), ``status`` and ``published_at`` and a history ``note``; a
@@ -88,7 +89,7 @@ async def create_core(
         extra=extra,
         **{name: getattr(data, name) for name in SCALARS},
     )
-    await _apply_registration_on_create(db, event, data)
+    await _apply_registration_on_create(db, event, data, viewer)
     async with db.begin_nested():  # a failed text leaves no half-created event
         db.add(event)
         await db.flush()
@@ -99,26 +100,30 @@ async def create_core(
     return event
 
 
-async def _apply_registration_on_create(db: Any, event: Event, data: EventCreate) -> None:
+async def _apply_registration_on_create(
+    db: Any, event: Event, data: EventCreate, viewer: Any
+) -> None:
     reg = registration.resolve(
         data.registration,
         url=data.registration_url,
         url_sent="registration_url" in data.model_fields_set,
     )
     if reg is not None:
-        await registration.apply_registration(db, event, reg, creating=True)
+        await registration.apply_registration(db, event, reg, creating=True, viewer=viewer)
     elif data.registration_url is not None:
         registration.apply_legacy_url(event, data.registration_url)
 
 
-async def _apply_registration_on_patch(db: Any, event: Event, data: EventPatch) -> bool:
+async def _apply_registration_on_patch(
+    db: Any, event: Event, data: EventPatch, viewer: Any
+) -> bool:
     """The ``registration`` object, or else the legacy ``registration_url``; whether it changed."""
     sent = data.model_fields_set
     reg = registration.resolve(
         data.registration, url=data.registration_url, url_sent="registration_url" in sent
     )
     if reg is not None:
-        return (await registration.apply_registration(db, event, reg)).changed
+        return (await registration.apply_registration(db, event, reg, viewer=viewer)).changed
     if "registration_url" in sent:
         return registration.apply_legacy_url(event, data.registration_url)
     return False
@@ -151,6 +156,7 @@ async def apply_patch(
     *,
     note: str | None = None,
     after: Callable[[Event], Awaitable[bool]] | None = None,
+    viewer: Any = None,
 ) -> None:
     """Everything :func:`update_event` does after the rights check. Raises :class:`Unchanged`
     (the savepoint rolled back) when nothing changes. ``note`` is added to the history row,
@@ -190,7 +196,7 @@ async def apply_patch(
                 changed = True
                 names.add(name)
         if sent & {"registration", "registration_url"} and await _apply_registration_on_patch(
-            db, event, data
+            db, event, data, viewer
         ):
             changed = True
             names.add("registration")

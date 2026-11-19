@@ -30,6 +30,7 @@ from sm_records.contracts.public_submissions import KIND_REGISTRATION
 from sm_records.core import constants
 from sm_records.core.tenancy import bound_tenant, tenant_scope
 from sm_records.models import tables_for
+from sm_records.public_submissions.registration.access import can_use, can_view
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.types import get_type, list_types
 
@@ -46,19 +47,43 @@ def _bound(ctx: RegistrationContext) -> None:
         raise RegistrationTargetError("not this tenant's")
 
 
+_REFUSED = "no such registration form"
+
+
+async def _registration_type(ctx: RegistrationContext, target: str) -> Any:
+    """The type if it exists and is a registration form, else ``None`` (never says which)."""
+    try:
+        rtype = await get_type(ctx.db, target)
+    except NotFound:
+        return None
+    return rtype if (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION else None
+
+
 async def _check_target(ctx: RegistrationContext, target: str) -> RegistrationTargetInfo:
+    """Existence **and** the editor's right to use the form (:func:`.access.can_use`). A form that
+    does not exist, is not a registration form, or that this caller may not use are one refusal. A
+    call with no caller (a worker) is not an editor and is refused."""
     _bound(ctx)
     with tenant_scope(ctx.tenant_id):
-        try:
-            rtype = await get_type(ctx.db, target)
-        except NotFound:
-            raise RegistrationTargetError("no such registration form") from None
-        if (rtype.public_submissions or {}).get("kind") != KIND_REGISTRATION:
-            raise RegistrationTargetError("not a registration form")
-        # Whoever sees the attendees needs records' own grants on this type; pointing an event at
-        # the form exposes no attendee, so this checks existence and kind, not the editor's rights.
+        rtype = await _registration_type(ctx, target)
+        viewer = ctx.viewer
+        if rtype is None or viewer is None or not can_use(rtype, viewer.roles, viewer.permissions):
+            raise RegistrationTargetError(_REFUSED)
         base = f"{constants.VIEW_PREFIX}/{rtype.key}"
         return RegistrationTargetInfo(label=rtype.label, admin_url=base, attendees_url=base)
+
+
+async def _can_read(ctx: RegistrationContext, target: str) -> bool:
+    """Whether the viewer may see the form (the console's own list rule); no viewer, no."""
+    _bound(ctx)
+    with tenant_scope(ctx.tenant_id):
+        rtype = await _registration_type(ctx, target)
+        viewer = ctx.viewer
+        return (
+            rtype is not None
+            and viewer is not None
+            and can_view(rtype, viewer.roles, viewer.permissions)
+        )
 
 
 async def _recipients(ctx: RegistrationContext, holders: Sequence[str]) -> Mapping[str, Registrant]:
@@ -94,5 +119,9 @@ async def _recipients(ctx: RegistrationContext, holders: Sequence[str]) -> Mappi
 
 def provider() -> RegistrationProvider:
     return RegistrationProvider(
-        id=PROVIDER_ID, label_key=LABEL_KEY, check_target=_check_target, recipients=_recipients
+        id=PROVIDER_ID,
+        label_key=LABEL_KEY,
+        check_target=_check_target,
+        recipients=_recipients,
+        can_read=_can_read,
     )

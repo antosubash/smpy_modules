@@ -18,7 +18,7 @@ from sm_events.web.schemas.events_in import EventPatch
 
 from tests.support.access import seed_calendars
 from tests.support.providers import KNOWN_TARGET, PROVIDER_ID, install_provider, provider
-from tests.support.writes import LOCALES, OWNER, OWNER_P, make
+from tests.support.writes import EDITOR, LOCALES, OWNER, OWNER_P, make
 
 BUILTIN = {"mode": "builtin", "provider": PROVIDER_ID, "target": KNOWN_TARGET}
 WEEKLY = "FREQ=WEEKLY;BYDAY=WE"
@@ -47,7 +47,12 @@ async def _refused(db, event, exc, who=OWNER_P, **body):
 
 async def _patch(db, event, who=OWNER_P, **body):
     await update_event(
-        db, who, event.id, EventPatch(expected_revision=event.revision, **body), locales=LOCALES
+        db,
+        who,
+        event.id,
+        EventPatch(expected_revision=event.revision, **body),
+        locales=LOCALES,
+        viewer=EDITOR,
     )
     await db.refresh(event)
 

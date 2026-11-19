@@ -34,6 +34,7 @@ from sm_events.web.schemas.overrides import (
 from sm_events.web.schemas.workflow import ApproveIn, RejectIn
 from sm_events.web.services.events_out import render
 from sm_events.web.services.names import member_names
+from sm_events.web.services.source_viewer import source_viewer_from
 
 router = APIRouter(tags=["events"], dependencies=[require_view])
 
@@ -46,7 +47,14 @@ async def _act(
 ) -> EventOut:
     event = await transition(db, who, event_id, action, now=utcnow(), **kw)
     await db.refresh(event)
-    out = await render(db, who, event, locale=None, default_locale=content_locales(request)[0])
+    out = await render(
+        db,
+        who,
+        event,
+        locale=None,
+        default_locale=content_locales(request)[0],
+        viewer=source_viewer_from(request, who),
+    )
     await bus.commit(db)
     return out
 

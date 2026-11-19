@@ -72,7 +72,7 @@ async def test_a_hostile_title_cannot_split_the_subject(reg_site):
 
 
 async def test_links_never_come_from_request_headers(reg_site):
-    """Spoofed forwarded headers change nothing (a spoofed Host is the Origin check's 403): every URL is the configured origin's."""
+    """Spoofed forwarded headers change nothing: every URL is the configured origin's."""
     spoof = {"X-Forwarded-Host": "evil.example", "Forwarded": "host=evil.example"}
     loaded = (await load_registration(reg_site, reg_site.event)).json()
     resp = await reg_site.post(

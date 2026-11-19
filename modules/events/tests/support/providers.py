@@ -63,3 +63,34 @@ def install_provider(monkeypatch, *providers: RegistrationProvider) -> None:
 
     monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", [*_REAL_LOADERS, plugins])
     monkeypatch.setattr(extensions, "_plugins", list)
+
+
+SECRET_TARGET = "secret-form"
+OPEN_TARGET = "open-form"
+
+
+def _may(ctx: RegistrationContext, target: str) -> bool:
+    """alice may use any form; everybody else only the open one; a worker (no viewer) none."""
+    if ctx.viewer is None:
+        return False
+    return target == OPEN_TARGET or (target == SECRET_TARGET and ctx.viewer.user_id == "alice")
+
+
+async def _restricted_check(ctx: RegistrationContext, target: str) -> RegistrationTargetInfo:
+    if not _may(ctx, target):  # one refusal for "missing" and "not yours"
+        raise RegistrationTargetError("no such registration form")
+    return RegistrationTargetInfo(label=f"Label of {target}", admin_url=f"/admin/{target}")
+
+
+async def _restricted_can_read(ctx: RegistrationContext, target: str) -> bool:
+    return _may(ctx, target)
+
+
+def restricted() -> RegistrationProvider:
+    return RegistrationProvider(
+        id=PROVIDER_ID,
+        label_key="records.registration",
+        check_target=_restricted_check,
+        recipients=_recipients,
+        can_read=_restricted_can_read,
+    )

@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from sm_events.calendar.plugins.extension_types import SourceViewer
+
 __all__ = [
     "Registrant",
     "RegistrationContext",
@@ -32,8 +34,13 @@ __all__ = [
 
 @dataclass(frozen=True)
 class RegistrationContext:
+    """``viewer`` is the signed-in editor a call is made for (the same object ``check_settings``
+    gets); ``None`` for a worker (reminders, reconciliation), which is not an editor: a provider
+    must refuse an editor-only question without one."""
+
     tenant_id: str
     db: AsyncSession
+    viewer: SourceViewer | None = None
 
 
 @dataclass(frozen=True)
@@ -70,3 +77,7 @@ class RegistrationProvider:
     label_key: str
     check_target: Callable[[RegistrationContext, str], Awaitable[RegistrationTargetInfo]]
     recipients: Callable[[RegistrationContext, Sequence[str]], Awaitable[Mapping[str, Registrant]]]
+    can_read: Callable[[RegistrationContext, str], Awaitable[bool]] | None = None
+    """Optional: whether ``ctx.viewer`` may *read* the target (see its key, label and links). An
+    editor who may edit the event but not read its target sees an opaque placeholder and cannot
+    change the form. ``check_target`` is the stricter question: may they *use* it."""

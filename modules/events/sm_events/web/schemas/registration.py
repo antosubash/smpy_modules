@@ -55,6 +55,9 @@ class RegistrationOut(BaseModel):
     closes_at_local: str | None
     show_seats: bool
     reminder_minutes: int | None
+    target_hidden: bool = False
+    """The editor may edit this event but not read the form it registers into: ``provider`` and
+    ``target`` are withheld, the form cannot be changed by them, and a save leaves it as it is."""
     provider_installed: bool | None
     """``None`` unless the mode is ``builtin``; ``False`` when this host has no such provider:
     the settings are kept as they are and cannot be changed until it is back."""

@@ -29,10 +29,14 @@ from sm_events.calendar.plugins import registry
 from sm_events.calendar.plugins.registration_types import RegistrationTargetInfo
 from sm_events.calendar.times import localize, parse_local, supported_instant
 from sm_events.core import constants
-from sm_events.core.errors_registration import InvalidRegistration, RegistrationUnavailable
+from sm_events.core.errors_registration import (
+    InvalidRegistration,
+    RegistrationUnavailable,
+    UnknownRegistrationTarget,
+)
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Event
-from sm_events.registration import guards, provider_call
+from sm_events.registration import access, guards, provider_call
 from sm_events.reminders.limits import REMINDER_LEADS
 from sm_events.web.schemas.registration import RegistrationIn
 
@@ -126,13 +130,35 @@ def _form(values: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+async def _keep_unreadable_form(
+    db: Any, event: Event, reg: RegistrationIn, viewer: Any
+) -> RegistrationIn:
+    """An event whose form this editor may not read keeps it: they can change the other settings,
+    and a submitted form must be the stored one or empty; anything else is refused exactly as a
+    form that does not exist (same code, message and cost)."""
+    if event.registration_mode != _BUILTIN or await access.target_readable(db, event, viewer):
+        return reg
+    stored = (_BUILTIN, event.registration_provider, event.registration_target)
+    if (reg.mode, reg.provider, reg.target) not in (stored, (_BUILTIN, None, None)):
+        raise UnknownRegistrationTarget
+    return reg.model_copy(
+        update={
+            "mode": _BUILTIN,
+            "provider": event.registration_provider,
+            "target": event.registration_target,
+        }
+    )
+
+
 async def apply_registration(
-    db: Any, event: Event, reg: RegistrationIn, *, creating: bool = False
+    db: Any, event: Event, reg: RegistrationIn, *, creating: bool = False, viewer: Any = None
 ) -> Applied:
     """Validate ``reg`` and set it on ``event`` (its timezone is the wall clock's). Whether anything
     changed, and the provider's word on the target when it was asked. Call it after the event's
     own times are applied, so a zone change in the same write is the zone used. Settings equal to
     the stored ones are not a change, whatever the provider's state."""
+    if not creating:
+        reg = await _keep_unreadable_form(db, event, reg, viewer)
     _check_shape(reg)
     values = _values(reg, _window(reg, event.timezone))
     if all(getattr(event, name) == value for name, value in values.items()):
@@ -147,8 +173,10 @@ async def apply_registration(
     ):
         provider = registry.registration_provider(reg.provider or "")
         assert provider is not None  # _check_builtin
+        if viewer is None:  # no caller, no editor check to make: fail closed
+            raise UnknownRegistrationTarget
         info = await provider_call.check_target(
-            provider, db=db, tenant_id=bound_tenant(), target=reg.target or ""
+            provider, db=db, tenant_id=bound_tenant(), target=reg.target or "", viewer=viewer
         )
     for name, value in values.items():
         setattr(event, name, value)

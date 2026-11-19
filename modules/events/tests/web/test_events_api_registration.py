@@ -48,6 +48,7 @@ async def test_round_trip(client):
         "closes_at_local": "2026-06-30T17:00",
         "show_seats": True,
         "reminder_minutes": 1440,
+        "target_hidden": False,
         "provider_installed": True,
     }
     got = await client.get(f"{EV}/{made['id']}", headers=OWNER)
@@ -148,3 +149,6 @@ async def test_provider_not_installed_is_shown_and_kept(client, monkeypatch):
     reg = got.json()["registration"]
     assert reg["provider"] == PROVIDER_ID and reg["provider_installed"] is False
     assert reg["capacity"] == 40  # untouched
+    assert (
+        reg["target"] is None and reg["target_hidden"] is True
+    )  # its provider cannot say who may read it

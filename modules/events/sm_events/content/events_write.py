@@ -32,11 +32,16 @@ __all__ = ["create_event", "update_event"]
 
 
 async def create_event(
-    db: Any, who: ResourcePrincipal, data: EventCreate, *, locales: tuple[str, ...]
+    db: Any,
+    who: ResourcePrincipal,
+    data: EventCreate,
+    *,
+    locales: tuple[str, ...],
+    viewer: Any = None,
 ) -> Event:
     """A new draft at revision 1, with its texts and a ``created`` history row."""
     calendar = await writable_calendar(db, who, data.calendar_id)
-    return await create_core(db, calendar, data, actor=who.user_id, locales=locales)
+    return await create_core(db, calendar, data, actor=who.user_id, locales=locales, viewer=viewer)
 
 
 async def update_event(
@@ -46,6 +51,7 @@ async def update_event(
     data: EventPatch,
     *,
     locales: tuple[str, ...],
+    viewer: Any = None,
 ) -> Event:
     """Apply a PATCH: only the fields the body set. One that changes nothing (only
     ``expected_revision``, or values equal to the stored ones) writes nothing: same
@@ -53,7 +59,7 @@ async def update_event(
     event, rights = await load_event(db, who, event_id)
     require(rights)
     try:
-        await apply_patch(db, who.user_id, event, data, locales)
+        await apply_patch(db, who.user_id, event, data, locales, viewer=viewer)
     except Unchanged:
         await db.refresh(event)  # the savepoint rolled back: the stored revision
     return event

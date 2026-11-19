@@ -29,7 +29,7 @@ from sm_events.calendar.plugins.registration_types import (
 from sm_events.core import constants
 from sm_events.core.errors_registration import RegistrationUnavailable, UnknownRegistrationTarget
 
-__all__ = ["check_target", "recipients"]
+__all__ = ["can_read", "check_target", "recipients"]
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def _valid_info(info: object) -> bool:
 
 
 async def check_target(
-    provider: RegistrationProvider, *, db: Any, tenant_id: str, target: str
+    provider: RegistrationProvider, *, db: Any, tenant_id: str, target: str, viewer: Any = None
 ) -> RegistrationTargetInfo:
     """What the provider says about ``target``; :class:`UnknownRegistrationTarget` when it is not
     one, :class:`RegistrationUnavailable` (503) when the provider could not answer."""
@@ -76,7 +76,9 @@ async def check_target(
         info = await run_isolated(
             db,
             constants.SOURCE_TIMEOUT_SECONDS,
-            lambda session: provider.check_target(RegistrationContext(tenant_id, session), target),
+            lambda session: provider.check_target(
+                RegistrationContext(tenant_id, session, viewer), target
+            ),
         )
     except RegistrationTargetError:
         raise UnknownRegistrationTarget from None
@@ -85,6 +87,30 @@ async def check_target(
     if not _valid_info(info):
         raise _unavailable(provider, "check_target answered something malformed")
     return info
+
+
+async def can_read(
+    provider: RegistrationProvider, *, db: Any, tenant_id: str, target: str, viewer: Any
+) -> bool:
+    """Whether ``viewer`` may read ``target``. Fails **closed**: no viewer, no hook answer, a
+    timeout or an error is "no" (the placeholder), never "yes"."""
+    if viewer is None:
+        return False
+    if provider.can_read is None:
+        return True  # the provider restricts nothing
+    hook = provider.can_read
+    try:
+        answer = await run_isolated(
+            db,
+            constants.SOURCE_TIMEOUT_SECONDS,
+            lambda session: hook(RegistrationContext(tenant_id, session, viewer), target),
+        )
+    except Exception as exc:
+        logger.error(
+            "events: registration provider %s: can_read raised %s", provider.id, type(exc).__name__
+        )
+        return False
+    return answer is True
 
 
 def _valid_registrant(value: object) -> bool:

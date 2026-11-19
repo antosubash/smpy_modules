@@ -153,3 +153,5 @@ def _check_provider(provider: Any, label: str) -> None:
     for name in ("check_target", "recipients"):
         if not inspect.iscoroutinefunction(getattr(provider, name)):
             raise InvalidExtension(f"{label}: {name} must be an 'async def' function")
+    if provider.can_read is not None and not inspect.iscoroutinefunction(provider.can_read):
+        raise InvalidExtension(f"{label}: can_read must be an 'async def' function")
