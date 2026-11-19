@@ -121,6 +121,7 @@ async def bulk_follows(db: Any, event_id: Any, users: list[str], lead: int = 60)
     """Many followers of one event in one statement (a Core insert: the ORM is too slow here)."""
     import uuid
 
+    from sm_events.core.tenancy import bound_tenant
     from sm_events.models import EventFollow
     from sqlalchemy import insert
 
@@ -128,7 +129,7 @@ async def bulk_follows(db: Any, event_id: Any, users: list[str], lead: int = 60)
         insert(EventFollow.__table__),
         [
             {
-                "tenant_id": "default",
+                "tenant_id": bound_tenant(),
                 "id": uuid.uuid4(),
                 "user_id": user,
                 "event_id": event_id,

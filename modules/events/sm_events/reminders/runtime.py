@@ -18,6 +18,7 @@ from simple_module_core.resources import ResourcePrincipal
 from starlette.requests import Request
 
 from sm_events.core.access.offline import offline_accounts
+from sm_events.core.tenancy import TenancyMode, mode_of
 from sm_events.reminders.base_url import public_base_url
 
 __all__ = ["Recipient", "ReminderRuntime", "web_runtime"]
@@ -35,6 +36,11 @@ class Recipient:
 class ReminderRuntime(Protocol):
     @property
     def public_base_url(self) -> str: ...
+
+    @property
+    def single_tenant(self) -> bool:
+        """Whether the host serves one tenant (its public origin is then the configured one)."""
+        ...
 
     async def recipients(
         self, db: Any, *, tenant_id: str, user_ids: Collection[str]
@@ -54,6 +60,10 @@ class _WebRuntime:
     @property
     def public_base_url(self) -> str:
         return public_base_url(self.app)
+
+    @property
+    def single_tenant(self) -> bool:
+        return mode_of(self.app) is TenancyMode.SINGLE
 
     async def recipients(
         self, db: Any, *, tenant_id: str, user_ids: Collection[str]
