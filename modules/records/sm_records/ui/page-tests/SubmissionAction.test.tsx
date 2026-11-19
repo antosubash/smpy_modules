@@ -77,4 +77,42 @@ describe('SubmissionAction', () => {
     expect(view.button('Abonnement bestätigen')).toBeDefined();
     await view.unmount();
   });
+
+  it('says the event is now full or closed (a finished state), and busy (try again)', async () => {
+    const copy = {
+      ...COPY,
+      full: 'Leider ausgebucht.',
+      closed: 'Leider geschlossen.',
+      busy: 'Gerade ausgelastet. Bitte noch einmal.',
+    };
+    const registration = (
+      <SubmissionAction
+        action="confirm"
+        token="tok"
+        locale="de"
+        endpoint="/api/records/submissions/confirm"
+        copy={copy}
+      />
+    );
+    for (const [code, text] of [
+      ['registration_full', 'Leider ausgebucht.'],
+      ['registration_closed', 'Leider geschlossen.'],
+      ['event_unavailable', 'Leider geschlossen.'],
+    ] as const) {
+      vi.stubGlobal('fetch', answer(409, { code, detail: 'x' }));
+      const view = await mount(registration);
+      await click(view.button('Abonnement bestätigen'));
+      await settle();
+      expect(view.find('[data-testid="submission-action-result"]')?.textContent).toBe(text);
+      expect(view.button('Abonnement bestätigen')).toBeUndefined(); // nothing more to press
+      await view.unmount();
+    }
+    vi.stubGlobal('fetch', answer(409, { code: 'seats_busy', detail: 'x' }));
+    const view = await mount(registration);
+    await click(view.button('Abonnement bestätigen'));
+    await settle();
+    expect(view.find('[role="alert"]')?.textContent).toBe('Gerade ausgelastet. Bitte noch einmal.');
+    expect(view.button('Abonnement bestätigen')).toBeDefined(); // press again
+    await view.unmount();
+  });
 });

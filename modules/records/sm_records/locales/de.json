@@ -859,6 +859,17 @@
         "already": "Ihr Abonnement war bereits bestätigt. Sie müssen nichts weiter tun.",
         "expired": "Dieser Link ist abgelaufen oder nicht mehr gültig. Melden Sie sich auf der Website erneut an, um einen neuen zu erhalten."
       },
+      "confirm_registration": {
+        "title": "Anmeldung bestätigen",
+        "intro": "Drücken Sie die Schaltfläche, um Ihre Anmeldung zu bestätigen und Ihren Platz zu belegen.",
+        "button": "Anmeldung bestätigen",
+        "done": "Vielen Dank. Ihre Anmeldung ist bestätigt.",
+        "already": "Ihre Anmeldung wurde bereits bestätigt. Es ist nichts weiter zu tun.",
+        "expired": "Dieser Link ist abgelaufen oder nicht mehr gültig. Melden Sie sich auf der Website erneut an, um einen neuen zu erhalten.",
+        "full": "Leider ist diese Veranstaltung jetzt ausgebucht, daher konnte Ihre Anmeldung nicht bestätigt werden. Es wurde nichts gespeichert.",
+        "closed": "Leider ist die Anmeldung für diese Veranstaltung geschlossen, daher konnte Ihre Anmeldung nicht bestätigt werden. Es wurde nichts gespeichert.",
+        "busy": "Die Anmeldungen sind gerade ausgelastet. Bitte drücken Sie die Schaltfläche gleich noch einmal."
+      },
       "unsubscribe": {
         "title": "Abmelden",
         "intro": "Klicken Sie auf die Schaltfläche, um diesen Newsletter nicht mehr zu erhalten.",

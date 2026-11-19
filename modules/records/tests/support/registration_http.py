@@ -134,7 +134,9 @@ async def regs(client: AsyncClient, key: str = TYPE, *, trashed: bool = False) -
     return resp.json()["items"]
 
 
-LINK = __import__("re").compile(r"https://site\.example/records/submissions/(confirm|cancel)\?\S+")
+LINK = __import__("re").compile(
+    r"https://site\.example/records/submissions/(confirm-registration|confirm|cancel)\?\S+"
+)
 
 
 def reg_links(message: Any) -> dict[str, dict[str, str]]:
@@ -144,7 +146,8 @@ def reg_links(message: Any) -> dict[str, dict[str, str]]:
     out: dict[str, dict[str, str]] = {}
     for match in LINK.finditer(message.text):
         query = parse_qs(urlsplit(match.group(0)).query)
-        out[match.group(1)] = {name: values[0] for name, values in query.items()}
+        action = match.group(1).removesuffix("-registration")  # the page, not the action
+        out[action] = {name: values[0] for name, values in query.items()}
     return out
 
 

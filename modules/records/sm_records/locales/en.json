@@ -859,6 +859,17 @@
         "already": "Your subscription was already confirmed. There is nothing else to do.",
         "expired": "This link has expired or is no longer valid. Sign up again on the website to get a new one."
       },
+      "confirm_registration": {
+        "title": "Confirm your registration",
+        "intro": "Press the button to confirm your registration and take your seat.",
+        "button": "Confirm registration",
+        "done": "Thank you. Your registration is confirmed.",
+        "already": "Your registration was already confirmed. There is nothing else to do.",
+        "expired": "This link has expired or is no longer valid. Register again on the website to get a new one.",
+        "full": "Sorry, this event is now fully booked, so your registration could not be confirmed. Nothing was saved.",
+        "closed": "Sorry, registration for this event has closed, so your registration could not be confirmed. Nothing was saved.",
+        "busy": "Registrations are busy right now. Please press the button again in a moment."
+      },
       "unsubscribe": {
         "title": "Unsubscribe",
         "intro": "Press the button to stop receiving this newsletter.",

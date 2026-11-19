@@ -57,6 +57,7 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+_CONFIRM_PAGE = links.CONFIRM_REGISTRATION_PAGE
 
 SUBJECT_MAX: Final = 200
 _PENDING: Final = "pending"
@@ -129,7 +130,7 @@ def message(
         expires = datetime.fromtimestamp(exp, UTC).strftime("%Y-%m-%d %H:%M UTC")
         blocks.append(
             f"{_text('confirm', locale)}\n"
-            f"{links.url(base_url, links.CONFIRM, confirm, locale)}\n\n"
+            f"{links.url(base_url, links.CONFIRM, confirm, locale, page=_CONFIRM_PAGE)}\n\n"
             f"{_text('expiry', locale, expires=expires)}\n\n"
         )
     cancel = links.sign(secret, links.CANCEL, **claims)
