@@ -632,6 +632,7 @@
       "part_of": "Part of {title}",
       "sub_events": "Sessions",
       "register": "Register",
+      "register_pick": "Choose a date to register",
       "add_to_calendar": "Add to calendar"
     },
     "not_found": {

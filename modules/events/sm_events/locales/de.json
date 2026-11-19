@@ -632,6 +632,7 @@
       "part_of": "Teil von {title}",
       "sub_events": "Programmpunkte",
       "register": "Anmelden",
+      "register_pick": "Termin zur Anmeldung wählen",
       "add_to_calendar": "Zum Kalender hinzufügen"
     },
     "not_found": {
