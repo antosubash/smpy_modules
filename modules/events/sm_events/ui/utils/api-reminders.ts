@@ -23,6 +23,8 @@ export type Follow = {
   defaults: Lead[];
   /** Per chosen lead, when its next reminder is due; `null`: too late for the next occurrence. */
   next_due: Record<string, string | null>;
+  /** No uncancelled occurrence is coming: nothing is left to remind of. */
+  over?: boolean;
   /** False when the worker could not verify this user's access: the follow is kept, no mail
    *  would come. */
   deliverable: boolean;

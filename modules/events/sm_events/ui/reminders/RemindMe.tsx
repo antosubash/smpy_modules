@@ -41,6 +41,13 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
   }
   const { follow, status } = state;
   const following = follow.leads.length > 0;
+  if (follow.over && !following) {
+    return (
+      <p className="text-xs text-muted-foreground" data-testid="remind-over">
+        {t(copy.over)}
+      </p>
+    );
+  }
   const close = () => {
     setOpen(false);
     clearError();

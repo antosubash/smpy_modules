@@ -79,6 +79,7 @@ async def _out(
         leads=list(state.leads),
         defaults=list(state.defaults),
         next_due=state.next_due,
+        over=state.over,
         deliverable=ok,
         code=None if ok else constants.REMINDERS_NO_ACCESS_CODE,
     )

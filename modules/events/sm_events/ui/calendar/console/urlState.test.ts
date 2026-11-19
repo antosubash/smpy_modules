@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CalendarState } from '../types';
-import { readState, writeState } from './urlState';
+import { readOpen, readState, writeState } from './urlState';
 
 const ALL = ['c1', 'c2', 'c3'];
 
@@ -47,5 +47,28 @@ describe('urlState', () => {
 
   it('reads the view and date alone', () => {
     expect(readState('?view=list&date=2026-03-30')).toEqual({ view: 'list', date: '2026-03-30' });
+  });
+});
+
+describe('readOpen', () => {
+  it('reads the occurrence a link asks to open, and nothing else', () => {
+    expect(readOpen('?view=day&event=e1%3A2026-07-01T08%3A00%3A00Z')).toBe(
+      'e1:2026-07-01T08:00:00Z',
+    );
+    expect(readOpen('?view=day')).toBeNull();
+    expect(readOpen('?event=')).toBeNull();
+    expect(readOpen(`?event=${'x'.repeat(300)}`)).toBeNull(); // far longer than any key
+  });
+  it('is never written back: the link opens the detail once', () => {
+    const state: CalendarState = {
+      view: 'day',
+      date: '2026-07-01',
+      tzMode: 'calendar',
+      calendars: [],
+      categories: [],
+      types: [],
+      sources: [],
+    };
+    expect(writeState(state, [])).not.toContain('event=');
   });
 });

@@ -65,6 +65,8 @@ class FollowState:
     next_due: dict[int, datetime | None]
     """Per chosen lead, when its next reminder falls due (``None``: too late for the next
     occurrence, or none is coming)."""
+    over: bool = False
+    """No uncancelled occurrence is coming: there is nothing left to remind of."""
 
 
 def request_locale(request: Any, default: str) -> str:
@@ -157,13 +159,12 @@ async def _state(
 ) -> FollowState:
     """The state, with when each chosen lead is next due (``None``: too late for the next
     occurrence, or none is coming), from the occurrences read."""
-    if not chosen:
-        return FollowState(leads=(), defaults=defaults, next_due={})
     starts = (await candidates.next_starts(db, [event], now=now))[event.id]
     return FollowState(
         leads=chosen,
         defaults=defaults,
         next_due={lead: due.next_due(starts, lead, now) for lead in chosen},
+        over=not starts,
     )
 
 

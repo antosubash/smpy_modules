@@ -39,6 +39,7 @@ type Props = {
   /** The installed plugin sources enabled on a shown calendar. */
   sources?: SourceOption[];
   initialState?: Partial<CalendarState>;
+  initialOpen?: string | null;
   onStateChange?: (state: CalendarState) => void;
 };
 
@@ -58,6 +59,7 @@ export function ConsoleCalendar({
   types: typeOptions,
   sources: sourceOptions,
   initialState,
+  initialOpen,
   onStateChange,
 }: Props) {
   const { t, locale } = useT();
@@ -159,6 +161,7 @@ export function ConsoleCalendar({
         slots={slots}
         defaultTimezone={defaultTimezone}
         initialState={initialState}
+        initialOpen={initialOpen}
         onStateChange={(state) => {
           setShown(state.calendars);
           onStateChange?.(state);

@@ -80,6 +80,8 @@ def build_message(
     default_locale: str,
     links: link_builder.Links,
     moved_from: datetime | None = None,
+    occurrence_key: str | None = None,
+    can_edit: bool = False,
 ) -> MailMessage:
     """The mail for one occurrence. ``ValueError`` for an event that may not be reminded (not
     published, or cancelled) and for an unusable public base URL: a bug in the caller, never a
@@ -118,6 +120,8 @@ def build_message(
         texts=dict(texts),
         lang=lang,
         occurrence_start=occurrence_start,
+        occurrence_key=occurrence_key,
+        can_edit=can_edit,
     )
     manage_link = link_builder.manage_url(links)
     site = links.origin().split("://", 1)[1]

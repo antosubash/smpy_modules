@@ -128,6 +128,9 @@ export type CalendarProps = {
    *  calendars have no zone in common. */
   calendarTime?: boolean;
   initialState?: Partial<CalendarState>;
+  /** The key of an occurrence to open once it is on the grid (a link from a reminder mail), read
+   *  only: opening it grants nothing the viewer does not have. */
+  initialOpen?: string | null;
   onStateChange?: (state: CalendarState) => void;
   /** Absent: read-only (the public site). */
   editing?: CalendarEditing;

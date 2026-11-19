@@ -42,10 +42,9 @@ def test_each_lead_at_the_edge_and_one_past():
         leads.validate_leads([min(limits.REMINDER_LEADS) - 1])
 
 
-def test_strict_refuses_duplicates():
-    assert leads.validate_distinct([60, 15]) == (15, 60)
-    with pytest.raises(InvalidLead):
-        leads.validate_distinct([60, 60])
+def test_duplicates_are_forgiven_everywhere():
+    assert leads.validate_leads([60, 15, 60]) == (15, 60)
+    assert not hasattr(leads, "validate_distinct")  # one validator, not two with two opinions
 
 
 def _calendar(minutes):

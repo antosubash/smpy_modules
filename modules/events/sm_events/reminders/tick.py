@@ -42,6 +42,7 @@ from sqlalchemy import distinct, select
 
 from sm_events.core import constants, public_prefix
 from sm_events.core.access.events import visible_events
+from sm_events.core.access.rights import calendar_rights
 from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import all_tenants, bound_tenant, tenant_scope
@@ -109,6 +110,9 @@ def _renderer(factory: Any, links: Links, default_locale: str) -> Any:
             ).scalar_one_or_none()
             if calendar is None:
                 return None
+            rights = await calendar_rights(
+                db, who.principal, calendar
+            )  # the editor only if they can
             texts = {
                 t.locale: t
                 for t in (
@@ -128,6 +132,8 @@ def _renderer(factory: Any, links: Links, default_locale: str) -> Any:
             default_locale=default_locale,
             links=links,
             moved_from=c.moved_from,
+            occurrence_key=c.occurrence_key,
+            can_edit=rights.write_events,
         )
 
     return render

@@ -23,6 +23,8 @@ class FollowOut(BaseModel):
     """What "Remind me" preselects on this event's calendar."""
     next_due: dict[int, datetime | None]
     """Per chosen lead, when its next reminder is due (``null``: too late for the next one)."""
+    over: bool = False
+    """No uncancelled occurrence is coming: there is nothing left to remind of."""
     deliverable: bool = True
     """False when the send-time check would refuse this user for this event (their rights are
     not ones a worker can read). The follow is kept; no mail would come."""

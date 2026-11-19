@@ -197,3 +197,20 @@ async def test_settings_are_read_the_way_a_worker_reads_them(host, monkeypatch):
     with no_tenant():
         got = await tick.reminders_async(state.session_factory, runtime_factory=factory, now=NOW)
     assert seen == [1] and got["sent"] == 0
+
+
+@pytest.mark.unbound_tenant
+async def test_the_mail_links_the_editor_only_to_someone_who_can_edit(host, mailbox):
+    from tests.support.app import Directory
+
+    app, state = host
+    app.state.user_directory = Directory(
+        {"v": ("v@example.com", "V", True), "se": ("se@example.com", "SE", True)},
+        {"v": ("viewer",), "se": ("viewer",)},
+    )
+    await seed(state, users=("v", "se"), visibility="internal")
+    assert (await run_tick(app, state))["sent"] == 2
+    by = {m.to: m.text for m in mailbox.messages}
+    assert "/admin/events/edit/" in by["se@example.com"]  # an edit share: the editor
+    assert "/admin/events/edit/" not in by["v@example.com"]  # a viewer: the calendar, read-only
+    assert "/admin/events/?view=day&date=2026-07-01&tz=calendar&calendar=" in by["v@example.com"]

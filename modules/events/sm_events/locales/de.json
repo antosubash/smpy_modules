@@ -161,7 +161,7 @@
     "import_too_large": "Die Datei ist größer als das Importlimit.",
     "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus.",
     "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut.",
-    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben. Beende zuerst eine. Entferne zuerst eine unter Erinnerungen; Veranstaltungen, die du nicht mehr sehen kannst, stehen dort ebenfalls.",
+    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben: entferne zuerst eine (Veranstaltungen, die du nicht mehr sehen kannst, stehen dort ebenfalls).",
     "not_published": "Nur veröffentlichte Veranstaltungen können erinnern.",
     "invalid_lead": "Wähle einen der angebotenen Erinnerungszeitpunkte.",
     "reminders_unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
@@ -948,6 +948,7 @@
       "too_late": "{lead}: zu spät für den nächsten Termin",
       "unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
       "time_zone": "Zeiten in der Zeitzone deines Browsers ({zone}); die Zeitzone der Veranstaltung ist {event_zone}.",
+      "over": "Diese Veranstaltung ist vorbei, es gibt nichts mehr, woran erinnert werden könnte.",
       "see_list": "Deine Erinnerungen ansehen"
     },
     "leads": {

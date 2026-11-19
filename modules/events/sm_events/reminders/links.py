@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import urlencode
 
 from sm_events.core import constants, locales
 from sm_events.core.web_urls import is_web_url
@@ -48,6 +49,24 @@ def manage_url(links: Links) -> str:
     return f"{links.origin()}{constants.REMINDERS_URL}"
 
 
+def _calendar_path(
+    event: Event, calendar: Calendar, occurrence_start: datetime, occurrence_key: str
+) -> str:
+    """The console calendar on that occurrence's day in the event's own zone, its detail open
+    (read-only: the page takes ``event=<key>``), for someone who may see but not edit it."""
+    day = occurrence_start.astimezone(formatting.zone_of(event.timezone)).date().isoformat()
+    query = urlencode(
+        {
+            "view": "day",
+            "date": day,
+            "tz": "calendar",
+            "calendar": str(calendar.id),
+            "event": occurrence_key,
+        }
+    )
+    return f"{constants.CALENDAR_URL}?{query}"
+
+
 def event_url(
     links: Links,
     *,
@@ -56,6 +75,8 @@ def event_url(
     texts: dict[str, EventText],
     lang: str,
     occurrence_start: datetime,
+    occurrence_key: str | None = None,
+    can_edit: bool = False,
 ) -> str:
     origin = links.origin()
     public = (
@@ -67,7 +88,9 @@ def event_url(
     text = texts.get(lang) if lang in links.content_locales else None
     text = text or texts.get(links.content_locales[0] if links.content_locales else "")
     if not public or text is None:
-        return f"{origin}{constants.EDITOR_URL}/{event.id}"
+        if can_edit or occurrence_key is None:
+            return f"{origin}{constants.EDITOR_URL}/{event.id}"
+        return f"{origin}{_calendar_path(event, calendar, occurrence_start, occurrence_key)}"
     base = f"{locales.prefix_for(text.locale, links.content_locales[0])}{links.prefix}"
     day = (
         occurrence_start.astimezone(formatting.zone_of(event.timezone)).date()

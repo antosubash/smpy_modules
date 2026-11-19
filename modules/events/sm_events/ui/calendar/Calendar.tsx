@@ -100,6 +100,24 @@ export function Calendar(props: CalendarProps) {
   });
   const items = nothingShown ? [] : data.items;
 
+  // A link can name one occurrence to show: open it once, when it is on the grid.
+  const pendingOpen = useRef(props.initialOpen ?? null);
+  useEffect(() => {
+    const key = pendingOpen.current;
+    const found = key ? items.find((o) => o.key === key) : undefined;
+    if (!found) return;
+    const frame = requestAnimationFrame(() => {
+      pendingOpen.current = null;
+      grid.current?.focusEvent(found.key);
+      const active = document.activeElement;
+      setSelected({
+        occurrence: found,
+        element: active instanceof HTMLElement ? active : document.body,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [items]);
+
   const first = useRef(true);
   const report = useRef(props.onStateChange);
   report.current = props.onStateChange;

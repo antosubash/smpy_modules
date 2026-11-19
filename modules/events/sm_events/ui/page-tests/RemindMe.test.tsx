@@ -125,7 +125,9 @@ describe('RemindMe', () => {
     await click(text(/^Save$/));
     await flush();
     expect(control()?.textContent).toBe('Remind me');
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('most events');
+    const text = document.querySelector('[role="alert"]')?.textContent ?? '';
+    expect(text).toContain('most events');
+    expect(text.match(/first/g)).toHaveLength(1); // one sentence, not three
     await view.unmount();
   });
 
@@ -263,5 +265,30 @@ describe('RemindMe pins', () => {
       if (before === undefined) delete process.env.TZ;
       else process.env.TZ = before;
     }
+  });
+});
+
+describe('RemindMe on an event that is over', () => {
+  it('offers no control, and says why in one line', async () => {
+    const { view } = await open({ [`GET ${FOLLOW}`]: follow({ over: true }) });
+    expect(control()).toBeNull();
+    const note = view.host.querySelector('[data-testid="remind-over"]');
+    expect(note?.textContent).toBe(
+      'This event is over, so there is nothing left to remind you of.',
+    );
+    await view.unmount();
+  });
+
+  it('keeps the control for someone already following, so they can stop', async () => {
+    const { view } = await open({ [`GET ${FOLLOW}`]: follow({ over: true, leads: [60] }) });
+    expect(control()?.textContent).toContain('Reminding');
+    expect(view.host.querySelector('[data-testid="remind-over"]')).toBeNull();
+    await view.unmount();
+  });
+
+  it('is unchanged while an occurrence is coming', async () => {
+    const { view } = await open({ [`GET ${FOLLOW}`]: follow({ over: false }) });
+    expect(control()?.textContent).toBe('Remind me');
+    await view.unmount();
   });
 });

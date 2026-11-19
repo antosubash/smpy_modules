@@ -23,7 +23,6 @@ __all__ = [
     "LEADS_INPUT_MAX",
     "effective_defaults",
     "install_defaults",
-    "validate_distinct",
     "validate_leads",
 ]
 
@@ -48,15 +47,6 @@ def validate_leads(values: Iterable[Any]) -> tuple[int, ...]:
     if not all(_known(value) for value in given):
         raise InvalidLead
     return tuple(sorted(set(given)))
-
-
-def validate_distinct(values: Iterable[Any]) -> tuple[int, ...]:
-    """:func:`validate_leads`, and a duplicate is refused too (a calendar's stored list)."""
-    given = list(values)
-    chosen = validate_leads(given)
-    if len(chosen) != len(given):
-        raise InvalidLead
-    return chosen
 
 
 def _readable(values: Iterable[Any]) -> tuple[int, ...]:

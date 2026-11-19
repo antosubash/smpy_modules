@@ -51,14 +51,16 @@ async def test_round_trip(world):
     got = await client.get(url, headers=U)
     assert got.status_code == 200, got.text
     assert got.json() == {
-        "leads": [], "defaults": [60], "next_due": {}, "deliverable": True, "code": None,
-    }  # fmt: skip
+        "leads": [], "defaults": [60], "next_due": {}, "over": True, "deliverable": True,
+        "code": None,
+    }  # fmt: skip  # the seeded event is in the past: nothing is left to remind of
     put = await client.put(url, json={"leads": [60, 15]}, headers=U)
     assert put.status_code == 200, put.text
     assert put.json() == {
         "leads": [15, 60],
         "defaults": [60],
         "next_due": {"15": None, "60": None},
+        "over": True,
         "deliverable": True,
         "code": None,
     }

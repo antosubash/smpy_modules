@@ -21,6 +21,14 @@ public pages carry none, so they stay cacheable and show nothing about who is si
   and it still counts toward the limit of 200 events, which is why it is listed.
 - The mail's *Stop or change your reminders* link is the Reminders page. It needs a sign-in: there is
   no token and no link a mail scanner could trigger.
+- The mail's *Open the event* link is the public page when the event has one. Otherwise it is the
+  console calendar on that day with the occurrence's detail open (read-only), and the **editor**
+  only for someone who may edit it (decided at send time from the same principal).
+- The control is not offered on an event with nothing left to remind of (every occurrence is past
+  or cancelled): the page says so in one line. Following a series stays possible while an
+  occurrence is coming. Someone already following can always stop.
+- The SMTP backend adds no `Date` or `Message-ID` header to any mail the framework sends
+  (upstream simple_module_python #1053); most relays add them.
 
 ## Who can be reminded, and who cannot
 
