@@ -17,13 +17,21 @@ from background_tasks.worker.task_routing import (
     load_task_configs,
     select_packages,
 )
-from sm_events.task_config import BEAT_SCHEDULE, JANITOR, PUBLISH_DUE, RUN_IMPORT, TASK_ROUTES
+from sm_events.task_config import (
+    BEAT_SCHEDULE,
+    JANITOR,
+    PUBLISH_DUE,
+    REFRESH_SUBSCRIPTION,
+    REFRESH_SUBSCRIPTIONS,
+    RUN_IMPORT,
+    TASK_ROUTES,
+)
 
 
 def test_the_task_module_sits_where_autodiscovery_imports_it():
     mod = importlib.import_module("sm_events.tasks")
     names = {getattr(obj, "name", None) for obj in vars(mod).values()}
-    assert {PUBLISH_DUE, RUN_IMPORT, JANITOR} <= names
+    assert {PUBLISH_DUE, RUN_IMPORT, JANITOR, REFRESH_SUBSCRIPTIONS, REFRESH_SUBSCRIPTION} <= names
 
 
 def test_the_framework_loads_routes_and_beat_from_the_package():
@@ -55,13 +63,20 @@ def test_import_tasks_and_the_hourly_janitor():
         RUN_IMPORT: {"queue": "events"},
         JANITOR: {"queue": "events"},
         REMINDERS: {"queue": "events"},
+        REFRESH_SUBSCRIPTIONS: {"queue": "events"},
+        REFRESH_SUBSCRIPTION: {"queue": "events"},
     }
     assert BEAT_SCHEDULE["events-janitor"] == {
         "task": JANITOR,
         "schedule": 3600.0,
         "options": {"queue": "events", "expires": 3500},
     }
-    assert set(BEAT_SCHEDULE) == {"events-publish-due", "events-janitor", "events-reminders"}
+    assert set(BEAT_SCHEDULE) == {
+        "events-publish-due",
+        "events-janitor",
+        "events-reminders",
+        "events-refresh-subscriptions",
+    }
 
 
 def test_a_worker_scoped_to_the_events_queue_imports_the_events_tasks():
@@ -93,3 +108,15 @@ def test_the_reminders_beat():
     }
     mod = importlib.import_module("sm_events.tasks")
     assert REMINDERS in {getattr(obj, "name", None) for obj in vars(mod).values()}
+
+
+def test_subscriptions_refresh_every_minute_and_a_dropped_tick_is_not_run_late():
+    assert (REFRESH_SUBSCRIPTIONS, REFRESH_SUBSCRIPTION) == (
+        "events.refresh_subscriptions",
+        "events.refresh_subscription",
+    )
+    assert BEAT_SCHEDULE["events-refresh-subscriptions"] == {
+        "task": REFRESH_SUBSCRIPTIONS,
+        "schedule": 60.0,
+        "options": {"queue": "events", "expires": 55},
+    }

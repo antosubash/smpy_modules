@@ -14,6 +14,11 @@
   backlog is dropped, never run late, because a late reminder is worthless and the claim makes a
   doubled run harmless anyway.
 
+* ``events.refresh_subscriptions`` - the beat every minute that fetches the external calendars that
+  have fallen due (:mod:`sm_events.feeds.subscriptions.refresh`), inside the tick's time, count and
+  byte budgets; a queued tick expires after 55 s like the others. ``events.refresh_subscription``
+  is one subscription on demand ("refresh now"), the same guarded fetch.
+
 ``QUEUES`` is what a worker started for a queue subset
 (``SM_BG_TASKS_WORKER_QUEUES``) checks before it imports ``sm_events.tasks``.
 Beat lives here and only here, so the entry is never merged twice. A host
@@ -22,6 +27,8 @@ imports (and of celery).
 """
 
 from __future__ import annotations
+
+from sm_events.core.constants.subscriptions import REFRESH_SUBSCRIPTION, REFRESH_SUBSCRIPTIONS
 
 PUBLISH_DUE = "events.publish_due"
 RUN_IMPORT = "events.run_import"
@@ -36,6 +43,8 @@ TASK_ROUTES = {
     RUN_IMPORT: {"queue": QUEUE_DEFAULT},
     JANITOR: {"queue": QUEUE_DEFAULT},
     REMINDERS: {"queue": QUEUE_DEFAULT},
+    REFRESH_SUBSCRIPTIONS: {"queue": QUEUE_DEFAULT},
+    REFRESH_SUBSCRIPTION: {"queue": QUEUE_DEFAULT},
 }
 
 PUBLISH_DUE_INTERVAL_SECONDS = 60.0
@@ -44,6 +53,8 @@ JANITOR_INTERVAL_SECONDS = 3600.0
 JANITOR_EXPIRES_SECONDS = 3500
 REMINDERS_INTERVAL_SECONDS = 60.0
 REMINDERS_EXPIRES_SECONDS = 55
+REFRESH_SUBSCRIPTIONS_INTERVAL_SECONDS = 60.0
+REFRESH_SUBSCRIPTIONS_EXPIRES_SECONDS = 55
 
 BEAT_SCHEDULE = {
     "events-publish-due": {
@@ -60,5 +71,10 @@ BEAT_SCHEDULE = {
         "task": REMINDERS,
         "schedule": REMINDERS_INTERVAL_SECONDS,
         "options": {"queue": QUEUE_DEFAULT, "expires": REMINDERS_EXPIRES_SECONDS},
+    },
+    "events-refresh-subscriptions": {
+        "task": REFRESH_SUBSCRIPTIONS,
+        "schedule": REFRESH_SUBSCRIPTIONS_INTERVAL_SECONDS,
+        "options": {"queue": QUEUE_DEFAULT, "expires": REFRESH_SUBSCRIPTIONS_EXPIRES_SECONDS},
     },
 }

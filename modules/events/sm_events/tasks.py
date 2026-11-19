@@ -10,6 +10,8 @@ here, everything else inside the bodies. Routing, queues and beat are in
   next one itself while the import is not finished.
 * ``events.janitor()`` - hourly cleanup of imports and revoked private feed links.
 * ``events.reminders()`` - the beat every minute that sends the reminders that have fallen due.
+* ``events.refresh_subscriptions()`` - the beat every minute that fetches the external calendars
+  that have fallen due; ``events.refresh_subscription(tenant_id, subscription_id)`` - one of them.
 
 Bodies run through :mod:`sm_events.core.worker`: no app, a fresh event loop per
 task, and the body binds every tenant itself.
@@ -17,13 +19,22 @@ task, and the body binds every tenant itself.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from celery import shared_task
 from celery.signals import worker_process_init
 
-from sm_events.task_config import JANITOR, PUBLISH_DUE, QUEUE_DEFAULT, REMINDERS, RUN_IMPORT
+from sm_events.task_config import (
+    JANITOR,
+    PUBLISH_DUE,
+    QUEUE_DEFAULT,
+    REFRESH_SUBSCRIPTION,
+    REFRESH_SUBSCRIPTIONS,
+    REMINDERS,
+    RUN_IMPORT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +123,66 @@ def reminders() -> dict[str, int]:
             factory, runtime_factory=worker_app.worker_runtime, now=utcnow()
         )
     )
+
+
+async def _install_secret() -> bool:
+    """Make the stored-secret crypto usable in this worker; ``False`` when there is no key (a
+    worker never makes one). The lookup is a blocking read, so it runs off the loop."""
+    import asyncio
+
+    from sm_events.core import secret
+
+    try:
+        secret.install(await asyncio.to_thread(secret.resolve_worker_secret))
+    except secret.SecretMissing:
+        return False
+    return True
+
+
+@shared_task(name=REFRESH_SUBSCRIPTIONS)
+def refresh_subscriptions() -> dict[str, int]:
+    """One pass over the due external calendars; counts only. Without a secret key the worker
+    cannot open any address: it fetches nothing and records nothing against the feeds."""
+    from sm_events.core.clock import utcnow
+    from sm_events.core.worker import run_platform
+    from sm_events.feeds.subscriptions import refresh
+
+    async def body(factory: Any) -> dict[str, int]:
+        if not await _install_secret():
+            logger.warning("events.refresh_subscriptions: no secret key; nothing was fetched")
+            return {"unavailable": 1, **dict.fromkeys(refresh.COUNTS, 0)}
+        settings = await asyncio.to_thread(refresh._stored_settings)
+        return await refresh.refresh_async(factory, now=utcnow(), settings=settings)
+
+    return run_platform(body)
+
+
+@shared_task(name=REFRESH_SUBSCRIPTION)
+def refresh_subscription(tenant_id: str, subscription_id: str) -> str:
+    """One subscription, on demand: the same claim, guarded fetch and fenced store. ``gone`` for
+    a tenant or an id that is nothing."""
+    import uuid
+
+    from sm_events.core.clock import utcnow
+    from sm_events.core.tenancy import valid_tenant
+    from sm_events.core.worker import run_platform
+    from sm_events.feeds.subscriptions import refresh
+
+    async def body(factory: Any) -> str:
+        try:
+            sid = uuid.UUID(subscription_id)
+        except ValueError:
+            return "gone"
+        if not valid_tenant(tenant_id):
+            return "gone"
+        if not await _install_secret():
+            return "unavailable"
+        settings = await asyncio.to_thread(refresh._stored_settings)
+        return await refresh.refresh_one_async(
+            factory, tenant_id=tenant_id, subscription_id=sid, now=utcnow(), settings=settings
+        )
+
+    return run_platform(body)
 
 
 @worker_process_init.connect(weak=False, dispatch_uid="sm_events.forget_parent_runtime")
