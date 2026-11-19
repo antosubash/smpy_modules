@@ -22,7 +22,12 @@ from pydantic import (
 from sm_newsletter.content.card_text import EXCERPT_MAX, LOCALE_MAX, PLACE_MAX, TITLE_MAX
 from sm_newsletter.content.merge import MAX_FALLBACK, check_merge
 from sm_newsletter.content.richtext import clean
-from sm_newsletter.content.urls import check_image, check_link
+from sm_newsletter.content.urls import (
+    check_image,
+    check_link,
+    check_site_image,
+    check_site_path,
+)
 from sm_newsletter.core.errors import InvalidBody
 from sm_newsletter.core.headers import check_header_text
 
@@ -71,6 +76,10 @@ Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 Link = Annotated[str, AfterValidator(check_link)]
 ImageUrl = Annotated[str, AfterValidator(check_image)]
 Merged = AfterValidator(_merge)
+# An event card links only into the site (its snapshot is always site-relative), so a forged body
+# cannot make a card that looks like an event of this site point anywhere else.
+SitePath = Annotated[str, AfterValidator(check_site_path)]
+SiteImage = Annotated[str, AfterValidator(check_site_image)]
 
 
 class _Props(BaseModel):
@@ -137,9 +146,9 @@ class EventCardProps(_Props):
     source_id: Annotated[str, Field(pattern=UUID_RE)]
     title: Annotated[str, Field(max_length=TITLE_MAX)] = ""
     excerpt: Annotated[str, Field(max_length=EXCERPT_MAX)] = ""
-    image_url: ImageUrl = ""
-    url: Link
-    ics_url: Link
+    image_url: SiteImage = ""
+    url: SitePath
+    ics_url: SitePath
     locale: Annotated[str, Field(max_length=LOCALE_MAX)] = ""
     starts_at: AwareDatetime
     ends_at: AwareDatetime

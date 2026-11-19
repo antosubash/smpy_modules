@@ -91,7 +91,7 @@ async def test_snapshot_event_from_contract(db_state, db):
     assert (props["url"], props["ics_url"]) == ("/events/open-day", "/events/open-day.ics")
     assert props["place"] == "Hall 1, Main St 2" and props["attendance_mode"] == "hybrid"
     assert props["timezone"] == "Europe/Vienna" and props["cancelled"] is False
-    assert props["image_url"] == "https://cdn.example.com/a.png"
+    assert props["image_url"] == ""  # an off-site image is never carded
     EventCardProps.model_validate(props)
     other = await cards.snapshot(APP, db, tenant_id=T, kind="event", source_id=str(eid))
     assert other["id"] != props["id"]

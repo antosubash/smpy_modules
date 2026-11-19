@@ -20,7 +20,7 @@ from sm_newsletter.content.card_text import (
     strip_bidi,
 )
 from sm_newsletter.content.integrations import EventHit
-from sm_newsletter.content.urls import check_image, check_link
+from sm_newsletter.content.urls import check_site_image, check_site_path
 from sm_newsletter.core.errors import CardSourceGone
 
 
@@ -31,14 +31,14 @@ def _text(value: str, limit: int) -> str:
 def event_snapshot_props(hit: EventHit, *, block_id: str, now: datetime) -> dict[str, Any]:
     """The event card's props for ``hit``. A page or calendar address the body would refuse
     cannot be carded (:class:`CardSourceGone`); an image it would refuse is dropped."""
-    if not (fits(check_link, hit.url) and fits(check_link, hit.ics_url)):
+    if not (fits(check_site_path, hit.url) and fits(check_site_path, hit.ics_url)):
         raise CardSourceGone()
     props = {
         "id": block_id,
         "source_id": hit.source_id,
         "title": _text(hit.title, TITLE_MAX),
         "excerpt": _text(hit.excerpt, EXCERPT_MAX),
-        "image_url": hit.image_url if fits(check_image, hit.image_url) else "",
+        "image_url": hit.image_url if fits(check_site_image, hit.image_url) else "",
         "url": hit.url,
         "ics_url": hit.ics_url,
         "locale": hit.locale[:LOCALE_MAX],

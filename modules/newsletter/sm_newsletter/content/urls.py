@@ -64,6 +64,30 @@ def check_image(value: str) -> str:
     raise ValueError("not an allowed image address")
 
 
+def is_site_path(value: str) -> bool:
+    """A path on the site itself: one leading ``/``, no scheme, no ``//``, no backslash, no
+    whitespace, control or format character, no merge tag, at most :data:`MAX_URL` long. What an
+    event card's snapshot always holds, and the only thing the card may link to."""
+    return (
+        _plain(value)
+        and value.startswith("/")
+        and not value.startswith("//")
+        and "\\" not in value
+        and "{{" not in value
+    )
+
+
+def check_site_path(value: str) -> str:
+    if not is_site_path(value):
+        raise ValueError("not a path on this site")
+    return value
+
+
+def check_site_image(value: str) -> str:
+    """Empty, or a path on the site itself."""
+    return value if value == "" else check_site_path(value)
+
+
 def absolute(base: str, url: str) -> str:
     """Make ``url`` absolute against ``base``; absolute, mailto and the tag pass through."""
     if url.startswith("//"):
