@@ -19,6 +19,8 @@ export type Calendar = {
   owner_id: string;
   owner_name: string | null;
   default_timezone: string;
+  /** Reminder lead times this calendar suggests (minutes); `null`: the site's. */
+  default_reminder_minutes: number[] | null;
   /** The plugin sources enabled here; `settings` is empty unless the caller can manage them. */
   sources: CalendarSource[];
   /** What a write to the sources sends back (empty for one who cannot manage them). */
@@ -37,6 +39,8 @@ export type CalendarInput = {
   color: string;
   description: string | null;
   default_timezone: string;
+  /** `null` goes back to the site's suggestion; omitted leaves it as it is. */
+  default_reminder_minutes?: number[] | null;
   visibility?: Visibility;
 };
 export type ShareRole = 'view' | 'edit';

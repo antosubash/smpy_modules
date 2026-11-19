@@ -48,6 +48,7 @@ export function calendar(overrides = {}) {
     owner_id: 'u1',
     owner_name: 'Olga Owner',
     default_timezone: 'Europe/Vienna',
+    default_reminder_minutes: null,
     sources: [],
     sources_version: 'v1',
     created_at: '2026-11-17T12:00:00Z',

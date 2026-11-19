@@ -176,6 +176,7 @@ describe('Calendars', () => {
       color: '#2563eb',
       description: null,
       default_timezone: 'Europe/Vienna',
+      default_reminder_minutes: null,
     });
     await view.unmount();
   });
