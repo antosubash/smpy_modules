@@ -1,10 +1,16 @@
-"""The bounds on this route: per IP, per address and the captcha; no per-type budget."""
+"""The bounds on this route: per IP, per form total, per address and the captcha."""
 
 from __future__ import annotations
 
 import pytest
 
-from tests.support.registration_http import load_registration, register, regs, seed_event
+from tests.support.registration_http import (
+    confirm_record,
+    load_registration,
+    register,
+    regs,
+    seed_event,
+)
 from tests.support.submissions_http import configure
 
 pytestmark = pytest.mark.usefixtures("reg_site")
@@ -36,21 +42,29 @@ async def test_the_per_ip_limit_and_the_captcha_apply(reg_site, provider):
     assert (refused.status_code, refused.json()["code"]) == (400, "captcha_failed")
 
 
-async def test_there_is_no_per_type_budget_for_registrations(reg_site):
-    """The shared per-type budget (60/hour) would let a dozen rotating addresses lock every genuine
-    registrant out; a registration is bounded per IP, per address and by the captcha instead."""
+async def test_the_form_total_limit_applies_to_registrations(reg_site):
+    """The per-form total (``public_submissions_type_rate``, every submission form has one) bounds
+    a distributed sender: without it the route could create unbounded pending records and mail
+    unbounded distinct third-party addresses. Over it: the same 429 every form answers, identical
+    for every address; confirm and cancel are not counted."""
     configure(
         reg_site,
         public_submissions_rate_per_ip="1000/minute",
         public_submissions_type_rate="2/hour",
     )
     event = await seed_event(reg_site.db_state, uid="t@x", registration_capacity=10)
-    tokens = [await token(reg_site, event) for _ in range(5)]
+    tokens = [await token(reg_site, event) for _ in range(4)]
     got = [
-        (await register(reg_site, f"t{n}@example.org", event=event, token=tokens[n])).status_code
-        for n in range(5)
+        await register(reg_site, f"t{n}@example.org", event=event, token=tokens[n])
+        for n in range(4)
     ]
-    assert got == [202] * 5 and len(await regs(reg_site)) == 5
+    assert [g.status_code for g in got] == [202, 202, 429, 429]
+    assert all("Retry-After" in g.headers for g in got[2:])
+    assert got[2].json() == got[3].json()  # no address-dependent difference
+    assert len(await regs(reg_site)) == 2
+    # a confirmation or a cancel is not a submit: the holder of a link can always use it
+    first = (await regs(reg_site))[0]
+    assert (await confirm_record(reg_site, first)).status_code == 200
 
 
 async def test_one_address_is_mailed_a_bounded_number_of_times(reg_site):
