@@ -150,6 +150,16 @@ export function eventItem(overrides = {}) {
   };
 }
 
+/** The public page's `registration` prop for an event nobody can register for. */
+export const NO_REGISTRATION = {
+  mode: 'none' as const,
+  url: null,
+  provider: null,
+  target: null,
+  occurrence_key: null,
+  upcoming: [],
+};
+
 export const category = { id: 'k1', slug: 'talks', names: { en: 'Talks' }, color: null };
 
 /** An event as `GET /api/events/events/{id}` returns it. */

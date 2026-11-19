@@ -4,11 +4,11 @@ import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { loadCatalogue } from '../utils/PageLocale';
 import { item } from './public-support';
+import { NO_REGISTRATION } from './support';
 import { mount, ready } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
 const { default: PublicEvent } = await import('../../pages/PublicEvent');
-
 import type { PublicEventProps } from '../public/types';
 
 function props(overrides: Partial<PublicEventProps> = {}): PublicEventProps {
@@ -50,14 +50,7 @@ function props(overrides: Partial<PublicEventProps> = {}): PublicEventProps {
     parent: null,
     sub_events: [],
     registration_url: 'https://register.example/x',
-    registration: {
-      mode: 'external',
-      url: 'https://register.example/x',
-      provider: null,
-      target: null,
-      occurrence_key: null,
-      upcoming: [],
-    },
+    registration: { ...NO_REGISTRATION, mode: 'external', url: 'https://register.example/x' },
     ics_url: '/events/concert.ics',
     canonical_url: 'https://x.example/events/concert',
     alternates: [],
@@ -169,18 +162,11 @@ it('a series lists its next occurrences with date links', async () => {
   expect(view.host.textContent).toContain('Every week');
 });
 
-const NONE = {
-  mode: 'none' as const,
-  url: null,
-  provider: null,
-  target: null,
-  occurrence_key: null,
-  upcoming: [],
-};
-
 it('a cancelled event shows the banner and hides registration', async () => {
   const view = await mount(
-    <PublicEvent {...props({ cancelled: true, registration_url: null, registration: NONE })} />,
+    <PublicEvent
+      {...props({ cancelled: true, registration_url: null, registration: NO_REGISTRATION })}
+    />,
   );
   expect(view.find('[role=status]')?.textContent).toBe('This event has been cancelled');
   expect(view.host.textContent).not.toContain('Register');
@@ -194,7 +180,7 @@ it('a cancelled date says so for that date', async () => {
         cancelled: true, // what the server sends for a cancelled date as well
         when: base.when && { ...base.when, status: 'cancelled', date_param: '2026-07-06' },
         registration_url: null,
-        registration: NONE,
+        registration: NO_REGISTRATION,
       })}
     />,
   );
