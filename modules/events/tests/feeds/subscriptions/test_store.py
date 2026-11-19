@@ -214,3 +214,19 @@ async def test_the_per_subscription_and_per_tenant_caps(db, sub, monkeypatch):
         await _store(db, sub, _three())  # 3 + 3 > 4 in this tenant
     assert caught.value.code == "too_many_events"
     assert await _rows(db, sub) == []
+
+
+async def test_storing_never_makes_an_event_a_revision_or_a_bus_event(db, sub):
+    """External items have no owner, revision or workflow: they are not events at all."""
+    from sm_events.content import bus
+    from sm_events.models import Event, Revision
+    from sqlalchemy import func
+
+    published: list = []
+    db.info[bus.BUS_KEY] = type("Bus", (), {"publish": lambda self, e: published.append(e)})()
+    await _store(db, sub, _three())
+    await db.flush()
+    for model in (Event, Revision):
+        count = (await db.execute(select(func.count()).select_from(model))).scalar_one()
+        assert count == 0, model
+    assert published == [] and not db.info.get("sm_db_on_commit_callbacks")
