@@ -153,6 +153,8 @@ class SubscriptionsSource:
         category and no event id."""
         if filters.sources is not None and self.id not in filters.sources:
             return False
+        if self.id in filters.exclude_sources:
+            return False
         if filters.types is not None and constants.BUILTIN_TYPE not in filters.types:
             return False
         return filters.category_ids is None and filters.event_ids is None

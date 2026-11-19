@@ -92,6 +92,7 @@ def test_all_tenants_call_sites():
         "core/access/resource_types.py",
         "feeds/importing/janitor.py",
         "feeds/importing/runner.py",
+        "feeds/subscriptions/refresh.py",  # the one narrow enumeration of due subscriptions
         "feeds/tokens/cleanup.py",
         "feeds/tokens/resolve.py",
         "reminders/cleanup.py",  # the UserDeleted delete, with its own user predicate

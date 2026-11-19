@@ -178,6 +178,14 @@ def blocks_router() -> APIRouter:
         db: AsyncSession = Depends(get_db),
         settings: EventsSettings = Depends(get_settings),
     ) -> Response:
-        return await occurrences_response(request, query, db, settings)
+        # The calendar block is a page on our own site: it shows what we publish and what
+        # plugins publish publicly, never someone else's subscribed calendar.
+        return await occurrences_response(
+            request,
+            query,
+            db,
+            settings,
+            exclude_sources=frozenset({constants.SOURCE_SUBSCRIPTIONS}),
+        )
 
     return router
