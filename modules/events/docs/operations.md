@@ -60,3 +60,15 @@ included, to `/setup`.
 `host/tests/test_events_wiring.py` boots the real host and checks the routes, the anonymous
 exemption (`GET`/`HEAD` only), the rate limits and the 304. `tests/web/public/test_leaks*.py` is the
 leak harness: every public route is in its table, and a route that is not fails a test.
+
+## Subscriptions to internal calendars
+
+`allow_private_subscription_urls` (off by default) is a system setting: only someone with
+`settings.edit` changes it, never a calendar owner. With it on, a holder of `events.manage` can
+subscribe a calendar to `http(s)` addresses in 10/8, 172.16/12, 192.168/16, 100.64/10, 198.18/15
+and fc00::/7, on any port. That means the server will send GET requests to internal services,
+including services bound to this server's own private address, and the subscriber learns whether
+the answer parsed as a calendar. Loopback, link-local, multicast and the cloud metadata and
+control endpoints (169.254.0.0/16, 100.100.100.200, 168.63.129.16, 192.0.0.192, fd00:ec2::/32 and
+every IPv6 form embedding one) are refused whatever the setting says. The user-visible failure
+codes are the same closed set either way. Turn it on only if an intranet calendar server needs it.

@@ -10,10 +10,13 @@ Checked on save **and** again on every fetch and every redirect hop, because DNS
 
 The *intranet switch* (``allow_private_subscription_urls``) is deliberately narrower than ai's,
 which skips the address check altogether: it lets RFC 1918, unique-local, CGNAT and benchmarking
-addresses through (plus ``http`` and any port), and **never** loopback, link-local (the cloud
-metadata addresses), unspecified, multicast or reserved ones, nor an IPv4-mapped, NAT64, 6to4 or
-Teredo form of those (:func:`address_allowed`). Using it also needs ``events.manage``: a save by
-anyone else is judged as if the switch were off (:class:`Policy.may_use_private`).
+addresses through (plus ``http`` and any port), and **never** anything in :data:`ALWAYS_DENIED`:
+loopback, link-local, multicast and the cloud metadata and control endpoints (even those inside
+the opened ranges), nor an IPv4-mapped, NAT64, 6to4 or Teredo form of one
+(:func:`address_allowed`).
+It is a SYSTEM setting written on the Settings screen (``settings.edit``), never per calendar.
+Using it also needs ``events.manage``: a save by anyone else is judged as if the switch
+were off (:class:`Policy.may_use_private`).
 
 Every refusal is an :class:`UnsafeURLError` whose message is its code and nothing else.
 """
@@ -32,7 +35,6 @@ import idna
 from sm_events.core import constants
 from sm_events.feeds.subscriptions import url_safety
 from sm_events.feeds.subscriptions.url_safety import (
-    _METADATA,
     IPAddress,
     UnsafeURLError,
     _embedded_ipv4,
@@ -41,6 +43,7 @@ from sm_events.feeds.subscriptions.url_safety import (
 )
 
 __all__ = [
+    "ALWAYS_DENIED",
     "Policy",
     "address_allowed",
     "check",
@@ -59,16 +62,43 @@ _NUMERIC_HOST: Final = re.compile(r"^(?:0x[0-9a-f]+|\d+)(?:\.(?:0x[0-9a-f]+|\d+)
 """A host made only of numbers: a resolver reads ``2130706433``, ``0x7f.1`` and ``127.1`` as
 127.0.0.1 although no parser here does, so anything but a canonical dotted quad is refused."""
 
-# What the intranet switch lets through (and nothing else beyond what is public).
+ALWAYS_DENIED: Final = tuple(
+    ipaddress.ip_network(n)
+    for n in (
+        "127.0.0.0/8",  # loopback: this server's own services
+        "::1/128",  # loopback (IPv6)
+        "0.0.0.0/8",  # "this network", including the unspecified address
+        "::/128",  # unspecified (IPv6)
+        # link-local: AWS, GCP, Azure, OpenStack and DigitalOcean metadata (169.254.169.254),
+        # the AWS ECS task-role endpoint (169.254.170.2), Tencent (169.254.0.23)
+        "169.254.0.0/16",
+        "fe80::/10",  # link-local (IPv6)
+        "224.0.0.0/4",  # multicast
+        "ff00::/8",  # multicast (IPv6)
+        "255.255.255.255/32",  # broadcast
+        "100.100.100.200/32",  # Alibaba Cloud metadata, inside CGNAT
+        "168.63.129.16/32",  # Azure wireserver and host agent (a public-looking address)
+        "192.0.0.192/32",  # Oracle Cloud metadata
+        "fd00:ec2::/32",  # AWS IPv6 metadata (fd00:ec2::254) and its service range, inside fc00::/7
+    )
+)
+"""Never reachable: not publicly, not with the intranet switch. Loopback, link-local, multicast
+and the cloud providers' metadata and control endpoints, including those that sit inside the
+ranges the switch opens. Embedded IPv4 forms of these are refused too (:func:`address_allowed`).
+The server's *own* addresses on its private interfaces are not listed: the plan does not rule
+them out, so with the switch on a subscription can reach a service on this host's private
+address, like any other internal host (see the setting's description)."""
+
+# What the intranet switch adds (after ALWAYS_DENIED is applied): the private ranges.
 _PRIVATE: Final = tuple(
     ipaddress.ip_network(n)
     for n in (
         "10.0.0.0/8",
         "172.16.0.0/12",
         "192.168.0.0/16",
-        "100.64.0.0/10",  # CGNAT
+        "100.64.0.0/10",  # CGNAT, less the denied /32 above
         "198.18.0.0/15",  # benchmarking: some intranets live here
-        "fc00::/7",  # unique local (the EC2 metadata address is excluded below)
+        "fc00::/7",  # unique local, less fd00:ec2::/32 above
     )
 )
 
@@ -136,18 +166,25 @@ def _literal(host: str) -> IPAddress | None:
 
 
 def address_allowed(ip: IPAddress, *, allow_private: bool) -> bool:
-    """Whether a connection to ``ip`` may be made: publicly routable, or (with the intranet
-    switch) in one of the private ranges. An IPv6 form that embeds an IPv4 address is judged by
-    what it embeds."""
-    if is_public_address(ip):
-        return True
-    if not allow_private or ip in _METADATA:
+    """Whether a connection to ``ip`` may be made.
+
+    First, :data:`ALWAYS_DENIED`, whatever the switch says. An IPv6 form that embeds an IPv4
+    address (mapped, compatible, NAT64, 6to4, Teredo) is judged by what it embeds, and refused
+    if any of it is refused. Then: publicly routable, or (with the switch) a private range.
+    """
+    if any(ip in net for net in ALWAYS_DENIED if net.version == ip.version):
         return False
     if isinstance(ip, ipaddress.IPv6Address):
         embedded = _embedded_ipv4(ip)
-        if embedded:
-            return all(address_allowed(v4, allow_private=True) for v4 in embedded)
-    return any(ip in net for net in _PRIVATE if net.version == ip.version)
+        if embedded and not all(
+            address_allowed(v4, allow_private=allow_private) for v4 in embedded
+        ):
+            return False
+        if embedded and allow_private:
+            return True  # every embedded address passed, and the switch is on
+    if is_public_address(ip):
+        return True
+    return allow_private and any(ip in net for net in _PRIVATE if net.version == ip.version)
 
 
 def check(url: str | httpx.URL, policy: Policy) -> tuple[str, int]:

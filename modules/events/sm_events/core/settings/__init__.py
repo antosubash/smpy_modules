@@ -73,6 +73,9 @@ class EventsSettings(DbBackedSettings):
 
     allow_private_subscription_urls: bool = False
     """Lets a subscription use an address on this site's own network (private ranges such as
-    10.x or 192.168.x, plain ``http://`` and any port). Never lets one reach this server itself,
-    link-local or cloud-metadata addresses. Saving such an address also needs ``events.manage``,
-    so an internal target needs both this switch and that permission."""
+    10.x or 192.168.x, plain ``http://`` and any port). Never lets one reach this server's
+    loopback, link-local or cloud-metadata addresses. WARNING: with this on, anyone who may
+    subscribe a calendar and holds ``events.manage`` can make the server send GET requests to
+    internal http(s) addresses (including services on this server's own private address) and see
+    whether the answer parses as a calendar. A system setting: only someone with
+    ``settings.edit`` changes it, never a calendar owner."""
