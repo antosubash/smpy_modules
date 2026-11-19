@@ -3202,7 +3202,9 @@ source = { editable = "modules/events" }
 dependencies = [
     { name = "babel" },
     { name = "cryptography" },
+    { name = "httpx" },
     { name = "icalendar" },
+    { name = "idna" },
     { name = "jinja2" },
     { name = "pydantic-settings" },
     { name = "python-dateutil" },
@@ -3229,7 +3231,9 @@ pagebuilder = [
 requires-dist = [
     { name = "babel", specifier = ">=2.14,<3" },
     { name = "cryptography", specifier = ">=42" },
+    { name = "httpx", specifier = ">=0.27,<1" },
     { name = "icalendar", specifier = ">=7,<8" },
+    { name = "idna", specifier = ">=3,<4" },
     { name = "jinja2", specifier = ">=3.1,<4" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },

@@ -258,6 +258,7 @@ FAMILIES: tuple[Family, ...] = (
         "SSRF address guard",
         (
             Copy("modules/images/sm_images/ingest/imports/url_safety.py"),
+            Copy("modules/events/sm_events/feeds/subscriptions/url_safety.py"),
             Copy(f"{AI}/core/url_safety.py", {"httpx2": "httpx"}),
         ),
         # The address rules are the guard; `check_url` and `resolve_public`
@@ -278,9 +279,21 @@ FAMILIES: tuple[Family, ...] = (
         ),
         differ={
             "check_url": "A provider endpoint may listen on any port (vLLM on 8000), so ai's "
-            "copy has no port allow-list; images fetches arbitrary URLs and keeps 80/443.",
+            "copy has no port allow-list; images fetches arbitrary URLs and keeps 80/443. "
+            "Events' copy equals images' (the next family pins that); its own https-only and "
+            "intranet rules are in feeds/subscriptions/policy.py.",
             "resolve_public": "See check_url: images passes its port allow-list through.",
         },
+    ),
+    Family(
+        "SSRF address guard: entry points",
+        (
+            Copy("modules/images/sm_images/ingest/imports/url_safety.py"),
+            Copy("modules/events/sm_events/feeds/subscriptions/url_safety.py"),
+        ),
+        # The two copies that keep the port allow-list: `check_url` and `resolve_public` are
+        # the guard's entry points, and events' copy must not wander from images'.
+        shared=("DEFAULT_ALLOWED_PORTS", "check_url", "resolve_public"),
     ),
     *CRYPTO_FAMILIES,
     *PUBLIC_FAMILIES,
