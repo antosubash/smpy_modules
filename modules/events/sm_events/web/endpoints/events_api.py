@@ -34,7 +34,7 @@ router = APIRouter(prefix="/events", tags=["events"], dependencies=[require_view
 
 ListStatus = Literal[*EVENT_STATUSES, constants.STATUS_SCHEDULED]  # type: ignore[valid-type]
 LocaleQuery = Annotated[str | None, Query(max_length=constants.LOCALE_MAX)]
-PAGE_LIMIT = 10_000
+PAGE_LIMIT = constants.PAGE_MAX
 
 
 @router.get("")

@@ -48,7 +48,7 @@ PATH_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/events/[^/]+/follow$"
 BY_ID_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/reminders/follows/[^/]+$"
 """Removal by follow id."""
 RATE = limits.FOLLOW_RATE
-Page = Annotated[int, Query(ge=1)]
+Page = Annotated[int, Query(ge=1, le=constants.PAGE_MAX)]
 PageSize = Annotated[int, Query(ge=1, le=limits.MINE_PAGE_MAX)]
 
 

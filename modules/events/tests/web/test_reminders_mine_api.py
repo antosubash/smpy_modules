@@ -82,7 +82,12 @@ async def test_mine_lists_only_the_callers_own_visible_follows(world):
     assert (await client.get(f"{BASE}/reminders/mine", headers=SV)).json()["total"] == 0
 
 
-@pytest.mark.parametrize("query", ["page=0", "page=-1", "page_size=0", "page_size=101", "page=x"])
+BIG = ["page=9223372036854775807", "page=99999999999999999999", "page=2147483648", "page=10001"]
+
+
+@pytest.mark.parametrize(
+    "query", ["page=0", "page=-1", "page_size=0", "page_size=101", "page=x", *BIG]
+)
 async def test_mine_paging_bounds_are_422(world, query):
     client, _ = world
     assert (await client.get(f"{BASE}/reminders/mine?{query}", headers=U)).status_code == 422
@@ -178,3 +183,9 @@ def test_request_locale_is_shape_checked():
     assert of("de") == "de" and of("pt-BR") == "pt-BR"
     for bad in (None, "", "x", "../etc", "a" * 17, 7, "de;drop", "dé"):
         assert of(bad) == "en", bad
+
+
+async def test_the_last_allowed_page_is_an_empty_page_not_an_error(world):
+    client, _ = world
+    got = await client.get(f"{BASE}/reminders/mine?page=10000&page_size=100", headers=U)
+    assert got.status_code == 200 and got.json()["items"] == []
