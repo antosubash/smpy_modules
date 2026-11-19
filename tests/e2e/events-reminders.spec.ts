@@ -43,7 +43,7 @@ test('while reminders cannot be delivered the popover says why in words and offe
   page,
   baseURL,
 }) => {
-  const seeded = await seedPublished(page, `Garden talk ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Garden talk');
   const detail = await openPopover(page, seeded);
   await expect(detail.getByTestId('remind-unavailable')).toContainText('public address is not set');
   await expect(detail.getByRole('button', { name: 'Remind me' })).toHaveCount(0);
@@ -63,7 +63,7 @@ test('follow from the popover, see it on the page, change the times, stop', asyn
   baseURL,
 }) => {
   await enableReminders(page, baseURL as string);
-  const seeded = await seedPublished(page, `Harvest supper ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Harvest supper');
   const detail = await openPopover(page, seeded);
   const control = detail.getByRole('button', { name: 'Remind me' });
   await control.click();
@@ -98,7 +98,7 @@ test('the editor header has the control for a published event, and a draft has n
   baseURL,
 }) => {
   await enableReminders(page, baseURL as string);
-  const seeded = await seedPublished(page, `Editor follow ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Pottery workshop');
   await page.goto(`/admin/events/edit/${seeded.id}`);
   await page.getByRole('button', { name: 'Remind me' }).click();
   await page.getByRole('checkbox', { name: '15 minutes before' }).click();
@@ -124,7 +124,7 @@ test('the editor header has the control for a published event, and a draft has n
 
 test('calendar defaults are what the control preselects', async ({ page, baseURL }) => {
   await enableReminders(page, baseURL as string);
-  const seeded = await seedPublished(page, `Defaults ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Open studio', 'internal', 'Studio events');
   await page.goto('/admin/events/calendars');
   const row = page.getByRole('row', { name: new RegExp(seeded.cal.name) });
   await row.getByRole('button', { name: /^Edit/ }).click();
@@ -144,7 +144,7 @@ test('calendar defaults are what the control preselects', async ({ page, baseURL
 
 test('German, and a phone', async ({ page, context, baseURL }) => {
   await enableReminders(page, baseURL as string);
-  const seeded = await seedPublished(page, `Gartenfest ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Gartenfest');
   await context.addCookies([{ name: 'locale', value: 'de', url: baseURL as string }]);
   try {
     const detail = await openPopover(page, seeded);

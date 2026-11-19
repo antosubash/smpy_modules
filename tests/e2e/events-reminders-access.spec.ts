@@ -45,7 +45,7 @@ test("a second user cannot see or touch the first user's follows", async ({
   baseURL,
 }) => {
   await enableReminders(page, baseURL as string);
-  const seeded = await seedPublished(page, `Private follow ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Book club');
   const put = await page.request.put(followUrl(seeded.id), {
     headers: await csrf(page),
     data: { leads: [60] },
@@ -82,7 +82,7 @@ test('a user who loses access sees an opaque row and can remove it', async ({
   baseURL,
 }) => {
   await enableReminders(page, baseURL as string);
-  const seeded = await seedPublished(page, `Soon secret ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Board retreat');
   const reader = await readerPage(browser, baseURL as string);
   try {
     const put = await reader.page.request.put(followUrl(seeded.id), {
@@ -119,7 +119,7 @@ test('a user the worker cannot verify is told, and the follow is kept', async ({
   // needs a membership role, upstream #1005): the API side is the Python suite's. Here the
   // server's answer is fixed, and what the person sees is what is checked.
   await enableReminders(page, baseURL as string);
-  const seeded = await seedPublished(page, `Unverifiable ${Date.now()}`);
+  const seeded = await seedPublished(page, 'Wine tasting');
   await page.route('**/api/events/events/*/follow', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
     return route.fulfill({

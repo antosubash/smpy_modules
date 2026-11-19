@@ -68,8 +68,10 @@ export async function seedPublished(
   page: Page,
   title: string,
   visibility: 'internal' | 'private' = 'internal',
+  calendarName = 'Town events',
 ) {
-  const cal = await seedCalendar(page, { visibility });
+  // A realistic name (the screenshots show it); the event's title tells the tests apart.
+  const cal = await seedCalendar(page, { visibility, label: calendarName, plain: true });
   const day = wednesday();
   const event = await seedEvent(page, {
     calendar: cal.id,
