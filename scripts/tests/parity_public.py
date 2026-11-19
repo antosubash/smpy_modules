@@ -63,4 +63,20 @@ PUBLIC_FAMILIES: tuple[Family, ...] = (
         ),
         shared=("_find",),
     ),
+    Family(
+        "block label localiser (TypeScript, #423)",
+        (
+            Copy(f"{PB}/ui/components/localizeConfig.ts"),
+            Copy(f"{EVENTS}/ui/blocks/localizeFields.ts"),
+        ),
+        shared=("LabelledOption", "LabelledField", "mapValues", "localizeField"),
+    ),
+    Family(
+        "page content locale hook (TypeScript, #423)",
+        (
+            Copy(f"{NEWS}/ui/hooks/useContentLocale.ts"),
+            Copy(f"{EVENTS}/ui/blocks/useContentLocale.ts"),
+        ),
+        shared=("LocaleCarryingProps", "useContentLocale"),
+    ),
 )

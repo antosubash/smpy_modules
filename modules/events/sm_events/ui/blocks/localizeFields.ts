@@ -5,35 +5,58 @@
  *  anonymous route answers) are made after that, so events resolves them itself, with the same
  *  reach: every `label`, every `options[].label`, and into `arrayFields` and `objectFields`.
  *
- *  A pure deep copy. A label that is already text (a calendar's name) is not a key, and the
- *  translator hands an unknown key back as it came. */
+ *  `mapValues` and `localizeField` are parity copies of pagebuilder's `localizeConfig.ts`
+ *  (`scripts/tests/parity_families.py`): pagebuilder exporting them is #423, and until then the two
+ *  stay identical. A label that is already text (a calendar's name) is not a key, and the
+ *  translator hands an unknown key back as it came. A pure deep copy. */
 
 import type { Translate } from '../utils/i18n';
 
-type Node = Record<string, unknown>;
+interface LabelledOption {
+  label?: string;
+}
 
-function field(value: unknown, tr: Translate): unknown {
-  if (!value || typeof value !== 'object') return value;
-  const source = value as Node;
-  const out: Node = { ...source };
-  if (typeof source.label === 'string') out.label = tr(source.label);
-  if (Array.isArray(source.options)) {
-    out.options = source.options.map((option) =>
-      option && typeof option === 'object' && typeof (option as Node).label === 'string'
-        ? { ...(option as Node), label: tr((option as Node).label as string) }
-        : option,
-    );
-  }
-  for (const nested of ['arrayFields', 'objectFields'] as const) {
-    const children = source[nested];
-    if (children && typeof children === 'object')
-      out[nested] = localizeFields(children as Node, tr);
-  }
+interface LabelledField {
+  label?: string;
+  options?: LabelledOption[];
+  arrayFields?: Record<string, LabelledField>;
+  objectFields?: Record<string, LabelledField>;
+}
+
+function mapValues<V, R>(
+  source: Record<string, V> | undefined,
+  fn: (value: V) => R,
+): Record<string, R> | undefined {
+  if (!source) return source;
+  const out: Record<string, R> = {};
+  for (const [name, value] of Object.entries(source)) out[name] = fn(value);
   return out;
 }
 
-export function localizeFields<F extends Node>(fields: F, tr: Translate): F {
-  const out: Node = {};
-  for (const [name, value] of Object.entries(fields)) out[name] = field(value, tr);
-  return out as F;
+function localizeField(field: LabelledField, t: Translate): LabelledField {
+  // A `custom` field has no label of its own — it renders its own
+  // `FieldLabel`, and translates there.
+  const next: LabelledField = { ...field };
+  if (field.label) next.label = t(field.label);
+  if (field.options) {
+    next.options = field.options.map((option) =>
+      option.label ? { ...option, label: t(option.label) } : option,
+    );
+  }
+  // An `array` or `object` field carries a second level of labels, which the
+  // editor shows once a row is expanded. Missing them left half of every
+  // repeater's chrome untranslated.
+  if (field.arrayFields) {
+    next.arrayFields = mapValues(field.arrayFields, (inner) => localizeField(inner, t));
+  }
+  if (field.objectFields) {
+    next.objectFields = mapValues(field.objectFields, (inner) => localizeField(inner, t));
+  }
+  return next;
+}
+
+export function localizeFields<F extends object>(fields: F, t: Translate): F {
+  return mapValues(fields as Record<string, LabelledField>, (field) =>
+    localizeField(field, t),
+  ) as unknown as F;
 }

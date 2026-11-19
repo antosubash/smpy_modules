@@ -3,7 +3,7 @@
  * client-side from the anonymous route (as news' feed does), so a block's data has its own short
  * cache and never goes stale inside its page's.
  *
- * Text only, never markup. The page's language comes from the page (`usePageLocale`), and the
+ * Text only, never markup. The page's language comes from the page (`useContentLocale`), and the
  * dates are the event's own clock as the server sent it. While loading, when there is nothing to
  * show, and when the fetch fails, a visitor sees nothing at all (a heading over an empty list
  * reads as a broken section); the editor gets a hint instead.
@@ -17,7 +17,7 @@ import { PageLocale } from '../utils/PageLocale';
 import { fetchBlockCalendars, fetchUpcoming } from './api-blocks';
 import { BlockBoundary } from './BlockBoundary';
 import { clampCount, oneOf, slugsOf } from './limits';
-import { usePageLocale } from './usePageLocale';
+import { useContentLocale } from './useContentLocale';
 
 export type UpcomingEventsProps = {
   heading: string;
@@ -108,7 +108,7 @@ function Cards({
 
 function Inner(props: UpcomingEventsProps & WithPuck) {
   const { t } = useT();
-  const locale = usePageLocale();
+  const locale = useContentLocale();
   const editing = props.puck?.isEditing === true;
   const { items, failed } = useUpcoming(props, locale ?? '');
   const missing = useUnresolved(props, locale ?? '', editing);
@@ -150,7 +150,7 @@ function Inner(props: UpcomingEventsProps & WithPuck) {
 }
 
 export function UpcomingEventsRender(props: UpcomingEventsProps & WithPuck) {
-  const locale = usePageLocale();
+  const locale = useContentLocale();
   const inner = (
     <BlockBoundary>
       <Inner {...props} />

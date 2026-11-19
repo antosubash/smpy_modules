@@ -19,7 +19,7 @@ import { type BlockCalendars, fetchBlockCalendars } from './api-blocks';
 import { BlockBoundary } from './BlockBoundary';
 import { type EventsCalendarProps, minHeight, VIEWS } from './calendarProps';
 import { oneOf, slugsOf } from './limits';
-import { usePageLocale } from './usePageLocale';
+import { useContentLocale } from './useContentLocale';
 
 export const OCCURRENCES_URL = '/api/events/public/occurrences';
 const copy = keys.events.blocks;
@@ -46,7 +46,7 @@ function useCalendars(slugs: string[], locale: string): Loaded {
 
 function Inner(props: EventsCalendarProps & WithPuck) {
   const { t } = useT();
-  const locale = usePageLocale();
+  const locale = useContentLocale();
   const slugs = slugsOf(props.calendars);
   const { answer, failed, loading } = useCalendars(slugs, locale ?? '');
   const height = minHeight(props.height);
@@ -102,7 +102,7 @@ function Inner(props: EventsCalendarProps & WithPuck) {
 }
 
 export function EventsCalendarRender(props: EventsCalendarProps & WithPuck) {
-  const locale = usePageLocale();
+  const locale = useContentLocale();
   const inner = (
     <BlockBoundary>
       <Inner {...props} />
