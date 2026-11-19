@@ -101,6 +101,34 @@ def test_length_bound():
     )
 
 
+def _padded(length):
+    """A valid rule of exactly ``length`` characters: zero-padded numbers, and a
+    leading ``+`` on as many month days as the remainder needs."""
+    days = [*range(1, 32), *range(-31, 0)]
+    pluses = 0
+    while True:
+        month_days = ",".join(
+            f"{'+' if d > 0 and n < pluses else ''}{d:04d}" if d > 0 else f"{d:+05d}"
+            for n, d in enumerate(days)
+        )
+        months = ",".join(f"{m:04d}" for m in range(1, 13))
+        text = (
+            f"FREQ=YEARLY;INTERVAL=0001;COUNT=0002;WKST=MO;BYDAY=MO,TU,WE,TH,FR,SA,SU;"
+            f"BYMONTH={months};BYMONTHDAY={month_days}"
+        )
+        if len(text) >= length or pluses == len(days):
+            return text
+        pluses += 1
+
+
+def test_length_cap_is_exactly_500_characters():
+    assert len(_padded(500)) == 500
+    assert parse(_padded(500)) is not None
+    assert len(_padded(501)) == 501
+    refused = code_of(lambda: parse(_padded(501)))
+    assert refused.code == "invalid_rrule"
+
+
 def test_until_bounds_at_validate():
     assert code_of(lambda: check("FREQ=DAILY;UNTIL=20260601T000000Z")).code == "invalid_rrule"
     assert code_of(lambda: check("FREQ=DAILY;UNTIL=21260702T000000Z")).code == "invalid_rrule"

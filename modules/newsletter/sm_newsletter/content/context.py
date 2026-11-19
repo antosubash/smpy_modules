@@ -25,7 +25,7 @@ from sm_newsletter.core.tenancy import TenancyMode, mode_of
 logger = logging.getLogger(__name__)
 
 _FALLBACK_NAME = "Newsletter"
-_KEYS = ("footer_reason", "unsubscribe", "read_more")
+_KEYS = ("footer_reason", "unsubscribe", "read_more", "add_to_calendar", "cancelled", "online")
 
 
 def test_unsubscribe_url(base_url: str) -> str:
@@ -56,7 +56,14 @@ def _footer(app: Any, app_name: str) -> FooterCopy:
     the same as the unsubscribe page's."""
     _, copy = server_copy(app, "email", _KEYS)
     reason = copy["footer_reason"].replace("{app_name}", app_name)
-    return FooterCopy(reason=reason, unsubscribe=copy["unsubscribe"], read_more=copy["read_more"])
+    return FooterCopy(
+        reason=reason,
+        unsubscribe=copy["unsubscribe"],
+        read_more=copy["read_more"],
+        add_to_calendar=copy["add_to_calendar"],
+        cancelled=copy["cancelled"],
+        online=copy["online"],
+    )
 
 
 async def _org_slug(app: Any, tenant_id: str) -> str | None:

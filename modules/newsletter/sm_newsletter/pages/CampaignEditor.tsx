@@ -69,9 +69,10 @@ export default function CampaignEditor() {
   const { campaign } = editor;
   const news = props.capabilities?.news === true;
   const pagebuilder = props.capabilities?.pagebuilder === true;
+  const events = props.capabilities?.events === true;
   const config = useMemo(
-    () => localizeConfig(buildConfig({ news, pagebuilder }), t),
-    [news, pagebuilder, t],
+    () => localizeConfig(buildConfig({ news, pagebuilder, events }), t),
+    [news, pagebuilder, events, t],
   );
   const actions = useMemo(() => ({ refresh: editor.refresh }), [editor.refresh]);
   const [tab, setTab] = useState<EditorTab>('edit');

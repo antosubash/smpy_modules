@@ -2,8 +2,9 @@
 
 Every statement starts from :func:`~sm_events.core.access.events.visible_events`,
 so a draft never reaches a viewer who cannot write the calendar. The fixed
-look-back (:data:`~sm_events.core.constants.MAX_SERIES_EVENT_DAYS`) is the longest
-an instance can be, so an instance meeting the window cannot have started earlier.
+look-back (:data:`~sm_events.core.constants.MAX_SERIES_EVENT_DAYS` plus a margin for
+a DST hour) is the longest an instance can be, so an instance meeting the window
+cannot have started earlier.
 """
 
 from __future__ import annotations
@@ -20,11 +21,12 @@ from sm_events.calendar.occurrence import OccurrenceFilters
 from sm_events.core import constants
 from sm_events.core.access import ACTION_WRITE_EVENTS, POLICY
 from sm_events.core.access.events import visible_events
+from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Calendar, Category, Event, EventText, OccurrenceOverride, OverrideKind
 
 __all__ = ["Row", "one_offs", "overrides", "series", "texts", "writable_calendars"]
 
-LOOK_BACK = timedelta(days=constants.MAX_SERIES_EVENT_DAYS)
+LOOK_BACK = timedelta(days=constants.MAX_SERIES_EVENT_DAYS + constants.LOOK_BACK_MARGIN_DAYS)
 
 Row = tuple[Event, str, str | None]
 """An event with its calendar's colour and its category's (if any)."""
@@ -36,6 +38,8 @@ def _base(viewer: ResourcePrincipal, filters: OccurrenceFilters) -> Any:
         .join(Calendar, col(Calendar.id) == col(Event.calendar_id))
         .outerjoin(Category, col(Category.id) == col(Event.category_id))
         .add_columns(col(Calendar.color), col(Category.color))
+        # Explicit, beside the framework's filter: the contract reads through here.
+        .where(col(Event.tenant_id) == bound_tenant())
     )
     if filters.calendar_ids is not None:
         stmt = stmt.where(col(Event.calendar_id).in_(filters.calendar_ids))
@@ -43,6 +47,8 @@ def _base(viewer: ResourcePrincipal, filters: OccurrenceFilters) -> Any:
         stmt = stmt.where(col(Event.category_id).in_(filters.category_ids))
     if filters.types is not None:
         stmt = stmt.where(col(Event.type).in_(filters.types))
+    if filters.event_ids is not None:
+        stmt = stmt.where(col(Event.id).in_(filters.event_ids))
     return stmt
 
 

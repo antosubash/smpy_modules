@@ -19,8 +19,19 @@ type Props = {
   can_manage: boolean;
   user_id: string;
   default_timezone: string;
+  /** The languages a private link may be in (the first is the default). */
+  content_locales?: string[];
+  /** Where the public feeds live (`/events`). */
+  public_prefix?: string;
 };
-export default function Calendars({ can_create, can_manage, user_id, default_timezone }: Props) {
+export default function Calendars({
+  can_create,
+  can_manage,
+  user_id,
+  default_timezone,
+  content_locales,
+  public_prefix,
+}: Props) {
   const { t } = useT();
   const copy = keys.events.calendars;
   const list = useCalendars();
@@ -80,6 +91,8 @@ export default function Calendars({ can_create, can_manage, user_id, default_tim
                     canManage={can_manage}
                     trashed={list.trashed}
                     onSaved={list.reload}
+                    contentLocales={content_locales}
+                    publicPrefix={public_prefix}
                   />
                 ))}
               </TableBody>

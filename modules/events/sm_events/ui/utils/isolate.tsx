@@ -12,8 +12,13 @@ const MARK = '';
 export const Name = ({ children }: { children: ReactNode }) => <bdi>{children}</bdi>;
 
 /** `t(key, { name })` as nodes, with the name isolated. */
-export function withName(t: Translate, key: string, name: string): ReactNode {
-  const [before = '', ...rest] = t(key, { name: MARK }).split(MARK);
+export function withName(
+  t: Translate,
+  key: string,
+  name: string,
+  params: Record<string, string | number> = {},
+): ReactNode {
+  const [before = '', ...rest] = t(key, { ...params, name: MARK }).split(MARK);
   return (
     <>
       {before}

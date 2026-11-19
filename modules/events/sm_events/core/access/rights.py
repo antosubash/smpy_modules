@@ -17,6 +17,7 @@ from sqlmodel import col, select
 
 from sm_events.core import constants
 from sm_events.core.access import ACTION_WRITE_EVENTS, POLICY
+from sm_events.core.errors import Forbidden, NotFound
 from sm_events.models import Calendar
 
 
@@ -73,3 +74,19 @@ async def calendar_rights_many(
         for action in (ACTION_VIEW, ACTION_EDIT, ACTION_DELETE, ACTION_WRITE_EVENTS)
     ]
     return {i: _rights(who, i in view, i in edit, i in own, i in write) for i in ids}
+
+
+async def writable_calendar(db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID) -> Calendar:
+    """The calendar, when the caller may write events in it: ``NotFound`` for one
+    that is missing or not visible, ``Forbidden`` for one they may only see."""
+    calendar = (
+        await db.execute(select(Calendar).where(Calendar.id == calendar_id))
+    ).scalar_one_or_none()
+    if calendar is None:
+        raise NotFound
+    rights = await calendar_rights(db, who, calendar)
+    if not rights.view:
+        raise NotFound
+    if not rights.write_events:
+        raise Forbidden(constants.EDIT_REFUSED_DETAIL)
+    return calendar

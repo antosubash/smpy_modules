@@ -10,25 +10,30 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictInt,
     StringConstraints,
     field_validator,
     model_validator,
 )
 
-from sm_events.core import constants, timezones
+from sm_events.calendar.plugins import source_entries
+from sm_events.core import constants
 from sm_events.models import Visibility
-from sm_events.web.schemas._fields import Color, MultiLine, SingleLine, Slug, lower_color
+from sm_events.reminders.leads import LEADS_INPUT_MAX
+from sm_events.web.schemas._fields import (
+    Color,
+    MultiLine,
+    SingleLine,
+    Slug,
+    known_timezone,
+    lower_color,
+)
+from sm_events.web.schemas.extensions import CalendarSourceOut
 
 Name = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200), SingleLine
 ]
 Description = Annotated[str, Field(max_length=2000), MultiLine]
-
-
-def _known_timezone(value: str | None) -> str | None:
-    if value is not None and not timezones.is_known(value):
-        raise ValueError("not a known IANA timezone")
-    return value
 
 
 class CalendarCreate(BaseModel):
@@ -40,7 +45,7 @@ class CalendarCreate(BaseModel):
     default_timezone: str | None = Field(default=None, max_length=constants.TZ_MAX)
 
     _lower_color = field_validator("color", mode="before")(lower_color)
-    _tz = field_validator("default_timezone")(_known_timezone)
+    _tz = field_validator("default_timezone")(known_timezone)
 
 
 class CalendarPatch(BaseModel):
@@ -51,9 +56,14 @@ class CalendarPatch(BaseModel):
     color: Color | None = None
     description: Description | None = None
     default_timezone: str | None = Field(default=None, max_length=constants.TZ_MAX)
+    default_reminder_minutes: list[StrictInt] | None = Field(
+        default=None, max_length=LEADS_INPUT_MAX
+    )
+    """Lead times "Remind me" preselects here; ``null`` goes back to the install-wide setting.
+    The values themselves are checked by the service (422 ``invalid_lead``)."""
 
     _lower_color = field_validator("color", mode="before")(lower_color)
-    _tz = field_validator("default_timezone")(_known_timezone)
+    _tz = field_validator("default_timezone")(known_timezone)
 
     @model_validator(mode="after")
     def _no_null_for_required(self) -> CalendarPatch:
@@ -83,7 +93,10 @@ class CalendarOut(BaseModel):
     owner_id: str
     owner_name: str | None = None
     default_timezone: str
-    sources: list[Any]
+    default_reminder_minutes: list[int] | None = None
+    sources: list[CalendarSourceOut] = []
+    sources_version: str = ""
+    """What a write to the sources must send back; empty for one who cannot manage them."""
     created_at: datetime
     updated_at: datetime | None
     deleted_at: datetime | None
@@ -91,3 +104,10 @@ class CalendarOut(BaseModel):
     can_own: bool = False
     can_write_events: bool = False
     can_publish: bool = False
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def _stored_entries(cls, raw: Any) -> list[dict[str, Any]]:
+        """The column holds ids and settings; what a caller sees is added by ``shown``, and
+        settings stay out until the caller is known to manage the calendar."""
+        return source_entries.shown(raw, with_settings=False)

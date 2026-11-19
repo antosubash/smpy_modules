@@ -18,11 +18,12 @@ from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from sm_events.calendar import rrule as rr
-from sm_events.calendar.times import Span, all_day_dates, localize
+from sm_events.calendar.times import Span, all_day_dates, day_exists, localize
+from sm_events.core import constants
 
 __all__ = ["Instance", "instances", "is_occurrence"]
 
-_MARGIN = timedelta(days=1)  # absorbs a UTC offset change; exact filtering is done in UTC
+_MARGIN = timedelta(days=constants.LOOK_BACK_MARGIN_DAYS)  # exact filtering is done in UTC
 _TICK = timedelta(microseconds=1)
 
 
@@ -48,43 +49,54 @@ def instances(
     recurrence_until: datetime | None,
 ) -> Iterator[Instance]:
     """Instances whose ``[start, end)`` meets ``[window_start, window_end)``,
-    ascending by start."""
+    ascending by start.
+
+    A local date that does not exist (a zone skipping a whole day) has no instance:
+    it is dropped, never mapped onto the next day's instant, though ``COUNT`` has
+    counted it (see :func:`sm_events.calendar.rrule.validate`)."""
     tz = ZoneInfo(timezone)
     if all_day:
         first, after = all_day_dates(span, timezone)
         length = after - first
-
-        def end_of(start_local: datetime, _start: datetime) -> datetime:
-            return localize(datetime.combine(start_local.date() + length, time.min), tz)
-
         reach = length
-        last_start = None if recurrence_until is None else _naive(recurrence_until, tz) - length
+        last_date = (
+            None if recurrence_until is None else _naive(recurrence_until, tz).date() - length
+        )
+        last_start = None
     else:
-        duration = span.ends_at - span.starts_at
-
-        def end_of(_start_local: datetime, start: datetime) -> datetime:
-            return start + duration
-
-        reach = duration
-        last_start = None if recurrence_until is None else _naive(recurrence_until - duration, tz)
+        reach = duration = span.ends_at - span.starts_at
+        last_date = None
+        last_start = None if recurrence_until is None else recurrence_until - duration
     upper = _naive(window_end, tz) + _MARGIN
-    if last_start is not None:
-        upper = min(upper, last_start)  # exact: the last instance, not one more
-    own = rr.until_local(rule, tz)
-    if own is not None:
-        upper = min(upper, own)
-    lower = _naive(window_start, tz) - reach - _MARGIN
+    for loose in (
+        rr.until_local(rule, tz),
+        None if last_start is None else _naive(last_start, tz) + _MARGIN,
+    ):
+        if loose is not None:
+            upper = min(upper, loose)
+    if last_date is not None:
+        upper = min(upper, datetime.combine(last_date, time(23, 59, 59)))
     walk = rr.iterate(
         rule,
-        dtstart_local=_naive(span.starts_at, tz),
-        lower_local=lower,
+        dtstart_local=rr.local_start(span, tz, all_day=all_day),
+        lower_local=_naive(window_start, tz) - reach - _MARGIN,
         until_local=upper,
     )
     for hit in walk:
-        start = localize(hit.replace(hour=0, minute=0, second=0) if all_day else hit, tz)
+        if not rr.within_until(rule, hit, tz) or (last_date is not None and hit.date() > last_date):
+            return
+        start = localize(hit, tz)
+        if last_start is not None and start > last_start:
+            return
+        if start.astimezone(tz).date() != hit.date() and not day_exists(hit.date(), tz):
+            continue
         if start >= window_end:
             return
-        end = end_of(hit, start)
+        end = (
+            localize(datetime.combine(hit.date() + length, time.min), tz)
+            if all_day
+            else start + duration
+        )
         if end > window_start:
             yield Instance(original_start=start, start=start, end=end)
 

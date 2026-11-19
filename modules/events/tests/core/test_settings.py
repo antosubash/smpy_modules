@@ -17,6 +17,17 @@ def test_defaults():
     assert settings.content_locales == ("en",)
 
 
+def test_public_fields():
+    settings = EventsSettings()
+    assert settings.public_prefix == "/events"
+    assert settings.public_cache_seconds == 300
+    assert settings.public_title == "Events"
+    extra = EventsSettings.model_fields["public_prefix"].json_schema_extra or {}
+    assert extra.get("requires_restart") is True
+    cache_extra = EventsSettings.model_fields["public_cache_seconds"].json_schema_extra or {}
+    assert "requires_restart" not in cache_extra
+
+
 def test_settings_ignore_env(monkeypatch):
     monkeypatch.setenv("SM_EVENTS_DEFAULT_TIMEZONE", "Europe/Vienna")
     monkeypatch.setenv("DEFAULT_TIMEZONE", "Europe/Vienna")
@@ -31,7 +42,7 @@ def test_restart_fields():
         for name, field in EventsSettings.model_fields.items()
         if (field.json_schema_extra or {}).get("requires_restart")
     }
-    assert restart == {"content_locales"}
+    assert restart == {"content_locales", "public_prefix"}
 
 
 def test_every_field_is_documented():
@@ -54,3 +65,10 @@ def test_pinned_settings_reach_the_container():
     app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     module.register_settings(app)
     assert app.state.sm_events.settings.default_timezone == "Europe/Vienna"
+
+
+def test_import_max_bytes():
+    settings = EventsSettings()
+    assert settings.import_max_bytes == 5 * 1024 * 1024
+    extra = EventsSettings.model_fields["import_max_bytes"].json_schema_extra or {}
+    assert "requires_restart" not in extra

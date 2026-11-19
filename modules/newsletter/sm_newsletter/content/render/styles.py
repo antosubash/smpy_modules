@@ -73,3 +73,10 @@ def accent_link(accent: str) -> str:
     """A link in the accent colour; validated like :func:`link_style`."""
     link_style(accent)
     return f"color:{accent};text-decoration:none"
+
+
+CARD_META = f"margin:0 0 4px;font-family:{FONT};font-size:14px;line-height:1.4;color:{MUTED}"
+CARD_BADGE = (
+    f"display:inline-block;margin:12px 0 0;padding:2px 8px;font-family:{FONT};font-size:12px;"
+    "font-weight:bold;color:#b91c1c;border:1px solid #b91c1c;border-radius:4px"
+)

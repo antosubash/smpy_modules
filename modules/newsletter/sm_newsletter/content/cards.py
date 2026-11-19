@@ -4,9 +4,10 @@ A card's props are a *snapshot* of its source, read through the source
 module's contract: what was sent is what the snapshot said, whatever the
 article says later. *Refresh* rewrites one card's snapshot in the stored draft
 through :func:`~sm_newsletter.campaigns.drafts.write_draft`, the same
-conditional, revision-bumping write a PATCH makes (amendment 2). A source that
-is no longer published, trashed, gone or another tenant's answers 409
-``card_source_gone`` and the stored campaign is left exactly as it was.
+conditional, revision-bumping write a PATCH makes (amendment 2). An event card
+reads its event the same way, through the public contract, and a series card rolls forward to
+the event's next occurrence. A source that is no longer published, trashed, gone or another
+tenant's answers 409 ``card_source_gone`` and the stored campaign is left exactly as it was.
 """
 
 from __future__ import annotations
@@ -19,8 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.campaigns import drafts
 from sm_newsletter.campaigns.access import Roles, require_campaign
-from sm_newsletter.content.blocks import CardProps, dump_body, parse_body
-from sm_newsletter.content.integrations import CardHit, news, pagebuilder
+from sm_newsletter.content.blocks import CardProps, EventCardProps, dump_body, parse_body
+from sm_newsletter.content.event_snapshot import event_snapshot_props
+from sm_newsletter.content.integrations import CardHit, EventHit, events, news, pagebuilder
 from sm_newsletter.content.urls import check_image, check_link
 from sm_newsletter.core.clock import utcnow
 from sm_newsletter.core.errors import (
@@ -32,8 +34,8 @@ from sm_newsletter.core.errors import (
 )
 from sm_newsletter.models import Campaign
 
-_SOURCES = {"article": news, "page": pagebuilder}
-_KIND_OF_BLOCK = {"ArticleCard": "article", "PageCard": "page"}
+_SOURCES = {"article": news, "page": pagebuilder, "event": events}
+_KIND_OF_BLOCK = {"ArticleCard": "article", "PageCard": "page", "EventCard": "event"}
 # CardProps' bounds; `snapshot_props` validates against the model all the same.
 _TITLE, _EXCERPT, _LOCALE = 300, 1000, 16
 
@@ -65,12 +67,20 @@ def snapshot_props(hit: CardHit, *, block_id: str, now: datetime) -> dict[str, A
     return CardProps.model_validate(props).model_dump(mode="json")
 
 
-async def _read(app: Any, session: AsyncSession, *, tenant_id: str, kind: str, source_id: int):
-    return await _SOURCES[kind].card(app, session, tenant_id=tenant_id, source_id=source_id)
+def _props(hit: CardHit | EventHit, *, block_id: str, now: datetime) -> dict[str, Any]:
+    if isinstance(hit, EventHit):
+        return event_snapshot_props(hit, block_id=block_id, now=now)
+    return snapshot_props(hit, block_id=block_id, now=now)
+
+
+async def _read(
+    app: Any, session: AsyncSession, *, tenant_id: str, kind: str, source_id: int | str
+) -> CardHit | EventHit | None:
+    return await _SOURCES[kind].card(app, session, tenant_id=tenant_id, source_id=source_id)  # type: ignore[arg-type]
 
 
 async def snapshot(
-    app: Any, session: AsyncSession, *, tenant_id: str, kind: str, source_id: int
+    app: Any, session: AsyncSession, *, tenant_id: str, kind: str, source_id: int | str
 ) -> dict[str, Any]:
     """A new card's props, with a fresh block id. :class:`IntegrationUnavailable`
     when the source module is not there, :class:`NotFound` when the article or
@@ -78,7 +88,7 @@ async def snapshot(
     hit = await _read(app, session, tenant_id=tenant_id, kind=kind, source_id=source_id)
     if hit is None:
         raise NotFound()
-    return snapshot_props(hit, block_id=uuid4().hex[:12], now=utcnow())
+    return _props(hit, block_id=uuid4().hex[:12], now=utcnow())
 
 
 async def refresh_block(
@@ -105,13 +115,13 @@ async def refresh_block(
     if index is None or blocks[index].type not in _KIND_OF_BLOCK:
         raise BlockNotFound()
     block = blocks[index]
-    assert isinstance(block.props, CardProps)  # both card blocks carry CardProps
+    assert isinstance(block.props, CardProps | EventCardProps)  # the card blocks
     kind = _KIND_OF_BLOCK[block.type]
     hit = await _read(app, session, tenant_id=tenant_id, kind=kind, source_id=block.props.source_id)
     if hit is None:
         raise CardSourceGone()
     body = dump_body(blocks)
-    body[index]["props"] = snapshot_props(hit, block_id=block_id, now=utcnow())
+    body[index]["props"] = _props(hit, block_id=block_id, now=utcnow())
     return await drafts.write_draft(
         session,
         tenant_id=tenant_id,

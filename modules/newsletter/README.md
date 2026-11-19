@@ -42,7 +42,7 @@ workspace = true
 ```
 
 The module needs the framework's `settings` and `background_tasks` modules and
-`simple_module_records`. The `news` and `pagebuilder` extras add article and page
+`simple_module_records`. The `news`, `pagebuilder` and `events` extras add article, page and event
 cards to the editor; without them those blocks are hidden. Migrations live in the consuming host (`make
 migration`), never in the wheel.
 

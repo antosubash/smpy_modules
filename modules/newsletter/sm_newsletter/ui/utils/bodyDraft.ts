@@ -28,6 +28,8 @@ export function isComplete(block: Block): boolean {
     case 'ArticleCard':
     case 'PageCard':
       return typeof p.source_id === 'number' && p.source_id > 0 && filled(p.url);
+    case 'EventCard':
+      return filled(p.source_id) && filled(p.url);
     default:
       return true;
   }

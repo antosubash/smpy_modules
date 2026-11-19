@@ -42,6 +42,13 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.36,<0.1"]
 # On an older neighbour that check is skipped.
 pagebuilder = ["simple_module_pagebuilder>=0.0.16,<0.1"]
 
+# Optional: records' dates on events calendars (the ``records:dates`` source). Records installs
+# and runs without it; the events module loads ``sm_records/events_extensions.py`` by name.
+# Must stay a 0.0.x range: the repo publishes at 0.0.x.
+# floor: 0.0.16: ``sm_events.contracts.extensions`` (the plugin registry) first ships in 0.0.16.
+# On an older events nothing crashes, but the source is never registered.
+events = ["simple_module_events>=0.0.16,<0.1"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -88,3 +95,4 @@ addopts = "-m 'not perf'"
 # tool config, so the published wheel still carries the range above.
 [tool.uv.sources]
 simple_module_pagebuilder = { workspace = true }
+simple_module_events = { workspace = true }
