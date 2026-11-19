@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<body>
+<p>{{ intro }}</p>
+<h2>{{ title }}</h2>
+<p>{{ when_line }}</p>
+{% for line in place_lines %}<p>{{ line }}</p>
+{% endfor %}{% if moved_line %}<p>{{ moved_line }}</p>
+{% endif %}<p>{{ open_label }} <a href="{{ event_url }}">{{ event_url }}</a></p>
+<p>{{ manage_label }} <a href="{{ manage_url }}">{{ manage_url }}</a></p>
+<hr>
+<p><small>{{ footer }}</small></p>
+</body>
+</html>

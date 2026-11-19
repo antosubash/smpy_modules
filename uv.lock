@@ -3202,6 +3202,7 @@ source = { editable = "modules/events" }
 dependencies = [
     { name = "babel" },
     { name = "icalendar" },
+    { name = "jinja2" },
     { name = "pydantic-settings" },
     { name = "python-dateutil" },
     { name = "simple-module-background-tasks" },
@@ -3227,6 +3228,7 @@ pagebuilder = [
 requires-dist = [
     { name = "babel", specifier = ">=2.14,<3" },
     { name = "icalendar", specifier = ">=7,<8" },
+    { name = "jinja2", specifier = ">=3.1,<4" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },

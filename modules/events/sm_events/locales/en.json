@@ -888,6 +888,23 @@
   "reminders": {
     "page": {
       "hidden_event": "An event you can no longer see"
+    },
+    "mail": {
+      "subject": "Reminder: {title} ({date})",
+      "intro": "Reminder: this event starts {lead}.",
+      "when": "When: {when}",
+      "when_all_day": "{date} (all day)",
+      "where": "Where: {place}",
+      "online": "Online: {url}",
+      "moved": "This occurrence was moved from: {original}",
+      "open": "Open the event:",
+      "manage": "Stop or change your reminders:",
+      "footer": "You get this because you asked for reminders on {site}.",
+      "lead_15": "in 15 minutes",
+      "lead_60": "in 1 hour",
+      "lead_1440": "in 1 day",
+      "lead_10080": "in 1 week",
+      "lead_other": "in {minutes} minutes"
     }
   }
 }

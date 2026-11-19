@@ -888,6 +888,23 @@
   "reminders": {
     "page": {
       "hidden_event": "Eine Veranstaltung, die du nicht mehr sehen kannst"
+    },
+    "mail": {
+      "subject": "Erinnerung: {title} ({date})",
+      "intro": "Erinnerung: Diese Veranstaltung beginnt {lead}.",
+      "when": "Wann: {when}",
+      "when_all_day": "{date} (ganztägig)",
+      "where": "Wo: {place}",
+      "online": "Online: {url}",
+      "moved": "Dieser Termin wurde verschoben, ursprünglich: {original}",
+      "open": "Veranstaltung öffnen:",
+      "manage": "Erinnerungen beenden oder ändern:",
+      "footer": "Du erhältst diese Nachricht, weil du auf {site} Erinnerungen angefordert hast.",
+      "lead_15": "in 15 Minuten",
+      "lead_60": "in 1 Stunde",
+      "lead_1440": "in 1 Tag",
+      "lead_10080": "in 1 Woche",
+      "lead_other": "in {minutes} Minuten"
     }
   }
 }

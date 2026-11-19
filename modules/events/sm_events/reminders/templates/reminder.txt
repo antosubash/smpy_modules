@@ -1,0 +1,9 @@
+$intro
+
+$details
+
+$open_label $event_url
+$manage_label $manage_url
+
+--
+$footer
