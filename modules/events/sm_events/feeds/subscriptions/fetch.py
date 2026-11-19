@@ -27,9 +27,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import ssl
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from importlib import metadata
 from typing import Final, Literal
 
@@ -76,6 +79,8 @@ class FetchResult:
     etag: str | None
     last_modified: str | None
     http_status: int
+    max_age: int | None = None
+    """``Cache-Control: max-age`` in seconds when the server gave a positive one."""
 
 
 def _printable(value: str | None, limit: int) -> str | None:
@@ -99,6 +104,31 @@ def _request(
         if stamp := _printable(last_modified, constants.SUBSCRIPTION_LAST_MODIFIED_MAX):
             headers["if-modified-since"] = stamp
     return httpx.Request("GET", url, headers=headers, extensions={"timeout": dict(_TIMEOUTS)})
+
+
+_MAX_AGE: Final = re.compile(r"(?i)(?:^|[\s,])max-age=(\d{1,9})(?:$|[\s,;])")
+_ONE_YEAR: Final = 365 * 24 * 3600
+
+
+def _max_age(response: httpx.Response) -> int | None:
+    found = _MAX_AGE.search(response.headers.get("cache-control", ""))
+    return int(found.group(1)) or None if found else None
+
+
+def _retry_after(response: httpx.Response) -> int | None:
+    """Seconds from ``Retry-After`` (a number, or an HTTP date), or ``None`` for anything else."""
+    raw = response.headers.get("retry-after", "").strip()
+    if not raw:
+        return None
+    try:
+        seconds = (
+            int(raw)
+            if raw.isdigit()
+            else int((parsedate_to_datetime(raw) - datetime.now(UTC)).total_seconds())
+        )
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return seconds if 0 < seconds <= _ONE_YEAR else None
 
 
 def _failure(error: BaseException) -> FetchFailure:
@@ -180,11 +210,11 @@ async def _final(
 ) -> FetchResult:
     status = response.status_code
     if status == 304 and hop == 0 and conditional:
-        return FetchResult("not_modified", b"", None, None, status)
+        return FetchResult("not_modified", b"", None, None, status, _max_age(response))
     if status == 410:
         raise FetchFailure("gone", http_status=status)
     if not 200 <= status < 300:
-        raise FetchFailure("http_status", http_status=status)
+        raise FetchFailure("http_status", http_status=status, retry_after=_retry_after(response))
     if response.headers.get("content-encoding", "").strip().lower() not in _IDENTITY:
         raise FetchFailure("unsupported_encoding")
     if (kind := _media_type(response)) and kind not in constants.FETCH_MEDIA_TYPES:
@@ -204,6 +234,7 @@ async def _final(
         _printable(response.headers.get("etag"), constants.SUBSCRIPTION_ETAG_MAX),
         _printable(response.headers.get("last-modified"), constants.SUBSCRIPTION_LAST_MODIFIED_MAX),
         status,
+        _max_age(response),
     )
 
 

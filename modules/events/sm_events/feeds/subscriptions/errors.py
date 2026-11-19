@@ -16,9 +16,13 @@ __all__ = ["FetchFailure"]
 class FetchFailure(Exception):  # noqa: N818 - names what happened
     """``str(failure)`` is ``failure.code``, one of ``constants.SUBSCRIPTION_FAILURE_CODES``."""
 
-    def __init__(self, code: str, *, http_status: int | None = None) -> None:
+    def __init__(
+        self, code: str, *, http_status: int | None = None, retry_after: int | None = None
+    ) -> None:
         if code not in constants.SUBSCRIPTION_FAILURE_CODES:
             raise ValueError("a failure code must come from the closed set")
         super().__init__(code)
         self.code = code
         self.http_status = http_status
+        self.retry_after = retry_after
+        """Seconds the server asked us to wait (``Retry-After``), when it said so sanely."""
