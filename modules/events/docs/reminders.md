@@ -127,6 +127,14 @@ beat is running or whether the worker's headless app can be built (a missing sec
 build or role overlay). In those cases follows are accepted and nothing is mailed; the beat logs the
 reason by exception class and its pass reports `unavailable`. Check the worker log, not the page.
 
+**How fresh the access check is.** Whether someone may still be reminded is decided at send time,
+from the worker's own view, which is not instant. A **direct** `events.*` grant revoked in the web
+process can still allow a reminder for **up to 30 s** (the framework's direct-grant source caches
+per user for `GRANTS_TTL_SECONDS` and the worker has no invalidation); a **role** change is replayed
+from the permissions module once per pass, so it applies within **one tick**. An account that is
+deactivated, a lost membership and an unpublished, cancelled, moved or trashed event are read fresh
+at claim time. A test pins the 30 s so a framework change is noticed.
+
 ## The headless worker app
 
 `worker_app.py` calls the framework's own `create_app(merge_host_settings())` **without starting its

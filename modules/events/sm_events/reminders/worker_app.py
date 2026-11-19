@@ -16,6 +16,10 @@ replayed from the permissions module's own public service once per call, i.e. on
 Measured on the demo host: about 16 s and 200 MB for the first build, then nothing; web and
 worker images must be installed identically.
 
+**How fresh.** Direct per-user grants come from the framework's grant source, cached for 30 s
+per user with no invalidation in a worker (up to 30 s after a revocation); the role overlay is
+replayed once per tick. Everything else is read when the reminder is claimed.
+
 **What it may grant.** The principal built this way **never grants more than a request principal
 for the same user** (the parity tests walk users x calendars x event states). It can grant less:
 the membership role (``tenant:<role>``) a live request carries has no public read, so a user

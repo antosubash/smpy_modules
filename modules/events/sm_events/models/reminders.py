@@ -3,8 +3,8 @@
 ``EventFollow`` is **personal data of one user**: every row carries the tenant and the user, and
 nothing reads it across users except the reminder beat (which sends to each follower alone).
 It stores ids and the language the user was using, never a snapshot of their rights or of the
-event: whether someone may still be reminded is decided from current state when a reminder is
-due.
+event: whether someone may still be reminded is decided when a reminder is due, from the worker's
+view of current state (see ``reminders/worker_app.py`` for how fresh that is).
 
 ``ReminderSent`` is the at-most-once ledger. A row is inserted (the *claim*) and committed
 before any mail goes out; its unique key is what makes two concurrent ticks send one mail.
