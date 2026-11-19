@@ -14,16 +14,19 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import ConfigDict, field_validator
+from pydantic import ConfigDict, field_validator, model_validator
 from sqlmodel import Field, SQLModel
 
 from sm_records.schema._builders import _check_email
 
 __all__ = [
+    "DEFAULT_PENDING_HOLD_HOURS",
     "KIND_FORM",
+    "KIND_REGISTRATION",
     "KIND_SUBSCRIPTION",
     "MAX_CONSENT_TEXT_LEN",
     "MAX_NOTIFY_TO",
+    "MAX_PENDING_HOLD_HOURS",
     "MAX_RETENTION_DAYS",
     "ConsentConfig",
     "PublicSubmissionsConfig",
@@ -35,7 +38,14 @@ KIND_FORM = "form"
 KIND_SUBSCRIPTION = "subscription"
 """A newsletter type: one record per address, with a double opt-in."""
 
-SubmissionKind = Literal["form", "subscription"]
+KIND_REGISTRATION = "registration"
+"""An event registration: one record per person per occurrence, with a seat at the event the
+signed token names (never the page, never the request body)."""
+
+SubmissionKind = Literal["form", "subscription", "registration"]
+
+DEFAULT_PENDING_HOLD_HOURS = 24
+MAX_PENDING_HOLD_HOURS = 168
 
 MAX_NOTIFY_TO = 10
 MAX_CONSENT_TEXT_LEN = 2000
@@ -74,11 +84,22 @@ class PublicSubmissionsConfig(SQLModel):
     """Form kind: who is told about each submission. Empty stores and sends nothing."""
     consent: ConsentConfig = Field(default_factory=ConsentConfig)
     double_opt_in: bool = True
-    """Subscription kind only. Off requires ``consent.required``."""
+    """Subscription and registration kinds. Off requires ``consent.required``."""
     retention_days: int = Field(default=365, ge=0, le=MAX_RETENTION_DAYS)
     """Form kind: records older than this are purged. ``0`` keeps them."""
     pending_purge_days: int = Field(default=30, ge=1, le=MAX_RETENTION_DAYS)
     """Subscription kind: never-confirmed records are purged after this."""
+
+    pending_hold_hours: int = Field(
+        default=DEFAULT_PENDING_HOLD_HOURS, ge=1, le=MAX_PENDING_HOLD_HOURS
+    )
+    """Registration kind: how long an unconfirmed registration holds its seat."""
+
+    @model_validator(mode="after")
+    def _hold_is_for_registrations(self) -> PublicSubmissionsConfig:
+        if self.kind != KIND_REGISTRATION and self.pending_hold_hours != DEFAULT_PENDING_HOLD_HOURS:
+            raise ValueError("pending_hold_hours belongs to the registration kind")
+        return self
 
     @field_validator("notify_to")
     @classmethod

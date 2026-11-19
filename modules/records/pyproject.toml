@@ -45,7 +45,8 @@ pagebuilder = ["simple_module_pagebuilder>=0.0.16,<0.1"]
 # Optional: records' dates on events calendars (the ``records:dates`` source). Records installs
 # and runs without it; the events module loads ``sm_records/events_extensions.py`` by name.
 # Must stay a 0.0.x range: the repo publishes at 0.0.x.
-# floor: 0.0.16: ``sm_events.contracts.extensions`` (the plugin registry) first ships in 0.0.16.
+# floor: 0.0.16: ``sm_events.contracts.extensions`` (the plugin registry) and
+# ``sm_events.contracts.registration`` (seats) first ship in 0.0.16.
 # On an older events nothing crashes, but the source is never registered.
 events = ["simple_module_events>=0.0.16,<0.1"]
 
