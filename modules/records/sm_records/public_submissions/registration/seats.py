@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import importlib
 import logging
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from typing import Any
 
 from sm_records.contracts.public_submissions import KIND_REGISTRATION
@@ -30,6 +31,9 @@ from sm_records.records.services.errors import Conflict
 __all__ = [
     "SeatsBusy",
     "available",
+    "batch_mark",
+    "batch_truncate",
+    "batched",
     "integration",
     "is_registration",
     "on_purged",
@@ -92,6 +96,53 @@ async def release_target(db: Any, *, tenant_id: str, target: str) -> int:
         raise SeatsBusy("the seats are busy; try again") from exc
 
 
+_BATCH = "sm_records.seat_release_batch"
+_PER_CALL = 1000  # events' own bound on one release
+
+
+@asynccontextmanager
+async def batched(db: Any) -> AsyncIterator[None]:
+    """Collect every seat release of a bulk, cascade or purge turn and make **one** contract call
+    per tenant at the end (one ascending lock acquisition per transaction), instead of one per
+    record: two transactions releasing the same occurrences in opposite orders would otherwise
+    cycle. Nested uses join the outer one. An error drops the batch (the transaction rolls back)."""
+    if _BATCH in db.info:
+        yield
+        return
+    db.info[_BATCH] = []
+    try:
+        yield
+    except BaseException:
+        db.info.pop(_BATCH, None)
+        raise
+    held: list[tuple[str, str]] = db.info.pop(_BATCH)
+    by_tenant: dict[str, list[str]] = {}
+    for tenant, holder in held:
+        by_tenant.setdefault(tenant, []).append(holder)
+    for tenant, holders in by_tenant.items():
+        unique = list(dict.fromkeys(holders))
+        for start in range(0, len(unique), _PER_CALL):
+            await release(db, tenant_id=tenant, holders=unique[start : start + _PER_CALL])
+
+
+def batch_mark(db: Any) -> int:
+    """How many holders the open batch holds now (``0`` with none): a turn's savepoint start."""
+    return len(db.info.get(_BATCH, ()))
+
+
+def batch_truncate(db: Any, mark: int) -> None:
+    """Drop what a turn added since ``mark``: its savepoint rolled back, so its seats stay."""
+    if _BATCH in db.info:
+        del db.info[_BATCH][mark:]
+
+
+async def _release_or_collect(db: Any, tenant: str, holders: Sequence[str]) -> None:
+    if _BATCH in db.info:
+        db.info[_BATCH].extend((tenant, h) for h in holders)
+    else:
+        await release(db, tenant_id=tenant, holders=holders)
+
+
 async def on_trashed(db: Any, pairs: Sequence[tuple[Any, Any]]) -> None:
     """A record of a registration type went to the trash (single, cascade, bulk, spam, retention):
     its seat is freed, in the trashing transaction. Cancelled records hold none (a release of a
@@ -103,7 +154,7 @@ async def on_trashed(db: Any, pairs: Sequence[tuple[Any, Any]]) -> None:
     if not held or not available():
         return
     for tenant, holders in held.items():
-        await release(db, tenant_id=tenant, holders=holders)
+        await _release_or_collect(db, tenant, holders)
 
 
 async def on_restored(db: Any, rtype: Any, record: Any) -> None:
@@ -137,7 +188,7 @@ async def on_purged(db: Any, rtype: Any, uuids: Sequence[str]) -> None:
     freed at the trash is not freed twice; one left by a record trashed before seats followed
     trashes, or on a host that had no events then, goes now)."""
     if is_registration(rtype) and uuids and available():
-        await release(db, tenant_id=rtype.tenant_id, holders=list(uuids))
+        await _release_or_collect(db, rtype.tenant_id, list(uuids))
 
 
 async def on_type_purged(db: Any, rtype: Any) -> None:

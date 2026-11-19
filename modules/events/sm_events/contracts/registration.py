@@ -30,9 +30,10 @@ event with this provider's registration, and for anything else say the same "una
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
 
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_events.core import constants
@@ -62,6 +63,23 @@ __all__ = [
     "seat_holders",
     "summaries",
 ]
+
+_RETRYABLE = frozenset({"40P01", "40001"})  # deadlock detected, serialization failure
+
+
+async def _guarded[T](db: AsyncSession, call: Callable[[], Awaitable[T]]) -> T:
+    """Run a write in a savepoint of its own: a database deadlock or serialization failure inside
+    it is rolled back to the savepoint and re-raised as :class:`SeatsBusy` (retry), so no path can
+    surface one as a 500. The transaction stays usable; the caller rolls back or retries."""
+    try:
+        async with db.begin_nested():
+            return await call()
+    except DBAPIError as exc:
+        code = getattr(exc.orig, "sqlstate", None) or getattr(exc.orig, "pgcode", None)
+        if code in _RETRYABLE:
+            raise SeatsBusy from exc
+        raise
+
 
 REGISTRATION_FULL = constants.REGISTRATION_FULL
 REGISTRATION_CLOSED = constants.REGISTRATION_CLOSED
@@ -111,17 +129,20 @@ async def admit(
     ``registration_closed`` or ``event_unavailable``. Never oversells, idempotent per holder, and
     its seat exists exactly when the caller's transaction commits. ``admin=True`` skips the window
     and "already started" (a restore), never availability, cancellation or capacity."""
-    return await _seats.admit(
+    return await _guarded(
         db,
-        tenant_id=tenant_id,
-        event_id=event_id,
-        occurrence_key=occurrence_key,
-        provider=provider,
-        target=target,
-        holder=holder,
-        admin=admin,
-        now=now,
-        locale=locale,
+        lambda: _seats.admit(
+            db,
+            tenant_id=tenant_id,
+            event_id=event_id,
+            occurrence_key=occurrence_key,
+            provider=provider,
+            target=target,
+            holder=holder,
+            admin=admin,
+            now=now,
+            locale=locale,
+        ),
     )
 
 
@@ -130,12 +151,20 @@ async def release(
 ) -> int:
     """Free these holders' seats (1 to 1,000); the number freed. Idempotent: an unknown holder is
     nothing, and a seat is never freed twice or by another provider."""
-    return await _release.release(db, tenant_id=tenant_id, provider=provider, holders=holders)
+    return await _guarded(
+        db,
+        lambda: _release.release(db, tenant_id=tenant_id, provider=provider, holders=holders),
+    )
 
 
 async def release_target(db: AsyncSession, *, tenant_id: str, provider: str, target: str) -> int:
     """Free every seat of a target (its form was deleted); the number freed."""
-    return await _release.release_target(db, tenant_id=tenant_id, provider=provider, target=target)
+    return await _guarded(
+        db,
+        lambda: _release.release_target(
+            db, tenant_id=tenant_id, provider=provider, target=target
+        ),
+    )
 
 
 async def seat_holders(

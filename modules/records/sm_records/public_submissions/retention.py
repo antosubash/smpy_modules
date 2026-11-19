@@ -60,6 +60,7 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.models import RecordType
+from sm_records.public_submissions.registration import seats
 from sm_records.public_submissions.registration.reconcile import reconcile
 from sm_records.public_submissions.retention_deliveries import prune_deliveries
 from sm_records.public_submissions.retention_purge import _due, _purge_one
@@ -148,12 +149,13 @@ async def _sweep_type(run: _Run, key: str, swept: Swept) -> None:
                 await events.rollback(session)
                 return
             purged = 0
-            for current in uuids:
-                await run.keep()
-                if await _purge_one(session, rtype, current, run):
-                    purged += 1
-                else:
-                    skip.add(current)
+            async with seats.batched(session):  # one seat release for the batch
+                for current in uuids:
+                    await run.keep()
+                    if await _purge_one(session, rtype, current, run):
+                        purged += 1
+                    else:
+                        skip.add(current)
             current = None  # a refusal from here on is the commit's, not a record's
             await run.keep()
             await events.commit(session)
