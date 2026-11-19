@@ -20,7 +20,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_newsletter.content import cards
 from sm_newsletter.content.integrations import events, news, pagebuilder
+from sm_newsletter.content.render.event_card import when
 from sm_newsletter.core import constants
+from sm_newsletter.core.messages import host_locale
 from sm_newsletter.core.tenancy import bind_admin
 from sm_newsletter.web.schemas.campaigns import CampaignDetail, parse_payload
 from sm_newsletter.web.schemas.cards import (
@@ -75,7 +77,10 @@ async def search_events(
 ) -> list[EventHitOut]:
     """Upcoming events the public could see: the picker offers nothing else."""
     hits = await events.search(request.app, db, tenant_id=tenant, q=q, locale=locale or None)
-    return [EventHitOut.model_validate(h) for h in hits]
+    locale_now = host_locale(request.app)
+    return [
+        EventHitOut.model_validate(h).model_copy(update={"when": when(h, locale_now)}) for h in hits
+    ]
 
 
 @router.post("/cards/snapshot", response_model=CardSnapshot | EventCardSnapshot)

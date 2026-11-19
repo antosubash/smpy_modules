@@ -848,9 +848,10 @@
     "upcoming": {
       "label": "Upcoming events",
       "heading": "Heading",
-      "calendars": "Calendars",
+      "calendars": "Calendars (up to 10)",
       "category": "Category",
       "count": "Number of events",
+      "count_invalid": "Enter a whole number from 1 to {max}.",
       "layout": "Layout",
       "layout_list": "List",
       "layout_cards": "Cards",
@@ -858,7 +859,7 @@
     },
     "calendar": {
       "label": "Events calendar",
-      "calendars": "Calendars",
+      "calendars": "Calendars (up to 10)",
       "default_view": "Opens as",
       "view_month": "Month",
       "view_week": "Week",
@@ -878,7 +879,8 @@
       "empty": "No upcoming public events. Visitors see nothing here until there are some.",
       "unresolved_one": "{count} chosen calendar is not public or no longer exists.",
       "unresolved_other": "{count} chosen calendars are not public or no longer exist.",
-      "failed": "Events could not be loaded."
+      "failed": "Events could not be loaded.",
+      "selection_unreadable": "The calendar selection could not be read, so nothing is shown. Choose the calendars again."
     }
   }
 }

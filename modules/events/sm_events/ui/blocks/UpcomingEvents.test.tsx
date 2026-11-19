@@ -190,6 +190,29 @@ describe('UpcomingEvents', () => {
     expect(view.host.textContent).not.toContain('gone-secret');
   });
 
+  it('a calendar selection that cannot be read shows nothing and asks for nothing', async () => {
+    const calls = stubFetch({
+      [UPCOMING]: { items: [item()] },
+      [CALENDARS]: { calendars: [], categories: [], default_timezone: 'UTC' },
+    });
+    for (const calendars of ['team', ['team'], [null], [{ name: 'x' }], [{ slug: 7 }], 5, {}]) {
+      const view = await mount(render({ calendars: calendars as never }));
+      await settle();
+      expect(view.host.innerHTML, JSON.stringify(calendars)).toBe('');
+      await view.unmount();
+    }
+    expect(calls.filter((c) => c.url.includes('/upcoming'))).toEqual([]); // never "every calendar"
+  });
+
+  it('tells the editor the selection could not be read', async () => {
+    stubFetch({ [UPCOMING]: { items: [item()] } });
+    const view = await mount(
+      render({ calendars: 'team' as never, puck: { isEditing: true } } as never),
+    );
+    await settle();
+    expect(view.host.textContent).toContain('could not be read');
+  });
+
   it('clamps a stored count of 4.5 and 99', async () => {
     const calls = stubFetch({ [UPCOMING]: { items: [] } });
     for (const count of [4.5, 99]) {
@@ -230,7 +253,7 @@ describe('UpcomingEventsBlock', () => {
       },
     });
     const fields = await resolveFields();
-    expect(fields.calendars.label).toBe('Calendars');
+    expect(fields.calendars.label).toBe('Calendars (up to 10)');
     expect(fields.calendars.arrayFields?.slug.options.map((o) => o.value)).toEqual(['', 'team']);
     expect(fields.calendars.arrayFields?.slug.options[1].label).toBe('Team');
     expect(fields.category.options?.map((o) => o.value)).toEqual(['', 'talks']);
@@ -259,7 +282,7 @@ describe('UpcomingEventsBlock', () => {
     const loaded = resolveData({ props: stored }, { trigger: 'load' }).props;
     expect(loaded.count).toBe(4);
     expect(loaded.layout).toBe('list');
-    expect(loaded.calendars).toEqual([{ slug: 'a' }]);
+    expect(loaded.calendars).toEqual(stored.calendars); // unreadable: kept as it is, never made "all"
     expect((loaded.heading as string).length).toBe(200);
     expect(resolveData({ props: stored }, { trigger: 'force' }).props.count).toBe(4.5);
   });

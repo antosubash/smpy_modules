@@ -61,6 +61,9 @@ async def test_search_events_route(client, built):
     ]
     assert hits[0]["url"] == "/events/open" and hits[0]["ics_url"] == "/events/open.ics"
     assert hits[0]["timezone"] == "Europe/Vienna"
+    # The server words the time (the email's own function), so the picker, the preview and the
+    # email name the same zone: CEST, not the browser's "GMT+2".
+    assert hits[0]["when"] == "Wednesday, July 1, 2026, 10:00 AM\u201311:00 AM CEST"
     assert (await client.get(f"{API}/cards/events?q=autumn", headers=EDIT)).json() == []
 
 

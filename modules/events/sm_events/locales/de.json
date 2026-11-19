@@ -848,9 +848,10 @@
     "upcoming": {
       "label": "Kommende Veranstaltungen",
       "heading": "Überschrift",
-      "calendars": "Kalender",
+      "calendars": "Kalender (bis zu 10)",
       "category": "Kategorie",
       "count": "Anzahl der Veranstaltungen",
+      "count_invalid": "Geben Sie eine ganze Zahl von 1 bis {max} ein.",
       "layout": "Darstellung",
       "layout_list": "Liste",
       "layout_cards": "Karten",
@@ -858,7 +859,7 @@
     },
     "calendar": {
       "label": "Veranstaltungskalender",
-      "calendars": "Kalender",
+      "calendars": "Kalender (bis zu 10)",
       "default_view": "Öffnet als",
       "view_month": "Monat",
       "view_week": "Woche",
@@ -878,7 +879,8 @@
       "empty": "Keine kommenden öffentlichen Veranstaltungen. Besucher sehen hier nichts, bis es welche gibt.",
       "unresolved_one": "{count} ausgewählter Kalender ist nicht öffentlich oder existiert nicht mehr.",
       "unresolved_other": "{count} ausgewählte Kalender sind nicht öffentlich oder existieren nicht mehr.",
-      "failed": "Die Veranstaltungen konnten nicht geladen werden."
+      "failed": "Die Veranstaltungen konnten nicht geladen werden.",
+      "selection_unreadable": "Die Kalenderauswahl konnte nicht gelesen werden, deshalb wird nichts angezeigt. Wählen Sie die Kalender erneut aus."
     }
   }
 }

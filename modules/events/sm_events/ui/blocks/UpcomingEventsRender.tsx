@@ -16,7 +16,7 @@ import { keys, useT } from '../utils/i18n';
 import { PageLocale } from '../utils/PageLocale';
 import { fetchBlockCalendars, fetchUpcoming } from './api-blocks';
 import { BlockBoundary } from './BlockBoundary';
-import { clampCount, oneOf, slugsOf } from './limits';
+import { clampCount, oneOf, selectionOf } from './limits';
 import { useContentLocale } from './useContentLocale';
 
 export type UpcomingEventsProps = {
@@ -39,12 +39,17 @@ type State = { items: PublicListItem[] | null; failed: boolean };
 
 function useUpcoming(props: UpcomingEventsProps, locale: string): State {
   const [state, setState] = useState<State>({ items: null, failed: false });
-  const slugs = slugsOf(props.calendars);
+  const { slugs, bad } = selectionOf(props.calendars);
   const count = clampCount(props.count);
   const category = typeof props.category === 'string' ? props.category : '';
-  const key = `${slugs.join('\u0000')}|${category}|${count}|${locale}`;
+  const key = `${bad}|${slugs.join('\u0000')}|${category}|${count}|${locale}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the query it names
   useEffect(() => {
+    // A selection that cannot be read means nothing, so nothing is asked for.
+    if (bad) {
+      setState({ items: [], failed: false });
+      return;
+    }
     const controller = new AbortController();
     fetchUpcoming({ slugs, category, count, locale }, controller.signal)
       .then((items) => setState({ items, failed: false }))
@@ -61,7 +66,7 @@ function useUpcoming(props: UpcomingEventsProps, locale: string): State {
 /** How many of the chosen calendars the public no longer sees (the editor's hint only). */
 function useUnresolved(props: UpcomingEventsProps, locale: string, editing: boolean): number {
   const [missing, setMissing] = useState(0);
-  const slugs = slugsOf(props.calendars);
+  const { slugs } = selectionOf(props.calendars);
   const key = `${slugs.join('\u0000')}|${locale}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the slugs
   useEffect(() => {
@@ -112,11 +117,18 @@ function Inner(props: UpcomingEventsProps & WithPuck) {
   const editing = props.puck?.isEditing === true;
   const { items, failed } = useUpcoming(props, locale ?? '');
   const missing = useUnresolved(props, locale ?? '', editing);
+  const unreadable = selectionOf(props.calendars).bad;
   const heading =
     typeof props.heading === 'string' ? props.heading.slice(0, HEADING_MAX).trim() : '';
   const layout = oneOf(props.layout, LAYOUTS, 'list');
   const hints = [
-    failed ? t(copy.editor_hint.failed) : items?.length === 0 ? t(copy.editor_hint.empty) : null,
+    unreadable
+      ? t(copy.editor_hint.selection_unreadable)
+      : failed
+        ? t(copy.editor_hint.failed)
+        : items?.length === 0
+          ? t(copy.editor_hint.empty)
+          : null,
     missing > 0 ? t(copy.editor_hint.unresolved, { count: missing }) : null,
   ].filter((hint): hint is string => hint !== null);
   const hint =

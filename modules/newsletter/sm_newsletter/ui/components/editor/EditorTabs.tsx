@@ -7,6 +7,16 @@ const copy = keys.newsletter.preview;
 
 export type EditorTab = 'edit' | 'preview';
 
+/** The class of the pane holding Puck. Off the Edit tab it is taken out of sight and out of the
+ *  tab order, but never `display: none`: Puck measures its frame every 100 ms, and a frame in a
+ *  `display: none` pane reads as `NaN` wide, which it turns into a `NaN` zoom and a
+ *  `top: NaN` on the selected block's action bar (React logs it). Off-screen, at the viewport's own
+ *  size, it still has a real width (and the pane carries `inert`). */
+export const editPaneClass = (active: boolean): string =>
+  active
+    ? 'min-h-0 flex-1'
+    : 'pointer-events-none invisible fixed -left-[9999px] top-0 h-screen w-screen overflow-hidden';
+
 interface Props {
   tab: EditorTab;
   onTab: (tab: EditorTab) => void;

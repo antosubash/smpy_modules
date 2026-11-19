@@ -18,7 +18,7 @@ import { PageLocale } from '../utils/PageLocale';
 import { type BlockCalendars, fetchBlockCalendars } from './api-blocks';
 import { BlockBoundary } from './BlockBoundary';
 import { type EventsCalendarProps, minHeight, VIEWS } from './calendarProps';
-import { oneOf, slugsOf } from './limits';
+import { oneOf, selectionOf } from './limits';
 import { useContentLocale } from './useContentLocale';
 
 export const OCCURRENCES_URL = '/api/events/public/occurrences';
@@ -28,11 +28,16 @@ type WithPuck = { puck?: { isEditing?: boolean } };
 
 type Loaded = { answer: BlockCalendars | null; failed: boolean; loading: boolean };
 
-function useCalendars(slugs: string[], locale: string): Loaded {
+function useCalendars(slugs: string[], bad: boolean, locale: string): Loaded {
   const [state, setState] = useState<Loaded>({ answer: null, failed: false, loading: true });
-  const key = `${slugs.join('\u0000')}|${locale}`;
+  const key = `${bad}|${slugs.join('\u0000')}|${locale}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the query it names
   useEffect(() => {
+    if (bad) {
+      // An unreadable selection means nothing: no calendar is asked for.
+      setState({ answer: null, failed: false, loading: false });
+      return;
+    }
     const controller = new AbortController();
     fetchBlockCalendars(slugs, locale, controller.signal)
       .then((answer) => setState({ answer, failed: false, loading: false }))
@@ -47,8 +52,8 @@ function useCalendars(slugs: string[], locale: string): Loaded {
 function Inner(props: EventsCalendarProps & WithPuck) {
   const { t } = useT();
   const locale = useContentLocale();
-  const slugs = slugsOf(props.calendars);
-  const { answer, failed, loading } = useCalendars(slugs, locale ?? '');
+  const { slugs, bad } = selectionOf(props.calendars);
+  const { answer, failed, loading } = useCalendars(slugs, bad, locale ?? '');
   const height = minHeight(props.height);
   const view = oneOf(props.defaultView, VIEWS, 'month');
   const editing = props.puck?.isEditing === true;
@@ -73,9 +78,14 @@ function Inner(props: EventsCalendarProps & WithPuck) {
   }
   if (failed || calendars.length === 0) {
     const missing = slugs.length - calendars.length;
-    return editing && !failed && missing > 0 ? (
+    const hint = bad
+      ? t(copy.editor_hint.selection_unreadable)
+      : !failed && missing > 0
+        ? t(copy.editor_hint.unresolved, { count: missing })
+        : null;
+    return editing && hint ? (
       <p className="container mx-auto px-4 py-2 text-sm text-muted-foreground" data-editor-only="">
-        {t(copy.editor_hint.unresolved, { count: missing })}
+        {hint}
       </p>
     ) : (
       <></>

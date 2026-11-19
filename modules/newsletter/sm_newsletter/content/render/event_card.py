@@ -13,6 +13,7 @@ against the campaign tenant's public origin. The event's id (``source_id``) is n
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from babel import Locale, UnknownLocaleError
@@ -50,7 +51,18 @@ def _time(value: datetime, locale: Locale) -> str:
     return format_time(value, "short", locale=locale).translate(_SPACES)
 
 
-def when(p: EventCardProps, locale: str) -> str:
+class WhenSource(Protocol):
+    """What the when-line needs: an event card's props, and a search hit, both have it."""
+
+    starts_at: datetime
+    ends_at: datetime
+    all_day: bool
+    start_date: date | None
+    end_date: date | None
+    timezone: str
+
+
+def when(p: WhenSource, locale: str) -> str:
     """The date and time of the card in the event's zone and ``locale``'s language."""
     loc = _locale(locale)
     if p.all_day and p.start_date and p.end_date:
