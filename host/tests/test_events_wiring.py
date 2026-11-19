@@ -36,6 +36,8 @@ EVENTS_TABLES = {
     "events_reminder_sent",
     "events_registration_count",
     "events_registration_seat",
+    "events_subscription",
+    "events_external_item",
 }
 
 

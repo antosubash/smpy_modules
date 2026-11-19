@@ -56,6 +56,7 @@ from sm_events.core.constants.public import (
 )  # isort: skip
 from sm_events.core.constants.registration import *  # noqa: F403 - registration (PR 9)
 from sm_events.core.constants.reminders import *  # noqa: F403 - reminders (PR 8)
+from sm_events.core.constants.subscriptions import *  # noqa: F403 - external subscriptions (PR 10)
 
 from sm_events.core.constants.names import MODULE_NAME  # isort: skip
 

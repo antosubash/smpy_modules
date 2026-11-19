@@ -72,3 +72,12 @@ def test_import_max_bytes():
     assert settings.import_max_bytes == 5 * 1024 * 1024
     extra = EventsSettings.model_fields["import_max_bytes"].json_schema_extra or {}
     assert "requires_restart" not in extra
+
+
+def test_subscription_defaults():
+    settings = EventsSettings()
+    assert settings.subscription_refresh_minutes == 60
+    assert settings.allow_private_subscription_urls is False
+    for name in ("subscription_refresh_minutes", "allow_private_subscription_urls"):
+        extra = EventsSettings.model_fields[name].json_schema_extra or {}
+        assert "requires_restart" not in extra  # read per fetch, applies at once

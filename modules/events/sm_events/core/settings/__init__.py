@@ -66,3 +66,13 @@ class EventsSettings(DbBackedSettings):
     """How long before an event "Remind me" suggests being reminded, in minutes. Only 15, 60,
     1440 (a day) and 10080 (a week) are used; a calendar can have its own suggestion. Nobody is
     followed automatically."""
+
+    subscription_refresh_minutes: int = 60
+    """How often a subscribed calendar is fetched again, in minutes, unless a subscription sets
+    its own. Read where it is used and kept between 15 and 1440, whatever is stored here."""
+
+    allow_private_subscription_urls: bool = False
+    """Lets a subscription use an address on this site's own network (private ranges such as
+    10.x or 192.168.x, plain ``http://`` and any port). Never lets one reach this server itself,
+    link-local or cloud-metadata addresses. Saving such an address also needs ``events.manage``,
+    so an internal target needs both this switch and that permission."""

@@ -1,4 +1,4 @@
-"""The eight tables: tenant ownership, unique keys, foreign keys and defaults."""
+"""The tables: tenant ownership, unique keys, foreign keys and defaults."""
 
 from __future__ import annotations
 
@@ -32,6 +32,8 @@ TABLES = {
     "events_reminder_sent",
     "events_registration_count",
     "events_registration_seat",
+    "events_subscription",
+    "events_external_item",
 }
 
 
