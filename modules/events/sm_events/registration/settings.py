@@ -29,6 +29,7 @@ from sm_events.calendar.plugins import registry
 from sm_events.calendar.plugins.registration_types import RegistrationTargetInfo
 from sm_events.calendar.times import localize, parse_local, supported_instant
 from sm_events.core import constants
+from sm_events.core.constants.reminders_limits import REMINDER_LEADS
 from sm_events.core.errors_registration import (
     InvalidRegistration,
     RegistrationUnavailable,
@@ -37,7 +38,6 @@ from sm_events.core.errors_registration import (
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Event
 from sm_events.registration import access, guards, provider_call
-from sm_events.reminders.limits import REMINDER_LEADS
 from sm_events.web.schemas.registration import RegistrationIn
 
 __all__ = ["Applied", "apply_legacy_url", "apply_registration", "resolve"]

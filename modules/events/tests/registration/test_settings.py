@@ -197,7 +197,7 @@ def test_target_length_bounds():
 
 
 async def test_reminder_lead_must_be_one_of_the_allowed(db, cal):
-    from sm_events.reminders.limits import REMINDER_LEADS
+    from sm_events.core.constants.reminders_limits import REMINDER_LEADS
 
     for lead in REMINDER_LEADS:
         event = await make(db, OWNER_P, cal, registration={**BUILTIN, "reminder_minutes": lead})

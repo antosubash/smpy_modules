@@ -15,8 +15,8 @@ from sm_events.core.errors_registration import SeatsBusy
 from sm_events.core.tenancy import tenant_scope
 
 from tests.pg_support import USING_POSTGRES
-from tests.registration.test_seats_pg import final, seeded, try_admit
-from tests.support.providers import PROVIDER_ID
+from tests.registration.test_seats_pg import NOW, final, seeded, try_admit
+from tests.support.providers import KNOWN_TARGET, PROVIDER_ID
 
 pytestmark = pytest.mark.skipif(not USING_POSTGRES, reason="needs real concurrent transactions")
 TIMEOUT = 60
@@ -61,3 +61,40 @@ async def test_a_deadlock_between_two_releases_is_seats_busy_pg(db_state):
     assert sorted(outcome) == ["busy", "committed"]  # one was the victim; it was told to retry
     counters, holders = await final(db_state)  # recomputed from the rows
     assert holders == [] and sum(counters.values()) == 0  # the survivor freed both; victim's undone
+
+
+async def test_a_session_without_the_framework_listeners_still_commits_pg(db_state):
+    """Core DML on a bare ``Table`` is only committed by ``finalize_session`` if the session was
+    marked written; a plain sessionmaker has no listeners to do it, so admit and release mark it
+    themselves (PR 8's lease claims were silently rolled back without this)."""
+    from simple_module_db import finalize_session
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    event_id, _ = await seeded(db_state, capacity=3, series_event=True, rule="FREQ=DAILY")
+    key = day(event_id, 1)
+    plain = async_sessionmaker(db_state.engine, class_=AsyncSession, expire_on_commit=False)
+    assert "has_writes" not in plain().sync_session.info  # nothing wired it
+    with tenant_scope("default"):
+        async with plain() as db:
+            got = await contract.admit(
+                db,
+                tenant_id="default",
+                event_id=event_id,
+                occurrence_key=key,
+                provider=PROVIDER_ID,
+                target=KNOWN_TARGET,
+                holder="plain-holder",
+                now=NOW,
+            )
+            assert got.admitted
+            await finalize_session(db)
+    counters, holders = await final(db_state)
+    assert holders == ["plain-holder"] and sum(counters.values()) == 1
+    with tenant_scope("default"):
+        async with plain() as db:
+            await contract.release(
+                db, tenant_id="default", provider=PROVIDER_ID, holders=["plain-holder"]
+            )
+            await finalize_session(db)
+    counters, holders = await final(db_state)
+    assert holders == [] and sum(counters.values()) == 0
