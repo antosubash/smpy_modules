@@ -54,12 +54,18 @@ def _time(value: datetime, locale: Locale) -> str:
 class WhenSource(Protocol):
     """What the when-line needs: an event card's props, and a search hit, both have it."""
 
-    starts_at: datetime
-    ends_at: datetime
-    all_day: bool
-    start_date: date | None
-    end_date: date | None
-    timezone: str
+    @property
+    def starts_at(self) -> datetime: ...
+    @property
+    def ends_at(self) -> datetime: ...
+    @property
+    def all_day(self) -> bool: ...
+    @property
+    def start_date(self) -> date | None: ...
+    @property
+    def end_date(self) -> date | None: ...
+    @property
+    def timezone(self) -> str: ...
 
 
 def when(p: WhenSource, locale: str) -> str:
