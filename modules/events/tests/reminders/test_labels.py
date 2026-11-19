@@ -16,7 +16,11 @@ from sm_events.core import constants
 ROOT = Path(sm_events.__file__).parent
 LOCALES = ("en", "de")
 TABLES = (ROOT / "ui" / "reminders" / "reasons.ts").read_text()
-FAILED_CODES = (constants.REMINDER_SEND_FAILED, constants.REMINDER_CODE_SEND_TIMEOUT)
+FAILED_CODES = (
+    constants.REMINDER_SEND_FAILED,
+    constants.REMINDER_CODE_SEND_TIMEOUT,
+    constants.REMINDER_CODE_TOO_LATE,
+)
 
 
 def _table(name: str) -> dict[str, str]:

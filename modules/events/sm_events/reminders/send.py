@@ -70,6 +70,14 @@ class Budget:
             and self.failures_in_row < limits.REMINDER_BREAKER_FAILURES
         )
 
+    def open_overall(self) -> bool:
+        """Is there install-wide budget, time and breaker left for another tenant pass?"""
+        return (
+            self.remaining > 0
+            and time.monotonic() < self.deadline
+            and self.failures_in_row < limits.REMINDER_BREAKER_FAILURES
+        )
+
     def spend(self) -> None:
         self.remaining -= 1
         self.tenant_remaining -= 1

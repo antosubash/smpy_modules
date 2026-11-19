@@ -52,7 +52,7 @@ event with your current access.* The follow is kept; a re-grant or the upstream 
   provably sent nothing and is reclaimed after the lease; a `sending` row may have sent and is **never
   reclaimed**: that reminder is lost, never repeated. It is counted *unfinished* once it is older
   than 5 minutes.
-- **A failed send is not retried.** `failed` is final (`send_failed`, `send_timeout`): a late reminder
+- **A failed send is not retried.** `failed` is final (`send_failed`, `send_timeout`, `too_late`): a late reminder
   is worth little and a duplicate is worse. A mail outage writes at most three `failed` rows per
   pass (the breaker), and the rest wait for the next pass while still inside their grace window.
 - **Late, never early or flooding.** A reminder is due at start minus lead, as an exact duration in
@@ -78,6 +78,8 @@ event with your current access.* The follow is kept; a re-grant or the upstream 
 | `REMINDER_BREAKER_FAILURES` | 3 |
 | `REMINDER_SEND_TIMEOUT` | 30 s |
 | `REMINDER_CLAIM_LEASE` | 120 s |
+| `REMINDER_TOO_LATE_LOOKBACK` | 300 s |
+| `REMINDER_TOO_LATE_BATCH` | 500 |
 | `REMINDER_UNFINISHED_AFTER` | 300 s |
 | `REMINDER_RUNTIME_TTL` | 600 s |
 | `REMINDER_SUBJECT_MAX` | 200 |
@@ -87,7 +89,19 @@ event with your current access.* The follow is kept; a re-grant or the upstream 
 | `STATS_WINDOW_DAYS` | 30 |
 
 The send and tenant budgets are per pass; at one pass a minute they are the rate. Tenants are served
-in an order that rotates every minute, so none starves another. The table is checked against
+in an order that rotates every minute, so none starves another: each gets `REMINDER_TENANT_BUDGET`
+(100) first, then a tenant that still has due reminders takes what is left of the install-wide
+`REMINDER_SEND_BUDGET` (300), still inside the 45 s and the failure breaker.
+
+**What a big event experiences.** A 15-minute lead is due for a 5-minute grace window plus one beat,
+so about six passes. One tenant alone can send up to 300 in each pass: **a 1,000-follower event is
+mailed in four passes**, and about 1,800 followers is the most one tenant can have mailed on that
+lead; with several tenants busy at once each gets at least 100 per pass, about 600 per event. A
+reminder the window closes on unsent is **not silently lost**: within five minutes the beat writes a
+terminal `too_late` ledger row for each follower who was following when it was due and may still see
+the event (at most 500 per tenant and pass, never mail). It is counted in that user's and the
+managers' delivery counts as "Not sent: too many reminders were due at once". A 1-hour lead has a
+15-minute window, so about 4,500 followers fit; longer leads have six hours. The table is checked against
 `sm_events/core/constants/reminders_limits.py` by a test.
 
 ## What it needs

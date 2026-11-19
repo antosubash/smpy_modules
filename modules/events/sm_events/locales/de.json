@@ -976,6 +976,7 @@
       "failed": "Fehlgeschlagen: {count}",
       "failed_code_send_failed": "Mail konnte nicht gesendet werden: {count}",
       "failed_code_send_timeout": "Mailserver antwortete nicht rechtzeitig: {count}",
+      "failed_code_too_late": "Nicht gesendet: zu viele Erinnerungen waren gleichzeitig fällig: {count}",
       "unfinished": "Unvollendet: {count}",
       "unfinished_note": "Unvollendet heißt: reserviert, aber nie als gesendet bestätigt. Diese werden nicht wiederholt."
     },

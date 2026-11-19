@@ -129,7 +129,8 @@ async def test_redelivered_tick_sends_nothing(host, mailbox):
     await seed(state)
     assert (await run_tick(app, state))["sent"] == 1
     again = await run_tick(app, state)
-    assert (again["sent"], again["taken"]) == (0, 1) and len(mailbox.messages) == 1
+    # already in the ledger, so it is not even a candidate: nothing rendered, nothing claimed
+    assert (again["sent"], again["taken"]) == (0, 0) and len(mailbox.messages) == 1
     assert (await run_tick(app, state, now=NOW + timedelta(seconds=30)))["sent"] == 0
 
 

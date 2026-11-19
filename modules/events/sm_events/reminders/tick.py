@@ -46,7 +46,7 @@ from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import all_tenants, bound_tenant, tenant_scope
 from sm_events.models import Calendar, Event, EventFollow, EventText
-from sm_events.reminders import candidates, recipients, send
+from sm_events.reminders import candidates, recipients, send, too_late
 from sm_events.reminders.links import Links
 from sm_events.reminders.message import build_message
 from sm_events.reminders.runtime import Recipient, ReminderRuntime
@@ -166,6 +166,9 @@ async def _tenant(
                     render=_renderer(factory, links, locales[0]),
                 )
             )
+        async with factory() as db:  # what went stale unsent is recorded, never lost silently
+            await too_late.record_too_late(db, runtime, now=now)
+            await finalize_session(db)
     return counts
 
 
@@ -196,6 +199,7 @@ async def reminders_async(
         tenant_remaining=limits.REMINDER_TENANT_BUDGET,
         deadline=time.monotonic() + limits.REMINDER_TICK_BUDGET.total_seconds(),
     )
+    wanting_more: dict[str, int] = {}
     for tenant in order_tenants(await _tenants(factory), now):
         summary["tenants"] += 1
         budget.tenant_remaining = min(limits.REMINDER_TENANT_BUDGET, budget.remaining)
@@ -207,6 +211,24 @@ async def reminders_async(
             continue
         for name in _COUNTS:
             summary[name] += getattr(counts, name)
+        if counts.deferred:
+            wanting_more[tenant] = counts.deferred
+    # Fairness without waste: every tenant has had its share; what is left of the install-wide
+    # budget goes to the tenants that still had due reminders, in the same rotating order.
+    for tenant, first_deferred in wanting_more.items():
+        if not budget.open_overall():
+            break
+        budget.tenant_remaining = budget.remaining
+        try:
+            counts = await _tenant(factory, tenant, runtime, sender, budget, settings, now)
+        except Exception as exc:
+            logger.warning("events.reminders: a tenant failed (%s)", type(exc).__name__)
+            summary["tenants_failed"] += 1
+            continue
+        # Only what this pass added: what it sent or failed, and how the left-over count moved.
+        summary["sent"] += counts.sent
+        summary["failed"] += counts.failed
+        summary["deferred"] += counts.deferred - first_deferred
     logger.info(
         "events.reminders: %d tenant(s), %d sent, %d failed, %d denied, %d taken, %d deferred",
         summary["tenants"], summary["sent"], summary["failed"], summary["denied"],

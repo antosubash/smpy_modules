@@ -28,6 +28,7 @@ __all__ = [
     "REMINDERS_URL",
     "REMINDER_CODE_MAX",
     "REMINDER_CODE_SEND_TIMEOUT",
+    "REMINDER_CODE_TOO_LATE",
     "REMINDER_SEND_FAILED",
     "REMINDER_STATES",
     "REMINDER_USER_MAX",
@@ -56,6 +57,8 @@ REMINDER_CODE_MAX: Final = 32
 REMINDER_STATES: Final = ("claimed", "sending", "sent", "failed")
 REMINDER_SEND_FAILED: Final = "send_failed"
 REMINDER_CODE_SEND_TIMEOUT: Final = "send_timeout"
+REMINDER_CODE_TOO_LATE: Final = "too_late"
+"""A due reminder that went stale unsent (too many were due at once): a terminal row, never mail."""
 
 # Why reminders cannot be delivered, in the order they are checked.
 AVAILABILITY_REASONS: Final = (

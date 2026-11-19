@@ -26,7 +26,7 @@ import uuid
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from simple_module_core.resources import ResourcePrincipal
@@ -38,14 +38,15 @@ from sm_events.core import constants
 from sm_events.core.constants.reminders_limits import (
     MAX_LEAD_MINUTES,
     REMINDER_CANDIDATES_MAX,
+    REMINDER_CLAIM_LEASE,
     REMINDER_LEADS,
 )
 from sm_events.core.tenancy import bound_tenant
-from sm_events.models import Event, EventFollow, OccurrenceOverride
+from sm_events.models import Event, EventFollow, OccurrenceOverride, ReminderSent
 from sm_events.models.enums import EventStatus
 from sm_events.reminders import due
 
-__all__ = ["CHUNK", "Candidate", "candidates", "next_starts"]
+__all__ = ["CHUNK", "Candidate", "candidates", "next_starts", "stale_candidates"]
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ SYSTEM = ResourcePrincipal(
 )
 """Sees every published event; used only to expand occurrences, never to decide who is told."""
 
-_F = EventFollow.__table__
+_F, _L = EventFollow.__table__, ReminderSent.__table__
 
 
 @dataclass(frozen=True)
@@ -221,8 +222,13 @@ async def candidates(
             continue
         rows, count = await _followers(db, lead, by_event, cap)
         total += count
+        handled = await _ledger_keys(
+            db, lead, list(by_event), lo, hi, reclaimable_before=now - REMINDER_CLAIM_LEASE
+        )  # already sent, failed or in flight: nothing left to do, so no render and no claim
         for event_id, user_id, locale in rows:
             for occ in by_event[event_id]:
+                if (event_id, occ.key, occ.start, user_id) in handled:
+                    continue
                 found.append(
                     Candidate(
                         event_id,
@@ -266,3 +272,72 @@ async def next_starts(
     for starts in out.values():
         starts.sort()
     return out
+
+
+async def _ledger_keys(
+    db: Any, lead: int, event_ids: Sequence[uuid.UUID], lo: datetime, hi: datetime,
+    *, reclaimable_before: datetime | None = None,
+) -> set[tuple[uuid.UUID, str, datetime, str]]:  # fmt: skip
+    """``(event, occurrence key, start, recipient)`` of the ledger rows for this lead among these
+    events starting in ``[lo, hi)``. With ``reclaimable_before``, a ``claimed`` row older than it
+    (its lease expired, so another tick may take it over) is not counted."""
+    where = [
+        _L.c.tenant_id == bound_tenant(),
+        _L.c.lead_minutes == lead,
+        _L.c.event_id.in_(list(event_ids)),
+        _L.c.starts_at >= lo,
+        _L.c.starts_at < hi,
+    ]
+    if reclaimable_before is not None:
+        where.append(or_(_L.c.state != "claimed", _L.c.claimed_at >= reclaimable_before))
+    stmt = select(_L.c.event_id, _L.c.occurrence_key, _L.c.starts_at, _L.c.recipient_id)
+    return {(r[0], r[1], _utc(r[2]), r[3]) for r in await db.execute(stmt.where(*where))}
+
+
+async def stale_candidates(
+    db: Any, *, now: datetime, lead: int, lo: datetime, hi: datetime, cap: int
+) -> list[Candidate]:
+    """Occurrences starting in ``[lo, hi)`` (and not yet started) whose ``lead`` reminder was due
+    and has gone stale, with the followers who were already following when it was due: what
+    :mod:`~sm_events.reminders.too_late` records. At most ``cap``, in a stable order."""
+    revisions = await _followed_events(db, lead, lo, hi)
+    if not revisions:
+        return []
+    by_event: dict[uuid.UUID, list[Occurrence]] = defaultdict(list)
+    for occ in await _expand(db, list(revisions), lo, hi):
+        if occ.event_id in revisions and lo <= occ.start < hi and occ.start > now:
+            by_event[occ.event_id].append(occ)
+    if not by_event:
+        return []
+    rows = await db.execute(
+        select(_F.c.event_id, _F.c.user_id, _F.c.locale, _F.c.created_at)
+        .where(
+            _F.c.tenant_id == bound_tenant(),
+            _F.c.lead_minutes == lead,
+            _F.c.event_id.in_(list(by_event)),
+        )
+        .order_by(_F.c.event_id, _F.c.user_id)
+    )
+    have = await _ledger_keys(db, lead, list(by_event), lo, hi)  # recorded: left out before the cap
+    found: list[Candidate] = []
+    for event_id, user_id, locale, created_at in rows:
+        for occ in by_event[event_id]:
+            if (event_id, occ.key, occ.start, user_id) in have:
+                continue
+            made = created_at if created_at.tzinfo else created_at.replace(tzinfo=UTC)
+            if made > due.due_at(occ.start, lead):
+                continue  # not following yet when it was due: never owed
+            found.append(
+                Candidate(
+                    event_id, revisions[event_id], occ.key, occ.start, occ.end, lead, user_id,
+                    locale, _moved_from(occ),
+                )
+            )  # fmt: skip
+            if len(found) >= cap:
+                return found
+    return found
+
+
+def _utc(value: datetime) -> datetime:
+    """A stored instant as read back (SQLite drops the zone), for comparing with a computed one."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)

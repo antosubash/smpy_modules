@@ -12,8 +12,9 @@ export const AVAILABILITY_REASONS: Record<string, string> = {
   console_mail: delivery.reason_console_mail,
 };
 
-/** The failure codes the ledger counts (`REMINDER_SEND_FAILED`, `REMINDER_CODE_SEND_TIMEOUT`). */
+/** The failure codes the ledger counts (`REMINDER_SEND_FAILED`, `REMINDER_CODE_SEND_TIMEOUT`, `REMINDER_CODE_TOO_LATE`). */
 export const FAILED_CODES: Record<string, string> = {
   send_failed: delivery.failed_code_send_failed,
   send_timeout: delivery.failed_code_send_timeout,
+  too_late: delivery.failed_code_too_late,
 };

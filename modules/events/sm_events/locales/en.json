@@ -976,6 +976,7 @@
       "failed": "Failed: {count}",
       "failed_code_send_failed": "Mail could not be sent: {count}",
       "failed_code_send_timeout": "Mail server did not answer in time: {count}",
+      "failed_code_too_late": "Not sent: too many reminders were due at once: {count}",
       "unfinished": "Unfinished: {count}",
       "unfinished_note": "Unfinished means claimed but never confirmed sent. Those are not retried."
     },
