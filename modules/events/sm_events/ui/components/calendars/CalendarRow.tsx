@@ -19,6 +19,7 @@ import type { Calendar } from '../../utils/types';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { SubscribeDialog } from '../feeds/SubscribeDialog';
 import { ShareDialog } from '../share/ShareDialog';
+import { SubscriptionsDialog } from '../subscriptions/SubscriptionsDialog';
 import { CalendarDialog } from './CalendarDialog';
 import { OwnerDialog } from './OwnerDialog';
 import { SourcesDialog } from './SourcesDialog';
@@ -57,6 +58,8 @@ export function CalendarRow({
   onSaved,
   contentLocales = ['en'],
   publicPrefix = '/events',
+  canPublish = false,
+  defaultRefreshMinutes = 60,
 }: {
   calendar: Calendar;
   userId: string;
@@ -67,6 +70,9 @@ export function CalendarRow({
   contentLocales?: string[];
   /** Where the public feeds live, for a public calendar's own subscribe box. */
   publicPrefix?: string;
+  /** Whether the caller holds `events.publish` (an external feed may be shown publicly). */
+  canPublish?: boolean;
+  defaultRefreshMinutes?: number;
 }) {
   const { t } = useT();
   const { can } = usePermissions();
@@ -168,6 +174,12 @@ export function CalendarRow({
                 <>
                   <VisibilityMenu calendar={calendar} onSaved={onSaved} />
                   <SourcesDialog calendar={calendar} onSaved={onSaved} />
+                  <SubscriptionsDialog
+                    calendar={calendar}
+                    canPublish={canPublish}
+                    defaultMinutes={defaultRefreshMinutes}
+                    onGone={onSaved}
+                  />
                   {can('sharing.share') && (
                     <ShareDialog
                       calendarId={calendar.id}

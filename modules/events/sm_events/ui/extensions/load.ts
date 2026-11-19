@@ -7,6 +7,7 @@
  *  import it before this module exists. Each file is loaded on its own, so one that fails to load,
  *  or throws while registering, is logged once by path and skipped; the rest still register. */
 import { useSyncExternalStore } from 'react';
+import { registerBuiltins } from './builtins';
 
 export const GLOB_PATTERN = '../../../../*/*/events-extensions.ts';
 
@@ -36,6 +37,7 @@ export const extensionFailures = (): readonly ExtensionFailure[] => failures;
 /** Load every plugin once; concurrent and later calls share the one run. */
 export function loadEventExtensions(loaders: Loaders = found): Promise<void> {
   started ??= (async () => {
+    registerBuiltins();
     const entries = Object.entries(loaders);
     const settled = await Promise.allSettled(entries.map(([, load]) => load()));
     settled.forEach((result, index) => {
