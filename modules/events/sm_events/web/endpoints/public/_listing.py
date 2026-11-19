@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -42,7 +42,15 @@ from sm_events.web.schemas.public import (
     PublicListItem,
 )
 
-__all__ = ["category_name", "make_item", "month_groups", "page_count", "page_param", "upcoming"]
+__all__ = [
+    "category_name",
+    "make_item",
+    "month_groups",
+    "page_count",
+    "page_param",
+    "reference_zone",
+    "upcoming",
+]
 
 
 def page_param(raw: str | None) -> int:
@@ -81,6 +89,13 @@ async def _calendars(db: Any) -> dict[uuid.UUID, Calendar]:
     return {c.id: c for c in (await db.execute(stmt)).scalars()}
 
 
+def reference_zone(calendars: Iterable[Calendar]) -> str | None:
+    """The one zone every one of ``calendars`` is in, or ``None`` when they differ (or there are
+    none): the clock a list is read on, so an item on another clock must say so."""
+    zones = {c.default_timezone for c in calendars}
+    return next(iter(zones)) if len(zones) == 1 else None
+
+
 def make_item(
     *,
     key: str,
@@ -94,6 +109,7 @@ def make_item(
     day: date | None,
     status: str,
     rescheduled: bool,
+    reference: str | None,
     origin: str = "",
 ) -> PublicListItem:
     """One list item for an event (or one of its occurrences) shown in ``span``; ``text`` is the
@@ -114,7 +130,9 @@ def make_item(
         start_date=first,
         end_date=last,
         timezone=event.timezone,
-        show_timezone=event.timezone != calendar.default_timezone,
+        # An all-day item is dates and never names a zone; a timed one does when its clock is not
+        # the list's reference (and always, when the list has none).
+        show_timezone=not event.all_day and (reference is None or event.timezone != reference),
         status="cancelled" if status == "cancelled" or event.cancelled else "confirmed",
         rescheduled=rescheduled,
         calendar=PublicCalendarRef(slug=calendar.slug, name=calendar.name, color=calendar.color),
@@ -160,6 +178,8 @@ async def upcoming(
     events = await _events(db, ids)
     texts = await public_texts(db, ids)
     cals = await _calendars(db)
+    chosen = [c for c in cals.values() if calendar_ids is None or c.id in set(calendar_ids)]
+    reference = reference_zone(chosen)
     cats = {c.id: c for c in await public_categories(db)}
     items: list[PublicListItem] = []
     for occ in occurrences:
@@ -181,6 +201,7 @@ async def upcoming(
                 day=occurrence_day(occ),
                 status=occ.status,
                 rescheduled=occ.original_start is not None and occ.original_start != occ.start,
+                reference=reference,
                 origin=origin,
             )
         )

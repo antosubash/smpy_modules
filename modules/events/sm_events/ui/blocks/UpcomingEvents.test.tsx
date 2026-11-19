@@ -95,6 +95,27 @@ describe('UpcomingEvents', () => {
     expect(view.host.textContent).toContain('Rescheduled');
   });
 
+  it('says the zone of an item the server marked, and only that one', async () => {
+    stubFetch({
+      [UPCOMING]: {
+        items: [
+          item({
+            key: 'a',
+            title: 'East coast reading',
+            show_timezone: true,
+            timezone: 'America/New_York',
+          }),
+          item({ key: 'b', title: 'Local reading', show_timezone: false }),
+        ],
+      },
+    });
+    const view = await mount(render());
+    await ready(view, 'li');
+    const times = view.all('time').map((t) => t.textContent ?? '');
+    expect(times[0]).toContain('(America/New_York)');
+    expect(times[1]).not.toContain('(');
+  });
+
   it('renders text only: markup in a title stays text', async () => {
     stubFetch({ [UPCOMING]: { items: [item({ title: '<img src=x onerror=alert(1)>' })] } });
     const view = await mount(render());

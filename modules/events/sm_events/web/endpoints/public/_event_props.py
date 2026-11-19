@@ -113,6 +113,7 @@ def _sub_items(ctx: EventContext, origin: str) -> list[PublicListItem]:
                 day=None,
                 status="cancelled" if child.cancelled else "scheduled",
                 rescheduled=False,
+                reference=calendar.default_timezone,
                 origin=origin,
             )
         )
