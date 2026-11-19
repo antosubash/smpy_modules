@@ -30,7 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.public_submissions_api import SubmitBody
-from sm_records.core import locales
+from sm_records.core import events, locales
 from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordStatus, RecordType, tables_for
@@ -42,13 +42,13 @@ from sm_records.public_submissions.definition import (
     page_locale,
 )
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.public_submissions.registration import mail, seats
+from sm_records.public_submissions.registration import holds, mail, seats
 from sm_records.public_submissions.registration.tokens import RegistrationToken
 from sm_records.public_submissions.subscribe import normalise
 from sm_records.public_submissions.tokens import host_secret, ip_hash
 from sm_records.records.index.query import Filter, FilterOp, exists_query
 from sm_records.records.services import records as record_service
-from sm_records.records.services._common import utcnow
+from sm_records.records.services._common import SESSION_HAS_WRITES_KEY, utcnow
 from sm_records.records.services._lock import lock_type
 from sm_records.records.services._payload import carry_system, field_defs, validate
 from sm_records.records.services.errors import Conflict, ValidationFailed
@@ -75,7 +75,9 @@ def _availability_refusal(state: str) -> str | None:
         return "event_unavailable"
     if state in ("cancelled", "closed", "not_open_yet"):
         return "registration_closed"
-    return None  # open, or full: a seat is the admit's to decide, after the duplicate check
+    if state == "full":  # the same for everyone, a registered person included
+        return "registration_full"
+    return None
 
 
 def _fresh(
@@ -157,6 +159,26 @@ async def _live_registration(
     return None
 
 
+class _Declined(Exception):  # noqa: N818 - control flow inside the savepoint
+    """The admit refused (full, closed or gone in the instant after the availability read)."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+_NOTICE = {
+    "registration_full": "full",
+    "registration_closed": "closed",
+    "event_unavailable": "closed",
+}
+
+
+async def _discard(db: AsyncSession) -> None:
+    await events.rollback(db)
+    db.info.pop(SESSION_HAS_WRITES_KEY, None)
+
+
 async def register(
     request: Request,
     db: AsyncSession,
@@ -169,8 +191,13 @@ async def register(
     settings: RecordsSettings,
     verdicts: Any,
 ) -> None:
-    """Register ``address`` for the token's occurrence; returns (to a ``202``) in every state a
-    person can be in."""
+    """Register ``address`` for the token's occurrence; returns (to the one ``202``) whatever state
+    the person is in. What actually happened is told by mail to that address, never by the answer.
+
+    Refusals that belong to the **event** (not public, closed, cancelled, full) answer everybody
+    alike before anything about the person is looked at. Past them every branch does the same
+    work (the type lock, a look for the person's live registration, an admit that is idempotent for
+    a holder who already has a seat) and answers the same 202."""
     tenant = bound_tenant()
     email = normalise(address)
     clean_name = name.strip() if isinstance(name, str) else ""
@@ -187,13 +214,26 @@ async def register(
     if (code := _availability_refusal(avail.state)) is not None or avail.event is None:
         raise _refuse(code or "event_unavailable")
     fresh = _fresh(request, rtype, body, settings, token, avail, email, clean_name)
+    outcome: tuple[str, Record | None] = ("registration", None)
     with checked(verdicts):
         _check(rtype, data, fresh, settings)
         await lock_type(db, rtype)
+        pending = await holds.expire_pending(db, rtype, token, settings)
         existing = await _live_registration(db, rtype, email, token)
         if existing is not None:
-            record = existing
-            wanted = (existing.data or {}).get("sm_status") == PENDING
+            # Same locks and reads as a new registration: an idempotent admit for its own seat.
+            await integration.admit(
+                db,
+                tenant_id=tenant,
+                event_id=token.event_id,
+                occurrence_key=token.occurrence_key,
+                target=rtype.key,
+                holder=existing.uuid,
+            )
+            was_pending = (existing.data or {}).get("sm_status") == PENDING
+            outcome = ("registration" if was_pending else "already", existing)
+        elif fresh["sm_status"] == PENDING and len(pending) >= holds.pending_cap(avail.capacity):
+            outcome = ("busy", None)
         else:
             try:
                 record = await record_service.create_record(
@@ -205,21 +245,30 @@ async def register(
                     actor=None,
                     system=fresh,
                 )
+                given = await integration.admit(
+                    db,
+                    tenant_id=tenant,
+                    event_id=token.event_id,
+                    occurrence_key=token.occurrence_key,
+                    target=rtype.key,
+                    holder=record.uuid,
+                    locale=lang,
+                )
+                if not given.admitted:
+                    raise _Declined(given.code or "event_unavailable")
+                outcome = ("registration", record)
             except ValidationFailed as exc:
                 raise SubmissionRefused("invalid", exc.detail, errors=exc.errors) from exc
             except Conflict as exc:
                 raise SubmissionRefused("conflict", exc.detail) from exc
-            given = await integration.admit(
-                db,
-                tenant_id=tenant,
-                event_id=token.event_id,
-                occurrence_key=token.occurrence_key,
-                target=rtype.key,
-                holder=record.uuid,
-                locale=lang,
-            )
-            if not given.admitted:
-                raise _refuse(given.code or "event_unavailable")
-            wanted = True
-    if wanted and await budget_wait(request, rtype, email, settings) == 0:
-        await mail.queue_registration_mail(db, request, rtype, record, avail.event)
+            except _Declined as declined:
+                await _discard(db)  # nothing is stored, and nothing announces a record
+                await db.refresh(rtype)  # the rollback expired it; the mail below reads it
+                outcome = (_NOTICE[declined.code], None)
+    kind, record = outcome
+    if await budget_wait(request, rtype, email, settings) != 0:
+        return  # over the address's own budget: still the one 202, nothing sent
+    if record is not None:
+        await mail.queue_registration_mail(db, request, rtype, record, avail.event, kind=kind)
+    else:
+        await mail.queue_notice_mail(db, request, rtype, email, avail.event, kind, lang)

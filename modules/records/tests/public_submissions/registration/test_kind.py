@@ -31,7 +31,7 @@ async def test_kind_fields(site):
     assert all(by_key[k]["system"] == "readonly" for k in SYSTEM if k != "sm_nonce")
     assert by_key["sm_event_title"]["constraints"] == {"max_length": 300}
     assert body["display_field"] == "sm_name"
-    assert body["public_submissions"]["pending_hold_hours"] == 24
+    assert body["public_submissions"]["pending_hold_hours"] == 1
     assert body["public_submissions"]["double_opt_in"] is True
 
 

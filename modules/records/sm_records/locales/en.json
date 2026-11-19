@@ -839,7 +839,14 @@
         "confirm": "Confirm your registration:",
         "expiry": "This link works until {expires}. If you did not register, ignore this email: the seat is released by itself.",
         "cancel": "Cannot come? Cancel your registration here:",
-        "why": "You get this email because this address was entered in a registration form on {site}."
+        "why": "You get this email because this address was entered in a registration form on {site}.",
+        "intro_already": "You are already registered for {title} on {site}. Nothing else is needed.",
+        "subject_already": "You are already registered for {title}",
+        "notice_subject": "Your registration for {title}",
+        "notice_full": "{title} on {site} is fully booked, so your registration could not be saved.",
+        "notice_closed": "Registration for {title} on {site} is closed, so your registration could not be saved.",
+        "notice_busy": "Many people are registering for {title} on {site} right now, so your registration could not be saved. Please try again later.",
+        "notice_why": "You get this email because this address was entered in a registration form on {site}. Nothing was saved."
       }
     },
     "landing": {

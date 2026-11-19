@@ -35,9 +35,9 @@ async def test_pending_expires_and_its_seat_goes(reg_site):
     mine = next(m for m in reg_site.outbox.sent if m.to == "b@example.org")
     assert (await follow(reg_site, "confirm", reg_links(mine)["confirm"]["t"])).status_code == 200
     assert await seat_counts(reg_site) == (2, 2)
-    soon = datetime.now(UTC) + timedelta(hours=23)
+    soon = datetime.now(UTC) + timedelta(minutes=30)
     assert (await sweep(reg_site, soon)).purged == 0, "inside the hold nothing is due"
-    later = datetime.now(UTC) + timedelta(hours=25)
+    later = datetime.now(UTC) + timedelta(hours=2)
     done = await sweep(reg_site, later)
     assert done is not None and done.purged == 1
     left = await regs(reg_site)

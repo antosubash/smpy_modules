@@ -82,6 +82,9 @@ class Availability:
     opens_at: datetime | None
     closes_at: datetime | None
     event: RegistrationEvent | None
+    capacity: int | None = None
+    """The event's seat limit (``None``: unlimited, or unavailable). For the provider's own
+    bounds (how many unconfirmed holds one occurrence may carry); not for a public page."""
 
 
 @dataclass(frozen=True)
@@ -225,4 +228,5 @@ async def describe(
             opens_at=event.registration_opens_at,
             closes_at=event.registration_closes_at,
             event=await registration_event(db, event, found.occurrence, lang),
+            capacity=event.registration_capacity,
         )

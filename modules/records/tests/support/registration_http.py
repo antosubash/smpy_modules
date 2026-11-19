@@ -64,7 +64,7 @@ async def seed_event(db_state: Any, *, tenant: str = "default", **fields: Any) -
                 "registration_mode": "builtin",
                 "registration_provider": PROVIDER,
                 "registration_target": TYPE,
-                "registration_capacity": 2,
+                "registration_capacity": 20,
                 **fields,
             }
             event = Event(calendar_id=cal.id, **values)

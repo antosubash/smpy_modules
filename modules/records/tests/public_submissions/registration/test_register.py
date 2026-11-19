@@ -34,8 +34,8 @@ def mails(monkeypatch):
     """Every confirmation the registration code asked for (Task 10 sends them)."""
     queued: list = []
 
-    async def capture(db, request, rtype, record, event):
-        queued.append((record.uuid, event.title))
+    async def capture(db, request, rtype, record, event, kind="registration"):
+        queued.append((record.uuid, event.title, kind))
 
     monkeypatch.setattr(reg_mail, "queue_registration_mail", capture)
     return queued
@@ -69,7 +69,7 @@ async def test_registers_pending(reg_site, mails):
     seat_rows, counters = await seats(reg_site)
     assert [uuid.UUID(s.holder).hex for s in seat_rows] == [record["uuid"]]
     assert counters[0].taken == 1
-    assert mails == [(record["uuid"], "Open day")]
+    assert mails == [(record["uuid"], "Open day", "registration")]
 
 
 async def test_single_opt_in(reg_site, mails):
@@ -169,7 +169,8 @@ async def test_a_registered_duplicate_queues_nothing(reg_site, mails):
     )
     await register(reg_site, consent=True)
     again = await register(reg_site, consent=True)
-    assert again.status_code == 202 and len(mails) == 1 and len(await regs(reg_site)) == 1
+    assert again.status_code == 202 and len(await regs(reg_site)) == 1
+    assert [kind for *_rest, kind in mails] == ["registration", "already"]
 
 
 async def test_same_address_other_occurrence(reg_site, mails):

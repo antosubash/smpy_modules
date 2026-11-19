@@ -21,7 +21,7 @@ async def test_create_and_dedupe(reg_site):
     made = await reg_site.get("/api/records/types/event_registrations_2", headers=roles(ADMIN))
     config = made.json()["public_submissions"]
     assert config["kind"] == "registration" and config["double_opt_in"] is True
-    assert config["enabled"] is True and config["pending_hold_hours"] == 24
+    assert config["enabled"] is True and config["pending_hold_hours"] == 1
     # a fresh tenant gets the unsuffixed key
     from sm_records.records.services import types as type_service  # noqa: F401
 
