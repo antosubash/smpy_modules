@@ -66,4 +66,16 @@ describe('calendar reminder defaults', () => {
     expect(document.body.textContent).not.toContain('Reminder times');
     await view.unmount();
   });
+
+  it('offers exactly the four lead times the server accepts', async () => {
+    stubFetch({ [`GET ${API}`]: [calendar({ default_reminder_minutes: [] })] });
+    const view = await mount(<Calendars {...props} />);
+    await flush();
+    await click(button('Edit'));
+    const ids = [...document.querySelectorAll<HTMLElement>('[role="dialog"] [role="checkbox"]')]
+      .map((b) => b.id.replace(/^.*-/, ''))
+      .filter((x) => x !== 'site' && /^\d+$/.test(x));
+    expect(ids).toEqual(['15', '60', '1440', '10080']);
+    await view.unmount();
+  });
 });
