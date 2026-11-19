@@ -202,10 +202,13 @@ function Row({
   const title = item.title ?? '';
   return (
     <TableRow>
-      <TableCell className="min-w-48 max-w-xs whitespace-normal [overflow-wrap:anywhere]">
+      <TableCell className="min-w-32 max-w-xs whitespace-normal [overflow-wrap:anywhere] sm:min-w-48">
         <Name>{title}</Name>
         {item.lang && locale && item.lang !== locale.split('-')[0] ? (
-          <span className="ml-2 rounded border px-1 text-xs uppercase" aria-hidden="true">
+          <span
+            className="ml-2 whitespace-nowrap rounded border px-1 text-xs uppercase"
+            aria-hidden="true"
+          >
             {item.lang}
           </span>
         ) : null}
@@ -239,7 +242,7 @@ function Row({
         )}
       </TableCell>
       <TableCell>
-        <div className="flex gap-2 whitespace-nowrap">
+        <div className="flex flex-col gap-2 whitespace-nowrap sm:flex-row">
           <Button
             variant="outline"
             size="sm"
