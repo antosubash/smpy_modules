@@ -887,7 +887,31 @@
   },
   "reminders": {
     "page": {
-      "hidden_event": "An event you can no longer see"
+      "hidden_event": "An event you can no longer see",
+      "title": "Reminders",
+      "subtitle": "Emails before the events you follow.",
+      "mine": "My reminders",
+      "empty": "You are not following any events. Open an event in the calendar and choose Remind me.",
+      "col_event": "Event",
+      "col_calendar": "Calendar",
+      "col_next": "Next start",
+      "col_leads": "Reminders",
+      "col_actions": "Actions",
+      "remove": "Remove",
+      "remove_for": "Remove reminders for {name}",
+      "edit": "Change",
+      "edit_for": "Change reminder times for {name}",
+      "hidden_note": "Some of your reminders are on events you can no longer see. They send nothing; remove them here.",
+      "cap_note": "You can follow at most {count} events. Remove one to follow another; events you can no longer see count too and are listed here.",
+      "paging": "Page {page} of {pages}",
+      "previous": "Previous",
+      "next": "Next",
+      "my_counts": "Your last 30 days: {sent} sent, {failed} failed, {unfinished} unfinished.",
+      "not_retried": "A failed reminder is not retried: a late reminder is worth little and a duplicate is worse. One that never finished is lost, not repeated.",
+      "scheduler": "Reminders are sent by a background scheduler. This page cannot tell whether it is running; if nothing arrives, ask whoever runs this site.",
+      "zone": "Times are shown in your browser's time zone ({zone}).",
+      "removed": "Reminders removed.",
+      "loading": "Loading your reminders…"
     },
     "mail": {
       "subject": "Reminder: {title} ({date})",
@@ -905,6 +929,58 @@
       "lead_1440": "in 1 day",
       "lead_10080": "in 1 week",
       "lead_other": "in {minutes} minutes"
+    },
+    "control": {
+      "remind_me": "Remind me",
+      "reminding": "Reminding: {leads}",
+      "panel_title": "Remind me before this event",
+      "save": "Save",
+      "saving": "Saving…",
+      "stop": "Stop reminding",
+      "loading": "Loading reminders…",
+      "already": "You are reminded before this event.",
+      "none_chosen": "Choose at least one time, or stop reminding.",
+      "next_due": "{lead}: next reminder {when}",
+      "too_late": "{lead}: too late for the next occurrence",
+      "no_coming": "{lead}: no coming occurrence",
+      "unavailable": "Reminders are not available on this site right now.",
+      "time_zone": "Times are shown in your browser's time zone ({zone}); the event's zone is {event_zone}.",
+      "reason_note": "Why: {reason}"
+    },
+    "leads": {
+      "m15": "15 minutes before",
+      "m60": "1 hour before",
+      "m1440": "1 day before",
+      "m10080": "1 week before",
+      "s15": "15 min",
+      "s60": "1 h",
+      "s1440": "1 day",
+      "s10080": "1 week"
+    },
+    "delivery": {
+      "title": "Delivery",
+      "enabled": "Reminders are switched on.",
+      "disabled": "Reminders are switched off.",
+      "ok": "Reminders can be delivered.",
+      "reason_disabled": "Reminders are switched off in the settings.",
+      "reason_no_public_base_url": "The site's public address is not set, so links in the mail would be wrong.",
+      "reason_no_mail_transport": "No mail transport is configured.",
+      "reason_console_mail": "Mail is set to the console backend, which only logs: nothing reaches an inbox.",
+      "reason_worker_access_unavailable": "The background worker cannot work out who may still be reminded.",
+      "defaults": "Suggested reminder times: {leads}",
+      "settings": "Change the reminder settings",
+      "counts_title": "Last {days} days, everyone (counts only, never who)",
+      "sent": "Sent: {count}",
+      "failed": "Failed: {count}",
+      "failed_code_send_failed": "Mail could not be sent: {count}",
+      "failed_code_send_timeout": "Mail server did not answer in time: {count}",
+      "unfinished": "Unfinished: {count}",
+      "unfinished_note": "Unfinished means claimed but never confirmed sent. Those are not retried."
+    },
+    "defaults": {
+      "label": "Reminder times",
+      "site_default": "Use the site default",
+      "help": "Suggested when someone chooses Remind me on this calendar. Nobody is followed automatically."
     }
   }
 }

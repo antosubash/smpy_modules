@@ -1,9 +1,11 @@
 /** The calendar component: state, fetching, toolbar, filters, status, the lazily loaded
  *  grid, the detail popover and the render slots. It never sees a FullCalendar type; the
  *  grid behind `adapter/` is the one thing a replacement would rewrite. */
+
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RemindMe } from '../reminders/RemindMe';
 import { keys, useT } from '../utils/i18n';
 import { DetailPopover, type Selected } from './DetailPopover';
 import { useOccurrences } from './data/useOccurrences';
@@ -140,6 +142,16 @@ export function Calendar(props: CalendarProps) {
         >
           {t(copy.detail.move)}
         </Button>
+      ) : null}
+      {editing &&
+      selectedOccurrence.source === 'events' &&
+      selectedOccurrence.event_id &&
+      selectedOccurrence.event_status === 'published' ? (
+        <RemindMe
+          key={selectedOccurrence.event_id}
+          eventId={selectedOccurrence.event_id}
+          eventZone={selectedOccurrence.timezone}
+        />
       ) : null}
     </>
   ) : null;

@@ -19,6 +19,7 @@ import { useEvent } from '../ui/hooks/useEvent';
 import { useEventActions } from '../ui/hooks/useEventActions';
 import { useLeaveGuard } from '../ui/hooks/useLeaveGuard';
 import { usePreview } from '../ui/hooks/usePreview';
+import { RemindMe } from '../ui/reminders/RemindMe';
 import { diffForms } from '../ui/utils/event-diff';
 import { times } from '../ui/utils/event-form';
 import { keys, useT } from '../ui/utils/i18n';
@@ -104,6 +105,7 @@ export default function EventEditor(props: Props) {
     ) : (
       <div className="space-y-6">
         <p className="text-sm text-muted-foreground">{t(copy.calendar, { name: calendar.name })}</p>
+        {event?.status === 'published' && <RemindMe eventId={event.id} eventZone={form.timezone} />}
         {readOnly && (
           <p role="status" className="rounded-md border bg-muted p-3 text-sm">
             {t(
