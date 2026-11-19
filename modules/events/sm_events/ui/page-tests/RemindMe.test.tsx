@@ -125,9 +125,9 @@ describe('RemindMe', () => {
     await click(text(/^Save$/));
     await flush();
     expect(control()?.textContent).toBe('Remind me');
-    const text = document.querySelector('[role="alert"]')?.textContent ?? '';
-    expect(text).toContain('most events');
-    expect(text.match(/first/g)).toHaveLength(1); // one sentence, not three
+    const said = document.querySelector('[role="alert"]')?.textContent ?? '';
+    expect(said).toContain('most events');
+    expect(said.match(/first/g)).toHaveLength(1); // one sentence, not three
     await view.unmount();
   });
 
