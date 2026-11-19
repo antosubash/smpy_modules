@@ -22,6 +22,7 @@ from sm_events.core.access.rights import CalendarRights, calendar_rights_many
 from sm_events.models import Calendar, Event, EventText, OccurrenceOverride
 from sm_events.web.schemas.events_out import EventListItem, EventOut, SubEvent
 from sm_events.web.schemas.overrides import override_out
+from sm_events.web.schemas.registration import RegistrationOut
 from sm_events.web.schemas.texts import TextOut
 
 __all__ = ["render", "render_items"]
@@ -64,6 +65,32 @@ def _base(event: Event, rights: CalendarRights | None) -> dict[str, Any]:
         "can_publish": bool(rights and rights.publish),
         "locked": is_locked(event),
     }
+
+
+def _wall(value: Any, timezone: str) -> str | None:
+    if value is None:
+        return None
+    return to_local(Span(value, value), all_day=False, timezone=timezone)[0]
+
+
+def registration_out(event: Event) -> RegistrationOut:
+    builtin = event.registration_mode == constants.REGISTRATION_MODE_BUILTIN
+    return RegistrationOut(
+        mode=event.registration_mode,
+        url=event.registration_url,
+        provider=event.registration_provider,
+        target=event.registration_target,
+        capacity=event.registration_capacity,
+        opens_at_local=_wall(event.registration_opens_at, event.timezone),
+        closes_at_local=_wall(event.registration_closes_at, event.timezone),
+        show_seats=event.registration_show_seats,
+        reminder_minutes=event.registration_reminder_minutes,
+        provider_installed=(
+            registry.registration_provider(event.registration_provider or "") is not None
+            if builtin
+            else None
+        ),
+    )
 
 
 def pick_title(texts: dict[str, EventText], *locales: str | None) -> tuple[str, str]:
@@ -170,6 +197,7 @@ async def render(
         organiser=event.organiser,
         image=event.image,
         registration_url=event.registration_url,
+        registration=registration_out(event),
         extra=event.extra,
         created_at=event.created_at,
         updated_at=event.updated_at,

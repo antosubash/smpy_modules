@@ -26,6 +26,8 @@ from sm_events.core.errors import InvalidParent, UnknownType
 from sm_events.core.errors_extensions import TypeNotInstalled
 from sm_events.models import Calendar, Event
 from sm_events.models.enums import EventStatus
+from sm_events.registration import guards as registration_guards
+from sm_events.registration import settings as registration
 from sm_events.web.schemas.events_in import EventCreate, EventPatch
 
 __all__ = ["SCALARS", "apply_patch", "create_core"]
@@ -41,7 +43,6 @@ SCALARS = (
     "category_id",
     "organiser",
     "image",
-    "registration_url",
 )
 
 
@@ -87,6 +88,7 @@ async def create_core(
         extra=extra,
         **{name: getattr(data, name) for name in SCALARS},
     )
+    await _apply_registration_on_create(db, event, data)
     async with db.begin_nested():  # a failed text leaves no half-created event
         db.add(event)
         await db.flush()
@@ -95,6 +97,31 @@ async def create_core(
             await before_history(event)
         await revisions.record(db, event, action="created", actor=actor, note=note)
     return event
+
+
+async def _apply_registration_on_create(db: Any, event: Event, data: EventCreate) -> None:
+    reg = registration.resolve(
+        data.registration,
+        url=data.registration_url,
+        url_sent="registration_url" in data.model_fields_set,
+    )
+    if reg is not None:
+        await registration.apply_registration(db, event, reg, creating=True)
+    elif data.registration_url is not None:
+        registration.apply_legacy_url(event, data.registration_url)
+
+
+async def _apply_registration_on_patch(db: Any, event: Event, data: EventPatch) -> bool:
+    """The ``registration`` object, or else the legacy ``registration_url``; whether it changed."""
+    sent = data.model_fields_set
+    reg = registration.resolve(
+        data.registration, url=data.registration_url, url_sent="registration_url" in sent
+    )
+    if reg is not None:
+        return (await registration.apply_registration(db, event, reg)).changed
+    if "registration_url" in sent:
+        return registration.apply_legacy_url(event, data.registration_url)
+    return False
 
 
 async def _check_recurrence(db: Any, event: Event, plan: schedule.Schedule) -> None:
@@ -147,6 +174,12 @@ async def apply_patch(
                 changed = True
                 names.add("times" if "times" in sent else "rrule")
                 await _check_recurrence(db, event, plan)
+                await registration_guards.guard_seats(
+                    db,
+                    event,
+                    new=None,
+                    orphaned_keys=await registration_guards.seat_keys_orphaned_by(db, event, plan),
+                )
                 dropped = await settle_overrides(db, event, plan, drop=data.drop_orphaned_overrides)
                 event.starts_at, event.ends_at = plan.span.starts_at, plan.span.ends_at
                 event.timezone, event.all_day = plan.timezone, plan.all_day
@@ -156,6 +189,11 @@ async def apply_patch(
                 setattr(event, name, getattr(data, name))
                 changed = True
                 names.add(name)
+        if sent & {"registration", "registration_url"} and await _apply_registration_on_patch(
+            db, event, data
+        ):
+            changed = True
+            names.add("registration")
         if data.texts is not None and await apply_texts(
             db, event, data.texts, locales=locales, creating=False
         ):

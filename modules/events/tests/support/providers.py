@@ -15,6 +15,10 @@ from sm_events.contracts.extensions import (
     RegistrationTargetInfo,
 )
 
+_REAL_LOADERS = list(extensions._BUILTIN_LOADERS)
+"""The built-ins' loaders, taken before any test patches them: a second install in one test must
+not inherit the first one's plugins."""
+
 PROVIDER_ID = "records:registration"
 KNOWN_TARGET = "event-registrations"
 
@@ -52,11 +56,10 @@ def install_provider(monkeypatch, *providers: RegistrationProvider) -> None:
     """A registry holding the built-ins plus ``providers`` (namespaced by their own id), frozen on
     first read. Call ``registry.reset_registry()`` (the ``fresh_registry`` fixture does)."""
     registry.reset_registry()
-    real = list(extensions._BUILTIN_LOADERS)
 
     def plugins() -> None:
         for each in providers:
             registry.add_registration_provider(each, namespace=each.id.split(":", 1)[0])
 
-    monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", [*real, plugins])
+    monkeypatch.setattr(extensions, "_BUILTIN_LOADERS", [*_REAL_LOADERS, plugins])
     monkeypatch.setattr(extensions, "_plugins", list)

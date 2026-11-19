@@ -18,6 +18,7 @@ from sm_events.core import constants
 from sm_events.core.errors import ImmutableField
 from sm_events.models.enums import ATTENDANCE_MODES, DEFAULT_EVENT_TYPE
 from sm_events.web.schemas._fields import HttpUrl, MultiLine, SingleLine, TimezoneName
+from sm_events.web.schemas.registration import RegistrationIn
 from sm_events.web.schemas.texts import TextIn
 
 LocaleKey = Annotated[str, Field(min_length=1, max_length=constants.LOCALE_MAX)]
@@ -61,6 +62,9 @@ class _Fields(BaseModel):
     organiser: Organiser | None = None
     image: HttpUrl | None = None
     registration_url: HttpUrl | None = None
+    """The older way to say "register at this link"; it sets mode ``external``. ``registration``
+    is the whole of it; a URL beside it must agree."""
+    registration: RegistrationIn | None = None
 
 
 class EventCreate(_Fields):
@@ -74,7 +78,7 @@ class EventCreate(_Fields):
 
 
 _IMMUTABLE = ("calendar_id", "parent_id", "type")
-_NOT_NULL = ("times", "cancelled", "attendance_mode", "texts", "extra")
+_NOT_NULL = ("times", "cancelled", "attendance_mode", "texts", "extra", "registration")
 
 
 class EventPatch(_Fields):
