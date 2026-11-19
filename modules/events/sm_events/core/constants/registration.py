@@ -32,6 +32,8 @@ __all__ = [
     "REGISTRATION_UNAVAILABLE_CODE",
     "REGISTRATION_UNAVAILABLE_DETAIL",
     "REGISTRATION_UPCOMING",
+    "SEATS_BUSY_CODE",
+    "SEATS_BUSY_DETAIL",
     "SEAT_HOLDERS_MAX",
     "SEAT_RELEASE_MAX",
     "SUMMARIES_MAX",
@@ -88,6 +90,8 @@ REGISTRATIONS_ORPHANED_DETAIL: Final = (
     "This change would leave registrations on dates that no longer exist; "
     "cancel those occurrences instead"
 )
+SEATS_BUSY_CODE: Final = "seats_busy"
+SEATS_BUSY_DETAIL: Final = "The seats of this event are busy right now; try again"
 REGISTRATION_HAS_SEATS_CODE: Final = "registration_has_seats"
 REGISTRATION_HAS_SEATS_DETAIL: Final = (
     "People are registered: the registration form and mode cannot change"

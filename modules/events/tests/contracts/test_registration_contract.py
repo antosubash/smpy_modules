@@ -26,6 +26,7 @@ EXPECTED = [
     "REGISTRATION_FULL",
     "RegistrationEvent",
     "SeatRef",
+    "SeatsBusy",
     "admit",
     "describe",
     "release",

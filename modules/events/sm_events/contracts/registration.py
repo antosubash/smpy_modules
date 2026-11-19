@@ -15,6 +15,12 @@ lock), then this contract's, which are always the event row (``FOR SHARE``, ``ad
 the occurrence's counter row, then the seat rows. Nothing here calls back into the caller, so no
 cycle can form. A caller must not hold a seat lock while it waits for something else.
 
+**Retry.** ``release`` and ``release_target`` may raise :class:`SeatsBusy` (a 409, code
+``seats_busy``): seats kept arriving below the counters they hold, so they could not settle their
+locks in ascending order within a bounded number of restarts. Nothing was changed; answer "try
+again" and never 500. Within a transaction, counter locks are only ever acquired in ascending id
+order.
+
 **Who may see what.** :func:`describe` and :func:`summaries` answer only for a public, published
 event with this provider's registration, and for anything else say the same "unavailable" /
 ``None`` the public pages say; they return counts at most, never a name or an address.
@@ -30,6 +36,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_events.core import constants
+from sm_events.core.errors_registration import SeatsBusy
 from sm_events.registration import availability as _availability
 from sm_events.registration import release as _release
 from sm_events.registration import seat_reads as _reads
@@ -47,6 +54,7 @@ __all__ = [
     "Availability",
     "RegistrationEvent",
     "SeatRef",
+    "SeatsBusy",
     "admit",
     "describe",
     "release",

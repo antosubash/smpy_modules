@@ -14,6 +14,7 @@ __all__ = [
     "RegistrationHasSeats",
     "RegistrationUnavailable",
     "RegistrationsOrphaned",
+    "SeatsBusy",
     "UnknownRegistrationTarget",
 ]
 
@@ -54,3 +55,12 @@ class RegistrationHasSeats(Conflict):
 
     code = constants.REGISTRATION_HAS_SEATS_CODE
     detail = constants.REGISTRATION_HAS_SEATS_DETAIL
+
+
+class SeatsBusy(Conflict):
+    """A release could not settle its locks in order within its bounded restarts, because seats kept
+    arriving at lower occurrences while it ran. Nothing was changed; **retry**: it is a 409, never a
+    half-done release."""
+
+    code = constants.SEATS_BUSY_CODE
+    detail = constants.SEATS_BUSY_DETAIL

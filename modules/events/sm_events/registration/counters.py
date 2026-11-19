@@ -38,14 +38,14 @@ def insert_for(db: Any) -> Any:
     return postgresql.insert if db.bind.dialect.name == "postgresql" else sqlite.insert
 
 
-async def lock_counter(db: Any, tenant: str, event_id: uuid.UUID, key: str, now: datetime) -> None:
-    """Make sure the occurrence's counter row exists, then take its row lock."""
+async def lock_counter(db: Any, tenant: str, event_id: uuid.UUID, key: str, now: datetime) -> int:
+    """Make sure the occurrence's counter row exists, then take its row lock; its id."""
     await db.execute(
         insert_for(db)(COUNT)
         .values(tenant_id=tenant, event_id=event_id, occurrence_key=key, taken=0, updated_at=now)
         .on_conflict_do_nothing(index_elements=COUNT_KEY)
     )
-    await db.execute(
+    found = await db.execute(
         select(COUNT.c.id)
         .where(
             COUNT.c.tenant_id == tenant,
@@ -54,6 +54,7 @@ async def lock_counter(db: Any, tenant: str, event_id: uuid.UUID, key: str, now:
         )
         .with_for_update()
     )
+    return found.scalar_one()
 
 
 async def recount(db: Any, tenant: str, counter_ids: Sequence[int], now: datetime) -> None:
