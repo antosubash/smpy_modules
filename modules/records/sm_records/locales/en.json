@@ -915,7 +915,11 @@
       "captcha_unavailable": "The security check isn't available right now. Please try again in a few minutes.",
       "bad_origin": "This form can only be sent from this website.",
       "network": "That didn't work. Check your connection and try again.",
-      "generic": "Something went wrong. Please try again later."
+      "generic": "Something went wrong. Please try again later.",
+      "registration_full": "This event is now fully booked. Nothing was saved.",
+      "registration_closed": "Registration for this event has closed. Nothing was saved.",
+      "event_unavailable": "Registration for this event is no longer available. Nothing was saved.",
+      "seats_busy": "Registrations are busy right now. Please try again in a moment."
     },
     "system_values": {
       "sm_status": {
@@ -926,6 +930,25 @@
       "sm_spam": {
         "links": "Too many links",
         "manual": "Marked by hand"
+      }
+    },
+    "registration": {
+      "panel": {
+        "heading": "Register",
+        "for_event": "Registering for {title}",
+        "loading": "Loading registration...",
+        "submit": "Register",
+        "success_title": "Thank you",
+        "success_pending": "Check your inbox to confirm your registration.",
+        "success_registered": "Thank you, your registration is in. We sent the details to your inbox.",
+        "state_full": "This event is fully booked.",
+        "state_closed": "Registration for this event is closed.",
+        "state_cancelled": "This event has been cancelled.",
+        "state_not_open": "Registration opens {time}.",
+        "state_unavailable": "Registration for this event is no longer available.",
+        "few_left": "Only a few seats left.",
+        "seats_left": "{count} seats left.",
+        "seats_left_one": "1 seat left."
       }
     }
   },

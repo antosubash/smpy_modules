@@ -1,5 +1,5 @@
 import type { FocusTarget, Options, Phase, Problem, SubmissionForm } from './submission-form-state';
-import { BY_CODE, CONSENT_KEY, errors, form, wait } from './submission-form-state';
+import { BY_CODE, CONSENT_KEY, errors, form, GONE, wait } from './submission-form-state';
 
 export type { FocusTarget, Phase, Problem, SubmissionForm } from './submission-form-state';
 export { CONSENT_KEY } from './submission-form-state';
@@ -41,6 +41,8 @@ export function useSubmissionForm({
   block,
   enabled = true,
   onFocus,
+  load,
+  onGone,
 }: Options): SubmissionForm {
   const [phase, setPhase] = useState<Phase>('loading');
   const [definition, setDefinition] = useState<SubmissionDefinition | null>(null);
@@ -55,6 +57,15 @@ export function useSubmissionForm({
   const [changed, setChanged] = useState(false);
   const focus = useRef(onFocus);
   focus.current = onFocus;
+  const source = useRef(load);
+  source.current = load;
+  const gone = useRef(onGone);
+  gone.current = onGone;
+  const fetchFresh = useCallback(
+    (signal?: AbortSignal) =>
+      source.current ? source.current(signal) : fetchDefinition(typeKey, locale, signal),
+    [typeKey, locale],
+  );
 
   const resetCaptcha = useCallback(() => {
     captcha.current = '';
@@ -76,7 +87,7 @@ export function useSubmissionForm({
     if (!enabled || !typeKey) return;
     const controller = new AbortController();
     setPhase('loading');
-    fetchDefinition(typeKey, locale, controller.signal)
+    fetchFresh(controller.signal)
       .then((result) => {
         if (result.status === 'ready') {
           adopt(result.definition);
@@ -88,7 +99,7 @@ export function useSubmissionForm({
       })
       .catch(() => undefined); // aborted on unmount or a new type key
     return () => controller.abort();
-  }, [typeKey, locale, enabled, adopt]);
+  }, [typeKey, enabled, adopt, fetchFresh]);
 
   const setValue = useCallback((key: string, value: FormValue) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -114,8 +125,13 @@ export function useSubmissionForm({
       setPhase('unavailable');
       return;
     }
+    if (result.code && GONE.has(result.code)) {
+      gone.current?.(result.code);
+      setPhase('unavailable');
+      return;
+    }
     if (result.code === 'form_expired' && !retried) {
-      const fresh = await fetchDefinition(typeKey, locale);
+      const fresh = await fetchFresh();
       if (fresh.status === 'ready') {
         adopt(fresh.definition, values, true);
         // The fresh token is refused until it is `min_fill_seconds` old.
@@ -145,7 +161,7 @@ export function useSubmissionForm({
       // Loaded before the host turned a CAPTCHA on: the form has no widget
       // to complete, so fetch the definition that names one.
       if (!current.captcha) {
-        const fresh = await fetchDefinition(typeKey, locale);
+        const fresh = await fetchFresh();
         if (fresh.status === 'ready') adopt(fresh.definition, values);
       }
     }

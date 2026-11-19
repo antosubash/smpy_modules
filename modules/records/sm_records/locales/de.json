@@ -915,7 +915,11 @@
       "captcha_unavailable": "Die Sicherheitsprüfung ist gerade nicht verfügbar. Bitte versuchen Sie es in ein paar Minuten erneut.",
       "bad_origin": "Dieses Formular kann nur von dieser Website gesendet werden.",
       "network": "Das hat nicht geklappt. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
-      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es später noch einmal."
+      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es später noch einmal.",
+      "registration_full": "Diese Veranstaltung ist jetzt ausgebucht. Es wurde nichts gespeichert.",
+      "registration_closed": "Die Anmeldung für diese Veranstaltung ist geschlossen. Es wurde nichts gespeichert.",
+      "event_unavailable": "Die Anmeldung für diese Veranstaltung ist nicht mehr möglich. Es wurde nichts gespeichert.",
+      "seats_busy": "Die Anmeldungen sind gerade ausgelastet. Bitte versuchen Sie es gleich noch einmal."
     },
     "system_values": {
       "sm_status": {
@@ -926,6 +930,25 @@
       "sm_spam": {
         "links": "Zu viele Links",
         "manual": "Von Hand markiert"
+      }
+    },
+    "registration": {
+      "panel": {
+        "heading": "Anmeldung",
+        "for_event": "Anmeldung für {title}",
+        "loading": "Anmeldung wird geladen ...",
+        "submit": "Anmelden",
+        "success_title": "Vielen Dank",
+        "success_pending": "Prüfen Sie Ihren Posteingang, um Ihre Anmeldung zu bestätigen.",
+        "success_registered": "Vielen Dank, Ihre Anmeldung ist eingegangen. Wir haben die Details an Ihren Posteingang geschickt.",
+        "state_full": "Diese Veranstaltung ist ausgebucht.",
+        "state_closed": "Die Anmeldung für diese Veranstaltung ist geschlossen.",
+        "state_cancelled": "Diese Veranstaltung wurde abgesagt.",
+        "state_not_open": "Die Anmeldung öffnet {time}.",
+        "state_unavailable": "Die Anmeldung für diese Veranstaltung ist nicht mehr möglich.",
+        "few_left": "Nur noch wenige Plätze frei.",
+        "seats_left": "Noch {count} Plätze frei.",
+        "seats_left_one": "Noch 1 Platz frei."
       }
     }
   },

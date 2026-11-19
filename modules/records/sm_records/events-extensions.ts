@@ -14,4 +14,5 @@ registerSource({
 registerRegistration({
   id: 'records:registration',
   EditorSection: () => import('./ui/events/RegistrationEditor'),
+  PublicPanel: () => import('./ui/events/RegistrationPanel'),
 });
