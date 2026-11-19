@@ -49,8 +49,10 @@ OCCURRENCE_KEY_MAX: Final = 80
 """``"{event_id}"`` or ``"{event_id}:{original_start}"`` (PR 2's occurrence key)."""
 REMINDER_CODE_MAX: Final = 32
 
-# The ledger: a claim is ``sending``; its outcome is ``sent`` or ``failed`` and final.
-REMINDER_STATES: Final = ("sending", "sent", "failed")
+# The ledger (state machine in :mod:`sm_events.reminders.claim`): ``claimed`` is committed before
+# any mail is attempted, ``sending`` just before the transport is called, and ``sent`` or
+# ``failed`` are final.
+REMINDER_STATES: Final = ("claimed", "sending", "sent", "failed")
 REMINDER_SEND_FAILED: Final = "send_failed"
 REMINDER_SEND_TIMEOUT: Final = "send_timeout"
 

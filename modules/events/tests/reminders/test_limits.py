@@ -22,6 +22,7 @@ def test_leads_are_a_sorted_closed_set():
 def test_budgets_consistent():
     assert limits.REMINDER_TENANT_BUDGET <= limits.REMINDER_SEND_BUDGET
     assert limits.REMINDER_SEND_TIMEOUT < limits.REMINDER_UNFINISHED_AFTER
+    assert limits.REMINDER_CLAIM_LEASE < limits.REMINDER_UNFINISHED_AFTER
 
 
 def test_window_is_at_most_six_hours_and_a_minute():
@@ -37,7 +38,7 @@ def test_follow_bounds():
 def test_constants_name_the_states_and_codes():
     from sm_events.core import constants
 
-    assert constants.REMINDER_STATES == ("sending", "sent", "failed")
+    assert constants.REMINDER_STATES == ("claimed", "sending", "sent", "failed")
     assert constants.REMINDER_SEND_FAILED == "send_failed"
     assert constants.REMINDER_SEND_TIMEOUT == "send_timeout"
     assert constants.AVAILABILITY_REASONS == (

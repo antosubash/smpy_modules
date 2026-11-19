@@ -16,6 +16,7 @@ __all__ = [
     "REMINDER_BREAKER_FAILURES",
     "REMINDER_CANDIDATES_MAX",
     "REMINDER_CATCHUP",
+    "REMINDER_CLAIM_LEASE",
     "REMINDER_EARLY",
     "REMINDER_LEADS",
     "REMINDER_RUNTIME_TTL",
@@ -58,6 +59,9 @@ REMINDER_TENANT_BUDGET: Final = 100
 REMINDER_TICK_BUDGET: Final = timedelta(seconds=45)
 REMINDER_BREAKER_FAILURES: Final = 3
 REMINDER_SEND_TIMEOUT: Final = timedelta(seconds=30)
+REMINDER_CLAIM_LEASE: Final = timedelta(minutes=2)
+"""How long a ``claimed`` row (committed, SMTP not yet begun) belongs to its claimer; after that it
+may be reclaimed, because a row that never reached ``sending`` provably sent nothing."""
 REMINDER_UNFINISHED_AFTER: Final = timedelta(minutes=5)
 REMINDER_RUNTIME_TTL: Final = timedelta(seconds=600)
 
