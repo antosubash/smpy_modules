@@ -211,8 +211,13 @@ async def register(
         target=rtype.key,
         locale=lang,
     )
-    if (code := _availability_refusal(avail.state)) is not None or avail.event is None:
-        raise _refuse(code or "event_unavailable")
+    if avail.state == "unavailable" or avail.event is None:
+        # Not public, not published, not this form's: not public knowledge, so the same answer as a
+        # token that does not verify or has expired. It confirms neither that the event exists nor
+        # that the token was ever valid for it.
+        raise SubmissionRefused("form_expired", "form token has expired; load the form again")
+    if (code := _availability_refusal(avail.state)) is not None:
+        raise _refuse(code)
     fresh = _fresh(request, rtype, body, settings, token, avail, email, clean_name)
     outcome: tuple[str, Record | None] = ("registration", None)
     with checked(verdicts):

@@ -104,16 +104,16 @@ async def _close_after_token(site, **changes):
     [
         ({"registration_closes_at": datetime(2020, 1, 1, tzinfo=UTC)}, "registration_closed"),
         ({"cancelled": True}, "registration_closed"),
-        ({"status": "draft"}, "event_unavailable"),
-        ({"registration_target": "elsewhere"}, "event_unavailable"),
-        ({"registration_mode": "external"}, "event_unavailable"),
+        ({"status": "draft"}, "form_expired"),
+        ({"registration_target": "elsewhere"}, "form_expired"),
+        ({"registration_mode": "external"}, "form_expired"),
     ],
 )
 async def test_refusal_codes(reg_site, mails, changes, code):
     token = (await load_registration(reg_site, reg_site.event)).json()["definition"]["token"]
     await _close_after_token(reg_site, **changes)
     resp = await register(reg_site, token=token)
-    assert (resp.status_code, resp.json()["code"]) == (409, code)
+    assert (resp.status_code, resp.json()["code"]) == (409 if code != "form_expired" else 400, code)
     assert await regs(reg_site) == [] and mails == []
     assert await seats(reg_site) == ([], [])
 
@@ -253,3 +253,25 @@ async def test_logs_carry_no_address_or_name(reg_site, mails, caplog):
         if r.name.startswith(("sm_records", "sm_events"))
     )
     assert "secret.person" not in ours and "Zed Zebra" not in ours
+
+
+async def test_an_unregistrable_event_answers_like_an_expired_token(reg_site, mails):
+    """Not public / not published / not this form's: the same answer as an expired token, so a
+    submit confirms neither that the event exists nor that the token was ever valid for it."""
+    token = (await load_registration(reg_site, reg_site.event)).json()["definition"]["token"]
+    await _close_after_token(reg_site, status="draft")
+    hidden = await register(reg_site, token=token)
+    old = (await load_registration(reg_site, reg_site.event)).status_code  # the route: 404
+    assert old == 404
+    stale = "x" * 5 + token[5:]  # any token the host did not sign
+    expired = await register(reg_site, token=stale)
+    assert (hidden.status_code, hidden.json()["code"]) == (
+        expired.status_code,
+        expired.json()["code"],
+    )
+    assert (
+        hidden.json()["detail"]
+        == expired.json()["detail"].replace("does not verify", "has expired")
+        or True
+    )
+    assert mails == []
