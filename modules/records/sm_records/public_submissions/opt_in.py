@@ -34,7 +34,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
+from sm_records.contracts.public_submissions import KIND_REGISTRATION, KIND_SUBSCRIPTION
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
@@ -55,13 +55,15 @@ __all__ = ["confirm", "leave", "unsubscribe"]
 _EXPIRED = "this link has expired or is no longer valid; sign up again"
 
 
-async def _subscriber(db: AsyncSession, link: links.Link) -> tuple[RecordType, Record] | None:
+async def _subscriber(
+    db: AsyncSession, link: links.Link, kinds: tuple[str, ...] = (KIND_SUBSCRIPTION,)
+) -> tuple[RecordType, Record] | None:
     """The live subscriber the link names, in the tenant it names (bound by
     the caller). Explicit ``tenant_id`` on both lookups (``get_type``,
     ``_by_uuid``)."""
     try:
         rtype = await get_type(db, link.type_key)
-        if (rtype.public_submissions or {}).get("kind") != KIND_SUBSCRIPTION:
+        if (rtype.public_submissions or {}).get("kind") not in kinds:
             return None
         return rtype, await record_service.get_record(db, rtype, link.uuid)
     except NotFound:
@@ -80,20 +82,24 @@ async def confirm(
     Decided from the row as it is when the write lands (:mod:`.transition`):
     an unsubscribe that rotated the nonce in between makes this link expired,
     and of two confirms only the one that wrote announces it."""
-    found = await _subscriber(db, link)
+    found = await _subscriber(db, link, (KIND_SUBSCRIPTION, KIND_REGISTRATION))
     if found is None or not (found[0].public_submissions or {}).get("enabled"):
         raise _expired()
     rtype, record = found
+    # A registration is *registered*, not "confirmed", and it is no newsletter subscription: its
+    # confirmation announces nothing to the newsletter's listeners.
+    registration = (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION
+    done = "registered" if registration else CONFIRMED
 
     def derive(row: Record) -> Change | None:
         data = row.data or {}
         if row.is_deleted or not links.matches(secret, link, data.get("sm_nonce")):
             raise _expired()
-        if data.get("sm_status") == CONFIRMED:
+        if data.get("sm_status") == done:
             return None
         if data.get("sm_status") != PENDING:
             raise _expired()
-        return {"sm_status": CONFIRMED, "sm_confirmed_at": utcnow()}, None
+        return {"sm_status": done, "sm_confirmed_at": utcnow()}, None
 
     try:
         outcome = await transition(db, rtype, record, derive, settings=settings)
@@ -101,7 +107,8 @@ async def confirm(
         raise _expired() from None
     if not outcome.wrote:
         return "already_confirmed"
-    events.emit(db, changed(rtype, outcome.record, PENDING, CONFIRMED))
+    if not registration:
+        events.emit(db, changed(rtype, outcome.record, PENDING, CONFIRMED))
     return "confirmed"
 
 

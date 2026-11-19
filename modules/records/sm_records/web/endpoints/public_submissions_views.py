@@ -38,6 +38,7 @@ router = APIRouter()
 _COPY_KEYS: Final = {
     links.CONFIRM: ("title", "intro", "button", "done", "already", "expired"),
     links.UNSUBSCRIBE: ("title", "intro", "button", "done"),
+    links.CANCEL: ("title", "intro", "button", "done"),
 }
 _COMMON_KEYS: Final = ("sending", "failed")
 
@@ -89,3 +90,14 @@ async def unsubscribe_page(
 ) -> Response:
     """The *Unsubscribe* button. Changes nothing until pressed."""
     return await _page(request, inertia, links.UNSUBSCRIBE, t, lang)
+
+
+@router.get("/cancel", response_model=None)
+async def cancel_page(
+    request: Request,
+    inertia: InertiaDep,
+    t: str = Query(default=""),
+    lang: str = Query(default="", alias="l"),
+) -> Response:
+    """The *Cancel registration* button. Changes nothing until pressed."""
+    return await _page(request, inertia, links.CANCEL, t, lang)

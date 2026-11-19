@@ -40,6 +40,7 @@ from sm_records.core.constants import TYPE_KEY_PATTERN
 from sm_records.core.tenancy import valid_tenant
 
 __all__ = [
+    "CANCEL",
     "CONFIRM",
     "UNSUBSCRIBE",
     "Link",
@@ -52,7 +53,10 @@ __all__ = [
 
 CONFIRM: Final = "confirm"
 UNSUBSCRIBE: Final = "unsubscribe"
-Action = Literal["confirm", "unsubscribe"]
+CANCEL: Final = "cancel"
+"""A registration's cancel link: shaped like the unsubscribe link (no expiry, killed by the nonce,
+which a cancel rotates)."""
+Action = Literal["confirm", "unsubscribe", "cancel"]
 
 MAX_LINK_TOKEN: Final = 300
 _TYPE_KEY_RE: Final = re.compile(TYPE_KEY_PATTERN)

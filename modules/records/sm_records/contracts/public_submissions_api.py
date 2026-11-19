@@ -120,7 +120,7 @@ class LinkResult(SQLModel):
     Confirm answers ``confirmed`` or ``already_confirmed`` (``410
     link_expired`` otherwise); unsubscribe always answers ``unsubscribed``."""
 
-    status: Literal["confirmed", "already_confirmed", "unsubscribed"]
+    status: Literal["confirmed", "already_confirmed", "unsubscribed", "cancelled"]
 
 
 class RegistrationAvailability(SQLModel):

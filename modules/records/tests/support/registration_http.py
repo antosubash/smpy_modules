@@ -132,3 +132,34 @@ async def regs(client: AsyncClient, key: str = TYPE, *, trashed: bool = False) -
     resp = await client.get(f"/api/records/types/{key}/records{query}", headers=roles(ADMIN))
     assert resp.status_code == 200, resp.text
     return resp.json()["items"]
+
+
+LINK = __import__("re").compile(r"https://site\.example/records/submissions/(confirm|cancel)\?\S+")
+
+
+def reg_links(message: Any) -> dict[str, dict[str, str]]:
+    """``{action: {"t": token, "l": locale}}`` from a registration mail's text."""
+    from urllib.parse import parse_qs, urlsplit
+
+    out: dict[str, dict[str, str]] = {}
+    for match in LINK.finditer(message.text):
+        query = parse_qs(urlsplit(match.group(0)).query)
+        out[match.group(1)] = {name: values[0] for name, values in query.items()}
+    return out
+
+
+async def follow(client: AsyncClient, action: str, token: Any):
+    return await client.post(f"{SUBMISSIONS}/{action}", json={"t": token})
+
+
+async def single_opt_in(client: AsyncClient) -> None:
+    from tests.support.public_submissions_support import update
+
+    resp = await update(
+        client,
+        TYPE,
+        public_submissions=reg_config(
+            double_opt_in=False, consent={"required": True, "text": {"en": "I agree"}}
+        ),
+    )
+    assert resp.status_code == 200, resp.text

@@ -825,6 +825,21 @@
         "expiry": "This link works until {expires}. If you did not sign up, ignore this email: nothing happens and you will not hear from us again.",
         "why": "You get this email because this address was entered in a signup form on {site}.",
         "unsubscribe": "Changed your mind later? Unsubscribe here:"
+      },
+      "registration": {
+        "subject_pending": "Confirm your registration for {title}",
+        "subject_registered": "Your registration for {title}",
+        "intro_pending": "Someone, hopefully you, registered this address for {title} on {site}. Please confirm that it was you.",
+        "intro_registered": "You are registered for {title} on {site}.",
+        "when": "When:",
+        "place": "Where:",
+        "online": "Online:",
+        "page": "The event page:",
+        "ics": "Add it to your calendar:",
+        "confirm": "Confirm your registration:",
+        "expiry": "This link works until {expires}. If you did not register, ignore this email: the seat is released by itself.",
+        "cancel": "Cannot come? Cancel your registration here:",
+        "why": "You get this email because this address was entered in a registration form on {site}."
       }
     },
     "landing": {
@@ -843,6 +858,12 @@
         "intro": "Press the button to stop receiving this newsletter.",
         "button": "Unsubscribe",
         "done": "You are unsubscribed. You will not receive this newsletter any more."
+      },
+      "cancel": {
+        "title": "Cancel your registration",
+        "intro": "Press the button to cancel your registration and free your seat.",
+        "button": "Cancel registration",
+        "done": "Your registration is cancelled."
       }
     },
     "block": {
