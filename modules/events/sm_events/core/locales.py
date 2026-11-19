@@ -37,6 +37,12 @@ def is_default(locale: str) -> bool:
     return locale == default()
 
 
+def prefix_for(locale: str, default: str) -> str:
+    """``""`` for ``default``, ``"/de"`` for another: the pure form, for a caller (the reminder
+    worker) with no process-wide locale list."""
+    return "" if locale == default else f"/{locale}"
+
+
 def path_prefix(locale: str) -> str:
     """``""`` for the default language, ``"/de"`` for another."""
     return "" if is_default(locale) else f"/{locale}"

@@ -30,6 +30,7 @@ from sm_events.core.tenancy import TenancyMode, mode_of
 __all__ = [
     "absolute",
     "api_path",
+    "build_event_path",
     "calendar_ics_path",
     "calendar_path",
     "configured_origin",
@@ -79,10 +80,16 @@ def calendar_path(slug: str, locale: str) -> str:
     return f"{_base(locale)}/{constants.SEGMENT_CALENDAR}/{_segment(slug)}"
 
 
+def build_event_path(slug: str, *, base: str, date: date | None = None) -> str:
+    """An event's page under ``base`` (the prefix plus the language's, ``/de/events``): pure, so
+    the reminder worker, which has no process-wide prefix or locale list, builds the same path."""
+    path = f"{base}/{_segment(slug)}"
+    return path if date is None else f"{path}?date={date.isoformat()}"
+
+
 def event_path(slug: str, locale: str, date: date | None = None) -> str:
     """An event's page; ``date`` names one occurrence of a series (``?date=``)."""
-    path = f"{_base(locale)}/{_segment(slug)}"
-    return path if date is None else f"{path}?date={date.isoformat()}"
+    return build_event_path(slug, base=_base(locale), date=date)
 
 
 def event_ics_path(slug: str, locale: str) -> str:
