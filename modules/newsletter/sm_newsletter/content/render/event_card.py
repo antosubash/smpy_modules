@@ -12,7 +12,6 @@ against the campaign tenant's public origin. The event's id (``source_id``) is n
 
 from __future__ import annotations
 
-import re
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -20,6 +19,7 @@ from babel import Locale, UnknownLocaleError
 from babel.dates import format_date, format_time
 
 from sm_newsletter.content.blocks import EventCardProps
+from sm_newsletter.content.card_text import strip_bidi
 from sm_newsletter.content.render import html as h
 from sm_newsletter.content.render import styles as s
 from sm_newsletter.content.render import text as t
@@ -28,19 +28,11 @@ from sm_newsletter.content.urls import absolute
 
 _FALLBACK = "en"
 _SPACES = str.maketrans({"\u202f": " ", "\u00a0": " "})  # CLDR's narrow no-break spaces
-_BIDI = re.compile("[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]")
 _ONE_DAY = timedelta(days=1)
 _CONTENT_WIDTH = s.WIDTH - 64
 _DOT = " · "
 _EN = "\u2013"  # an en dash
 _DASH = f" {_EN} "
-
-
-def strip_bidi(value: str) -> str:
-    """``value`` without direction marks, embeddings, overrides and isolates: they would reorder
-    the text around them in a mail client. Events refuses them in a title, but a snapshot may hold
-    text from before that, so the renderer neutralises them itself."""
-    return _BIDI.sub("", value)
 
 
 def _locale(name: str) -> Locale:

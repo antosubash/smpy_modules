@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_newsletter.campaigns import drafts
 from sm_newsletter.campaigns.access import Roles, require_campaign
 from sm_newsletter.content.blocks import CardProps, EventCardProps, dump_body, parse_body
+from sm_newsletter.content.card_text import EXCERPT_MAX, LOCALE_MAX, TITLE_MAX, fits
 from sm_newsletter.content.event_snapshot import event_snapshot_props
 from sm_newsletter.content.integrations import CardHit, EventHit, events, news, pagebuilder
 from sm_newsletter.content.urls import check_image, check_link
@@ -36,32 +37,22 @@ from sm_newsletter.models import Campaign
 
 _SOURCES = {"article": news, "page": pagebuilder, "event": events}
 _KIND_OF_BLOCK = {"ArticleCard": "article", "PageCard": "page", "EventCard": "event"}
-# CardProps' bounds; `snapshot_props` validates against the model all the same.
-_TITLE, _EXCERPT, _LOCALE = 300, 1000, 16
-
-
-def _fits(check: Any, value: str) -> bool:
-    try:
-        check(value)
-    except ValueError:
-        return False
-    return True
 
 
 def snapshot_props(hit: CardHit, *, block_id: str, now: datetime) -> dict[str, Any]:
     """The card block's props for ``hit``: clipped to what the body accepts, an
     image it would refuse dropped. A source whose address the body would refuse
     cannot be carded (:class:`CardSourceGone`)."""
-    if not _fits(check_link, hit.url):
+    if not fits(check_link, hit.url):
         raise CardSourceGone()
     props = {
         "id": block_id,
         "source_id": hit.source_id,
-        "title": hit.title[:_TITLE],
-        "excerpt": hit.excerpt[:_EXCERPT],
-        "image_url": hit.image_url if _fits(check_image, hit.image_url) else "",
+        "title": hit.title[:TITLE_MAX],
+        "excerpt": hit.excerpt[:EXCERPT_MAX],
+        "image_url": hit.image_url if fits(check_image, hit.image_url) else "",
         "url": hit.url,
-        "locale": hit.locale[:_LOCALE],
+        "locale": hit.locale[:LOCALE_MAX],
         "snapshot_at": now.isoformat(),
     }
     return CardProps.model_validate(props).model_dump(mode="json")
