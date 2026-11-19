@@ -12,6 +12,7 @@ import type {
   OverrideResult,
   Preview,
   PreviewInput,
+  RegistrationCount,
   Revision,
   RevisionDetail,
   WorkflowAction,
@@ -33,6 +34,9 @@ function query(params: object): string {
 
 export const listEvents = (params: EventQuery, signal?: AbortSignal) =>
   send<EventPage>(`${EVENTS}${query(params)}`, { signal });
+/** How many seats are taken at each date: counts only, for someone who may write the event. */
+export const getRegistrationCounts = (id: string, signal?: AbortSignal) =>
+  send<{ items: RegistrationCount[]; total: number }>(`${EVENTS}/${id}/registrations`, { signal });
 export const getEvent = (id: string, locale?: string, signal?: AbortSignal) =>
   send<EventDetail>(`${EVENTS}/${id}${query({ locale })}`, { signal });
 export const createEvent = (body: EventCreate) =>

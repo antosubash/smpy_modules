@@ -93,6 +93,12 @@ export function errorText(error: unknown, gone?: string): string {
     invalid_lead: keys.events.errors.invalid_lead,
     reminders_unavailable: keys.events.errors.reminders_unavailable,
     reminders_no_access: keys.events.errors.reminders_no_access,
+    invalid_registration: keys.events.errors.invalid_registration,
+    registration_unavailable: keys.events.errors.registration_unavailable,
+    unknown_registration_target: keys.events.errors.unknown_registration_target,
+    registrations_orphaned: keys.events.errors.registrations_orphaned,
+    registration_has_seats: keys.events.errors.registration_has_seats,
+    seats_busy: keys.events.errors.seats_busy,
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);

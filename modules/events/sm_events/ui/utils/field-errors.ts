@@ -16,7 +16,6 @@ const MESSAGES: Record<string, string> = {
   default_timezone: E.default_timezone_invalid,
   rrule: E.rrule_invalid,
   online_url: E.url_invalid,
-  registration_url: E.url_invalid,
   image: E.url_invalid,
   latitude: E.coordinate_invalid,
   longitude: E.coordinate_invalid,
@@ -39,8 +38,18 @@ const TEXT_MESSAGES: Record<string, string> = {
   seo_description: E.seo_invalid,
 };
 
+/** `registration.<leaf>`: the leaf names the message. */
+const REGISTRATION_MESSAGES: Record<string, string> = {
+  url: E.url_invalid,
+  capacity: E.registration_capacity_invalid,
+  opens_at_local: E.registration_window_invalid,
+  closes_at_local: E.registration_window_invalid,
+};
+
 const messageFor = (path: string): string => {
   const [head = '', ...rest] = path.split('.');
+  if (head === 'registration')
+    return REGISTRATION_MESSAGES[rest.at(-1) ?? ''] ?? E.invalid_registration;
   if (head === 'texts') return TEXT_MESSAGES[rest.at(-1) ?? ''] ?? E.invalid_input;
   return MESSAGES[head] ?? E.invalid_input;
 };

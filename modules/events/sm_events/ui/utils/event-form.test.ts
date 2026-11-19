@@ -84,4 +84,59 @@ describe('event form', () => {
     expect([form.start, form.end]).toEqual(['2026-07-02T09:00', '2026-07-02T10:00']);
     expect(emptyForm('Not/AZone', ['en'], instant).start).toMatch(/^\d{4}-\d{2}-\d{2}T09:00$/);
   });
+
+  it('sends registration only when it is set, and only what changed on a patch', () => {
+    expect(toCreate(base(), 'c1').registration).toBeUndefined();
+    const set = base();
+    set.registration = {
+      ...set.registration,
+      mode: 'builtin',
+      provider: 'records:registration',
+      target: 'event_registrations',
+      capacity: '25',
+      opens: '2026-06-01T09:00',
+      closes: '',
+      show_seats: true,
+      reminder: '1440',
+    };
+    expect(toCreate(set, 'c1').registration).toEqual({
+      mode: 'builtin',
+      url: null,
+      provider: 'records:registration',
+      target: 'event_registrations',
+      capacity: 25,
+      opens_at_local: '2026-06-01T09:00',
+      closes_at_local: null,
+      show_seats: true,
+      reminder_minutes: 1440,
+    });
+    const after = structuredClone(set);
+    expect(toPatch(set, after, 1)).toBeNull();
+    after.registration.capacity = '30';
+    expect(toPatch(set, after, 1)?.registration?.capacity).toBe(30);
+  });
+
+  it('a registration whose form the editor cannot read is never sent', () => {
+    const before = base();
+    before.registration = { ...before.registration, mode: 'builtin', hidden: true };
+    const after = structuredClone(before);
+    after.venue_name = 'Hall';
+    expect(toPatch(before, after, 1)?.registration).toBeUndefined();
+  });
+
+  it('switching to external drops the built-in settings', () => {
+    const form = base();
+    form.registration = {
+      ...form.registration,
+      mode: 'external',
+      url: 'https://x.example/r',
+      capacity: '5',
+      provider: 'records:registration',
+      target: 'a',
+    };
+    expect(toCreate(form, 'c1').registration).toEqual({
+      mode: 'external',
+      url: 'https://x.example/r',
+    });
+  });
 });

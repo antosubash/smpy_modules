@@ -30,6 +30,7 @@ export type {
 // The plugin surface: what an `events-extensions.ts` registers and the props it receives.
 export {
   registerEventType,
+  registerRegistration,
   registerSource,
   registerToolbarItem,
 } from './ui/extensions/registry';
@@ -39,6 +40,9 @@ export type {
   ExtraValues,
   LazyComponent,
   PublicDetailProps,
+  RegistrationEditorProps,
+  RegistrationPanelProps,
+  RegistrationRegistration,
   SourceRegistration,
   SourceSettingsProps,
   SourceStatus,

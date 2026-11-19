@@ -42,3 +42,15 @@ it('has no messages for another status', async () => {
   )) as ApiError;
   expect(error.messages).toEqual({});
 });
+
+it.each([
+  ['invalid_registration', 422, 'registration settings are not valid'],
+  ['registration_unavailable', 422, 'not available'],
+  ['unknown_registration_target', 422, 'does not exist'],
+  ['registrations_orphaned', 409, 'already has registrations'],
+  ['registration_has_seats', 409, 'already registered'],
+  ['seats_busy', 409, 'try again'],
+])("words the registration code %s in the reader's language", async (code, status, words) => {
+  const { errorText } = await import('./api');
+  expect(errorText(new ApiError(status, code))).toContain(words);
+});
