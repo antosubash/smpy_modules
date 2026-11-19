@@ -32,7 +32,7 @@ from sm_events.web.schemas.registration import RegistrationIn
 
 __all__ = ["guard_seats", "has_seats", "seat_keys", "seat_keys_orphaned_by"]
 
-_STAMPED = re.compile(r"^(?P<id>[0-9a-f-]{36}):(?P<stamp>\d{8}T\d{6}Z)$")
+_STAMPED = re.compile(r"(?P<id>[0-9a-f-]{36}):(?P<stamp>[0-9]{8}T[0-9]{6}Z)\Z", re.ASCII)
 
 
 async def seat_keys(db: Any, event_id: uuid.UUID) -> list[str]:

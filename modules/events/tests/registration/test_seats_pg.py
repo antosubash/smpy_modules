@@ -220,3 +220,18 @@ async def test_no_deadlock_across_occurrences_and_target_release_pg(db_state):
     await asyncio.wait_for(asyncio.gather(*jobs), TIMEOUT)
     counters, holders = await final(db_state)
     assert sum(counters.values()) == len(holders)
+
+
+async def test_lookalike_keys_cannot_oversell_pg(db_state):
+    """Only the canonical key names an occurrence: look-alike spellings are refused, so they can
+    neither open a second counter nor take seats beyond the capacity."""
+    event_id, key = await seeded(db_state, capacity=1, series_event=True)
+    arabic = "".join(chr(0x660 + int(c)) for c in "20260708")
+    fake = [f"{event_id}:{arabic}T080000Z", key + "\n", key.upper(), key.replace("T", "t")]
+    jobs = [try_admit(db_state, event_id, key, f"c{n}") for n in range(6)]
+    jobs += [try_admit(db_state, event_id, fake[n % 4], f"f{n}") for n in range(12)]
+    got = await asyncio.wait_for(asyncio.gather(*jobs, return_exceptions=True), TIMEOUT)
+    assert sum(1 for g in got[6:] if isinstance(g, ValueError)) == 12
+    assert sum(1 for g in got[:6] if not isinstance(g, Exception) and g.admitted) == 1
+    counters, holders = await final(db_state)
+    assert counters == {(event_id, key): 1} and len(holders) == 1

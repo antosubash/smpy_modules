@@ -49,7 +49,10 @@ def original_start_of(event: Event, key: str) -> datetime | None:
         return None
     if not stamp:
         return None
-    original = args.parse_stamp(stamp)
+    try:
+        original = args.parse_stamp(stamp)
+    except ValueError:
+        return None
     if not constants.ORIGINAL_START_MIN_YEAR <= original.year < constants.ORIGINAL_START_MAX_YEAR:
         return None
     return original

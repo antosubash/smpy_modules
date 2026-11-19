@@ -28,8 +28,8 @@ __all__ = [
 ]
 
 _UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-_EVENT_ID = re.compile(rf"^{_UUID}$")
-_KEY = re.compile(rf"^(?P<id>{_UUID})(?::(?P<stamp>\d{{8}}T\d{{6}}Z))?$")
+_EVENT_ID = re.compile(rf"{_UUID}\Z", re.ASCII)
+_KEY = re.compile(rf"(?P<id>{_UUID})(?::(?P<stamp>[0-9]{{8}}T[0-9]{{6}}Z))?\Z", re.ASCII)
 
 
 def event_id(value: Any) -> uuid.UUID:
@@ -42,7 +42,10 @@ def event_id(value: Any) -> uuid.UUID:
 
 def parse_stamp(stamp: str) -> datetime:
     """The UTC instant of a key's ``YYYYMMDDTHHMMSSZ`` (``ValueError`` for an impossible one)."""
-    return datetime.strptime(stamp, constants.OCCURRENCE_KEY_STAMP).replace(tzinfo=UTC)
+    parsed = datetime.strptime(stamp, constants.OCCURRENCE_KEY_STAMP).replace(tzinfo=UTC)
+    if parsed.strftime(constants.OCCURRENCE_KEY_STAMP) != stamp:  # one spelling of an instant
+        raise ValueError("not the canonical spelling of an instant")
+    return parsed
 
 
 def occurrence_key(value: Any) -> str:
@@ -52,9 +55,14 @@ def occurrence_key(value: Any) -> str:
     found = _KEY.fullmatch(value)
     if found is None:
         raise ValueError("occurrence_key is not an occurrence key")
+    # Parse, rebuild from the parts, compare byte for byte: callers store and compare only what
+    # this returns, so two spellings can never name one occurrence.
+    canonical = str(uuid.UUID(found["id"]))
     if found["stamp"] is not None:
-        parse_stamp(found["stamp"])  # ValueError: an impossible date is malformed, not absent
-    return value
+        canonical += ":" + parse_stamp(found["stamp"]).strftime(constants.OCCURRENCE_KEY_STAMP)
+    if canonical != value:
+        raise ValueError("occurrence_key is not in its canonical spelling")
+    return canonical
 
 
 def text(value: Any, name: str, *, maximum: int) -> str:
