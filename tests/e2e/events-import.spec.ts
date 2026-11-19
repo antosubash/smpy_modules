@@ -27,7 +27,9 @@ test.afterEach(() => expect(problems).toEqual([]));
 
 async function upload(page: Page, calendar: string, name: string, buffer: Buffer) {
   await page.goto(IMPORT);
-  await page.getByLabel('Into calendar').selectOption({ label: calendar });
+  // By id, never by name: a screenshot's calendar has a fixed name, so two runs (or two specs)
+  // against one database make the name ambiguous and the import lands in the older calendar.
+  await page.getByLabel('Into calendar').selectOption({ value: calendar });
   await page
     .getByLabel('Calendar file (.ics)')
     .setInputFiles({ name, mimeType: 'text/calendar', buffer });
@@ -52,7 +54,7 @@ test('a realistic file goes through preview, import and a second import', async 
   await expect(page.getByLabel('Calendar file (.ics)')).toBeVisible();
   await shoot(page, '03-import-upload');
 
-  await upload(page, cal.name, 'term-dates.ics', FIXTURE);
+  await upload(page, cal.id, 'term-dates.ics', FIXTURE);
   await expect(page.getByRole('heading', { name: 'Preview' })).toBeFocused();
   await expect(page.getByTestId('events-import-announce')).toContainText('Preview ready: 5 events');
   const table = page.getByRole('table');
@@ -75,10 +77,20 @@ test('a realistic file goes through preview, import and a second import', async 
   expect(made['Status ticker']).toBeUndefined(); // an unsupported rule is skipped, not guessed
 
   // The same file again changes nothing.
-  await upload(page, cal.name, 'term-dates.ics', FIXTURE);
+  await upload(page, cal.id, 'term-dates.ics', FIXTURE);
   await expect(page.getByRole('heading', { name: 'Preview' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Unchanged 4/ })).toBeVisible(); // the preview agrees
-  await expect(page.getByRole('button', { name: /^Update 0/ })).toBeVisible();
+  // The preview agrees with what the first import made. Print every verdict it shows, so a
+  // failure says what it saw rather than that one button was missing.
+  const verdicts = page.getByRole('button', {
+    name: /^(New|Update|Unchanged|Skipped|Refused|Failed)/,
+  });
+  await expect(verdicts.first()).toBeVisible();
+  expect(await verdicts.allTextContents()).toEqual(
+    expect.arrayContaining([
+      expect.stringMatching(/^Unchanged 4/),
+      expect.stringMatching(/^Update 0/),
+    ]),
+  );
   await page.getByRole('button', { name: 'Import as drafts' }).click();
   await expect(page.getByRole('heading', { name: 'Result' })).toBeVisible();
   await expect(page.getByText('Created 0')).toBeVisible();
@@ -91,7 +103,7 @@ test('a file with too many events is refused with a readable message', async ({ 
   const one = (n: number) =>
     `BEGIN:VEVENT\r\nUID:h${n}@x\r\nDTSTART:20270301T080000Z\r\nDTEND:20270301T090000Z\r\nSUMMARY:E${n}\r\nEND:VEVENT\r\n`;
   const body = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${Array.from({ length: 5001 }, (_, n) => one(n)).join('')}END:VCALENDAR\r\n`;
-  await upload(page, cal.name, 'archive-export.ics', Buffer.from(body));
+  await upload(page, cal.id, 'archive-export.ics', Buffer.from(body));
   await expect(page.getByRole('heading', { name: 'The import failed' })).toBeFocused();
   await expect(page.getByRole('alert')).toContainText(/more events than one import takes/);
   await shoot(page, '06-import-refused', { fullPage: true });

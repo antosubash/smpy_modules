@@ -133,6 +133,7 @@
     "range_too_long": "Der Zeitraum ist zu lang.",
     "invalid_range": "Das Ende des Zeitraums muss nach seinem Beginn liegen.",
     "unknown_category": "Diese Kategorie gibt es nicht mehr.",
+    "image_off_site": "Dieses Bild liegt auf einer anderen Website und lässt sich auf den öffentlichen Seiten nicht laden. Verwenden Sie ein Bild aus der Medienbibliothek dieser Website.",
     "unknown_type": "Diese Art von Veranstaltung wird nicht unterstützt.",
     "invalid_parent": "Die übergeordnete Veranstaltung muss zum selben Kalender gehören und darf weder selbst eine Unterveranstaltung noch eine Serie sein.",
     "immutable_field": "Kalender und übergeordnete Veranstaltung lassen sich nicht ändern.",
@@ -160,7 +161,7 @@
     "import_too_large": "Die Datei ist größer als das Importlimit.",
     "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus.",
     "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut.",
-    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben. Beende zuerst eine. Entferne zuerst eine unter Erinnerungen; Veranstaltungen, die du nicht mehr sehen kannst, stehen dort ebenfalls.",
+    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben: entferne zuerst eine (Veranstaltungen, die du nicht mehr sehen kannst, stehen dort ebenfalls).",
     "not_published": "Nur veröffentlichte Veranstaltungen können erinnern.",
     "invalid_lead": "Wähle einen der angebotenen Erinnerungszeitpunkte.",
     "reminders_unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
@@ -349,6 +350,7 @@
     "no_category": "Keine Kategorie",
     "organiser": "Veranstalter",
     "image": "Bildadresse",
+    "image_hint": "Verwenden Sie ein Bild aus der Medienbibliothek dieser Website: Die Adresse beginnt mit /. Ein Bild von einer anderen Website wird auf den öffentlichen Seiten nicht geladen.",
     "registration_url": "Link zur Anmeldung",
     "cancelled": "Diese Veranstaltung ist abgesagt",
     "sub_events": "Unterveranstaltungen",
@@ -852,9 +854,10 @@
     "upcoming": {
       "label": "Kommende Veranstaltungen",
       "heading": "Überschrift",
-      "calendars": "Kalender",
+      "calendars": "Kalender (bis zu 10)",
       "category": "Kategorie",
       "count": "Anzahl der Veranstaltungen",
+      "count_invalid": "Geben Sie eine ganze Zahl von 1 bis {max} ein.",
       "layout": "Darstellung",
       "layout_list": "Liste",
       "layout_cards": "Karten",
@@ -862,7 +865,7 @@
     },
     "calendar": {
       "label": "Veranstaltungskalender",
-      "calendars": "Kalender",
+      "calendars": "Kalender (bis zu 10)",
       "default_view": "Öffnet als",
       "view_month": "Monat",
       "view_week": "Woche",
@@ -882,7 +885,8 @@
       "empty": "Keine kommenden öffentlichen Veranstaltungen. Besucher sehen hier nichts, bis es welche gibt.",
       "unresolved_one": "{count} ausgewählter Kalender ist nicht öffentlich oder existiert nicht mehr.",
       "unresolved_other": "{count} ausgewählte Kalender sind nicht öffentlich oder existieren nicht mehr.",
-      "failed": "Die Veranstaltungen konnten nicht geladen werden."
+      "failed": "Die Veranstaltungen konnten nicht geladen werden.",
+      "selection_unreadable": "Die Kalenderauswahl konnte nicht gelesen werden, deshalb wird nichts angezeigt. Wählen Sie die Kalender erneut aus."
     }
   },
   "reminders": {
@@ -942,10 +946,10 @@
       "none_chosen": "Wähle mindestens einen Zeitpunkt oder beende die Erinnerung.",
       "next_due": "{lead}: nächste Erinnerung {when}",
       "too_late": "{lead}: zu spät für den nächsten Termin",
-      "no_coming": "{lead}: kein kommender Termin",
       "unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
       "time_zone": "Zeiten in der Zeitzone deines Browsers ({zone}); die Zeitzone der Veranstaltung ist {event_zone}.",
-      "reason_note": "Grund: {reason}"
+      "over": "Diese Veranstaltung ist vorbei, es gibt nichts mehr, woran erinnert werden könnte.",
+      "see_list": "Deine Erinnerungen ansehen"
     },
     "leads": {
       "m15": "15 Minuten vorher",
@@ -966,7 +970,6 @@
       "reason_no_public_base_url": "Die öffentliche Adresse der Website ist nicht gesetzt, daher wären Links in der E-Mail falsch.",
       "reason_no_mail_transport": "Es ist kein Mailversand eingerichtet.",
       "reason_console_mail": "Der Mailversand steht auf Konsole und schreibt nur ins Protokoll: Nichts erreicht ein Postfach.",
-      "reason_worker_access_unavailable": "Der Hintergrunddienst kann nicht feststellen, wer noch erinnert werden darf.",
       "defaults": "Vorgeschlagene Erinnerungszeiten: {leads}",
       "settings": "Erinnerungseinstellungen ändern",
       "counts_title": "Letzte {days} Tage, alle zusammen (nur Zahlen, nie wer)",
@@ -974,6 +977,7 @@
       "failed": "Fehlgeschlagen: {count}",
       "failed_code_send_failed": "Mail konnte nicht gesendet werden: {count}",
       "failed_code_send_timeout": "Mailserver antwortete nicht rechtzeitig: {count}",
+      "failed_code_too_late": "Nicht gesendet: zu viele Erinnerungen waren gleichzeitig fällig: {count}",
       "unfinished": "Unvollendet: {count}",
       "unfinished_note": "Unvollendet heißt: reserviert, aber nie als gesendet bestätigt. Diese werden nicht wiederholt."
     },

@@ -64,7 +64,7 @@ async def test_a_card_is_the_public_projection_only(public_locales_client, fx):
     }
     allowed = {
         "id", "title", "summary", "starts_at", "ends_at", "all_day", "start_date", "end_date",
-        "timezone", "occurrence_start", "attendance_mode", "venue_name", "address",
+        "timezone", "attendance_mode", "venue_name", "address",
         "image_url", "path", "ics_path", "locale", "cancelled",
     }  # fmt: skip
     for card in cards:

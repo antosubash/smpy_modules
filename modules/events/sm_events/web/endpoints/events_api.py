@@ -24,6 +24,7 @@ from sm_events.core import constants
 from sm_events.core.access.events import load_event
 from sm_events.models.enums import EVENT_STATUSES
 from sm_events.web.endpoints.deps import Principal, content_locales, event_db, require_view
+from sm_events.web.endpoints.public import _urls
 from sm_events.web.schemas._fields import SupportedInstant
 from sm_events.web.schemas.events_in import EventCreate, EventPatch, Expected, Revision
 from sm_events.web.schemas.events_out import EventOut, EventPage
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/events", tags=["events"], dependencies=[require_view
 
 ListStatus = Literal[*EVENT_STATUSES, constants.STATUS_SCHEDULED]  # type: ignore[valid-type]
 LocaleQuery = Annotated[str | None, Query(max_length=constants.LOCALE_MAX)]
-PAGE_LIMIT = 10_000
+PAGE_LIMIT = constants.PAGE_MAX
 
 
 @router.get("")
@@ -76,7 +77,12 @@ async def create(
 ) -> EventOut:
     locales = content_locales(request)
     event = await create_event(
-        db, who, body, locales=locales, viewer=source_viewer_from(request, who)
+        db,
+        who,
+        body,
+        locales=locales,
+        viewer=source_viewer_from(request, who),
+        site_origin=_urls.public_base_url(request),
     )
     await db.refresh(event)
     out = await render(
@@ -116,7 +122,13 @@ async def update(
 ) -> EventOut:
     locales = content_locales(request)
     event = await update_event(
-        db, who, event_id, body, locales=locales, viewer=source_viewer_from(request, who)
+        db,
+        who,
+        event_id,
+        body,
+        locales=locales,
+        viewer=source_viewer_from(request, who),
+        site_origin=_urls.public_base_url(request),
     )
     await db.refresh(event)
     out = await render(

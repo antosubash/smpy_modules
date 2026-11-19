@@ -15,10 +15,10 @@ from typing import Any
 
 from sqlalchemy import func, select
 
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import bound_tenant
 from sm_events.core.user_ids import canonical_user_id
 from sm_events.models import ReminderSent
-from sm_events.reminders import limits
 
 __all__ = ["Counts", "counts"]
 

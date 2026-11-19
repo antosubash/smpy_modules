@@ -112,6 +112,15 @@ describe('EventsCalendar', () => {
     expect(editor.view.host.textContent).not.toContain('secret-one');
   });
 
+  it('a selection that cannot be read renders nothing and asks for no calendars', async () => {
+    for (const calendars of ['pub', ['pub'], [null], [{ slug: 7 }], {}]) {
+      const { view, calls } = await open({ calendars: calendars as never });
+      expect(view.host.innerHTML, JSON.stringify(calendars)).toBe('');
+      expect(calls.filter((c) => c.url.includes('/public/'))).toEqual([]);
+      document.body.innerHTML = '';
+    }
+  });
+
   it('renders nothing when no calendar is public, or the route fails', async () => {
     const none = await open({ calendars: [] }, { [CALENDARS]: answer() });
     expect(none.view.host.innerHTML).toBe('');
@@ -150,7 +159,7 @@ describe('EventsCalendarBlock', () => {
       >
     >;
     const built = await resolve();
-    expect(built.calendars.label).toBe('Calendars');
+    expect(built.calendars.label).toBe('Calendars (up to 10)');
     expect(built.calendars.arrayFields?.slug.options.map((o) => o.value)).toEqual(['', 'team']);
     expect(built.height.options?.map((o) => o.label)).toEqual(['Compact', 'Medium', 'Tall']);
   });
@@ -164,6 +173,11 @@ describe('EventsCalendarBlock', () => {
       { props: { calendars: [{ slug: 'a' }, 3], defaultView: 'x', height: 'huge' } },
       { trigger: 'load' },
     ).props;
-    expect(loaded).toEqual({ calendars: [{ slug: 'a' }], defaultView: 'month', height: 'medium' });
+    // An unreadable selection is kept as it is (and shows nothing), never rewritten to "all".
+    expect(loaded).toEqual({
+      calendars: [{ slug: 'a' }, 3],
+      defaultView: 'month',
+      height: 'medium',
+    });
   });
 });

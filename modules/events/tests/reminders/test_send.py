@@ -9,9 +9,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from simple_module_core.mail import MailMessage
 from simple_module_core.resources import ResourcePrincipal
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import ReminderSent
-from sm_events.reminders import limits, send
+from sm_events.reminders import send
 from sm_events.reminders.candidates import Candidate
 from sm_events.reminders.recipients import Eligibility
 from sm_events.reminders.runtime import Recipient

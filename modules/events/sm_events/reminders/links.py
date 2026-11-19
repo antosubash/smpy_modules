@@ -1,7 +1,7 @@
 """The links in a reminder: built from the host's configured origin, never from a request.
 
 ``base_url`` is the host's ``public_base_url``
-(:func:`~sm_events.reminders.base_url.public_base_url`); a relative, missing or non-web one is
+(:func:`~sm_events.core.host_settings.public_base_url`); a relative, missing or non-web one is
 refused (``ValueError``) so a reminder is never sent with a link that points nowhere or somewhere
 a visitor chose. ``availability`` already reports
 ``no_public_base_url`` before anything is built.
@@ -20,12 +20,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from urllib.parse import quote
-from zoneinfo import ZoneInfo
+from urllib.parse import urlencode
 
-from sm_events.core import constants
+from sm_events.core import constants, locales
 from sm_events.core.web_urls import is_web_url
 from sm_events.models import Calendar, Event, EventText
+from sm_events.reminders import formatting
+from sm_events.web.endpoints.public import _urls
 
 __all__ = ["Links", "event_url", "manage_url"]
 
@@ -48,12 +49,22 @@ def manage_url(links: Links) -> str:
     return f"{links.origin()}{constants.REMINDERS_URL}"
 
 
-def _local_date(event: Event, start: datetime) -> str:
-    try:
-        zone = ZoneInfo(event.timezone)
-    except Exception:  # an unknown zone name: the date in UTC is still a date
-        zone = ZoneInfo("UTC")
-    return start.astimezone(zone).date().isoformat()
+def _calendar_path(
+    event: Event, calendar: Calendar, occurrence_start: datetime, occurrence_key: str
+) -> str:
+    """The console calendar on that occurrence's day in the event's own zone, its detail open
+    (read-only: the page takes ``event=<key>``), for someone who may see but not edit it."""
+    day = occurrence_start.astimezone(formatting.zone_of(event.timezone)).date().isoformat()
+    query = urlencode(
+        {
+            "view": "day",
+            "date": day,
+            "tz": "calendar",
+            "calendar": str(calendar.id),
+            "event": occurrence_key,
+        }
+    )
+    return f"{constants.CALENDAR_URL}?{query}"
 
 
 def event_url(
@@ -64,6 +75,8 @@ def event_url(
     texts: dict[str, EventText],
     lang: str,
     occurrence_start: datetime,
+    occurrence_key: str | None = None,
+    can_edit: bool = False,
 ) -> str:
     origin = links.origin()
     public = (
@@ -75,10 +88,13 @@ def event_url(
     text = texts.get(lang) if lang in links.content_locales else None
     text = text or texts.get(links.content_locales[0] if links.content_locales else "")
     if not public or text is None:
-        return f"{origin}{constants.EDITOR_URL}/{event.id}"
-    default = links.content_locales[0]
-    locale_prefix = "" if text.locale == default else f"/{text.locale}"
-    path = f"{locale_prefix}{links.prefix}/{quote(text.slug, safe='')}"
-    if event.rrule:
-        path += f"?date={_local_date(event, occurrence_start)}"
-    return f"{origin}{path}"
+        if can_edit or occurrence_key is None:
+            return f"{origin}{constants.EDITOR_URL}/{event.id}"
+        return f"{origin}{_calendar_path(event, calendar, occurrence_start, occurrence_key)}"
+    base = f"{locales.prefix_for(text.locale, links.content_locales[0])}{links.prefix}"
+    day = (
+        occurrence_start.astimezone(formatting.zone_of(event.timezone)).date()
+        if event.rrule
+        else None
+    )
+    return f"{origin}{_urls.build_event_path(text.slug, base=base, date=day)}"

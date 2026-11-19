@@ -250,6 +250,7 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
     what the framework's forwarded-host allow-list accepts (nothing, here: the list is empty, so
     only ``Host`` counts) and the response varies on ``Host``."""
     from httpx import ASGITransport, AsyncClient
+    from sm_events.core import host_settings
 
     app = booted_host
 
@@ -267,7 +268,9 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
             AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as http,
         ):
             for slot, base in zip(out, ("https://events.example.org", ""), strict=True):
-                monkeypatch.setattr(app.state.sm.settings, "public_base_url", base, raising=False)
+                # The address is read from the live host settings, so that is what to set.
+                live = host_settings.host_settings(app)
+                monkeypatch.setattr(live, "public_base_url", base, raising=False)
                 for path in paths:
                     slot[path] = await http.get(path, headers={"Host": "evil.test"} | spoof)
         return out

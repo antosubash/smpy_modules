@@ -16,7 +16,13 @@ import { StatusBar } from './StatusBar';
 import { Toolbar } from './Toolbar';
 import type { Range } from './time/range';
 import { browserTimeZone, gridTimeZone, todayIn } from './time/zones';
-import type { CalendarProps, CalendarState, GridHandle, Occurrence } from './types';
+import {
+  type CalendarProps,
+  type CalendarState,
+  type GridHandle,
+  NO_SOURCES,
+  type Occurrence,
+} from './types';
 
 // The grid, FullCalendar and its CSS are one chunk of their own.
 const Grid = lazy(() => import('./adapter/FullCalendarGrid'));
@@ -66,7 +72,8 @@ export function Calendar(props: CalendarProps) {
   const myZone = browserTimeZone();
   const zone = gridTimeZone(state.tzMode, shown, props.defaultTimezone, myZone);
   const calendarZone = gridTimeZone('calendar', shown, props.defaultTimezone, myZone);
-  const nothingShown = shown.length === 0;
+  // Nothing is shown when no calendar is checked, or the last source box was unchecked.
+  const nothingShown = shown.length === 0 || state.sources.includes(NO_SOURCES);
   const filters = useMemo(
     () => ({
       calendars: shown.length === calendars.length ? [] : state.calendars,
@@ -92,6 +99,24 @@ export function Calendar(props: CalendarProps) {
     refreshToken: props.refreshToken ?? 0,
   });
   const items = nothingShown ? [] : data.items;
+
+  // A link can name one occurrence to show: open it once, when it is on the grid.
+  const pendingOpen = useRef(props.initialOpen ?? null);
+  useEffect(() => {
+    const key = pendingOpen.current;
+    const found = key ? items.find((o) => o.key === key) : undefined;
+    if (!found) return;
+    const frame = requestAnimationFrame(() => {
+      pendingOpen.current = null;
+      grid.current?.focusEvent(found.key);
+      const active = document.activeElement;
+      setSelected({
+        occurrence: found,
+        element: active instanceof HTMLElement ? active : document.body,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [items]);
 
   const first = useRef(true);
   const report = useRef(props.onStateChange);

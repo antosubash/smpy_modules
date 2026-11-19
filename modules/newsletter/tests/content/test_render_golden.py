@@ -40,7 +40,7 @@ EVENT_CARDS = [
         "type": "EventCard",
         "props": {
             "id": "timed", **EVENT, "title": "Tag der offenen Tür", "excerpt": "Kommen Sie vorbei.",
-            "image_url": "https://cdn.example.com/tag.png", "place": "Halle 1, Hauptstraße 2",
+            "image_url": "/media/tag.png", "place": "Halle 1, Hauptstraße 2",
         },
     },
     {  # a series' next occurrence: the page address names the date

@@ -14,8 +14,9 @@ import type { ComponentConfig } from '@puckeditor/core';
 
 import { keys, type Translate, translate } from '../utils/i18n';
 import { fetchBlockCalendars } from './api-blocks';
+import { countField } from './CountField';
 import { calendarsField, type Option } from './calendarField';
-import { clampCount, oneOf, slugsOf, UPCOMING_DEFAULT, UPCOMING_MAX, UPCOMING_MIN } from './limits';
+import { clampCount, oneOf, selectionOf, UPCOMING_DEFAULT } from './limits';
 import { localizeFields } from './localizeFields';
 import {
   HEADING_MAX,
@@ -36,12 +37,7 @@ function buildFields(tr: Translate, calendars: Option[], categories: Option[]) {
       label: tr(copy.upcoming.category),
       options: [{ label: tr(copy.fields.category_any), value: '' }, ...categories],
     },
-    count: {
-      type: 'number' as const,
-      label: tr(copy.upcoming.count),
-      min: UPCOMING_MIN,
-      max: UPCOMING_MAX,
-    },
+    count: countField(tr(copy.upcoming.count)),
     layout: {
       type: 'radio' as const,
       label: tr(copy.upcoming.layout),
@@ -109,7 +105,11 @@ export const UpcomingEventsBlock: ComponentConfig<UpcomingEventsProps> = {
             ...props,
             count: clampCount(props.count),
             layout: oneOf(props.layout, LAYOUTS, 'list'),
-            calendars: slugsOf(props.calendars).map((slug) => ({ slug })),
+            // An unreadable selection is kept as it is (it shows nothing): rewriting it would
+            // turn "nothing" into "every calendar".
+            ...(selectionOf(props.calendars).bad
+              ? {}
+              : { calendars: selectionOf(props.calendars).slugs.map((slug) => ({ slug })) }),
             heading: typeof props.heading === 'string' ? props.heading.slice(0, HEADING_MAX) : '',
           },
         }

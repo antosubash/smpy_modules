@@ -39,14 +39,14 @@ from fastapi import APIRouter, Request, Response
 from simple_module_db import no_tenant
 
 from sm_events.calendar.plugins.extension_types import SourceViewer
-from sm_events.core import constants, locales, timezones
+from sm_events.core import clock, constants, locales, timezones
 from sm_events.core.access.offline import feed_viewer
 from sm_events.core.tenancy import tenant_scope, valid_tenant
 from sm_events.feeds.select import feed_events
 from sm_events.feeds.tokens.codec import well_formed
 from sm_events.feeds.tokens.resolve import FeedAccess, TokenRow, lookup, resolve, touch_last_used
 from sm_events.feeds.tokens.throttle import TokenThrottle
-from sm_events.web.endpoints.public import _clock, _urls
+from sm_events.web.endpoints.public import _urls
 from sm_events.web.endpoints.public._feeds import TRUNCATED_HEADER, ics_file, plugin_events
 from sm_events.web.endpoints.public._host_tenant import host_tenant
 
@@ -161,7 +161,7 @@ async def _viewer(request: Request, access: FeedAccess, db) -> SourceViewer | No
 
 
 async def _body(request: Request, access: FeedAccess, db) -> tuple[bytes, bool]:
-    now = _clock.now()
+    now = clock.now()
     read = await feed_events(
         db,
         calendar_id=access.row.calendar_id,
@@ -241,5 +241,5 @@ async def private_feed(request: Request, token: str) -> Response:
         return await _padded(deny(request), started)
     response, row = served
     with no_tenant():
-        await touch_last_used(request.app.state.sm.db.session_factory, row, now=_clock.now())
+        await touch_last_used(request.app.state.sm.db.session_factory, row, now=clock.now())
     return response

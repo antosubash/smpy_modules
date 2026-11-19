@@ -6,8 +6,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.models import EventFollow, EventText
-from sm_events.reminders import limits, mine
+from sm_events.reminders import mine
 from sqlalchemy import update
 
 from tests.reminders.support import (

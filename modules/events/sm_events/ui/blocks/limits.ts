@@ -28,3 +28,27 @@ export function slugsOf(value: unknown): string[] {
     .map((slug) => slug.trim());
   return [...new Set(slugs)].slice(0, CALENDARS_MAX);
 }
+
+/** What a block's `calendars` prop says. Only an absent or empty selection (or one of blank rows,
+ *  the picker's "All public calendars") means every public calendar. Anything that cannot be read
+ *  as `[{ slug }]` (a string, a number, an entry that is null or has no string `slug`) or that
+ *  names more than the cap is `bad`: the block then shows nothing, never every calendar. */
+export function selectionOf(value: unknown): { slugs: string[]; bad: boolean } {
+  if (value === undefined || value === null) return { slugs: [], bad: false };
+  if (!Array.isArray(value)) return { slugs: [], bad: true };
+  const slugs: string[] = [];
+  for (const row of value) {
+    if (!row || typeof row !== 'object' || typeof (row as { slug?: unknown }).slug !== 'string') {
+      return { slugs: [], bad: true };
+    }
+    const slug = ((row as { slug: string }).slug ?? '').trim();
+    if (slug !== '' && !slugs.includes(slug)) slugs.push(slug);
+  }
+  return { slugs, bad: slugs.length > CALENDARS_MAX };
+}
+
+/** Why a count is refused: not a whole number, or outside the range. `null` when it is fine. */
+export function countProblem(value: unknown): 'integer' | 'range' | null {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return 'integer';
+  return value < UPCOMING_MIN || value > UPCOMING_MAX ? 'range' : null;
+}

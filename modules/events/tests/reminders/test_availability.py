@@ -9,7 +9,7 @@ from simple_module_core.mail import (
     install_mail_sender,
     reset_mail_sender,
 )
-from sm_events.core import constants
+from sm_events.core import constants, host_settings
 from sm_events.reminders import availability, worker_app
 from sm_events.reminders.availability import Availability
 
@@ -66,16 +66,11 @@ def _break_console(app):
     install_mail_sender(ConsoleMailSender())
 
 
-def _break_worker(app):
-    worker_app.worker_runtime_supported = lambda: False  # monkeypatched by ``world``
-
-
 BREAKERS = [
     ("disabled", _break_setting),
     ("no_public_base_url", _break_base_url),
     ("no_mail_transport", _break_transport),
     ("console_mail", _break_console),
-    ("worker_access_unavailable", _break_worker),
 ]
 
 
@@ -121,11 +116,11 @@ async def test_resolver_only_host(world):
 async def test_public_base_url_is_trimmed(world):
     app, _ = world
     app.state.sm.settings.public_base_url = f"  {ORIGIN}/  "
-    assert availability.public_base_url(app) == ORIGIN
+    assert host_settings.public_base_url(app) == ORIGIN
     app.state.sm.settings.public_base_url = None
-    assert availability.public_base_url(app) == ""
+    assert host_settings.public_base_url(app) == ""
     app.state.sm.settings = object()
-    assert availability.public_base_url(app) == ""
+    assert host_settings.public_base_url(app) == ""
 
 
 def test_the_headless_runtime_is_supported_until_it_fails():
@@ -143,7 +138,7 @@ async def test_public_base_url_follows_the_live_host_settings_not_the_boot_snaps
     app.state.sm.settings.public_base_url = ""
     assert (await availability.availability(app, db)).reason == "no_public_base_url"
     app.state.host = SimpleNamespace(settings=SimpleNamespace(public_base_url=f"{ORIGIN}/"))
-    assert availability.public_base_url(app) == ORIGIN
+    assert host_settings.public_base_url(app) == ORIGIN
     assert await availability.availability(app, db) == Availability(True, None)
     app.state.host = SimpleNamespace(settings=SimpleNamespace(public_base_url=""))
     assert (await availability.availability(app, db)).reason == "no_public_base_url"

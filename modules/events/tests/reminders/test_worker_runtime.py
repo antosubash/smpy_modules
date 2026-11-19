@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 from permissions.models import RolePermission
+from sm_events.core.host_settings import public_base_url
 from sm_events.reminders import worker_app
-from sm_events.reminders.availability import public_base_url
 
 from tests.reminders.support import published, world
 from tests.support.app import Directory, build_app

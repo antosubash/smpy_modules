@@ -23,9 +23,10 @@ from simple_module_db.deps import get_db
 
 from sm_events.core import constants
 from sm_events.core.clock import utcnow
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.errors import NotFound
 from sm_events.core.errors_reminders import RemindersUnavailable
-from sm_events.reminders import access, follows, leads, limits, mine, stats
+from sm_events.reminders import access, follows, leads, mine, stats
 from sm_events.reminders.availability import availability
 from sm_events.web.endpoints.deps import Principal, get_settings, require_manage, require_view
 from sm_events.web.schemas.reminders import (
@@ -47,7 +48,7 @@ PATH_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/events/[^/]+/follow$"
 BY_ID_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/reminders/follows/[^/]+$"
 """Removal by follow id."""
 RATE = limits.FOLLOW_RATE
-Page = Annotated[int, Query(ge=1)]
+Page = Annotated[int, Query(ge=1, le=constants.PAGE_MAX)]
 PageSize = Annotated[int, Query(ge=1, le=limits.MINE_PAGE_MAX)]
 
 
@@ -78,6 +79,7 @@ async def _out(
         leads=list(state.leads),
         defaults=list(state.defaults),
         next_due=state.next_due,
+        over=state.over,
         deliverable=ok,
         code=None if ok else constants.REMINDERS_NO_ACCESS_CODE,
     )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from sm_events.reminders import limits
+from sm_events.core.constants import reminders_limits as limits
 
 from tests.support.access import grant
 from tests.support.calendars import BASE, OWNER, SE, SV, VIEWER, make
@@ -39,7 +39,7 @@ async def test_reminder_defaults_round_trip(client):
 
 @pytest.mark.parametrize(
     "value",
-    [[30], [0], [-60], [limits.MAX_LEAD_MINUTES + 1], [60, 60], [15, 60, 1440, 10080, 15]],
+    [[30], [0], [-60], [limits.MAX_LEAD_MINUTES + 1]],
 )
 async def test_reminder_defaults_invalid_lead_422(client, value):
     cid = (await make(client))["id"]
@@ -80,3 +80,15 @@ async def test_only_those_who_may_edit_the_calendar_set_them(client):
     assert (await _patch(client, cid, body, SV)).status_code == 403
     assert (await _patch(client, cid, body, VIEWER)).status_code == 404  # cannot even see it
     assert (await _patch(client, cid, body, SE)).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("value", "stored"),
+    [([60, 60], [60]), ([15, 15], [15]), ([1440, 15, 60, 15, 10080, 15], [15, 60, 1440, 10080])],
+)
+async def test_duplicates_are_forgiven_as_a_follow_forgives_them(client, value, stored):
+    """One validator (``validate_leads``) for a follow and a calendar's list: distinct, sorted."""
+    cid = (await make(client))["id"]
+    got = await _patch(client, cid, {"default_reminder_minutes": value})
+    assert got.status_code == 200, got.text
+    assert got.json()["default_reminder_minutes"] == stored

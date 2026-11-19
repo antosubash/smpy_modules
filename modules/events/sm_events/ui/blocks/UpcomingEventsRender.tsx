@@ -3,7 +3,7 @@
  * client-side from the anonymous route (as news' feed does), so a block's data has its own short
  * cache and never goes stale inside its page's.
  *
- * Text only, never markup. The page's language comes from the page (`usePageLocale`), and the
+ * Text only, never markup. The page's language comes from the page (`useContentLocale`), and the
  * dates are the event's own clock as the server sent it. While loading, when there is nothing to
  * show, and when the fetch fails, a visitor sees nothing at all (a heading over an empty list
  * reads as a broken section); the editor gets a hint instead.
@@ -16,8 +16,8 @@ import { keys, useT } from '../utils/i18n';
 import { PageLocale } from '../utils/PageLocale';
 import { fetchBlockCalendars, fetchUpcoming } from './api-blocks';
 import { BlockBoundary } from './BlockBoundary';
-import { clampCount, oneOf, slugsOf } from './limits';
-import { usePageLocale } from './usePageLocale';
+import { clampCount, oneOf, selectionOf } from './limits';
+import { useContentLocale } from './useContentLocale';
 
 export type UpcomingEventsProps = {
   heading: string;
@@ -39,12 +39,17 @@ type State = { items: PublicListItem[] | null; failed: boolean };
 
 function useUpcoming(props: UpcomingEventsProps, locale: string): State {
   const [state, setState] = useState<State>({ items: null, failed: false });
-  const slugs = slugsOf(props.calendars);
+  const { slugs, bad } = selectionOf(props.calendars);
   const count = clampCount(props.count);
   const category = typeof props.category === 'string' ? props.category : '';
-  const key = `${slugs.join('\u0000')}|${category}|${count}|${locale}`;
+  const key = `${bad}|${slugs.join('\u0000')}|${category}|${count}|${locale}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the query it names
   useEffect(() => {
+    // A selection that cannot be read means nothing, so nothing is asked for.
+    if (bad) {
+      setState({ items: [], failed: false });
+      return;
+    }
     const controller = new AbortController();
     fetchUpcoming({ slugs, category, count, locale }, controller.signal)
       .then((items) => setState({ items, failed: false }))
@@ -61,7 +66,7 @@ function useUpcoming(props: UpcomingEventsProps, locale: string): State {
 /** How many of the chosen calendars the public no longer sees (the editor's hint only). */
 function useUnresolved(props: UpcomingEventsProps, locale: string, editing: boolean): number {
   const [missing, setMissing] = useState(0);
-  const slugs = slugsOf(props.calendars);
+  const { slugs } = selectionOf(props.calendars);
   const key = `${slugs.join('\u0000')}|${locale}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the slugs
   useEffect(() => {
@@ -88,7 +93,7 @@ function Cards({
   images: boolean;
 }) {
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <ul className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => (
         <li key={item.key} className="space-y-1 overflow-hidden rounded border p-3">
           {images && item.image ? (
@@ -108,27 +113,37 @@ function Cards({
 
 function Inner(props: UpcomingEventsProps & WithPuck) {
   const { t } = useT();
-  const locale = usePageLocale();
+  const locale = useContentLocale();
   const editing = props.puck?.isEditing === true;
   const { items, failed } = useUpcoming(props, locale ?? '');
   const missing = useUnresolved(props, locale ?? '', editing);
+  const unreadable = selectionOf(props.calendars).bad;
   const heading =
     typeof props.heading === 'string' ? props.heading.slice(0, HEADING_MAX).trim() : '';
   const layout = oneOf(props.layout, LAYOUTS, 'list');
   const hints = [
-    failed ? t(copy.editor_hint.failed) : items?.length === 0 ? t(copy.editor_hint.empty) : null,
+    unreadable
+      ? t(copy.editor_hint.selection_unreadable)
+      : failed
+        ? t(copy.editor_hint.failed)
+        : items?.length === 0
+          ? t(copy.editor_hint.empty)
+          : null,
     missing > 0 ? t(copy.editor_hint.unresolved, { count: missing }) : null,
   ].filter((hint): hint is string => hint !== null);
   const hint =
     editing && hints.length > 0 ? (
-      <p className="text-sm text-muted-foreground" data-editor-only="">
+      <p className="container mx-auto px-4 py-2 text-sm text-muted-foreground" data-editor-only="">
         {hints.join(' ')}
       </p>
     ) : null;
   if (items === null || items.length === 0) return hint ?? <></>;
   const shown = locale ?? 'en';
   return (
-    <section className="space-y-3" aria-label={heading || t(copy.upcoming.label)}>
+    <section
+      className="container mx-auto space-y-3 px-4 py-4"
+      aria-label={heading || t(copy.upcoming.label)}
+    >
       {heading ? <h2 className="text-xl font-semibold">{heading}</h2> : null}
       {layout === 'cards' ? (
         <Cards items={items} locale={shown} images={props.showImages !== false} />
@@ -147,7 +162,7 @@ function Inner(props: UpcomingEventsProps & WithPuck) {
 }
 
 export function UpcomingEventsRender(props: UpcomingEventsProps & WithPuck) {
-  const locale = usePageLocale();
+  const locale = useContentLocale();
   const inner = (
     <BlockBoundary>
       <Inner {...props} />

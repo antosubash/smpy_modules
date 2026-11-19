@@ -8,7 +8,7 @@ import {
   type SourceOption,
   type TypeOption,
 } from '../ui/calendar/console/ConsoleCalendar';
-import { readState, writeState } from '../ui/calendar/console/urlState';
+import { readOpen, readState, writeState } from '../ui/calendar/console/urlState';
 import type { CalendarInfo, CalendarState } from '../ui/calendar/types';
 import { keys, useT } from '../ui/utils/i18n';
 import type { Category } from '../ui/utils/types';
@@ -46,6 +46,7 @@ export default function CalendarPage({
   const ids = useMemo(() => calendars.map((c) => c.id), [calendars]);
   // Read once: the component owns its state from then on and reports every change.
   const initialState = useMemo(() => stateFromUrl(ids), [ids]);
+  const initialOpen = useMemo(() => readOpen(window.location.search), []);
   const mirror = useCallback(
     (state: CalendarState) => {
       const { pathname, hash } = window.location;
@@ -71,6 +72,7 @@ export default function CalendarPage({
           sources={sources}
           calendarsUrl={can('events.edit') ? '/admin/events/calendars' : undefined}
           initialState={initialState}
+          initialOpen={initialOpen}
           onStateChange={mirror}
         />
       </PageShell>

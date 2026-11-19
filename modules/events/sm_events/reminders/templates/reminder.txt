@@ -1,9 +1,9 @@
-$intro
+{{ intro }}
 
-$details
+{{ details }}
 
-$open_label $event_url
-$manage_label $manage_url
+{{ open_label }} {{ event_url }}
+{{ manage_label }} {{ manage_url }}
 
 --
-$footer
+{{ footer }}

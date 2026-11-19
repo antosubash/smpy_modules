@@ -161,6 +161,8 @@ export interface EventCardHit {
   attendance_mode: 'in_person' | 'online' | 'hybrid';
   place: string;
   cancelled: boolean;
+  /** The date and time as the email words them: the server's own, zone abbreviation included. */
+  when: string;
 }
 
 export type CardHit = ArticleCardHit | EventCardHit;
@@ -184,7 +186,10 @@ export interface CardSnapshot {
 }
 
 /** An event card block's props, ready to drop into the body. */
-export type EventCardSnapshot = Omit<EventCardHit, 'kind'> & { id: string; snapshot_at: string };
+export type EventCardSnapshot = Omit<EventCardHit, 'kind' | 'when'> & {
+  id: string;
+  snapshot_at: string;
+};
 
 export interface Preview {
   subject: string;

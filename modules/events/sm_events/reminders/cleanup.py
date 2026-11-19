@@ -34,13 +34,13 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import all_tenants as unscoped
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 from sqlalchemy import delete, select
 
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import bound_tenant, tenant_scope, valid_tenant
 from sm_events.core.user_ids import user_match
 from sm_events.models import EventFollow, ReminderSent
-from sm_events.reminders import limits
 
 __all__ = [
     "delete_member_data",
@@ -63,6 +63,7 @@ async def _run(
         async with factory() as session:
             for statement in statements:
                 removed += int((await session.execute(statement)).rowcount or 0)
+            mark_written(session)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(session)
     return removed
 

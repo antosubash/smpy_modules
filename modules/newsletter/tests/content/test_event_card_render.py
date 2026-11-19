@@ -118,12 +118,12 @@ def test_html_links_absolute_and_inert():
     out = _email(
         title='<script>alert(1)</script> {{first_name}} "q"',
         excerpt="<b>x</b> {{unsubscribe_url}}",
-        image_url="https://cdn.example.com/a.png",
+        image_url="/media/a.png",
     )
     hrefs = re.findall(r'href="([^"]*)"', out.html)
     assert "https://acme.example.org/events/open-day?date=2026-07-01" in hrefs
     assert "https://acme.example.org/events/open-day.ics" in hrefs
-    assert 'src="https://cdn.example.com/a.png"' in out.html
+    assert 'src="https://acme.example.org/media/a.png"' in out.html
     assert "<script" not in out.html and "<b>x" not in out.html and "{{first_name" not in out.html
     assert "&lt;script&gt;" in out.html and "&quot;q&quot;" in out.html
     assert "Wednesday, July 1, 2026, 10:00 AM–11:30 AM CEST" in out.html
@@ -200,3 +200,22 @@ def test_direction_controls_never_reach_the_email():
     for part in (out.html, out.text):
         assert not re.search("[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]", part)
     assert "Evil" in out.html and "Evil" in out.text
+
+
+def test_a_stored_off_site_link_renders_no_anchor():
+    """A body stored before the save-time check (or built without it) never emits an address that
+    is not the site's: the link, the calendar link and the image are dropped, text stays."""
+    forged = EventCardProps.model_construct(
+        **{
+            **props().model_dump(),
+            "url": "https://evil.example/phish",
+            "ics_url": "mailto:a@evil.example",
+            "image_url": "https://evil.example/x.png",
+        }
+    )
+    ctx = RenderContext(**CTX.__dict__)
+    html, text = card.html(forged, ctx), card.text(forged, ctx)
+    for part in (html, text):
+        assert "evil.example" not in part
+    assert "<a " not in html and "<img" not in html
+    assert "Open day" in html and "Open day" in text

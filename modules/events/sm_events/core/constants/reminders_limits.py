@@ -28,6 +28,8 @@ __all__ = [
     "REMINDER_TENANT_BUDGET",
     "REMINDER_TICK_BUDGET",
     "REMINDER_TICK_SECONDS",
+    "REMINDER_TOO_LATE_BATCH",
+    "REMINDER_TOO_LATE_LOOKBACK",
     "REMINDER_UNFINISHED_AFTER",
     "STATS_WINDOW_DAYS",
 ]
@@ -64,6 +66,11 @@ REMINDER_SEND_TIMEOUT: Final = timedelta(seconds=30)
 REMINDER_CLAIM_LEASE: Final = timedelta(minutes=2)
 """How long a ``claimed`` row (committed, SMTP not yet begun) belongs to its claimer; after that it
 may be reclaimed, because a row that never reached ``sending`` provably sent nothing."""
+REMINDER_TOO_LATE_LOOKBACK: Final = timedelta(minutes=5)
+"""How far back from the catch-up edge a tick looks for reminders that just went stale unsent,
+to record them as ``too_late``; a beat that was down longer than this leaves no record."""
+REMINDER_TOO_LATE_BATCH: Final = 500
+"""Most ``too_late`` rows one tenant gets per tick."""
 REMINDER_UNFINISHED_AFTER: Final = timedelta(minutes=5)
 REMINDER_RUNTIME_TTL: Final = timedelta(seconds=600)
 

@@ -39,6 +39,10 @@ export type OccurrenceFetcher = (
   signal: AbortSignal,
 ) => Promise<OccurrencePage>;
 
+/** In `CalendarState.sources`: every source is unchecked. (An empty list is no filter: every
+ *  source is shown, and every box checked.) A plugin source id has a colon, so none can be this. */
+export const NO_SOURCES = 'none';
+
 /** `date` is YYYY-MM-DD in the grid's time zone. */
 export type CalendarState = {
   view: CalendarView;
@@ -124,6 +128,9 @@ export type CalendarProps = {
    *  calendars have no zone in common. */
   calendarTime?: boolean;
   initialState?: Partial<CalendarState>;
+  /** The key of an occurrence to open once it is on the grid (a link from a reminder mail), read
+   *  only: opening it grants nothing the viewer does not have. */
+  initialOpen?: string | null;
   onStateChange?: (state: CalendarState) => void;
   /** Absent: read-only (the public site). */
   editing?: CalendarEditing;

@@ -1,7 +1,8 @@
 """Lead times: the closed set, one validation for every entry point, effective defaults.
 
 A lead is how many minutes before an occurrence a reminder goes out, and it is one of
-:data:`~sm_events.reminders.limits.REMINDER_LEADS`. Nothing else is ever stored by a write;
+:data:`~sm_events.core.constants.reminders_limits.REMINDER_LEADS`.
+Nothing else is ever stored by a write;
 what a *stored* value may be (an older release's, a hand-edited setting) is handled where it is
 read, by dropping it, never by refusing to load.
 """
@@ -11,8 +12,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Final
 
+from sm_events.core.constants.reminders_limits import REMINDER_LEADS
 from sm_events.core.errors_reminders import InvalidLead
-from sm_events.reminders.limits import REMINDER_LEADS
 
 if TYPE_CHECKING:
     from sm_events.core.settings import EventsSettings
@@ -22,7 +23,6 @@ __all__ = [
     "LEADS_INPUT_MAX",
     "effective_defaults",
     "install_defaults",
-    "validate_distinct",
     "validate_leads",
 ]
 
@@ -47,15 +47,6 @@ def validate_leads(values: Iterable[Any]) -> tuple[int, ...]:
     if not all(_known(value) for value in given):
         raise InvalidLead
     return tuple(sorted(set(given)))
-
-
-def validate_distinct(values: Iterable[Any]) -> tuple[int, ...]:
-    """:func:`validate_leads`, and a duplicate is refused too (a calendar's stored list)."""
-    given = list(values)
-    chosen = validate_leads(given)
-    if len(chosen) != len(given):
-        raise InvalidLead
-    return chosen
 
 
 def _readable(values: Iterable[Any]) -> tuple[int, ...]:

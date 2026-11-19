@@ -26,8 +26,9 @@ started (it caches them), and the bootstrap admin must exist. CI's
    ``events.reminders`` beat (every minute) has mailed it exactly once (the Delivery card's
    counts: one ``sent``, nothing failed or unfinished). It needs a mail sender that really
    delivers, so CI points the mail module's SMTP backend at a local ``aiosmtpd`` sink, and the
-   host's ``SM_PUBLIC_BASE_URL`` for the links; the headless worker app builds from the same
-   environment (``SM_SECRET_KEY``, ``SM_DATABASE_URL``).
+   host's public address for the links, stored in the database (``host.public_base_url``), not in
+   the environment: the headless worker app reads it from there each pass and builds from the
+   same environment (``SM_SECRET_KEY``, ``SM_DATABASE_URL``).
 
 Exits 0 when all settle, 1 with the last state seen otherwise.
 """
@@ -45,37 +46,13 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from bg_tasks_smoke_events import reminder_sent
+from bg_tasks_smoke_support import SmokeError, check, poll
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE = ROOT / "modules" / "images" / "tests" / "fixtures" / "rotated.jpg"
 _PAGE_JSON = re.compile(r'<script data-page="app" type="application/json">([^<]*)</script>')
 _SETTLED = {"completed", "skipped"}
-
-
-class SmokeError(Exception):
-    """A step did not reach the state it should; the message says what was seen."""
-
-
-def _check(res: httpx.Response, *expected: int) -> Any:
-    if res.status_code not in expected:
-        raise SmokeError(
-            f"{res.request.method} {res.request.url.path}: {res.status_code} {res.text}"
-        )
-    return res.json() if res.content else None
-
-
-def _poll(what: str, fetch: Callable[[], Any], done: Callable[[Any], bool], timeout: float) -> Any:
-    """``fetch()`` every 2 s until ``done`` holds for it; raise after ``timeout``."""
-    deadline = time.monotonic() + timeout
-    last: Any = None
-    while time.monotonic() < deadline:
-        last = fetch()
-        if done(last):
-            return last
-        time.sleep(2)
-    raise SmokeError(
-        f"{what}: not reached within {timeout:.0f} s; last seen {json.dumps(last, default=str)}"
-    )
 
 
 def wait_until_up(client: httpx.Client, timeout: float) -> None:
@@ -85,15 +62,13 @@ def wait_until_up(client: httpx.Client, timeout: float) -> None:
         except httpx.TransportError:
             return False
 
-    _poll("host /health/live", live, bool, timeout)
+    poll("host /health/live", live, bool, timeout)
 
 
 def sign_in(client: httpx.Client, email: str, password: str) -> dict[str, str]:
     """A session cookie, then the session's CSRF token from a console page's props."""
     # A native client (no Origin, Referer or CSRF header) signs in without a token.
-    _check(
-        client.post("/api/users/auth/login", data={"username": email, "password": password}), 204
-    )
+    check(client.post("/api/users/auth/login", data={"username": email, "password": password}), 204)
     page = client.get("/admin/newsletter/")
     match = _PAGE_JSON.search(page.text)
     if page.status_code != 200 or not match:
@@ -105,7 +80,7 @@ def sign_in(client: httpx.Client, email: str, password: str) -> dict[str, str]:
 
 
 def image_settles(client: httpx.Client, csrf: dict[str, str], timeout: float) -> dict[str, Any]:
-    collection = _check(
+    collection = check(
         client.post(
             "/api/images/collections",
             headers=csrf,
@@ -114,7 +89,7 @@ def image_settles(client: httpx.Client, csrf: dict[str, str], timeout: float) ->
         201,
     )
     with FIXTURE.open("rb") as fh:
-        batch = _check(
+        batch = check(
             client.post(
                 f"/api/images/collections/{collection['id']}/images",
                 headers=csrf,
@@ -127,7 +102,7 @@ def image_settles(client: httpx.Client, csrf: dict[str, str], timeout: float) ->
         raise SmokeError(f"upload refused: {uploaded}")
 
     def fetch() -> dict[str, Any]:
-        return _check(client.get(f"/api/images/images/{uploaded['id']}"), 200)
+        return check(client.get(f"/api/images/images/{uploaded['id']}"), 200)
 
     def settled(image: dict[str, Any]) -> bool:
         runs = image.get("step_runs") or []
@@ -138,7 +113,7 @@ def image_settles(client: httpx.Client, csrf: dict[str, str], timeout: float) ->
             bool(runs) and all(r["status"] in _SETTLED for r in runs) and bool(image["thumb_url"])
         )
 
-    image = _poll("image pipeline settled", fetch, settled, timeout)
+    image = poll("image pipeline settled", fetch, settled, timeout)
     return {"id": image["id"], "steps": {r["step"]: r["status"] for r in image["step_runs"]}}
 
 
@@ -148,12 +123,12 @@ def _mailchimp_csv(email: str) -> bytes:
 
 def campaign_sends(client: httpx.Client, csrf: dict[str, str], timeout: float) -> dict[str, Any]:
     api = "/api/newsletter"
-    settings = _check(client.get(f"{api}/settings"), 200)
+    settings = check(client.get(f"{api}/settings"), 200)
     if settings.get("transport") != "console":
         raise SmokeError(f"newsletter transport is {settings.get('transport')!r}, not 'console'")
 
     rand = uuid.uuid4().hex[:8]
-    key = _check(
+    key = check(
         client.post(
             f"{api}/lists",
             headers=csrf,
@@ -161,7 +136,7 @@ def campaign_sends(client: httpx.Client, csrf: dict[str, str], timeout: float) -
         ),
         201,
     )["key"]
-    staged = _check(
+    staged = check(
         client.post(
             f"{api}/imports",
             headers=csrf,
@@ -176,17 +151,17 @@ def campaign_sends(client: httpx.Client, csrf: dict[str, str], timeout: float) -
         ),
         201,
     )
-    _check(client.post(f"{api}/imports/{staged['id']}/apply", headers=csrf), 202)
-    job = _poll(
+    check(client.post(f"{api}/imports/{staged['id']}/apply", headers=csrf), 202)
+    job = poll(
         "subscriber import (newsletter.run_import) done",
-        lambda: _check(client.get(f"{api}/imports/{staged['id']}"), 200),
+        lambda: check(client.get(f"{api}/imports/{staged['id']}"), 200),
         lambda j: j["status"] in {"done", "failed"},
         120,
     )
     if job["status"] != "done" or job["created"] != 1:
         raise SmokeError(f"import did not create the subscriber: {job}")
 
-    draft = _check(
+    draft = check(
         client.post(
             f"{api}/campaigns",
             headers=csrf,
@@ -195,7 +170,7 @@ def campaign_sends(client: httpx.Client, csrf: dict[str, str], timeout: float) -
         201,
     )
     body = [{"type": "Divider", "props": {"id": "a"}}]
-    draft = _check(
+    draft = check(
         client.patch(
             f"{api}/campaigns/{draft['id']}",
             headers=csrf,
@@ -203,7 +178,7 @@ def campaign_sends(client: httpx.Client, csrf: dict[str, str], timeout: float) -
         ),
         200,
     )
-    scheduled = _check(
+    scheduled = check(
         client.post(
             f"{api}/campaigns/{draft['id']}/send",
             headers=csrf,
@@ -215,14 +190,14 @@ def campaign_sends(client: httpx.Client, csrf: dict[str, str], timeout: float) -
         raise SmokeError(f"campaign not scheduled: {scheduled['status']}")
 
     def fetch() -> dict[str, Any]:
-        return _check(client.get(f"{api}/campaigns/{draft['id']}/progress"), 200)
+        return check(client.get(f"{api}/campaigns/{draft['id']}/progress"), 200)
 
     def sent(p: dict[str, Any]) -> bool:
         if p["status"] in {"paused", "cancelled"}:
             raise SmokeError(f"campaign stopped: {p}")
         return p["status"] == "sent"
 
-    final = _poll("campaign sent by the newsletter.dispatch beat", fetch, sent, timeout)
+    final = poll("campaign sent by the newsletter.dispatch beat", fetch, sent, timeout)
     if final["sent"] != 1 or final["queued"] != 0:
         raise SmokeError(f"campaign sent, but not to its one subscriber: {final}")
     return {"id": draft["id"], "progress": final}
@@ -238,8 +213,6 @@ def _timed(label: str, run: Callable[[], dict[str, Any]]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from bg_tasks_smoke_events import reminder_sent
-
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--email", default="admin@example.com")
