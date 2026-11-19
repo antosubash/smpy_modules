@@ -399,22 +399,16 @@ last-write-wins; event writes use `expected_revision`.
 
 ## Status
 
-PR 4 adds the public surface: pages, ICS feeds, JSON-LD and a sitemap, with calendar slug
-redirects (see [Public pages](public.md) and [Operating](operations.md)); private feed links are in [Private feed links](feeds.md). PR 3 adds the calendar: the `Calendar` component and the console grid at
-`/admin/events/`. PR 2 adds events: texts, recurrence and overrides, the
-occurrences read, the workflow, scheduled publishing, the API, and the Events list and editor. PR 1
-provided calendars, categories, settings, the tenancy and access policy and all
-seven tables. Browser QA and the shipping pipeline follow branch verification.
-Later delivery remains:
+Delivered: calendars, categories, settings, the tenancy and access policy; events with texts,
+recurrence and overrides, the occurrences read, the workflow and scheduled publishing; the
+`Calendar` component and the console grid at `/admin/events/`; the public surface with calendar
+slug redirects ([Public pages](public.md), [Operating](operations.md)); private feed links and
+the `.ics` import ([Feeds](feeds.md), [Import](import.md)); the extension registry
+([Extensions](extensions.md)); and the pagebuilder blocks and newsletter card
+([Blocks and cards](blocks.md)). Still to come:
 
 | PR | Delivers |
 | --- | --- |
-| 2 | Events and texts, recurrence and overrides, occurrences read, workflow, API, list and editor |
-| 3 | Calendar component and console grid: views, create, drag, resize, timezone |
-| 4 (this release) | Public pages, calendar slug redirects, public ICS, JSON-LD and sitemap |
-| 5 | Private feed tokens and `.ics` upload |
-| 6 | Extension registry, plugin guide and records date-field source |
-| 7 (this release) | Pagebuilder blocks and newsletter card |
 | 8 | Reminders |
 | 9 | Registration through records |
 | 10 | External ICS subscriptions |
