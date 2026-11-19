@@ -75,6 +75,10 @@ class RegistrationEvent:
     """The language of ``title`` and of the two paths."""
 
 
+FEW_LEFT_DIVISOR = 5
+"""A fifth of the capacity or fewer is "few left"."""
+
+
 @dataclass(frozen=True)
 class Availability:
     state: str
@@ -82,12 +86,9 @@ class Availability:
     opens_at: datetime | None
     closes_at: datetime | None
     event: RegistrationEvent | None
-    taken: int | None = None
-    """Seats taken, when the event has a capacity. For the provider only (it derives public
-    *states* from it); never shown as a number on a page unless the event chose to show seats."""
-    capacity: int | None = None
-    """The event's seat limit (``None``: unlimited, or unavailable). For the provider's own
-    bounds (how many unconfirmed holds one occurrence may carry); not for a public page."""
+    few_left: bool = False
+    """A fifth of the seats or fewer remain (at least one seat counts). Computed only for an event
+    that shows seats; never raw counts: the contract returns what a caller may publish."""
 
 
 @dataclass(frozen=True)
@@ -223,14 +224,16 @@ async def describe(
         taken = await _taken(db, eid, key)
         state = state_of(found, taken, now or utcnow())
         left = None
+        few = False
         if event.registration_show_seats and event.registration_capacity is not None:
-            left = max(event.registration_capacity - taken, 0)
+            capacity = event.registration_capacity
+            left = max(capacity - taken, 0)
+            few = 0 < left <= max(1, capacity // FEW_LEFT_DIVISOR)
         return Availability(
             state=state,
             seats_left=left,
             opens_at=event.registration_opens_at,
             closes_at=event.registration_closes_at,
             event=await registration_event(db, event, found.occurrence, lang),
-            capacity=event.registration_capacity,
-            taken=taken if event.registration_capacity is not None else None,
+            few_left=few,
         )

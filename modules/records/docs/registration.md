@@ -21,15 +21,36 @@ An unconfirmed record is kept for `pending_hold_hours` (default 1, at most 168),
 The submit route answers the same 202 for a new, a pending, a confirmed and a cancelled address; what
 happened is told by mail to that address only. A public event that is full, closed or cancelled
 refuses everyone alike; one that is not public (or not this form's) answers like an invalid token.
-Public availability shows `seats_left` only for double opt-in forms whose event shows seats; a single
-opt-in form shows `few_left` (a fifth of the capacity or less), never a number.
+What the public availability may show is decided by the events module (the contract returns only
+what may be published, never raw counts): with the event's "show seats" off, the states are `open`,
+`full`, `closed` and `ended` only, no number and no `few_left`. With it on, a double opt-in form shows
+the exact `seats_left`; a single opt-in form shows `few_left` (a fifth of the capacity or fewer),
+never a number.
+
+**Residual, stated plainly.** On a single opt-in form the seat is taken at submit, so a submit by a new
+address can flip a public state (open to few-left when seats are shown, and to `full` always), and an
+observer can see that. A double opt-in form does not have this, because its seat is taken at
+confirmation. Use double opt-in for capacity-limited events (the event editor warns about it).
 
 ## Bounds on the anonymous route (defaults)
 
-Per IP 5 per 10 minutes; per address 3 mails per day per form (`public_submissions_confirm_rate_per_email`);
-the captcha when configured. There is no per-type budget for registrations. Mails (confirmation,
-"already registered", "full/closed") go to whatever address was typed: records has no suppression list
-for its own mails, as for its other public confirmations.
+Three limits, then the captcha when one is configured. They are records' existing public-submission
+settings, shared with every other form:
+
+- **per IP:** `public_submissions_rate_per_ip`, 5 per 10 minutes;
+- **per form, in total:** `public_submissions_type_rate`, 60 per hour for everyone together. Every
+  accepted submit creates a pending record and mails an address the caller typed, so this is what
+  bounds a distributed sender (it keeps the route from creating unbounded pending records or mailing
+  unbounded distinct third-party addresses from the site's domain). Over it the route answers the
+  same 429 with `Retry-After` as every other form, identical for every address;
+- **per address:** `public_submissions_confirm_rate_per_email`, 3 mails a day per form.
+
+Confirming and cancelling are not submits and are never counted. An attacker can exhaust the form
+total for one window and lock new submits out until it passes; nobody loses a seat they held (a seat
+is taken at confirmation). For a large event's opening minute an operator should raise
+`public_submissions_type_rate` (for example `600/hour`) on the Settings screen beforehand, and may add
+the captcha. Mails (confirmation, "already registered", "full/closed") go to whatever address was
+typed: records has no suppression list for its own mails, as for its other public confirmations.
 
 ## Links
 

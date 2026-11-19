@@ -31,10 +31,7 @@ from sm_records.records.services.errors import NotFound
 from sm_records.records.services.public import NOT_FOUND
 from sm_records.records.services.types import get_type
 
-__all__ = ["FEW_LEFT_DIVISOR", "registration_view"]
-
-FEW_LEFT_DIVISOR = 5
-"""\"Few left\": at most a fifth of the capacity (at least one seat). The one threshold."""
+__all__ = ["registration_view"]
 
 
 async def _type(db: AsyncSession, type_key: str) -> RecordType:
@@ -93,17 +90,11 @@ async def registration_view(
             occurrence_key=key,
         )
     double = bool((rtype.public_submissions or {}).get("double_opt_in", True))
-    few = (
-        not double
-        and found.capacity is not None
-        and found.taken is not None
-        and 0 < found.capacity - found.taken <= max(1, found.capacity // FEW_LEFT_DIVISOR)
-    )
     return RegistrationView(
         availability=RegistrationAvailability(
             state=state,  # type: ignore[arg-type]
             seats_left=found.seats_left if double else None,
-            few_left=few,
+            few_left=found.few_left and not double,
             opens_at=_iso(found.opens_at),
             closes_at=_iso(found.closes_at),
         ),

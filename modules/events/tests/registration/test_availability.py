@@ -266,3 +266,27 @@ async def test_a_moved_occurrence_closes_at_its_new_start(db, cal):
     key = SECOND_KEY.format(id=event.id)
     assert (await ask(db, event, key, now=SECOND + timedelta(hours=2))).state == "open"
     assert (await ask(db, event, key, now=new)).state == "closed"
+
+
+@pytest.mark.parametrize(
+    ("show", "capacity", "used", "few"),
+    [
+        (True, 10, 0, False),
+        (True, 10, 7, False),
+        (True, 10, 8, True),  # a fifth or less of the seats is left
+        (True, 10, 9, True),
+        (True, 10, 10, False),  # full is a state of its own
+        (True, 3, 2, True),  # at least one seat counts
+        (False, 10, 9, False),  # hidden seats: no count-derived state at all
+        (False, 10, 8, False),
+        (True, None, 50, False),
+    ],
+)
+async def test_few_left_only_when_the_event_shows_seats(db, cal, show, capacity, used, few):
+    event = await one_off(db, cal, registration_capacity=capacity, registration_show_seats=show)
+    await taken(db, event, None, used)
+    got = await ask(db, event)
+    assert got.few_left is few
+    assert not hasattr(got, "taken") and not hasattr(got, "capacity")  # no raw numbers returned
+    if not show:
+        assert got.seats_left is None

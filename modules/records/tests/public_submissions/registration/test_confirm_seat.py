@@ -156,3 +156,26 @@ async def test_double_opt_in_shows_the_exact_number_only_when_the_event_says_so(
     assert (await load_registration(reg_site, shown)).json()["availability"]["seats_left"] == 10
     got = (await load_registration(reg_site, hidden)).json()["availability"]
     assert got["seats_left"] is None and got["few_left"] is False
+
+
+@pytest.mark.parametrize("single", [True, False])
+async def test_hidden_seats_never_leak_a_count_state(reg_site, single):
+    """An event that hides seat information shows only open/full: no integer and no ``few_left``,
+    before or after submits, on either kind of form."""
+    if single:
+        await single_opt_in(reg_site)
+    event = await seed_event(reg_site.db_state, uid=f"hid{single}@x", registration_capacity=10)
+    seen = []
+    for n in range(10):
+        t = await token(reg_site, event)
+        seen.append((await load_registration(reg_site, event)).json()["availability"])
+        await register(reg_site, f"h{n}@example.org", event=event, token=t, consent=True)
+        if not single:
+            record = next(
+                r for r in await regs(reg_site) if r["data"]["sm_email"] == f"h{n}@example.org"
+            )
+            await confirm_record(reg_site, record)
+    seen.append((await load_registration(reg_site, event)).json()["availability"])
+    assert {a["state"] for a in seen[:-1]} == {"open"} and seen[-1]["state"] == "full"
+    for a in seen:
+        assert a["few_left"] is False and a["seats_left"] is None
