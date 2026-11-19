@@ -131,7 +131,8 @@ export function EventForm({
           <FieldError id={fieldErrorId('event-category')}>{errors.category_id}</FieldError>
         </div>
         {text('organiser', t(copy.organiser), { max: 200 })}
-        {text('image', t(copy.image), { type: 'url', max: 2048 })}
+        {text('image', t(copy.image), { max: 2048 })}
+        <p className="-mt-4 text-xs text-muted-foreground">{t(copy.image_hint)}</p>
         {text('registration_url', t(copy.registration_url), { type: 'url', max: 2048 })}
         <div className="flex items-center gap-2">
           <Checkbox

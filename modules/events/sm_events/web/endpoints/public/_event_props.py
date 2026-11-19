@@ -19,7 +19,7 @@ from sm_events.content.public_read import (
 from sm_events.content.richtext_tree import to_tree
 from sm_events.content.types import public_extra
 from sm_events.core import constants, locales
-from sm_events.core.web_urls import is_web_url
+from sm_events.core.web_urls import is_site_image, is_web_url
 from sm_events.feeds.plaintext import to_text
 from sm_events.models import Event
 from sm_events.web.endpoints.public import _urls
@@ -92,7 +92,7 @@ def _alternates(request_origin: Any, ctx: EventContext) -> list[AlternateOut]:
     ]
 
 
-def _sub_items(ctx: EventContext) -> list[PublicListItem]:
+def _sub_items(ctx: EventContext, origin: str) -> list[PublicListItem]:
     items: list[PublicListItem] = []
     for child in ctx.children:
         texts = ctx.child_texts.get(child.id)
@@ -113,6 +113,7 @@ def _sub_items(ctx: EventContext) -> list[PublicListItem]:
                 day=None,
                 status="cancelled" if child.cancelled else "scheduled",
                 rescheduled=False,
+                origin=origin,
             )
         )
     return items
@@ -132,10 +133,13 @@ def build_props(
     day: date | None = shown.date_param if shown else None
     url = origin(_urls.event_path(text.slug, locale))
     canonical = origin(_urls.event_path(text.slug, locale, day))
-    image = web_url(event.image)
+    base = origin("")
+    image = event.image if event.image and is_site_image(event.image, base) else None
+    # A crawler needs an absolute address for the JSON-LD image and ``og:image``.
+    image_abs = origin(image) if image and image.startswith("/") else image
     ld_occurrences = [shown] if shown is not None else upcoming
     json_ld = event_json_ld(
-        event=event, text=text, url=url, image=image, locale=locale, occurrences=ld_occurrences
+        event=event, text=text, url=url, image=image_abs, locale=locale, occurrences=ld_occurrences
     )
     next_items = [
         NextOccurrence(
@@ -194,7 +198,7 @@ def build_props(
             title=ctx.parent_text.title,
             url=_urls.event_path(ctx.parent_text.slug, ctx.parent_text.locale),
         ),
-        sub_events=_sub_items(ctx),
+        sub_events=_sub_items(ctx, base),
         registration_url=None if cancelled else web_url(event.registration_url),
         ics_url=_urls.event_ics_path(text.slug, locale),
         canonical_url=canonical,

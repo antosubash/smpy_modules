@@ -38,6 +38,7 @@ from sm_events.core.tenancy import bind_public, bound_tenant
 from sm_events.core.timezones import effective
 from sm_events.models import Calendar, CalendarRedirect
 from sm_events.web.endpoints.deps import get_settings
+from sm_events.web.endpoints.public import _urls
 from sm_events.web.endpoints.public._api import occurrences_response
 from sm_events.web.endpoints.public._errors import PublicApiRoute
 from sm_events.web.endpoints.public._listing import category_name, upcoming
@@ -167,6 +168,7 @@ def blocks_router() -> APIRouter:
             calendar_ids=None if chosen is None else [c.id for c in chosen],
             category_id=category.id if category else None,
             limit=query.count,
+            origin=_urls.public_base_url(request),
         )
         return _json(request, settings, UpcomingOut(items=items[: query.count]))
 

@@ -95,11 +95,16 @@ def event_router(locale: str) -> APIRouter:
             return unchanged
         props = build_props(ctx, shown, upcoming, lambda path: _urls.absolute(request, path))
         response = await inertia.render(constants._PAGE_PUBLIC_EVENT, props.model_dump(mode="json"))
+        head_image = props.image
+        if head_image and head_image.startswith("/"):  # og:image needs an absolute address
+            head_image = _urls.absolute(request, head_image)
         head = _head.event_head(
             title=text.seo_title or text.title,
             description=description_for_head(ctx) or fallback_description(props),
             canonical=props.canonical_url,
-            image=props.image,
+            image=_urls.absolute(request, props.image)
+            if (props.image or "").startswith("/")
+            else props.image,
             index_in_search=props.index_in_search,
             json_ld=props.json_ld,
             locale=locale,

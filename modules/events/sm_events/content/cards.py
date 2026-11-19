@@ -35,7 +35,7 @@ from sm_events.content.public_read import pick_text
 from sm_events.content.texts import texts_of
 from sm_events.core import constants, locales
 from sm_events.core.access.public import ANONYMOUS
-from sm_events.core.web_urls import is_web_url
+from sm_events.core.web_urls import is_site_image
 from sm_events.models import Event, EventText
 from sm_events.web.endpoints.public import _urls
 
@@ -68,7 +68,8 @@ class EventCard(BaseModel):
     venue_name: str
     address: str
     image_url: str
-    """An absolute http(s) address as stored, else ``""``."""
+    """A path on the site (the card has no origin to compare an absolute address with) that the
+    site may show, else ``""``: an off-site image is never carded."""
     path: str
     """A series' card: ``?date=`` in it names the occurrence the card shows."""
     ics_path: str
@@ -141,7 +142,7 @@ def _card(
         attendance_mode=event.attendance_mode,
         venue_name=event.venue_name or "",
         address=event.address or "",
-        image_url=event.image if event.image and is_web_url(event.image) else "",
+        image_url=event.image if event.image and is_site_image(event.image) else "",
         path=_urls.event_path(text.slug, text.locale, day),
         ics_path=_urls.event_ics_path(text.slug, text.locale),
         locale=text.locale,

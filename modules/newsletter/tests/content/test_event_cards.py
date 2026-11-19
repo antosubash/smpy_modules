@@ -97,6 +97,16 @@ async def test_snapshot_event_from_contract(db_state, db):
     assert other["id"] != props["id"]
 
 
+async def test_a_site_image_is_carded_and_an_off_site_one_is_not(db_state, db):
+    mine = await seed_event(db_state, T, slug="mine", image="/media/studio.jpg")
+    theirs = await seed_event(db_state, T, slug="theirs", image="https://cdn.example.net/a.jpg")
+    got = {}
+    for name, eid in (("mine", mine), ("theirs", theirs)):
+        props = await cards.snapshot(APP, db, tenant_id=T, kind="event", source_id=str(eid))
+        got[name] = props["image_url"]
+    assert got == {"mine": "/media/studio.jpg", "theirs": ""}
+
+
 async def test_snapshot_strips_bidi_overrides(db_state, db):
     eid = await seed_event(db_state, T, title="Ev\u202eil", summary="a\u2066b")
     props = await cards.snapshot(APP, db, tenant_id=T, kind="event", source_id=str(eid))

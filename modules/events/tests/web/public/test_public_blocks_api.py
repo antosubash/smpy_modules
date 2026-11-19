@@ -125,13 +125,13 @@ async def test_upcoming_items(public_locales_client, fx):
         public_locales_client,
         Event,
         Event.id == fx.one_off.id,
-        image="https://cdn.example.com/a.png",
+        image="/media/a.png",
     )
     await _update(public_locales_client, Event, Event.id == fx.conf.id, image="javascript:alert(1)")
     got = (await public_locales_client.get(f"{UPCOMING}?count=20&locale=de")).json()["items"]
     by_title = {i["title"]: i for i in got}
     one = by_title[fx.slug(fx.one_off, "de").title()]
-    assert one["image"] == "https://cdn.example.com/a.png"
+    assert one["image"] == "/media/a.png"
     conf = by_title[fx.slug(fx.conf).title()]
     assert conf["image"] is None and conf["lang"] == "en"  # a fallback text, marked
     series = [i for i in got if i["title"] == fx.slug(fx.series, "de").title()]

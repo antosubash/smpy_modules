@@ -46,7 +46,7 @@ async def test_one_off_card_fields(db):
         attendance_mode="hybrid",
         venue_name="Hall 1",
         address="Main St 2",
-        image="https://cdn.example.com/a.png",
+        image="/media/a.png",
     )
     card = await _card(db, event)
     assert card == EventCard(
@@ -62,7 +62,7 @@ async def test_one_off_card_fields(db):
         attendance_mode="hybrid",
         venue_name="Hall 1",
         address="Main St 2",
-        image_url="https://cdn.example.com/a.png",
+        image_url="/media/a.png",
         path="/events/open-day",
         ics_path="/events/open-day.ics",
         locale="en",

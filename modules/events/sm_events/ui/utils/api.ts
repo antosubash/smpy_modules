@@ -72,6 +72,7 @@ export function errorText(error: unknown, gone?: string): string {
     range_too_long: keys.events.errors.range_too_long,
     invalid_range: keys.events.errors.invalid_range,
     unknown_category: keys.events.errors.unknown_category,
+    image_off_site: keys.events.errors.image_off_site,
     unknown_type: keys.events.errors.unknown_type,
     invalid_parent: keys.events.errors.invalid_parent,
     immutable_field: keys.events.errors.immutable_field,

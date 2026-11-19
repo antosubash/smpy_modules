@@ -31,7 +31,7 @@ from sm_events.content.public_read import (
 from sm_events.core import constants
 from sm_events.core.access.public import public_calendars, public_events
 from sm_events.core.tenancy import bound_tenant
-from sm_events.core.web_urls import is_web_url
+from sm_events.core.web_urls import is_site_image
 from sm_events.models import Calendar, Category, Event, EventText
 from sm_events.web.endpoints.public import _urls
 from sm_events.web.endpoints.public._api import occurrence_day, public_read
@@ -94,6 +94,7 @@ def make_item(
     day: date | None,
     status: str,
     rescheduled: bool,
+    origin: str = "",
 ) -> PublicListItem:
     """One list item for an event (or one of its occurrences) shown in ``span``; ``text`` is the
     already-chosen language and ``day`` the ``?date=`` of a series instance."""
@@ -127,7 +128,7 @@ def make_item(
         venue_name=event.venue_name,
         attendance_mode=event.attendance_mode,
         summary=text.summary,
-        image=event.image if event.image and is_web_url(event.image) else None,
+        image=event.image if event.image and is_site_image(event.image, origin) else None,
     )
 
 
@@ -141,6 +142,7 @@ async def upcoming(
     category_id: uuid.UUID | None,
     window_days: int = constants.MAX_RANGE_DAYS,
     limit: int | None = None,
+    origin: str = "",
 ) -> list[PublicListItem]:
     """The upcoming public occurrences in the next ``window_days``, as list items; with a
     ``limit``, only the first that many are enriched (the read itself is bounded by the window)."""
@@ -179,6 +181,7 @@ async def upcoming(
                 day=occurrence_day(occ),
                 status=occ.status,
                 rescheduled=occ.original_start is not None and occ.original_start != occ.start,
+                origin=origin,
             )
         )
     return items

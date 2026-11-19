@@ -27,6 +27,14 @@ that language's page.
 `calendar`, `c`, `api`, `feed` and `sitemap` are reserved: no calendar or event can have them as a
 slug (a 422 `slug_reserved`; derived slugs skip them).
 
+## Images
+
+The public pages allow images from their own origin only (`img-src 'self'`), so an event's image is
+emitted (page, JSON-LD, `og:image`, lists, blocks, the card contract) only when it is a path on the site
+(`/media/...`) or an address on the site's own origin; an off-site address is simply not emitted. The
+editor accepts a path or an address, and refuses a *new* off-site value with `image_off_site`
+(`422`, `field: image`); an image already stored is kept as it is.
+
 ## Occurrences
 
 An occurrence's address is `{slug}?date=YYYY-MM-DD`, the local date of its original start in the

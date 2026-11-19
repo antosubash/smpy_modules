@@ -14,9 +14,9 @@ lists every tenant. An invalid ``tenant_id`` raises ``ValueError`` before any SQ
 session with nothing bound (``MissingTenantError``) answers "nothing found".
 
 ``path`` and ``ics_path`` are site-relative and locale-prefixed except for the default language,
-and ``image_url`` is an absolute http(s) address or ``""``; the caller makes the paths absolute
-from its own public origin. Dates stay instants plus the event's timezone: the caller formats
-them in its own language.
+and ``image_url`` is a path on the site or ``""`` (never an off-site address); the caller makes
+the paths absolute from its own public origin. Dates stay instants plus the event's timezone: the
+caller formats them in its own language.
 
 ``pattern`` is a SQL ``LIKE`` pattern with ``\\`` as the escape character; the caller owns
 escaping (``simple_module_db.like_contains_pattern``). It matches any of the event's titles.

@@ -110,6 +110,7 @@ async def _render(
         default_locale=locales.default(),
         now=clock.now(),
         calendar_ids=[calendar.id] if calendar else None,
+        origin=_urls.public_base_url(request),
         category_id=category.id if category else None,
     )
     pages = page_count(len(items))
