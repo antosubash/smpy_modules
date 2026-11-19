@@ -88,7 +88,7 @@ event with your current access.* The follow is kept; a re-grant or the upstream 
 
 The send and tenant budgets are per pass; at one pass a minute they are the rate. Tenants are served
 in an order that rotates every minute, so none starves another. The table is checked against
-`sm_events/reminders/limits.py` by a test.
+`sm_events/core/constants/reminders_limits.py` by a test.
 
 ## What it needs
 
@@ -99,13 +99,19 @@ in an order that rotates every minute, so none starves another. The table is che
    saving it on the Settings screen applies at once.)
 3. **A worker serving the `events` queue and a beat** (`make worker`, `make beat`), with a
    `SM_SECRET_KEY` in the environment or the database. The scheduler's absence **cannot be detected**:
-   follows are accepted and nothing is mailed. The Reminders page says so; if nothing arrives, check
-   the beat. CI's `Background tasks` job proves the path (`scripts/bg_tasks_smoke.py`).
+   follows are accepted and nothing is mailed. The Reminders page does not say so; if nothing arrives, check
+   the beat. CI's `Background tasks` job proves the path (`scripts/bg_tasks_smoke.py` and
+   `scripts/bg_tasks_smoke_events.py`, the reminder step).
 
 `availability` reports the first reason it cannot deliver: `disabled`, `no_public_base_url`,
-`no_mail_transport`, `console_mail`, `worker_access_unavailable`. Managers see the reason; others see
+`no_mail_transport`, `console_mail`. Managers see the reason; others see
 that reminders are unavailable. While unavailable, adding or changing a follow is a 503; stopping
 always works.
+
+**What the page cannot know.** The web process answers `availability`, and it cannot see whether a
+beat is running or whether the worker's headless app can be built (a missing secret key, a failed
+build or role overlay). In those cases follows are accepted and nothing is mailed; the beat logs the
+reason by exception class and its pass reports `unavailable`. Check the worker log, not the page.
 
 ## The headless worker app
 

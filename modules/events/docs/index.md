@@ -404,7 +404,7 @@ recurrence and overrides, the occurrences read, the workflow and scheduled publi
 `Calendar` component and the console grid at `/admin/events/`; the public surface with calendar
 slug redirects ([Public pages](public.md), [Operating](operations.md)); private feed links and
 the `.ics` import ([Feeds](feeds.md), [Import](import.md)); the extension registry
-([Extensions](extensions.md)); and the pagebuilder blocks and newsletter card
+([Extensions](extensions.md)); the pagebuilder blocks and newsletter card
 ([Blocks and cards](blocks.md)); and email reminders before events a user follows
 ([Reminders](reminders.md)). Still to come:
 
