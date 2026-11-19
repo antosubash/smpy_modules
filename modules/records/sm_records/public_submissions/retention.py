@@ -60,6 +60,7 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import tenant_scope
 from sm_records.core.tenancy._cross_tenant import read_all
 from sm_records.models import RecordType
+from sm_records.public_submissions.registration.reconcile import reconcile
 from sm_records.public_submissions.retention_deliveries import prune_deliveries
 from sm_records.public_submissions.retention_purge import _due, _purge_one
 from sm_records.records.services._common import utcnow
@@ -88,6 +89,8 @@ class Swept:
     purged: int = 0
     skipped: int = 0
     deliveries: int = 0
+    seats: int = 0
+    """Seats reconciliation freed (registration forms; ``0`` without events)."""
     tenants: list[str] = field(default_factory=list)
 
 
@@ -181,6 +184,7 @@ async def _sweep_tenant(run: _Run, swept: Swept) -> None:
         await session.close()
     for key in keys:
         await _sweep_type(run, key, swept)
+    swept.seats += await reconcile(run.session)
     days = run.settings.public_submissions_delivery_retention_days
     # No type inventory goes in: pruning looks each record up itself, at prune
     # time, and renews the lease (``run.keep``) before every commit.

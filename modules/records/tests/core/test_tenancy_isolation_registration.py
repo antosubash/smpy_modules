@@ -170,3 +170,17 @@ async def test_the_cancel_page_reads_nothing_of_any_tenant(acme_registration):
     ]
     assert pages[0] == pages[1] == pages[2] and pages[0]["token"] == "abc"
     assert pages[0]["action"] == "cancel" and pages[0]["copy"]["button"]
+
+
+@covers("GET /api/records/registration-forms", "POST /api/records/registration-forms")
+async def test_registration_forms_are_per_tenant(acme_registration):
+    client, _, _ = acme_registration
+    url = f"{API.removesuffix('/types')}/registration-forms"
+    assert [f["key"] for f in (await client.get(url, headers=as_(ACME))).json()] == [TYPE]
+    assert (await client.get(url, headers=as_(GLOBEX))).json() == []
+    made = await client.post(url, headers=as_(GLOBEX))
+    assert (made.status_code, made.json()) == (
+        201,
+        {"key": TYPE},
+    )  # acme's is not "taken" for globex
+    assert [f["key"] for f in (await client.get(url, headers=as_(ACME))).json()] == [TYPE]

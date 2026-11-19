@@ -7,15 +7,19 @@ the sweep itself (the lease, the tenants, the batches) stays there.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
 
-from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
+from sm_records.contracts.public_submissions import (
+    KIND_FORM,
+    KIND_REGISTRATION,
+    KIND_SUBSCRIPTION,
+)
 from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, tables_for
-from sm_records.public_submissions.retention_rules import PENDING, days_for, still_due
+from sm_records.public_submissions.retention_rules import PENDING, still_due, window_for
 from sm_records.records.index.query import Filter, FilterOp, filtered
 from sm_records.records.services._lock import lock_type
 from sm_records.records.services.records import hard_delete_record, soft_delete_record
@@ -29,13 +33,16 @@ def _due(rtype: RecordType, now: datetime, limit: int, skip: set[str]) -> Any:
     earlier than the record — that :func:`.retention_rules.still_due` narrows under the lock."""
     config = rtype.public_submissions or {}
     cls = tables_for(rtype).record
-    days = days_for(config)
-    if config.get("kind") not in (KIND_FORM, KIND_SUBSCRIPTION) or days <= 0:
+    window = window_for(config)
+    if (
+        config.get("kind") not in (KIND_FORM, KIND_SUBSCRIPTION, KIND_REGISTRATION)
+        or window is None
+    ):
         return None
     stmt = select(cls.uuid).where(
         cls.type_id == rtype.id,
         cls.tenant_id == bound_tenant(),
-        cls.created_at < now - timedelta(days=days),
+        cls.created_at < now - window,
     )
     if config.get("kind") == KIND_SUBSCRIPTION:
         pending = [Filter("sm_status", FilterOp.EQ, PENDING)]
