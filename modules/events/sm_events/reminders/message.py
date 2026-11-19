@@ -10,9 +10,9 @@ redirect link.
 
 Both parts are Jinja templates in one environment (:func:`environment`); the HTML part has
 autoescape on, so every value is escaped by the engine and no HTML is ever assembled by hand.
-A title or place is reduced to one line without control, direction or line-separator characters before it is used
-anywhere, the subject doubly so (``clean_subject``). Only ``http(s)`` links without credentials are
-ever shown.
+A title or place is reduced to one line without control, direction or line-separator
+characters before it is used anywhere, the subject doubly so (``clean_subject``). Only
+``http(s)`` links without credentials are ever shown.
 """
 
 from __future__ import annotations
