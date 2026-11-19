@@ -3,7 +3,8 @@
 Events PR 8: ``events_follow`` (one user's wish to be reminded a lead time before an event),
 ``events_reminder_sent`` (the at-most-once ledger of what was sent) and the nullable
 ``events_calendar.default_reminder_minutes`` (per-calendar default lead times; ``NULL`` means the
-install-wide setting). No data migration, no branch label (``events`` is already named by
+install-wide setting), and two indexes for the reminder beat (``ix_events_follow_lead``,
+``ix_events_event_start``). No data migration, no branch label (``events`` is already named by
 ``b8e1d0783868``).
 
 Revision ID: 19adf24acec2
@@ -53,6 +54,12 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_events_follow_user", "events_follow", ["tenant_id", "user_id"], unique=False
+    )
+    op.create_index(
+        "ix_events_follow_lead",
+        "events_follow",
+        ["tenant_id", "lead_minutes", "event_id"],
+        unique=False,
     )
     op.create_table(
         "events_reminder_sent",
@@ -104,6 +111,9 @@ def upgrade() -> None:
         ["tenant_id"],
         unique=False,
     )
+    op.create_index(
+        "ix_events_event_start", "events_event", ["tenant_id", "starts_at"], unique=False
+    )
     with op.batch_alter_table("events_calendar") as batch:
         batch.add_column(sa.Column("default_reminder_minutes", sa.JSON(), nullable=True))
 
@@ -111,10 +121,12 @@ def upgrade() -> None:
 def downgrade() -> None:
     with op.batch_alter_table("events_calendar") as batch:
         batch.drop_column("default_reminder_minutes")
+    op.drop_index("ix_events_event_start", table_name="events_event")
     op.drop_index(op.f("ix_events_reminder_sent_tenant_id"), table_name="events_reminder_sent")
     op.drop_index(op.f("ix_events_reminder_sent_event_id"), table_name="events_reminder_sent")
     op.drop_index("ix_events_reminder_sent_claimed", table_name="events_reminder_sent")
     op.drop_table("events_reminder_sent")
+    op.drop_index("ix_events_follow_lead", table_name="events_follow")
     op.drop_index("ix_events_follow_user", table_name="events_follow")
     op.drop_index(op.f("ix_events_follow_tenant_id"), table_name="events_follow")
     op.drop_index(op.f("ix_events_follow_event_id"), table_name="events_follow")

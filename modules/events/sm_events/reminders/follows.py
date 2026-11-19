@@ -40,6 +40,7 @@ from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Calendar, Event, EventFollow
 from sm_events.models.enums import EventStatus
 from sm_events.models.reminders import FOLLOW_CONSTRAINT
+from sm_events.reminders import candidates, due
 from sm_events.reminders import leads as lead_rules
 from sm_events.reminders.limits import FOLLOWS_PER_USER
 
@@ -54,7 +55,7 @@ class FollowState:
     defaults: tuple[int, ...]
     next_due: dict[int, datetime | None]
     """Per chosen lead, when its next reminder falls due (``None``: too late for the next
-    occurrence). The due maths arrives with the beat; until then every lead says ``None``."""
+    occurrence, or none is coming)."""
 
 
 def request_locale(request: Any, default: str) -> str:
@@ -142,20 +143,31 @@ async def _insert_missing(
                 raise
 
 
-def _state(chosen: tuple[int, ...], defaults: tuple[int, ...]) -> FollowState:
-    return FollowState(leads=chosen, defaults=defaults, next_due=dict.fromkeys(chosen))
+async def _state(
+    db: Any, event: Event, chosen: tuple[int, ...], defaults: tuple[int, ...], *, now: datetime
+) -> FollowState:
+    """The state, with when each chosen lead is next due (``None``: too late for the next
+    occurrence, or none is coming), from the occurrences read."""
+    if not chosen:
+        return FollowState(leads=(), defaults=defaults, next_due={})
+    starts = (await candidates.next_starts(db, [event], now=now))[event.id]
+    return FollowState(
+        leads=chosen,
+        defaults=defaults,
+        next_due={lead: due.next_due(starts, lead, now) for lead in chosen},
+    )
 
 
 async def get_follow(
     db: Any, who: ResourcePrincipal, event_id: uuid.UUID, *, settings: EventsSettings, now: datetime
 ) -> FollowState:
-    """The caller's leads on a published event they can see (``NotFound`` otherwise), and what
-    "Remind me" would preselect on its calendar."""
+    """The caller's leads on a published event they can see (``NotFound`` otherwise), what
+    "Remind me" would preselect on its calendar and when each lead is next due."""
     user_id = _user(who)
     event = await _event(db, who, event_id, published_only=True)
     chosen = tuple(sorted((await _own_leads(db, user_id)).get(event.id, ())))
     defaults = lead_rules.effective_defaults(settings, await _calendar(db, event))
-    return _state(chosen, defaults)
+    return await _state(db, event, chosen, defaults, now=now)
 
 
 async def set_follow(
@@ -181,7 +193,7 @@ async def set_follow(
     defaults = lead_rules.effective_defaults(settings, await _calendar(db, event))
     if not chosen:
         await _delete_event_rows(db, user_id, event.id)
-        return _state((), defaults)
+        return await _state(db, event, (), defaults, now=now)
     await _lock_user(db, user_id)
     own = await _own_leads(db, user_id)
     if event.id not in own and len(own) >= FOLLOWS_PER_USER:
@@ -213,7 +225,7 @@ async def set_follow(
     await _insert_missing(
         db, user_id, event.id, [lead for lead in chosen if lead not in have], locale=locale, now=now
     )
-    return _state(chosen, defaults)
+    return await _state(db, event, chosen, defaults, now=now)
 
 
 async def _delete_event_rows(db: Any, user_id: str, event_id: uuid.UUID) -> int:

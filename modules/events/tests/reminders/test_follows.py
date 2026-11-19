@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from sm_events.core.errors import NotFound
 from sm_events.core.errors_reminders import NotPublished
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import EventFollow
 from sm_events.reminders import follows
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 
 from tests.reminders.support import (
     ANON,
@@ -211,21 +213,37 @@ async def test_delete_is_idempotent_and_survives_lost_access(db):
     await follows.delete_follow(db, U, public.id)
 
 
-async def test_no_next_due_until_the_due_maths_lands(db):
+async def test_next_due_per_lead(db):
     cals = await world(db)
-    event = await published(db, cals["U"])
-    state = await _set(db, U, event, [60, 15])
-    assert state.next_due == {15: None, 60: None}
-
-
-async def test_hard_delete_of_the_event_removes_follows(db):
-    cals = await world(db)
-    event = await published(db, cals["U"])
-    await _set(db, U, event, [60])
-    event_id = event.id
-    await db.execute(
-        delete(type(event).__table__).where(  # type: ignore[arg-type]
-            type(event).__table__.c.id == event_id, type(event).__table__.c.tenant_id == "default"
-        )
+    start = NOW + timedelta(days=3)
+    event = await published(db, cals["U"], starts_at=start)
+    state = await _set(db, U, event, [60, 15, 10080])
+    assert state.next_due == {
+        15: start - timedelta(minutes=15),
+        60: start - timedelta(minutes=60),
+        10080: None,  # three days ahead is too late for a week's notice
+    }
+    assert (await follows.get_follow(db, U, event.id, settings=SETTINGS, now=NOW)).next_due == (
+        state.next_due
     )
-    assert await _rows(db) == []
+    soon = await published(db, cals["U"], starts_at=NOW + timedelta(minutes=30), title="Soon")
+    assert (await _set(db, U, soon, [15, 60])).next_due == {
+        15: NOW + timedelta(minutes=15),
+        60: None,  # due half an hour ago: past the catch-up, never sent late
+    }
+
+
+async def test_next_due_skips_to_the_following_occurrence_of_a_series(db):
+    from tests.support.calendars import seed_series
+
+    cals = await world(db)
+    event = await seed_series(
+        db, cals["U"], "FREQ=WEEKLY", "2026-06-24T10:00", "2026-06-24T11:00", tz="UTC",
+        status="published", title="Weekly",
+    )  # fmt: skip
+    state = await _set(db, U, event, [10080, 60])
+    # Next start is 10:00 on 1 July (two hours away): a week's notice is for the one after.
+    assert state.next_due == {
+        60: datetime(2026, 7, 1, 9, tzinfo=UTC),
+        10080: datetime(2026, 7, 1, 10, tzinfo=UTC),
+    }

@@ -26,6 +26,8 @@ class Event(Base, AuditMixin, SoftDeleteMixin, MultiTenantMixin, table=True):  #
         # The recurrence prefilter: rrule IS NOT NULL AND
         # (recurrence_until IS NULL OR recurrence_until >= :start).
         Index("ix_events_event_series", "tenant_id", "calendar_id", "recurrence_until"),
+        # PR 8's reminder beat: one-offs starting in a narrow window, whoever owns the calendar.
+        Index("ix_events_event_start", "tenant_id", "starts_at"),
         # PR 2's publish beat, read across tenants.
         Index("ix_events_event_publish_due", "status", "publish_at"),
     )

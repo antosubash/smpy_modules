@@ -43,6 +43,8 @@ class EventFollow(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported
         ),
         Index("ix_events_follow_event", "tenant_id", "event_id"),
         Index("ix_events_follow_user", "tenant_id", "user_id"),
+        # The beat: one lead's followed events, without touching the other leads' rows.
+        Index("ix_events_follow_lead", "tenant_id", "lead_minutes", "event_id"),
     )
 
     id: uuid.UUID = pk_uuid()

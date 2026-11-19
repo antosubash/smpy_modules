@@ -20,6 +20,7 @@ from sm_events.core.access.events import visible_events
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Calendar, Event, EventFollow, EventText
+from sm_events.reminders import candidates
 from sm_events.reminders.limits import MINE_PAGE_MAX
 from sm_events.web.services.events_out import pick_title
 
@@ -54,14 +55,6 @@ class MinePage:
     """Followed events they cannot (counted, never named)."""
     page: int
     page_size: int
-
-
-def _next_start(event: Event, now: datetime) -> datetime | None:
-    """A one-off's start while it is still ahead. A series' next occurrence needs the expansion
-    and its overrides, which the beat's candidate code brings; until then it says ``None``."""
-    if event.rrule is None and event.starts_at > now:
-        return event.starts_at
-    return None
 
 
 async def my_reminders(
@@ -140,6 +133,7 @@ async def _items(
         )
     ):
         leads.setdefault(event_id, []).append(lead)
+    upcoming = await candidates.next_starts(db, list(events.values()), now=now)
     default = settings.content_locales[0] if settings.content_locales else "en"
     out = []
     for event_id in ids:
@@ -153,7 +147,7 @@ async def _items(
                 lang=lang,
                 calendar=MineCalendar(calendar.id, calendar.name, calendar.color),
                 leads=tuple(sorted(leads[event_id])),
-                next_start=_next_start(event, now),
+                next_start=next(iter(upcoming[event_id]), None),
             )
         )
     return out

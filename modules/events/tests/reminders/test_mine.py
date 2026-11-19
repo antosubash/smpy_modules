@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sm_events.models import EventFollow, EventText
 from sm_events.reminders import limits, mine
@@ -135,3 +135,23 @@ async def test_follow_rows_are_not_loaded_across_users(db):
     await db.execute(update(EventFollow).values(locale="de"))
     got = await _page(db, U)
     assert got.items[0].leads == (60,)
+
+
+async def test_next_start_for_a_series_and_a_yearly_one(db):
+    from tests.support.calendars import seed_series
+
+    cals = await world(db)
+    weekly = await seed_series(
+        db, cals["U"], "FREQ=WEEKLY", "2026-06-24T10:00", "2026-06-24T11:00", tz="UTC",
+        status="published", title="Weekly",
+    )  # fmt: skip
+    yearly = await seed_series(
+        db, cals["U"], "FREQ=YEARLY", "2025-12-24T10:00", "2025-12-24T11:00", tz="UTC",
+        status="published", title="Xmas",
+    )  # fmt: skip
+    for event in (weekly, yearly):
+        db.add(follow_row(event))
+    await db.flush()
+    got = {i.title: i.next_start for i in (await _page(db)).items}
+    assert got["Weekly"] == datetime(2026, 7, 1, 10, tzinfo=UTC)
+    assert got["Xmas"] == datetime(2026, 12, 24, 10, tzinfo=UTC)

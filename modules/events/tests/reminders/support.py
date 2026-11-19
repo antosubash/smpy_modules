@@ -98,3 +98,27 @@ async def seed_http(client: Any, tenant: str = "default") -> dict[str, Any]:
             }
             await db.commit()
     return ids
+
+
+async def bulk_follows(db: Any, event_id: Any, users: list[str], lead: int = 60) -> None:
+    """Many followers of one event in one statement (a Core insert: the ORM is too slow here)."""
+    import uuid
+
+    from sm_events.models import EventFollow
+    from sqlalchemy import insert
+
+    await db.execute(
+        insert(EventFollow.__table__),
+        [
+            {
+                "tenant_id": "default",
+                "id": uuid.uuid4(),
+                "user_id": user,
+                "event_id": event_id,
+                "lead_minutes": lead,
+                "locale": "en",
+                "created_at": NOW,
+            }
+            for user in users
+        ],
+    )
