@@ -50,7 +50,9 @@ test.describe('Newsletter event card', () => {
       if (/NaN/.test(m.text())) nan.push(m.text());
     });
     const day = wednesday(2);
-    const listKey = 'members';
+    // Unique per run, so a CI retry on the same database can create it again; the plain key is only for
+    // the PR screenshots.
+    const listKey = process.env.E2E_SHOTS_DIR ? 'members' : `members_${Date.now().toString(36)}`;
     let campaignId = 0;
     let event = { id: '', revision: 0 };
     let slug = '';
