@@ -24,7 +24,7 @@ from urllib.parse import quote
 from fastapi import Request
 from simple_module_core.environments import NON_PROD_ENVIRONMENTS
 
-from sm_events.core import constants, locales
+from sm_events.core import constants, host_settings, locales
 from sm_events.core.tenancy import TenancyMode, mode_of
 
 __all__ = [
@@ -110,15 +110,11 @@ def api_path() -> str:
     return f"{_prefix}/{constants.SEGMENT_API}/occurrences"
 
 
-def _host_settings(app: Any) -> Any:
-    return getattr(getattr(app.state, "sm", None), "settings", None)
-
-
 def configured_origin(app: Any) -> str:
     """The host's ``public_base_url`` on a single-tenant host, else ``""``."""
     if mode_of(app) is not TenancyMode.SINGLE:
         return ""
-    return str(getattr(_host_settings(app), "public_base_url", "") or "").strip().rstrip("/")
+    return host_settings.public_base_url(app)
 
 
 def guessed(app: Any) -> bool:
@@ -143,7 +139,7 @@ def warn_if_unset(app: Any, mode: TenancyMode) -> bool:
     """Log once at startup when a production single-tenant host has no ``public_base_url``;
     returns whether it warned. Not on a multi-tenant host, where blank is right, nor in
     development or testing."""
-    environment = getattr(_host_settings(app), "environment", None)
+    environment = getattr(host_settings.host_settings(app), "environment", None)
     if not guessed(app) or environment in NON_PROD_ENVIRONMENTS:
         return False
     if mode is not TenancyMode.SINGLE:
