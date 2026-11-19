@@ -134,3 +134,24 @@ async def test_a_claim_in_flight_serialises_a_later_cancel(one):
             await db.execute(update(Event).where(Event.id == c.event_id).values(cancelled=True))
             await db.commit()
     assert await _count(state) == 1
+
+
+async def test_claim_once_on_sessions_without_the_framework_write_listeners(one):
+    """At-most-once must not depend on the session class carrying the framework's DML listeners:
+    on a plain ``async_sessionmaker`` the claim marks the session written itself, so it is
+    committed and exactly one of four racers holds it."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    state, c = one
+    plain = async_sessionmaker(state.engine, class_=AsyncSession, expire_on_commit=False)
+    assert "has_writes" not in plain().sync_session.info  # nothing wired it
+    got = await asyncio.gather(
+        *(ledger.claim(plain, c, tenant_id="default", now=NOW) for _ in range(4))
+    )
+    winners = [g for g in got if g is not None]
+    assert len(winners) == 1
+    assert await _count(state) == 1
+    held = winners[0]
+    assert await ledger.begin_send(plain, "default", held) is True  # committed, not rolled back
+    assert await ledger.begin_send(plain, "default", held) is False
+    assert await ledger.mark_sent(plain, "default", held.id, now=NOW) is True

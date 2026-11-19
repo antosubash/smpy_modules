@@ -86,7 +86,7 @@ async def _lost(db: Any, now: datetime) -> list[int]:
 
 
 async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[int], int, int]:
-    from simple_module_db import finalize_session
+    from simple_module_db import finalize_session, mark_written
 
     with tenant_scope(tenant):
         async with factory() as db:
@@ -94,6 +94,7 @@ async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[i
             lost = await _lost(db, now)
             tokens = await sweep_revoked(db, now=now)
             ledger = await reminder_cleanup.prune_ledger(db, now=now)
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
     return deleted, lost, tokens, ledger
 

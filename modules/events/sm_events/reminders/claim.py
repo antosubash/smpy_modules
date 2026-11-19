@@ -42,7 +42,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 from sqlalchemy import select, update
 from sqlalchemy.dialects import postgresql, sqlite
 
@@ -145,6 +145,7 @@ async def claim(factory: Any, c: Candidate, *, tenant_id: str, now: datetime) ->
     with tenant_scope(tenant_id):
         async with factory() as db:
             got = await _claim(db, c, tenant_id, now)
+            mark_written(db)  # Core DML: say so, whatever the session class listens for
             await finalize_session(db)
     return got
 
@@ -153,6 +154,7 @@ async def _mark(factory: Any, tenant_id: str, statement: Any) -> bool:
     with tenant_scope(tenant_id):
         async with factory() as db:
             changed = (await db.execute(statement)).rowcount
+            mark_written(db)
             await finalize_session(db)
     return bool(changed)
 

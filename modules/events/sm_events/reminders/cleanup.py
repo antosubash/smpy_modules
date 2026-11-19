@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import all_tenants as unscoped
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 from sqlalchemy import delete, select
 
 from sm_events.core.constants import reminders_limits as limits
@@ -63,6 +63,7 @@ async def _run(
         async with factory() as session:
             for statement in statements:
                 removed += int((await session.execute(statement)).rowcount or 0)
+            mark_written(session)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(session)
     return removed
 

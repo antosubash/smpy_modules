@@ -21,7 +21,7 @@ from typing import Any
 
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_db import all_tenants as unscoped
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 from sqlalchemy import or_, select, update
 
 from sm_events.core import constants
@@ -147,6 +147,7 @@ async def touch_last_used(factory: Any, row: TokenRow, *, now: datetime) -> None
                     )
                     .values(last_used_at=now)
                 )
+                mark_written(session)  # Core DML: mark it, whatever the session class listens for
                 await finalize_session(session)
     except Exception as exc:  # never the message: it can carry the address
         logger.warning("events: could not record a private feed use (%s)", type(exc).__name__)
