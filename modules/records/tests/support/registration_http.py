@@ -44,12 +44,17 @@ async def seed_event(db_state: Any, *, tenant: str = "default", **fields: Any) -
     """A public calendar and a published one-off with builtin registration of ``TYPE``."""
     from sm_events.core.tenancy import tenant_scope
     from sm_events.models import Calendar, Event, EventText, Visibility
+    from sqlalchemy import select
 
     with tenant_scope(tenant):
         async with db_state.session_factory() as db:
-            cal = Calendar(slug="pub", name="Pub", owner_id="o", visibility=Visibility.PUBLIC)
-            db.add(cal)
-            await db.flush()
+            cal = (
+                (await db.execute(select(Calendar).where(Calendar.slug == "pub"))).scalars().first()
+            )
+            if cal is None:
+                cal = Calendar(slug="pub", name="Pub", owner_id="o", visibility=Visibility.PUBLIC)
+                db.add(cal)
+                await db.flush()
             values = {
                 "status": "published",
                 "starts_at": SOON,
@@ -65,7 +70,14 @@ async def seed_event(db_state: Any, *, tenant: str = "default", **fields: Any) -
             event = Event(calendar_id=cal.id, **values)
             db.add(event)
             await db.flush()
-            db.add(EventText(event_id=event.id, locale="en", slug="open-day", title="Open day"))
+            db.add(
+                EventText(
+                    event_id=event.id,
+                    locale="en",
+                    slug=f"open-day-{event.id.hex[:8]}",
+                    title="Open day",
+                )
+            )
             await db.commit()
             return {"event_id": str(event.id), "key": str(event.id), "calendar_id": str(cal.id)}
 

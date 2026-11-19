@@ -98,7 +98,7 @@ async def test_every_submission_operation_documents_its_refusals(schema):
         "POST /api/records/submissions/confirm",
         "POST /api/records/submissions/unsubscribe",
     }
-    assert len(seen) == 4 and links <= set(seen), sorted(seen)
+    assert len(seen) == 5 and links <= set(seen), sorted(seen)  # PR 9: GET …/registration
     for name, operation in seen.items():
         codes = set(operation.get("responses", {}))
         assert "401" not in codes, f"{name} documents an auth refusal"

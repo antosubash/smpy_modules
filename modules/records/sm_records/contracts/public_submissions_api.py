@@ -18,6 +18,9 @@ from sqlmodel import Field, SQLModel
 __all__ = [
     "LinkResult",
     "NotificationQueued",
+    "RegistrationAvailability",
+    "RegistrationEventInfo",
+    "RegistrationView",
     "SubmissionAccepted",
     "SubmissionConsent",
     "SubmissionDefinition",
@@ -49,7 +52,7 @@ class SubmissionConsent(SQLModel):
 
 
 class SubmissionDefinition(SQLModel):
-    kind: Literal["form", "subscription"]
+    kind: Literal["form", "subscription", "registration"]
     schema_version: int
     fields: list[SubmissionField]
     consent: SubmissionConsent | None = None
@@ -63,6 +66,9 @@ class SubmissionDefinition(SQLModel):
     """How old ``token`` must be before a submission carrying it is accepted
     (``public_submissions_min_fill_seconds``); sooner is ``form_expired``. A
     form resending after a refresh waits this long."""
+    double_opt_in: bool | None = None
+    """Set only for the registration kind: whether the visitor must confirm by mail, which is what
+    the form's success text says."""
 
 
 class SubmitBody(SQLModel):
@@ -115,3 +121,31 @@ class LinkResult(SQLModel):
     link_expired`` otherwise); unsubscribe always answers ``unsubscribed``."""
 
     status: Literal["confirmed", "already_confirmed", "unsubscribed"]
+
+
+class RegistrationAvailability(SQLModel):
+    """What one occurrence offers now. Counts and states only: never who is registered."""
+
+    state: Literal["cancelled", "not_open_yet", "closed", "full", "open"]
+    seats_left: int | None = None
+    """Only when the event chose to show it."""
+    opens_at: str | None = None
+    closes_at: str | None = None
+
+
+class RegistrationEventInfo(SQLModel):
+    """The public facts a registration form shows: the same as the event's own page."""
+
+    title: str
+    when_text: str
+    venue_name: str | None = None
+    address: str | None = None
+
+
+class RegistrationView(SQLModel):
+    """``GET …/{type_key}/registration``. ``definition`` (with a registration token) is present
+    only while the occurrence is open and the type accepts registrations."""
+
+    availability: RegistrationAvailability
+    event: RegistrationEventInfo | None = None
+    definition: SubmissionDefinition | None = None

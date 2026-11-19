@@ -17,7 +17,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
+from sm_records.contracts.public_submissions import (
+    KIND_FORM,
+    KIND_REGISTRATION,
+    KIND_SUBSCRIPTION,
+)
 from sm_records.contracts.public_submissions_api import (
     SubmissionConsent,
     SubmissionDefinition,
@@ -37,12 +41,14 @@ from sm_records.records.services.types import get_type
 
 __all__ = [
     "EMAIL_KEY",
+    "REGISTRATION_NAME_KEY",
     "accepting_type",
     "consent_text",
     "definition",
     "form_digest",
     "page_locale",
     "public_fields_of",
+    "registration_definition",
 ]
 
 _LOCALE_RE = re.compile(LOCALE_PATTERN)
@@ -55,6 +61,10 @@ EMAIL_KEY = "sm_email"
 """A newsletter form's address input. Its key is the system field's own: the
 ``sm_`` prefix is reserved, so no ordinary field of the list can collide with
 it. The visitor fills it, and the server writes it (``public_submissions.subscribe``)."""
+
+
+REGISTRATION_NAME_KEY = "sm_name"
+"""A registration form's name input, written by the server like ``sm_email``."""
 
 
 async def accepting_type(db: AsyncSession, type_key: str) -> RecordType:
@@ -125,6 +135,11 @@ def _shown(
     if config.get("kind") == KIND_SUBSCRIPTION:
         email = next(entry for entry in field_defs(rtype) if entry.key == EMAIL_KEY)
         fields.insert(0, _field(email))
+    if config.get("kind") == KIND_REGISTRATION:
+        # The visitor fills the name and the address, in that order, before the questions the
+        # type asks (their keys are the system fields' own: ``sm_`` is reserved).
+        by_key = {entry.key: entry for entry in field_defs(rtype)}
+        fields[0:0] = [_field(by_key[REGISTRATION_NAME_KEY]), _field(by_key[EMAIL_KEY])]
     consent_cfg = config.get("consent") or {}
     text = consent_text(config, settings, page_locale(locale))
     consent = (
@@ -176,4 +191,34 @@ def definition(
         token=sign_form(secret, tenant, rtype.key, digest, now=issued),
         captcha=public_config(settings),
         min_fill_seconds=settings.public_submissions_min_fill_seconds,
+    )
+
+
+def registration_definition(
+    rtype: RecordType,
+    settings: RecordsSettings,
+    *,
+    secret: str,
+    tenant: str,
+    locale: str | None,
+    event_id: str,
+    occurrence_key: str,
+    issued: float | None = None,
+) -> SubmissionDefinition:
+    """The form for one occurrence, with a token that binds it (PR 9)."""
+    from sm_records.public_submissions.registration.tokens import sign_registration
+
+    fields, consent = _shown(rtype, settings, locale)
+    digest = _digest(rtype, fields, consent)
+    return SubmissionDefinition(
+        kind=KIND_REGISTRATION,  # type: ignore[arg-type]
+        schema_version=rtype.schema_version,
+        fields=fields,
+        consent=consent,
+        token=sign_registration(
+            secret, tenant, rtype.key, digest, event_id, occurrence_key, now=issued
+        ),
+        captcha=public_config(settings),
+        min_fill_seconds=settings.public_submissions_min_fill_seconds,
+        double_opt_in=bool((rtype.public_submissions or {}).get("double_opt_in", True)),
     )
