@@ -3,12 +3,17 @@
 Follow an event that starts in 16 minutes with the 15-minute lead and wait until the
 ``events.reminders`` beat has mailed it exactly once (the Delivery card's counts: one more
 ``sent``, nothing failed or unfinished). It needs a mail sender that really delivers (CI points
-the mail module's SMTP backend at a local ``aiosmtpd`` sink) and the host's ``SM_PUBLIC_BASE_URL``.
+the mail module's SMTP backend at a local ``aiosmtpd`` sink) and the host's public address
+**stored in the database** (``host.public_base_url``): the smoke refuses to run with
+``SM_PUBLIC_BASE_URL`` in its environment, because the variable would make a worker that never
+reads the database pass.
 """
 
 from __future__ import annotations
 
+import os
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -16,7 +21,17 @@ import httpx
 from bg_tasks_smoke_support import SmokeError, check, poll
 
 
+def require_database_only(environ: Mapping[str, str] = os.environ) -> None:
+    """The smoke proves the database-only configuration; the env var would mask a worker that
+    cannot read the stored address."""
+    if environ.get("SM_PUBLIC_BASE_URL"):
+        raise SmokeError(
+            "SM_PUBLIC_BASE_URL is set: store host.public_base_url in the database instead"
+        )
+
+
 def reminder_sent(client: httpx.Client, csrf: dict[str, str], timeout: float) -> dict[str, Any]:
+    require_database_only()
     api = "/api/events"
     rand = uuid.uuid4().hex[:8]
     status = check(client.get(f"{api}/reminders/status"), 200)

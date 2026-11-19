@@ -7,7 +7,8 @@ lost access, so a worker needs that answer.
 
 **The stopgap.** The worker builds the host's app *without starting its lifespan*, with the
 framework's own ``create_app(merge_host_settings())``, once per process and again after
-:data:`TTL_SECONDS` (so a changed ``public_base_url`` is picked up). The app is only a bag of
+`TTL_SECONDS`; every pass reads the stored settings (``public_base_url`` among them) into it, as
+the lifespan would. The app is only a bag of
 the real pieces: the user directory, the membership store, the permission registry and its grant
 sources, the host settings. On top of it the worker's principal is
 :func:`~sm_events.core.access.offline.offline_accounts`, the very code the web process uses for
@@ -128,6 +129,38 @@ async def _replay_overlay_default(app: Any, db: Any) -> None:
     await PermissionService(db, registry).load_all_into_registry()
 
 
+async def _hydrate_default(app: Any, db: Any) -> None:
+    """Read every registered settings object from the database into ``app.state``, as the
+    lifespan does at start (the worker's app never starts one) and a save on the Settings screen
+    does in the web process: ``host.public_base_url`` stored only in the database is otherwise
+    ``""`` here while the web side says it is set. Env still outranks the database (the
+    framework's own precedence)."""
+    from simple_module_core.module_settings import get_module_settings_registry
+    from simple_module_core.settings_hydrate import hydrate_settings
+    from simple_module_db.stored_settings import SessionOverrideSource, settings_table_exists
+
+    registry = get_module_settings_registry(app)
+    if registry is None or not await settings_table_exists(db):
+        return
+    store = SessionOverrideSource(db)
+    for package, cls in registry.items():
+        services = getattr(app.state, package, None)
+        if services is None:
+            continue
+        try:
+            services.settings = await hydrate_settings(cls, store, package, lenient=True)
+        except Exception as exc:  # keep what it had; the class only, a value can be a secret
+            logger.warning(
+                "events: could not read %s settings for the worker (%s)",
+                package,
+                type(exc).__name__,
+            )
+            await db.rollback()
+
+
+_hydrate: Any = _hydrate_default
+"""Replaced in a test of an app with no settings registry."""
+
 _replay_overlay: Any = _replay_overlay_default
 """Replaced by ``None`` in a test of a host without the permissions module."""
 
@@ -181,6 +214,11 @@ async def worker_runtime(db: Any) -> ReminderRuntime | None:
             _fail(exc)
             return None
         built = _built = _Built(app, now, os.getpid())
+    try:
+        await _hydrate(built.app, db)
+    except Exception as exc:
+        _fail(exc)
+        return None
     if _replay_overlay is not None and _permissions_installed():
         try:
             await _replay_overlay(built.app, db)

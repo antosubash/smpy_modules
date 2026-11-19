@@ -109,8 +109,9 @@ managers' delivery counts as "Not sent: too many reminders were due at once". A 
 1. **A mail transport that delivers.** The mail module's SMTP backend; the console backend only logs
    and reminders then report themselves unavailable. Mail goes only through `simple_module_core.mail`.
 2. **The host's `public_base_url`.** Links are built from it, never from a request's `Host`; unset, the
-   control is replaced by the reason and nothing is sent. (It is read from the live host settings, so
-   saving it on the Settings screen applies at once.)
+   control is replaced by the reason and nothing is sent. (It is read from the database on every pass in the worker, and from the live host settings in
+   the web process, so saving it on the Settings screen applies at once to both, with no
+   `SM_PUBLIC_BASE_URL` and no restart; the environment variable still outranks the database.)
 3. **A worker serving the `events` queue and a beat** (`make worker`, `make beat`), with a
    `SM_SECRET_KEY` in the environment or the database. The scheduler's absence **cannot be detected**:
    follows are accepted and nothing is mailed. The Reminders page does not say so; if nothing arrives, check
@@ -138,8 +139,8 @@ at claim time. A test pins the 30 s so a framework change is noticed.
 ## The headless worker app
 
 `worker_app.py` calls the framework's own `create_app(merge_host_settings())` **without starting its
-lifespan**, once per worker process (rebuilt after 10 minutes, so a new `public_base_url` is
-picked up). Measured on the demo host: about 16 s and 200 MB the first time, then nothing. It must run
+lifespan**, once per worker process (rebuilt after 10 minutes; the stored settings, `public_base_url`
+and the mail settings among them, are read from the database again on every pass). Measured on the demo host: about 16 s and 200 MB the first time, then nothing. It must run
 from the host's project root, as `make worker` does (the framework finds the host's templates there),
 imports no host package, and **never provisions a secret key**: with none in the environment or the
 database it refuses to build, because building would otherwise create the deployment's session key.

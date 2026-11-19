@@ -26,8 +26,9 @@ started (it caches them), and the bootstrap admin must exist. CI's
    ``events.reminders`` beat (every minute) has mailed it exactly once (the Delivery card's
    counts: one ``sent``, nothing failed or unfinished). It needs a mail sender that really
    delivers, so CI points the mail module's SMTP backend at a local ``aiosmtpd`` sink, and the
-   host's ``SM_PUBLIC_BASE_URL`` for the links; the headless worker app builds from the same
-   environment (``SM_SECRET_KEY``, ``SM_DATABASE_URL``).
+   host's public address for the links, stored in the database (``host.public_base_url``), not in
+   the environment: the headless worker app reads it from there each pass and builds from the
+   same environment (``SM_SECRET_KEY``, ``SM_DATABASE_URL``).
 
 Exits 0 when all settle, 1 with the last state seen otherwise.
 """

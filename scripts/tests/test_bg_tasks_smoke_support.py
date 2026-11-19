@@ -58,3 +58,11 @@ def test_poll_returns_when_done_and_raises_with_the_last_value(monkeypatch) -> N
     assert support.poll("counter", lambda: next(seen), lambda v: v == 3, 5) == 3
     with pytest.raises(support.SmokeError, match="never: not reached within 0 s; last seen 7"):
         support.poll("never", lambda: 7, lambda v: False, 0.01)
+
+
+def test_the_events_step_refuses_a_public_address_from_the_environment() -> None:
+    import bg_tasks_smoke_events as events
+
+    events.require_database_only({})
+    with pytest.raises(support.SmokeError, match="SM_PUBLIC_BASE_URL is set"):
+        events.require_database_only({"SM_PUBLIC_BASE_URL": "http://x"})
