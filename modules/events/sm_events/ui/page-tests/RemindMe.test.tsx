@@ -170,3 +170,33 @@ describe('RemindMe', () => {
     await b.unmount();
   });
 });
+
+describe('RemindMe cap message', () => {
+  it('links the cap message to the list where every follow can be removed', async () => {
+    const { view } = await open({
+      [`GET ${FOLLOW}`]: follow(),
+      [`PUT ${FOLLOW}`]: () => refusal(409, 'follow_limit'),
+    });
+    await click(control());
+    await click(text(/^Save$/));
+    await flush();
+    const link = [...document.querySelectorAll('a')].find((a) =>
+      /your reminders/i.test(a.textContent ?? ''),
+    );
+    expect(link?.getAttribute('href')).toBe('/admin/events/reminders');
+    await view.unmount();
+  });
+
+  it('offers no list link for another refusal', async () => {
+    const { view } = await open({
+      [`GET ${FOLLOW}`]: follow(),
+      [`PUT ${FOLLOW}`]: () => refusal(422, 'invalid_lead'),
+    });
+    await click(control());
+    await click(text(/^Save$/));
+    await flush();
+    expect(document.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.querySelector('a[href="/admin/events/reminders"]')).toBeNull();
+    await view.unmount();
+  });
+});

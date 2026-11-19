@@ -24,7 +24,7 @@ const REASONS: Record<string, string> = {
 export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: string }) {
   const { t, locale } = useT();
   const copy = keys.events.reminders.control;
-  const { state, saving, error, save, clearError } = useFollow(eventId);
+  const { state, saving, error, atCap, save, clearError } = useFollow(eventId);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<number[]>([]);
   const panel = useId();
@@ -138,7 +138,12 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
           </p>
           {error ? (
             <p role="alert" className="text-xs text-destructive">
-              {error}
+              {error}{' '}
+              {atCap ? (
+                <a className="underline" href="/admin/events/reminders">
+                  {t(copy.see_list)}
+                </a>
+              ) : null}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">

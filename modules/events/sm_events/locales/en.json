@@ -949,7 +949,8 @@
       "no_coming": "{lead}: no coming occurrence",
       "unavailable": "Reminders are not available on this site right now.",
       "time_zone": "Times are shown in your browser's time zone ({zone}); the event's zone is {event_zone}.",
-      "reason_note": "Why: {reason}"
+      "reason_note": "Why: {reason}",
+      "see_list": "See your reminders"
     },
     "leads": {
       "m15": "15 minutes before",

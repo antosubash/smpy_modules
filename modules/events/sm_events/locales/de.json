@@ -949,7 +949,8 @@
       "no_coming": "{lead}: kein kommender Termin",
       "unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
       "time_zone": "Zeiten in der Zeitzone deines Browsers ({zone}); die Zeitzone der Veranstaltung ist {event_zone}.",
-      "reason_note": "Grund: {reason}"
+      "reason_note": "Grund: {reason}",
+      "see_list": "Deine Erinnerungen ansehen"
     },
     "leads": {
       "m15": "15 Minuten vorher",
