@@ -286,6 +286,15 @@ FAMILIES: tuple[Family, ...] = (
         },
     ),
     Family(
+        "pinned transport hardening",
+        (
+            Copy("modules/images/sm_images/ingest/imports/netsafe.py"),
+            Copy("modules/events/sm_events/feeds/subscriptions/netsafe.py"),
+        ),
+        # The whole file is the copy: it closes the socket of a cancelled TLS handshake.
+        shared=None,
+    ),
+    Family(
         "SSRF address guard: entry points",
         (
             Copy("modules/images/sm_images/ingest/imports/url_safety.py"),
