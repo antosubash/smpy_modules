@@ -1,5 +1,7 @@
 # Events
 
+Reminders (emails before events a user follows): see [Reminders](reminders.md).
+
 [Installation, settings, screens and API](../README.md). The
 [approved design](../../../docs/superpowers/specs/2026-11-17-events-module-design.md)
 sets out the later calendar engine and integrations. [Writing a plugin](extensions.md) covers

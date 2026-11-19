@@ -5,7 +5,7 @@ multilingual categories, and events for SimpleModule hosts. Events have texts in
 each content language, one-off, all-day and recurring schedules, overrides for
 single occurrences, a review and publishing workflow, and a bounded occurrences
 read, a console calendar, and (from PR 4) a public site: pages, ICS feeds, JSON-LD and a
-sitemap. This is **PR 4 of 10**. See the [guide](docs/index.md), [public pages](docs/public.md), [blocks and cards](docs/blocks.md), [operating](docs/operations.md) and the
+sitemap. This is **PR 8 of 10**. See the [guide](docs/index.md), [public pages](docs/public.md), [blocks and cards](docs/blocks.md), [reminders](docs/reminders.md), [operating](docs/operations.md) and the
 [approved design](../../docs/superpowers/specs/2026-11-17-events-module-design.md).
 
 ## Install
@@ -44,6 +44,15 @@ With the `pagebuilder` extra, events adds an "Upcoming events" list and a read-o
 calendar" to pagebuilder's palette. They show only published events of public calendars,
 fetched when the page is viewed. `sm_events.contracts.cards` gives newsletter the same public
 projection for its Event card. See [blocks and cards](docs/blocks.md).
+
+## Reminders
+
+A signed-in user follows a published event ("Remind me") with one or more lead times (15 minutes, 1
+hour, 1 day, 1 week) and gets one email per occurrence and lead, at most once, from the `events.reminders`
+beat. It needs a worker and beat serving the `events` queue, a mail transport that delivers and the host's
+`public_base_url`; the control says why in words when reminders cannot be delivered. The worker grants no
+more access than a request would, so a user whose only right is the tenant membership role is told no mail
+will come (upstream #1005). See [Reminders](docs/reminders.md).
 
 ## Usage
 

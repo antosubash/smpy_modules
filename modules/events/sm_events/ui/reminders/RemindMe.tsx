@@ -94,7 +94,7 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
             close();
           }}
         >
-          {!follow.deliverable ? (
+          {!follow.deliverable && !following ? (
             <p role="status" className="text-xs text-destructive">
               {t(keys.events.errors.reminders_no_access)}
             </p>

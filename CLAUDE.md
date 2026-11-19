@@ -213,6 +213,17 @@ stored URL never carries credentials (`http_url`). A worker cannot re-check the 
 captured at apply expire after one hour (`rights_expired`); eager hosts re-check every slice. Log
 redaction covers the app only: redact `/feed/` in proxies and CDNs yourself.
 
+**Events reminders are at most once.** `events.reminders` claims a row in `events_reminder_sent`
+(unique per tenant, event, occurrence, start, recipient and lead) and commits it before the send. A
+`sending` row is never reclaimed and a failed send is never retried; only an expired `claimed` row
+(nothing handed to the transport) may be reclaimed. Recipients are re-checked at send time and fail
+closed (`reminders/recipients.py`), through a headless app the worker builds (`reminders/worker_app.py`:
+no lifespan, never provisions a secret key) whose principal grants no more than a request would (upstream
+#1005: the membership role is unreadable, so such a user is told in the request, never silently). Follows
+are personal: tenant- and user-bound, managers see counts only. User ids match **exactly** unless they are
+UUIDs (`core/user_ids.py`). Mail goes only through `simple_module_core.mail`, links come from the live
+`public_base_url`. Docs: `modules/events/docs/reminders.md`.
+
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
 which fields are public, the consent text and the recipients live on

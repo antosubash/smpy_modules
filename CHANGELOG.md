@@ -7,6 +7,18 @@ name the module they affect.
 
 ### Added
 
+- **events: reminders** (PR 8 of the events module). A signed-in user follows a published event
+  with lead times of 15 minutes, 1 hour, 1 day or 1 week and gets one email per occurrence and lead
+  from the new `events.reminders` beat (every minute, `events` queue): at most once (a claim row is
+  committed before any send, a failed or unfinished send is never retried), re-checked at send time,
+  never for a cancelled, skipped, unpublished or invisible occurrence, times in the event's zone. The
+  Reminders page lists a user's follows (an event they can no longer see is an opaque row they can
+  remove) and gives managers counts only; calendars can suggest their own lead times. Hosts run the
+  `events` migration `19adf24acec2`, add `events.reminders` to the worker's tasks (the `events` queue
+  is already served) and need a mail transport that delivers and `public_base_url`. The worker builds
+  the host app headless (about 16 s and 200 MB once per process, never provisioning a secret key) and
+  grants no more access than a request would. Events now depends on `babel` and `jinja2`.
+
 - **events and newsletter: the pagebuilder blocks and the event card** (PR 7 of the events module).
   Events contributes `UpcomingEvents` and `EventsCalendar` to pagebuilder's palette (the optional
   `pagebuilder` extra), reading three anonymous routes under `/api/events/public/`; they show only
