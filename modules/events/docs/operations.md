@@ -72,3 +72,10 @@ the answer parsed as a calendar. Loopback, link-local, multicast and the cloud m
 control endpoints (169.254.0.0/16, 100.100.100.200, 168.63.129.16, 192.0.0.192, fd00:ec2::/32 and
 every IPv6 form embedding one) are refused whatever the setting says. The user-visible failure
 codes are the same closed set either way. Turn it on only if an intranet calendar server needs it.
+
+Who may use an internal address is stored per subscription (`may_use_private`): it is set when the
+address is saved, from the saver's `events.manage`, and cleared when someone without it changes
+the address; it is never taken from a request. The worker applies it at every fetch and every
+redirect hop together with the setting above, and the setting being off always wins. If the saver
+later loses `events.manage` the flag stays until the address is edited; the status screen shows
+managers which subscriptions use internal addresses.

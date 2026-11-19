@@ -48,6 +48,7 @@ __all__ = [
     "address_allowed",
     "check",
     "effective",
+    "flag_after_save",
     "normalise",
     "resolve_allowed",
     "user_code",
@@ -117,6 +118,13 @@ class Policy:
 
 def effective(policy_setting: bool, *, may_use_private: bool) -> Policy:
     return Policy(allow_private=policy_setting, may_use_private=may_use_private)
+
+
+def flag_after_save(previous: bool, *, url_changed: bool, saver_may_use_private: bool) -> bool:
+    """The stored ``may_use_private`` after a save. A new or changed address takes the saver's
+    right (so a non-manager editing a manager's internal subscription clears it); any other edit
+    leaves it as it was and never grants it."""
+    return saver_may_use_private if url_changed else previous
 
 
 def user_code(error: UnsafeURLError) -> str:

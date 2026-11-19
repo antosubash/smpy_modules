@@ -57,6 +57,12 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
     public: bool = flag()
     """Whether anonymous visitors may see its items (only on a public calendar)."""
 
+    may_use_private: bool = flag()
+    """Whether the address may be an internal one: set at save from the saver's ``events.manage``
+    (never from a request body) and re-evaluated when the address changes. The intranet setting
+    must also be on, at every fetch and every redirect hop. Stays when the saver later loses the
+    permission, until the address is edited."""
+
     status: str = Field(default="pending", max_length=SUBSCRIPTION_STATUS_MAX)
     """One of ``constants.SUBSCRIPTION_STATUSES``."""
     error_code: str | None = Field(default=None, max_length=SUBSCRIPTION_CODE_MAX)

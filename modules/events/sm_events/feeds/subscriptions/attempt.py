@@ -27,7 +27,7 @@ from sm_events.feeds.importing.staging import effective_max_bytes
 from sm_events.feeds.subscriptions import lease, schedule, urls
 from sm_events.feeds.subscriptions.errors import FetchFailure
 from sm_events.feeds.subscriptions.fetch import FetchResult
-from sm_events.feeds.subscriptions.policy import Policy
+from sm_events.feeds.subscriptions.policy import effective
 from sm_events.feeds.subscriptions.store import store_feed
 from sm_events.models import Calendar, Subscription
 
@@ -43,6 +43,7 @@ class _Job:
     last_modified: str | None
     minutes: int
     calendar_tz: str
+    may_use_private: bool
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ async def _claim(
                     sub.refresh_minutes, settings.subscription_refresh_minutes
                 ),
                 calendar.default_timezone,
+                sub.may_use_private,
             )
             await finalize_session(db)
             return job
@@ -96,7 +98,9 @@ async def _fetch(
     try:
         return await fetcher(
             url,
-            policy=Policy(allow_private=settings.allow_private_subscription_urls),
+            policy=effective(
+                settings.allow_private_subscription_urls, may_use_private=job.may_use_private
+            ),
             etag=job.etag,
             last_modified=job.last_modified,
             max_bytes=effective_max_bytes(settings),
