@@ -174,7 +174,9 @@ async def test_list_and_the_provider_agree_for_every_user_and_type(reg_site):
     for name, (headers, who) in people.items():
         listed = {
             r["key"]
-            for r in (await reg_site.get("/api/records/registration-forms", headers=headers)).json()
+            for r in (
+                await reg_site.get("/api/records/registration-forms", headers=headers)
+            ).json()["items"]
         }
         for key in (TYPE, "restricted"):
             with tenant_scope("default"):
