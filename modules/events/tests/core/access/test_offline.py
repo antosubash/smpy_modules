@@ -259,3 +259,35 @@ async def test_multi_inactive_member_is_nobody(multi):
 def test_offline_user_is_a_plain_principal():
     user = OfflineUser(id="u", roles=("viewer",), tenant_id="default")
     assert user.permissions == () and user.scopes is None and user.required_permission is None
+
+
+async def test_accounts_in_one_batch(single):
+    """Several users at once: one directory call, the same answers as asking one at a time."""
+    from sm_events.core.access.offline import offline_accounts
+
+    app, state = single
+    directory = app.state.user_directory
+    calls = []
+    real = directory.get_many
+
+    async def counting(db, ids, **kw):
+        calls.append(list(ids))
+        return await real(db, ids, **kw)
+
+    directory.get_many = counting
+    async with state.session_factory() as db:
+        got = await offline_accounts(
+            app,
+            db,
+            user_ids=["viewer", "manager", "off", "idp", "nobody", "ghost", "viewer"],
+            tenant_id="default",
+            request=_request(app),
+        )
+    assert len(calls) == 1 and sorted(calls[0]) == sorted(set(calls[0]))
+    assert set(got) == {"viewer", "manager", "nobody"}  # inactive, unknown roles and unknown: out
+    assert got["viewer"].principal.permissions == frozenset({"events.view"})
+    assert got["viewer"].user.email == "viewer@example.com"
+    assert got["viewer"].roles == ("viewer",)
+    for user in ("viewer", "manager", "nobody"):
+        single_one = await _ask(app, state, user)
+        assert single_one == got[user].principal

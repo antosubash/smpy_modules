@@ -26,17 +26,28 @@ class Directory:
         self,
         users: dict[str, tuple[str, str | None, bool]] | None = None,
         roles: dict[str, tuple[str, ...] | None] | None = None,
+        verified: dict[str, bool | None] | None = None,
     ) -> None:
         self.users = users or {}
         self.roles = roles or {}
+        self.verified = verified or {}
+        self.get_many_calls = 0
         self.searches: list[str | None] = []
 
     def _user(self, uid: str, *, with_roles: bool = False) -> DirectoryUser:
         email, name, active = self.users[uid]
         roles = self.roles.get(uid, ()) if with_roles else None
-        return DirectoryUser(id=uid, email=email, full_name=name, is_active=active, roles=roles)
+        return DirectoryUser(
+            id=uid,
+            email=email,
+            full_name=name,
+            is_active=active,
+            roles=roles,
+            email_verified=self.verified.get(uid),
+        )
 
     async def get_many(self, db, ids, *, with_roles=False):
+        self.get_many_calls += 1
         return {i: self._user(i, with_roles=with_roles) for i in ids if i in self.users}
 
     async def search(self, db, term, *, limit):

@@ -25,6 +25,7 @@ have. Principals holding rights through platform roles or grant sources are unaf
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any
 
@@ -32,13 +33,13 @@ from fastapi import Request
 from simple_module_core.app_state import get_services
 from simple_module_core.resources import ResourcePrincipal
 from simple_module_core.tenancy import tenant_member_ids
-from simple_module_core.user_directory import get_user_directory
+from simple_module_core.user_directory import DirectoryUser, get_user_directory
 from simple_module_hosting.permissions import resolve_principal_permissions
 
 from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.core.tenancy import DEFAULT_TENANT, TenancyMode, mode_of, request_mode
 
-__all__ = ["OfflineUser", "feed_viewer", "offline_principal"]
+__all__ = ["OfflineAccount", "OfflineUser", "feed_viewer", "offline_accounts", "offline_principal"]
 
 
 @dataclass(frozen=True)
@@ -72,36 +73,56 @@ def _everyone_is_in(app: Any, tenant_id: str, request: Request | None) -> bool:
     return getattr(request.state, "tenant_id", None) in (None, DEFAULT_TENANT)
 
 
-async def _is_member(
-    app: Any, db: Any, user_id: str, tenant_id: str, request: Request | None
-) -> bool:
+async def _members(
+    app: Any, db: Any, user_ids: list[str], tenant_id: str, request: Request | None
+) -> set[str]:
+    """Which of ``user_ids`` are in the tenant: all of them on a single-tenant host, else the
+    membership store's answer, and nobody when there is no store (fail closed)."""
     if _everyone_is_in(app, tenant_id, request):
-        return True  # one tenant: every active account is in it
-    members = await tenant_member_ids(app, db, tenant_id, [user_id])
-    return members is not None and user_id in members
+        return set(user_ids)
+    members = await tenant_member_ids(app, db, tenant_id, user_ids)
+    return set() if members is None else members & set(user_ids)
 
 
-async def _resolve(
-    app: Any, db: Any, *, user_id: str, tenant_id: str, request: Request | None
-) -> tuple[ResourcePrincipal, tuple[str, ...], Any] | None:
-    """The principal, the roles the directory reported and the permission registry, or ``None``
-    for every doubt (see :func:`offline_principal`)."""
-    found = (await get_user_directory(app).get_many(db, [user_id], with_roles=True)).get(user_id)
-    if found is None or not found.is_active or found.roles is None:
-        return None
-    if not await _is_member(app, db, user_id, tenant_id, request):
-        return None
-    services = get_services(app)
-    registry = getattr(services, "permissions", None)
+@dataclass(frozen=True)
+class OfflineAccount:
+    """An account as the offline principal sees it: the directory's record (address, name,
+    ``email_verified``) and the principal that account holds in the tenant right now."""
+
+    user: DirectoryUser
+    principal: ResourcePrincipal
+    roles: tuple[str, ...]
+
+
+async def offline_accounts(
+    app: Any, db: Any, *, user_ids: Collection[str], tenant_id: str, request: Request | None
+) -> dict[str, OfflineAccount]:
+    """:func:`offline_principal` for many users at once, on one directory read
+    (``get_many(..., with_roles=True)``) and one membership read. A user missing from the answer
+    is unknown, deactivated, without reportable roles, not a member, or the host has no
+    permission registry: the caller cannot tell which, and must treat all as "no"."""
+    ids = sorted(set(user_ids))
+    if not ids:
+        return {}
+    registry = getattr(get_services(app), "permissions", None)
     if registry is None:
-        return None
-    roles = tuple(found.roles)
-    user = OfflineUser(id=user_id, roles=roles, tenant_id=tenant_id)
+        return {}
+    found = await get_user_directory(app).get_many(db, ids, with_roles=True)
+    live = {i: u for i, u in found.items() if u.is_active and u.roles is not None}
+    if not live:
+        return {}
     bare = request or Request(
         {"type": "http", "app": app, "headers": [], "method": "GET", "path": "/"}
     )
-    held = await resolve_principal_permissions(bare, user, registry)
-    return ResourcePrincipal(user_id=user_id, permissions=frozenset(held)), roles, registry
+    accounts: dict[str, OfflineAccount] = {}
+    for user_id in sorted(await _members(app, db, sorted(live), tenant_id, request)):
+        record = live[user_id]
+        roles = tuple(record.roles or ())
+        user = OfflineUser(id=user_id, roles=roles, tenant_id=tenant_id)
+        held = await resolve_principal_permissions(bare, user, registry)
+        principal = ResourcePrincipal(user_id=user_id, permissions=frozenset(held))
+        accounts[user_id] = OfflineAccount(user=record, principal=principal, roles=roles)
+    return accounts
 
 
 async def offline_principal(
@@ -114,8 +135,8 @@ async def offline_principal(
     host with no permission registry. ``request`` is handed to the grant sources, which take
     one; it is the feed request itself, anonymous, and a source must go by the ``user`` it is
     given. ``None`` (a worker) still resolves; grant sources then get a bare request."""
-    got = await _resolve(app, db, user_id=user_id, tenant_id=tenant_id, request=request)
-    return None if got is None else got[0]
+    got = await offline_accounts(app, db, user_ids=[user_id], tenant_id=tenant_id, request=request)
+    return got[user_id].principal if user_id in got else None
 
 
 async def feed_viewer(
@@ -124,14 +145,15 @@ async def feed_viewer(
     """The same person as :func:`offline_principal`, as a plugin source sees a viewer: roles from
     the directory (a source may narrow by role), the permissions the principal holds, and the
     role map. ``None`` under every doubt, and the feed then calls no plugin source for them."""
-    got = await _resolve(app, db, user_id=user_id, tenant_id=tenant_id, request=request)
-    if got is None:
+    got = await offline_accounts(app, db, user_ids=[user_id], tenant_id=tenant_id, request=request)
+    account = got.get(user_id)
+    if account is None:
         return None
-    who, roles, registry = got
+    registry = get_services(app).permissions
     role_map = getattr(registry, "role_map", None)
     return SourceViewer(
         user_id=user_id,
-        roles=roles,
-        permissions=who.permissions,
+        roles=account.roles,
+        permissions=account.principal.permissions,
         role_map=dict(role_map) if role_map is not None else None,
     )
