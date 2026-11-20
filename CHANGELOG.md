@@ -7,6 +7,29 @@ name the module they affect.
 
 ### Added
 
+- **events and records: event registration** (PR 9 of the events module). An event can offer
+  registration on this site: the editor's Registration section sets the seats, a window, whether the
+  remaining seats show and a reminder lead, and picks (or creates) a records registration form; the
+  public event page shows a panel that registers a visitor and says what the occurrence offers now
+  (open, few seats left, full, closed); "My registrations" lists a signed-in user's own and cancels
+  them. Events owns the seats (an atomic counter per occurrence that never oversells) and records owns
+  the person (the registration is a record of kind `registration`); `sm_events.contracts.registration`
+  is the seam. Hosts run the `events` migration `00a990d5c813`; records' `events` extra needs events
+  `>=0.0.16`. Limits to know: **a seat is taken when the address is confirmed** on a double opt-in form
+  (the default) and at submit on a single opt-in form, where anyone can take seats without confirming
+  an address (the editor warns, and a captcha is recommended); **there is no waitlist** (a confirmation
+  that finds the event full is refused and the record stays pending until it expires, one hour by
+  default); a submit always answers the same neutral 202 whether or not the address already
+  registered, and what happened is told only by mail; the public submit is bounded **per event** by
+  the form's total (`public_submissions_type_rate`, charged after the captcha), a higher per-event
+  attempts bucket, per IP (IPv6 by /64, now for every submission form) and per address (3 mails a
+  day), so raise the total before a large event opens; **the registration token and the panel carry
+  the event's internal id** (signed, not secret; it leaks nothing today, and slug-based public
+  surfaces are a tracked follow-up); the confirm and cancel links are the same signed pages as
+  records' other tokens and their `?t=` is redacted from logs (a proxy must do the same). A moved
+  event's registrations follow its new date; trashing an event keeps its registrations. See
+  `modules/records/docs/registration.md`.
+
 - **events: reminders** (PR 8 of the events module). A signed-in user follows a published event
   with lead times of 15 minutes, 1 hour, 1 day or 1 week and gets one email per occurrence and lead
   from the new `events.reminders` beat (every minute, `events` queue): at most once (a claim row is
