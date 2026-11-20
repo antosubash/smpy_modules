@@ -38,6 +38,7 @@ def upgrade() -> None:
         sa.Column("refresh_minutes", sa.Integer(), nullable=True),
         sa.Column("public", sa.Boolean(), nullable=False),
         sa.Column("may_use_private", sa.Boolean(), nullable=False),
+        sa.Column("policy_generation", sa.Integer(), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False),
         sa.Column("error_code", sa.String(length=40), nullable=True),
         sa.Column("last_http_status", sa.Integer(), nullable=True),

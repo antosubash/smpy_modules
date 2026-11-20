@@ -114,10 +114,13 @@ async def update(
         raise PublishRequired  # what the public sees is chosen with the publish right, every time
     if public and body.public is not None and not sub.public:
         rules.check_public(True, calendar, ctx)
-        rules.recheck_public(
-            sub, ctx
-        )  # an address that needs internal access cannot be shown publicly
-        sub.may_use_private = False
+        rules.recheck_public(sub, ctx)  # an address needing internal access cannot be public
+        if sub.may_use_private:
+            # What it stored came from an internal address: none of it may reach the public.
+            await _forget_items(db, sub)
+            sub.may_use_private = False
+            rules.make_due(sub, now)
+        sub.policy_generation += 1
     sub.public = public
     if body.label is not None:
         sub.label = body.label
@@ -138,6 +141,7 @@ async def update(
         if not rules.same_address([sub], url):  # a changed address, not the one it already has
             sub.url_enc, sub.url_display = urls.seal(url), display
             sub.etag = sub.last_modified = None
+            sub.policy_generation += 1
             sub.may_use_private = policy.flag_after_save(
                 sub.may_use_private,
                 url_changed=True,
@@ -195,6 +199,19 @@ async def refresh_now(
     sub.status, sub.next_fetch_at, sub.updated_at = "pending", now, now
     await db.flush()
     return sub
+
+
+async def _forget_items(db: Any, sub: Subscription) -> None:
+    """Delete the stored items and the validators that would skip a refetch, in this transaction."""
+    items = ExternalItem.__table__
+    await db.execute(
+        sa_delete(items).where(
+            items.c.tenant_id == bound_tenant(), items.c.subscription_id == sub.id
+        )
+    )
+    mark_written(db)  # Core DML: the ORM never sees it
+    sub.item_count, sub.last_counts = 0, {}
+    sub.etag = sub.last_modified = None
 
 
 async def delete(db: Any, who: ResourcePrincipal, sub_id: uuid.UUID, *, now: datetime) -> None:

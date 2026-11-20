@@ -78,7 +78,7 @@ may use it only if its saver held `events.manage` when the address was saved**; 
 per subscription, cleared when someone without that right changes the address, never taken from a
 request, and stays when the saver later loses the permission until the address is edited. It is
 applied at every fetch and redirect hop together with the setting (the setting off always wins).
-A public subscription is never an internal one. With the switch on, anyone who may add a
+A public subscription is never an internal one: turning one public deletes everything it stored from an internal address and fetches again under the public policy, and a fetch that started under another policy (public, internal access or the address changed meanwhile) stores nothing. With the switch on, anyone who may add a
 subscription and holds `events.manage` can make the server send GET requests to internal http(s)
 addresses, including services on its own private address, and see whether the answer parses as a
 calendar: turn it on only for trusted networks. The server's own addresses are not listed.

@@ -45,6 +45,8 @@ class _Job:
     calendar_tz: str
     may_use_private: bool
     public: bool
+    generation: int
+    """``policy_generation`` when the fetch started: the store discards a result of another."""
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,7 @@ async def _claim(
                 calendar.default_timezone,
                 sub.may_use_private,
                 sub.public,
+                sub.policy_generation,
             )
             await finalize_session(db)
             return job
@@ -160,6 +163,12 @@ async def _store(
             sub = await lease.fenced(db, sid, owner=owner, now=utc_now())
             if sub is None:
                 await db.rollback()
+                return Attempt("lease_lost")
+            if sub.policy_generation != job.generation:
+                # An edit changed the policy (public, internal access or the address) while this
+                # fetch ran: its result came from the old one and is discarded (due again).
+                await lease.release(db, sub)
+                await finalize_session(db)
                 return Attempt("lease_lost")
             stamp = utc_now()
             paused = sub.status == "paused"  # a pause made during the fetch outlives its result

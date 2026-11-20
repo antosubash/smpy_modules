@@ -63,6 +63,10 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
     must also be on, at every fetch and every redirect hop. Stays when the saver later loses the
     permission, until the address is edited."""
 
+    policy_generation: int = counter()
+    """Bumped whenever ``public``, ``may_use_private`` or the address changes. A fetch records the
+    value it started under and its result is discarded if the row has moved on."""
+
     status: str = Field(default="pending", max_length=SUBSCRIPTION_STATUS_MAX)
     """One of ``constants.SUBSCRIPTION_STATUSES``."""
     error_code: str | None = Field(default=None, max_length=SUBSCRIPTION_CODE_MAX)
