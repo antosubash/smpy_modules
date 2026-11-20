@@ -222,3 +222,57 @@ async def test_a_provider_without_its_key_charges_the_strict_budget_first(reg_si
     keyless = RecordsSettings(public_submissions_captcha_provider="turnstile")
     assert captcha.enforced(keyless) is False
     assert captcha.public_config(keyless) is None  # the widget and the order agree
+
+
+async def test_a_flood_on_one_event_leaves_the_forms_other_events_open(reg_site):
+    """One form serves many events: the strict total and the attempts bucket are keyed by the event
+    the verified token names, so exhausting one event does not block the others."""
+    configure(reg_site, **limits())
+    a = await seed_event(reg_site.db_state, uid="ea@x", registration_capacity=50)
+    b = await seed_event(reg_site.db_state, uid="eb@x", registration_capacity=50)
+    flood = [(await send(reg_site, a, n, None)).status_code for n in range(4)]
+    assert flood == [202, 202, 429, 429]
+    assert (await send(reg_site, b, 100, None)).status_code == 202
+
+
+async def test_forged_tokens_share_one_invalid_bucket(reg_site):
+    """A token that does not verify names no event and cannot mint buckets: all of them are
+    charged to one per-tenant bucket, so a flood of forgeries ends in 429 and spends nothing of
+    any real form's budget."""
+    from sm_records.public_submissions.abuse import ATTEMPTS_MULTIPLE
+
+    configure(reg_site, **limits())
+    event = await seed_event(reg_site.db_state, uid="fg@x", registration_capacity=50)
+    cap = 2 * ATTEMPTS_MULTIPLE
+    codes = []
+    for n in range(cap + 3):
+        forged = f"a.{n}.b.{event['event_id']}.{event['key']}.c"
+        got = await register(reg_site, f"x{n}@example.org", event=event, token=forged)
+        codes.append(got.status_code)
+    assert codes == [400] * cap + [429] * 3
+    assert (await send(reg_site, event, 999, None)).status_code == 202  # a real registrant is fine
+
+
+def test_ipv6_clients_are_bucketed_by_their_64():
+    from sm_records.public_submissions.abuse import ip_bucket
+
+    same = {ip_bucket("2001:db8:0:1::1"), ip_bucket("2001:db8:0:1:ffff:ffff:ffff:ffff")}
+    assert len(same) == 1
+    assert ip_bucket("2001:db8:0:2::1") not in same
+    assert ip_bucket("203.0.113.9") == "203.0.113.9" and ip_bucket("unknown") == "unknown"
+    assert ip_bucket("::ffff:203.0.113.9") == "203.0.113.9"  # a mapped IPv4 is the IPv4
+
+
+async def test_two_addresses_in_one_64_share_the_per_ip_limit(reg_site, monkeypatch):
+    from sm_records.public_submissions import abuse
+
+    configure(reg_site, **limits(public_submissions_rate_per_ip="2/minute"))
+    event = await seed_event(reg_site.db_state, uid="v6@x", registration_capacity=50)
+    sources = iter(f"2001:db8:0:7::{n:x}" for n in range(1, 10))
+    monkeypatch.setattr(abuse, "client_ip", lambda request: next(sources))
+    tokens = [await token(reg_site, event) for _ in range(3)]
+    codes = [
+        (await register(reg_site, f"p{n}@example.org", event=event, token=tokens[n])).status_code
+        for n in range(3)
+    ]
+    assert codes == [202, 202, 429]

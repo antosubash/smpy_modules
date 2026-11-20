@@ -38,15 +38,17 @@ confirmation. Use double opt-in for capacity-limited events (the event editor wa
 Three limits, then the captcha when one is configured. They are records' existing public-submission
 settings, shared with every other form:
 
-- **per IP:** `public_submissions_rate_per_ip`, 5 per 10 minutes;
-- **per form, in total:** `public_submissions_type_rate`, 60 per hour for everyone together. Every
+- **per IP:** `public_submissions_rate_per_ip`, 5 per 10 minutes (an IPv6 client is counted by its /64, for every submission form);
+- **per form and event, in total:** `public_submissions_type_rate`, 60 per hour for everyone together, counted separately for each event the form serves (the event the verified token names, never the body), so a flood on one event does not block the form's other events. Every
   accepted submit creates a pending record and mails an address the caller typed, so this is what
   bounds a distributed sender (it keeps the route from creating unbounded pending records or mailing
   unbounded distinct third-party addresses from the site's domain). Over it the route answers the
   same 429 with `Retry-After` as every other form, identical for every address;
 - **per address:** `public_submissions_confirm_rate_per_email`, 3 mails a day per form.
 
-Order on a registration submit with a captcha configured: per IP; a separate **attempts** bucket (ten times the form total, e.g. 600/hour for the default 60/hour), charged before the captcha provider is called, so a flood of wrong answers can neither call the provider nor run the pattern worker without bound; then the captcha; then the strict form total, charged right after the captcha passes and before the pattern check. A submit that fails the captcha consumes attempts, never the total, so a real registrant with a right answer still gets in. With no captcha configured nothing proves a human, so the strict total is charged first, as for any other form: recommend a captcha for capacity-limited public registration. Confirming and cancelling are not submits and are never counted. An attacker can exhaust the form
+A token that fails verification names no event: all of them share one per-tenant bucket (the attempts rate), so forged tokens cannot mint buckets or spend a real form's budget.
+
+Order on a registration submit with a captcha configured: per IP; a separate **attempts** bucket per event (ten times the form total, e.g. 600/hour for the default 60/hour), charged before the captcha provider is called, so a flood of wrong answers can neither call the provider nor run the pattern worker without bound; then the captcha; then the strict form total, charged right after the captcha passes and before the pattern check. A submit that fails the captcha consumes attempts, never the total, so a real registrant with a right answer still gets in. With no captcha configured nothing proves a human, so the strict total is charged first, as for any other form: recommend a captcha for capacity-limited public registration. Confirming and cancelling are not submits and are never counted. An attacker can exhaust the form
 total for one window and lock new submits out until it passes; nobody loses a seat they held (a seat
 is taken at confirmation). For a large event's opening minute an operator should raise
 `public_submissions_type_rate` (for example `600/hour`) on the Settings screen beforehand, and may add

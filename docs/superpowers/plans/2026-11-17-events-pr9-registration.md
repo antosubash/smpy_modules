@@ -206,11 +206,13 @@ paragraph of Ruling 23. Decided by the maintainer after review.
   bound and the captcha. The editor warns about it. Its public availability shows states only
   (open / few left / full), never an integer, so a public number cannot tell whether an address was
   new; the exact `seats_left` is public only for double opt-in forms with show-seats on.
-- **Abuse bounds** (records' own, shared with every submission form): per IP 5 per 10 minutes, per
-  address 3 mails a day per form. **No per-type budget for registrations** (records' existing
-  60/hour per type applies to the other kinds): a dozen rotating addresses would otherwise lock every
-  genuine registrant out. Mails go to whatever address was typed: records has no suppression list
-  (newsletter's is not visible to it), the same as its existing submission confirmations.
+- **Abuse bounds** (records' own, shared with every submission form): per IP 5 per 10 minutes (IPv6 by
+  /64), per address 3 mails a day per form. **The form's total (`public_submissions_type_rate`, 60 per
+  hour) applies to registrations too, per event**: keyed by the event the verified token names, and
+  charged only after the captcha has passed (a separate per-event attempts bucket, ten times the rate,
+  is charged before the provider is called; with no usable captcha the total is charged first). A token
+  that fails verification is charged to one per-tenant bucket. Mails go to whatever address was typed:
+  records has no suppression list, the same as its existing submission confirmations.
 - **Events that are not public answer a submit like an invalid token** (400 `form_expired`); a public
   event that is full, closed or cancelled says so.
 - **Lock order** and releases: one release call per bulk/cascade/purge turn; a database deadlock inside
