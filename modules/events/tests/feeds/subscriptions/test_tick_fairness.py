@@ -10,13 +10,11 @@ from datetime import timedelta
 import pytest
 from sm_events.core import constants
 from sm_events.core.tenancy import tenant_scope
-from sm_events.feeds.subscriptions import lease
 from sm_events.models import Subscription
 from sqlalchemy import update
 
 from tests.feeds.subscriptions.refresh_support import NOW, Fetcher, load, ok, seed, tick
 from tests.pg_support import USING_POSTGRES
-from tests.support.subscriptions import seed_calendar, seed_subscription
 
 pytestmark = pytest.mark.unbound_tenant
 OLD = NOW - timedelta(minutes=30)
@@ -70,8 +68,8 @@ async def test_other_tenants_normal_feeds_are_fetched_within_a_few_ticks(db_stat
     assert fetched == set(normal_b), (
         per_tick_by_tenant
     )  # all five within six ticks (two a tick: one calendar, every other minute)
-    for calls in per_tick_by_tenant:  # never more than the per-tenant share in one tick
-        assert calls.count("a") <= constants.SUBSCRIPTION_TICK_PER_TENANT
+    for calls in per_tick_by_tenant:  # a slow fetch ends the tick: at most one slow feed of a
+        assert calls.count("a") <= 1
 
 
 async def test_a_slow_fetch_ends_its_tenants_tick_and_pushes_the_feed_out(db_state):
@@ -127,60 +125,35 @@ async def test_the_slowdown_is_bounded(db_state):
     assert sub.next_fetch_at - now <= constants.SUBSCRIPTION_MAX_BACKOFF * 1.11  # + jitter
 
 
-async def test_one_host_is_fetched_once_per_floor_per_tenant(db_state):
-    ids = []
+async def test_the_slow_score_decays_by_one_per_fast_success(db_state):
+    (sid,) = await seed(db_state, tenant="a", slug="d", count=1, next_fetch_at=OLD)
     with tenant_scope("a"):
         async with db_state.session_factory() as db:
-            cal = await seed_calendar(db, "h")
-            for n in range(6):
-                sub = await seed_subscription(
-                    db, cal, label=f"s{n}", url=f"https://same.example/{n}.ics", next_fetch_at=OLD
-                )
-                ids.append(sub.id)
-            await db.commit()
-    fetcher = Fetcher(ok())
-    await tick(db_state, fetcher)
-    assert len(fetcher.calls) == 1  # six feeds, one host: one fetch
-    later = NOW + timedelta(seconds=constants.SUBSCRIPTION_HOST_FLOOR_SECONDS + 1)
-    await tick(db_state, fetcher, now=later)
-    assert len(fetcher.calls) == 2  # the next one after the floor, never several at once
-    other = Fetcher(ok())
-    await seed(db_state, tenant="b", slug="h", count=1, url="https://same.example/x.ics")
-    await tick(db_state, other, now=later)
-    assert len(other.calls) >= 1  # another tenant's feed on that host is not held back by a's
-
-
-async def test_a_create_delete_loop_starts_one_fetch_per_floor_window(db_state):
-    starts = 0
-    with tenant_scope("a"):
-        async with db_state.session_factory() as db:
-            cal = await seed_calendar(db, "loop")
-            await db.commit()
-        for n in range(6):
-            async with db_state.session_factory() as db:
-                sub = await seed_subscription(
-                    db, cal, label=f"l{n}", url=f"https://loop.example/{n}.ics", next_fetch_at=OLD
-                )
-                await db.commit()
-                if await lease.claim(db, sub.id, owner="w", now=NOW):
-                    starts += 1
-                await db.commit()
-                await db.execute(  # deleted, its lease cleared, before the fetch ends
-                    update(Subscription)
-                    .where(Subscription.id == sub.id)
-                    .values(is_deleted=True, lease_owner=None, lease_until=None)
-                    .execution_options(include_deleted=True)
-                )
-                await db.commit()
-    assert starts == 1
-    with tenant_scope("a"):
-        async with db_state.session_factory() as db:
-            late = NOW + timedelta(seconds=constants.SUBSCRIPTION_HOST_FLOOR_SECONDS + 1)
-            sub = await seed_subscription(
-                db, cal, label="after", url="https://loop.example/z.ics", next_fetch_at=OLD
+            await db.execute(
+                update(Subscription).where(Subscription.id == sid).values(slow_count=3)
             )
             await db.commit()
-            assert await lease.claim(db, sub.id, owner="w", now=late)
+    await tick(db_state, Fetcher(ok()))
+    assert (await load(db_state, sid, "a")).slow_count == 2  # lowered, not erased
+
+
+async def test_a_tenant_is_charged_for_the_seconds_it_uses_not_a_cliff(db_state):
+    """Feeds answering in 4 s (under the slow threshold) still use their tenant's share of the
+    tick: the tenant of fast feeds gets more fetches in it."""
+    clock = Clock()
+
+    class Timed(Fetcher):
+        async def __call__(self, url, **kw):
+            clock.t += 4.0 if "//t1-" in url else 0.2
+            return await super().__call__(url, **kw)
+
+    for tenant in ("t1", "t2"):
+        for n in range(12):
+            await seed(db_state, tenant=tenant, count=1, slug=f"c{n}", next_fetch_at=NOW)
+    fetcher = Timed(ok())
+    await tick(db_state, fetcher, now=NOW + timedelta(minutes=1), clock=clock)
+    tenants = [c["url"].split("//")[1].split("-")[0] for c in fetcher.calls]
+    assert tenants.count("t2") > tenants.count("t1")
 
 
 @pytest.mark.skipif(not USING_POSTGRES, reason="needs real concurrent connections")
@@ -194,4 +167,4 @@ async def test_concurrent_ticks_respect_the_per_tenant_pick_and_never_double_fet
     assert len(urls) == len(set(urls))  # no subscription fetched twice
     for fetcher in (first, second):
         mine = [c["url"] for c in fetcher.calls if "//a-" in c["url"]]
-        assert len(mine) <= constants.SUBSCRIPTION_TICK_PER_TENANT
+        assert len(mine) <= constants.SUBSCRIPTION_TICK_FETCHES

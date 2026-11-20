@@ -1051,6 +1051,7 @@
       "next_refresh": "Nächste Aktualisierung {when}",
       "events_count_one": "{count} Termin",
       "events_count_other": "{count} Termine",
+      "queued": "In der Warteschlange: wird in etwa {minutes} Minuten aktualisiert.",
       "internal": "Darf interne Adressen nutzen",
       "skipped": "{count} Termine ausgelassen",
       "skipped_reason": "{reason} ({count})"

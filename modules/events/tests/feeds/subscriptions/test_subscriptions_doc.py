@@ -77,6 +77,8 @@ NOT_LIMITS = {
     "URL_DISPLAY_MAX",
     "SUBSCRIPTION_STORE_CHUNK",
     "URL_HOST_MAX",
+    "SUBSCRIPTION_QUEUED_MINUTES",  # what refresh-now says, not a bound
+    "SUBSCRIPTION_TARGET_KEPT_HOURS",  # janitor retention of the server records (1 hour)
 }
 
 

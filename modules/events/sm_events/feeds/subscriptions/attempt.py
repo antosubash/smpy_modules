@@ -50,6 +50,12 @@ class _Job:
     public: bool
     generation: int
     """``policy_generation`` when the fetch started: the store discards a result of another."""
+    claimed_at: datetime
+    """The tick's time when the attempt was claimed: all an internal address's timestamps show."""
+
+    @property
+    def internal(self) -> bool:
+        return self.may_use_private and not self.public
 
 
 @dataclass(frozen=True)
@@ -91,6 +97,7 @@ async def _claim(
                 sub.may_use_private,
                 sub.public,
                 sub.policy_generation,
+                now,
             )
             await finalize_session(db)
             return job
@@ -135,9 +142,10 @@ async def _fetch(
 def _charge_slowness(sub: Subscription, stamp: datetime, seconds: float, *, failed: bool) -> None:
     """A slow fetch (``SUBSCRIPTION_SLOW_SECONDS``) pushes the next one out, doubling each time
     in a row up to ``SUBSCRIPTION_SLOW_MAX`` and never beyond ``SUBSCRIPTION_MAX_BACKOFF``; a fast
-    one resets it. A failure already backs off on its own, so only the count moves then."""
+    one lowers the score by one. A failure already backs off on its own, so only the count moves
+    then."""
     if seconds <= constants.SUBSCRIPTION_SLOW_SECONDS:
-        sub.slow_count = 0
+        sub.slow_count = max(0, sub.slow_count - 1)  # decays; one fast answer does not erase it
         return
     sub.slow_count = min(sub.slow_count + 1, constants.SUBSCRIPTION_SLOW_MAX)
     if not failed and sub.next_fetch_at is not None:
@@ -155,13 +163,22 @@ def _record_failure(
     sub: Subscription, failure: FetchFailure, job: _Job, stamp: datetime, rng: random.Random
 ) -> None:
     failures = sub.consecutive_failures + 1
+    code = _internal_code(failure.code) if job.internal else failure.code
+    # An internal address shows nothing status-specific: it backs off (and is disabled) by the
+    # collapsed code, and a server's own Retry-After is not believed, so neither the schedule nor
+    # the status tells a refused port, a 410 or a 429 apart.
     at, status = schedule.after_failure(
-        stamp, job.minutes, failures, failure.code, rng, retry_after=failure.retry_after
+        stamp,
+        job.minutes,
+        failures,
+        code,
+        rng,
+        retry_after=None if job.internal else failure.retry_after,
     )
-    sub.status, sub.error_code, sub.last_http_status = status, failure.code, failure.http_status
-    if job.may_use_private and not job.public:  # an internal address: show almost nothing
-        sub.error_code, sub.last_http_status = _internal_code(failure.code), None
+    sub.status, sub.error_code, sub.last_http_status = status, code, failure.http_status
     sub.consecutive_failures, sub.last_fetched_at, sub.next_fetch_at = failures, stamp, at
+    if job.internal:
+        sub.last_http_status = None
 
 
 def _record_success(
@@ -210,6 +227,8 @@ async def _store(
                 await finalize_session(db)
                 return Attempt("lease_lost")
             stamp = utc_now()
+            if job.internal:  # when it really finished would show how long it took: only the tick
+                stamp = job.claimed_at.replace(second=0, microsecond=0)
             paused = sub.status == "paused"  # a pause made during the fetch outlives its result
             received = 0
             if prepared is not None:
@@ -225,7 +244,7 @@ async def _store(
             if failure is not None and failure.code == "try_later":
                 # A server this tenant just contacted: not the feed's fault. Wait out the floor;
                 # nothing is recorded against the subscription and nothing is shown.
-                wait = failure.retry_after or constants.SUBSCRIPTION_HOST_FLOOR_SECONDS
+                wait = failure.retry_after or constants.SUBSCRIPTION_TARGET_SPACING_SECONDS
                 sub.next_fetch_at = stamp + timedelta(seconds=wait + rng.randint(0, 5))
                 await lease.release(db, sub)
                 await finalize_session(db)
@@ -241,7 +260,7 @@ async def _store(
             await finalize_session(db)
     if failure is not None:
         # The precise cause is for the operator; the address and its host never are.
-        log = logger.warning if job.may_use_private and not job.public else logger.info
+        log = logger.warning if job.internal else logger.info
         log("events subscription %s failed: %s", sid, failure.code)
         return Attempt("failed", received)
     return Attempt("not_modified" if outcome.status == "not_modified" else "stored", received)  # type: ignore[union-attr]

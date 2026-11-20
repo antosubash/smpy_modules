@@ -1052,6 +1052,7 @@
       "events_count_one": "{count} event",
       "events_count_other": "{count} events",
       "internal": "May use internal addresses",
+      "queued": "Queued: it will refresh within about {minutes} minutes.",
       "skipped": "{count} events left out",
       "skipped_reason": "{reason} ({count})"
     },

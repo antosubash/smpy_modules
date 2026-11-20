@@ -82,7 +82,7 @@ async def test_fair_across_tenants(db_state):
     fetcher = Fetcher()
     got = await tick(db_state, fetcher)
     hosts = [c["url"].split("//")[1][0] for c in fetcher.calls]
-    share = constants.SUBSCRIPTION_TICK_PER_TENANT
+    share = constants.SUBSCRIPTION_TICK_FETCHES // 2  # equal shares of the tick's budget
     assert got["tenants"] == 2 and hosts.count("a") == hosts.count("b") == share
 
 

@@ -68,6 +68,19 @@ async def create(
     ).scalar_one()
     if total >= constants.SUBSCRIPTIONS_PER_TENANT:
         raise SubscriptionLimit
+    mine = (
+        await db.execute(
+            select(func.count())
+            .select_from(Subscription.__table__)
+            .where(
+                Subscription.__table__.c.tenant_id == bound_tenant(),
+                Subscription.__table__.c.is_deleted.is_(False),
+                Subscription.__table__.c.created_by == (who.user_id or ""),
+            )
+        )
+    ).scalar_one()
+    if mine >= constants.SUBSCRIPTIONS_PER_OWNER:  # one member cannot take the whole allowance
+        raise SubscriptionLimit
     if rules.same_address(held, url):
         raise SubscriptionExists
     sub = Subscription(

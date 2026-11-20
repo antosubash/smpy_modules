@@ -82,3 +82,7 @@ class SubscriptionOut(BaseModel):
     last_counts: dict[str, Any]
     may_use_internal_addresses: bool
     version: str
+    queued: bool = False
+    """Set on a refresh-now answer when the refresh could not start yet: it will run on the beat
+    within about ``queued_minutes``."""
+    queued_minutes: int | None = None

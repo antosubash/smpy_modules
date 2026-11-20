@@ -9,6 +9,7 @@ import {
   type Subscription,
   subscriptionErrorText,
 } from '../utils/api-subscriptions';
+import { keys, translate } from '../utils/i18n';
 import { useGoneOnce, useRequestScope } from './useRequestScope';
 
 type Action = 'refresh' | 'pause' | 'resume' | 'delete';
@@ -28,6 +29,7 @@ export function useSubscriptions(calendarId: string, open: boolean, onGone?: () 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     const request = begin();
@@ -53,8 +55,16 @@ export function useSubscriptions(calendarId: string, open: boolean, onGone?: () 
   const act = useCallback(
     async (id: string, action: Action) => {
       setRowError(({ [id]: _dropped, ...rest }) => rest);
+      setNotes(({ [id]: _gone, ...rest }) => rest);
       try {
-        await run[action](id);
+        const answer = await run[action](id);
+        if (action === 'refresh' && answer && (answer as Subscription).queued) {
+          const minutes = (answer as Subscription).queued_minutes ?? 2;
+          setNotes((now) => ({
+            ...now,
+            [id]: translate(keys.events.subscriptions.row.queued, { minutes }),
+          }));
+        }
       } catch (e) {
         setRowError((now) => ({ ...now, [id]: subscriptionErrorText(e) }));
       }
@@ -62,5 +72,5 @@ export function useSubscriptions(calendarId: string, open: boolean, onGone?: () 
     },
     [load],
   );
-  return { items, loading, error, rowError, reload: load, act };
+  return { items, loading, error, rowError, notes, reload: load, act };
 }

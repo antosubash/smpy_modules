@@ -28,5 +28,5 @@ class FetchTarget(Base, MultiTenantMixin, table=True):  # ty: ignore[unsupported
 
     id: int | None = big_pk()
     ip: str = Field(max_length=45)
-    """A validated address, canonical form (an IPv6 one is at most 45 characters)."""
+    """The server: a validated IP, an IPv6 one as its /64 network (at most 45 characters)."""
     last_attempt_at: datetime = dt_required()

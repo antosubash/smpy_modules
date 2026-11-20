@@ -113,41 +113,53 @@ nothing and records nothing against the feeds.
 | Events kept per tenant | 50,000 | `SUBSCRIPTION_TENANT_ITEMS_MAX` |
 | Subscriptions per calendar | 10 | `SUBSCRIPTIONS_PER_CALENDAR` |
 | Subscriptions per tenant | 100 | `SUBSCRIPTIONS_PER_TENANT` |
+| Subscriptions per member (who added them) | 30 | `SUBSCRIPTIONS_PER_OWNER` |
 | Refresh interval, shortest / longest | 15 / 1,440 minutes | `SUBSCRIPTION_MIN_REFRESH_MINUTES` / `SUBSCRIPTION_MAX_REFRESH_MINUTES` |
 | Refresh now, per subscription | 300 s | `SUBSCRIPTION_REFRESH_NOW_SECONDS` |
 | Writes per signed-in user (add, edit, refresh, resume) | 20 per minute | `SUBSCRIPTION_WRITE_RATE` |
 | Failures in a row before it stops | 10 | `SUBSCRIPTION_MAX_FAILURES` |
 | Longest backoff and longest honoured Retry-After or max-age | 24 hours | `SUBSCRIPTION_MAX_BACKOFF` |
 | Fetches per tick | 20 | `SUBSCRIPTION_TICK_FETCHES` |
-| Subscriptions one tenant may start per tick, per calendar | 3 / 2 | `SUBSCRIPTION_TICK_PER_TENANT` / `SUBSCRIPTION_TICK_PER_CALENDAR` |
-| One tenant's fetches of one server (the validated IP, every redirect hop included), at most one per | 60 s | `SUBSCRIPTION_HOST_FLOOR_SECONDS` |
-| A slow fetch (longer than 10 s) pushes the next one out, doublings at most | 10 s / 4 | `SUBSCRIPTION_SLOW_SECONDS` / `SUBSCRIPTION_SLOW_MAX` |
+| Subscriptions a tick reads, per tenant and address host it selects | 200 / 5 | `SUBSCRIPTION_TICK_CANDIDATES` / `SUBSCRIPTION_TICK_PER_HOST` |
+| One tenant's connections to one server (the validated IP, an IPv6 one by its /64; every redirect hop included), at least this far apart | 3 s | `SUBSCRIPTION_TARGET_SPACING_SECONDS` |
+| A fetch longer than this is slow: its score rises (and its next fetch is pushed out), at most this many doublings; a fast success lowers it by one | 5 s / 4 | `SUBSCRIPTION_SLOW_SECONDS` / `SUBSCRIPTION_SLOW_MAX` |
 | Bytes received per tick | 50 MiB | `SUBSCRIPTION_TICK_BYTES` |
 | Seconds per tick | 45 s | `SUBSCRIPTION_TICK_SECONDS` |
 | Lease | 2 minutes | `SUBSCRIPTION_LEASE` |
 | Simultaneous fetches, install-wide / per tenant | 8 / 2 | `SUBSCRIPTION_MAX_CONCURRENT_FETCHES` / `SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT` |
 | Deleted subscriptions kept | 30 days | `SUBSCRIPTION_DELETED_KEPT_DAYS` |
 
-**Fairness.** What one tick starts is chosen in SQL before anything is fetched: at most three
-subscriptions per tenant and two per calendar (calendars in turn, the oldest first, feeds that have
-been slow after the others) and one per address host, so a tenant with a hundred overdue feeds
-cannot fill the tick. A fetch that takes longer than 10 s (valid or not) ends its tenant's turn
-for the tick and pushes that feed's next fetch out (doubling up to four times, never beyond a day);
-one fast success resets it. A tenant contacts one server at most once a minute, and the rule
-follows the address actually connected to, not the name typed: before connecting, the fetch records
-the validated IP (for the first request and every redirect hop; the smallest of a name's addresses
-stands for it) in one atomic statement, and a request that finds it contacted within the minute ends
-the fetch as "try later": the feed is simply due again after the floor, nothing is shown, and it
-counts neither as a failure nor as slow. So wildcard subdomains, a trailing dot, an IP in another
-spelling and many names redirecting to one server all share one floor. The record holds only the
-tenant, the IP and a time (no URL, name or secret), is purged by the janitor after a day and never
-logged. Per address name, the same minute is applied to the SQL-side selection as a cheap
-pre-filter, and survives deleting a subscription, so adding and removing feeds in a loop cannot
-hammer a third party or hold the fetch slots.
+**Throughput and fairness.** The tick's budget (20 fetches, 50 MiB, 45 s with a fetch starting only
+in its first 15) belongs to the tenants that have work: the tenant that has used the fewest seconds
+goes next (a fetch counts at least a second), so tenants share the time equally, a tenant of slow
+feeds uses up its own share and not another's, and a tenant alone, or with a short queue, leaves the
+rest to the others. Within a tenant, members take turns (every member's first feed before anyone's
+second) and, within a member, calendars; a provider's feeds (every calendar of one service shares
+a host) are selected up to five a tick, not one. At 15 minutes, the shortest interval, the 100
+subscriptions a tenant may hold need about 7 fetches a minute; a tick of fast fetches starts up to 20.
+Capacity is tested: 100 feeds on three hosts are all refreshed within one interval. A feed that takes
+longer than 5 s (valid or not) gets a rising slow score (pushed out, ordered after the others;
+a fast success lowers it by one, a feed answering in 4.9 s is still charged to its tenant's share by
+the seconds it uses). **Refresh now** answers "queued, within about 2 minutes" when the fetch has
+not run yet.
+
+**The server is the unit of politeness.** A tenant connects to one server at most once every 3
+seconds, and the rule follows the address actually connected to, not the name typed: before each
+connection (the first request, every redirect hop and every address a fetch tries) the fetch records
+the validated IP, an IPv6 one by its /64, in one atomic statement. A fetch that is early waits out the
+rest of the spacing; one that finds the server booked further ahead ends as "try later": the feed is
+due again after the spacing, nothing is shown, and it counts neither as a failure nor as slow. So
+wildcard subdomains, a trailing dot, an IP in another spelling, many names redirecting to one
+server or decoy addresses all share one spacing. The most one tenant can aim at one server is one
+request per 3 s, 20 a minute: also what its write limit (20 a minute) and its 100 subscriptions'
+300 s floors (100 per 300 s) allow in the worst case. The record holds only the tenant, the server
+and a time (no URL, name or secret), is purged by the janitor after an hour and never logged.
 
 The interval is the subscription's own or `subscription_refresh_minutes` (default 60), kept
 between 15 and 1,440 minutes and jittered by 10 %. A server's `Cache-Control: max-age` and
-`Retry-After` are believed (never shorter than our interval, never beyond a day). A failure backs
+`Retry-After` are believed (never shorter than our interval, never beyond a day), except for an
+internal address, which backs off the same whatever the server says and shows only when the tick
+ran, not when the fetch finished (so neither shows how long it took). A failure backs
 off exponentially (interval x 2^(n-1), at most a day). The **lease** must outlive a fetch's total
 timeout by a margin and no more, so a hung fetch frees its slot soon after it is cut off; the
 install-wide and per-tenant caps keep one tenant's hung feeds from holding every slot.

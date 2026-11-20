@@ -102,7 +102,7 @@ def upgrade() -> None:
         ),
         sa.Column("ip", sa.String(length=45), nullable=False),
         sa.Column("last_attempt_at", sa.DateTime(timezone=True), nullable=False),
-        sa.PrimaryKeyConstraint("id"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_events_fetch_target")),
     )
     op.create_index(
         "ix_events_fetch_target_attempt", "events_fetch_target", ["last_attempt_at"], unique=False

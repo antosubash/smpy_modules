@@ -71,13 +71,17 @@ async def test_expired_leases_free_their_slots(db_state, monkeypatch):
     assert await _claim(db_state, "a", second, now=later) is True
 
 
-def test_the_tick_starts_at_a_different_tenant_each_minute():
-    rows = [(t, n) for t in ("a", "b", "c") for n in range(2)]
-    firsts = {
-        refresh.rotate(rows, NOW.replace(second=0) + timedelta(minutes=m))[0][0] for m in range(3)
-    }
-    assert firsts == {"a", "b", "c"}
-    assert sorted(refresh.rotate(rows, NOW)) == sorted(rows)
+async def test_the_tick_starts_at_a_different_tenant_each_minute(db_state):
+    for tenant in ("a", "b", "c"):
+        await _due(db_state, tenant, 2)
+    firsts, every = set(), []
+    for minute in range(3):
+        queues, _slow = await refresh._due(
+            db_state.session_factory, NOW.replace(second=0) + timedelta(minutes=minute)
+        )
+        firsts.add(next(iter(queues)))
+        every.append(sorted(queues))
+    assert firsts == {"a", "b", "c"} and every == [["a", "b", "c"]] * 3
 
 
 @pytest.mark.skipif(not USING_POSTGRES, reason="needs real concurrent connections")

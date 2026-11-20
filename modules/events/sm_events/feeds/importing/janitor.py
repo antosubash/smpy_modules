@@ -124,12 +124,13 @@ async def _purge_subscriptions(db: Any, now: datetime) -> int:
 
 
 async def _purge_targets(db: Any, now: datetime) -> None:
-    """Server-contact records older than a day (nothing in them but an IP and a time)."""
+    """Server-contact records older than an hour (nothing in them but a server and a time)."""
     table = FetchTarget.__table__
     await db.execute(
         delete(table).where(
             table.c.tenant_id == bound_tenant(),
-            table.c.last_attempt_at < now - timedelta(days=1),
+            table.c.last_attempt_at
+            < now - timedelta(hours=constants.SUBSCRIPTION_TARGET_KEPT_HOURS),
         )
     )
     mark_written(db)  # Core DML: the ORM never sees it

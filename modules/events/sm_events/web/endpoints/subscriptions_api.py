@@ -55,9 +55,11 @@ def _out(sub, settings: EventsSettings, who) -> SubscriptionOut:
     )
 
 
-def _start(request: Request, db, sub, settings: EventsSettings) -> None:
+def _start(request: Request, db, sub, settings: EventsSettings) -> bool:
+    """Launch the fetch now. ``True`` when it is only queued: due later (a wait or a lease: the beat
+    picks it up) or sent to a worker that takes it up when it can; ``False`` when it ran inline."""
     if sub.next_fetch_at is None or sub.next_fetch_at > utcnow():
-        return  # due later (a floor or a lease): the beat picks it up
+        return True
     state = getattr(request.app.state, "sm", None)
     launch.refresh_one(
         db,
@@ -66,6 +68,7 @@ def _start(request: Request, db, sub, settings: EventsSettings) -> None:
         session_factory=getattr(getattr(state, "db", None), "session_factory", None),
         settings=settings,
     )
+    return not launch.celery_eager()
 
 
 @router.get("/calendars/{calendar_id}/subscriptions")
@@ -120,8 +123,11 @@ async def refresh_subscription(
     settings: EventsSettings = Depends(get_settings),
 ) -> SubscriptionOut:
     sub = await service.refresh_now(db, who, sub_id, now=utcnow())
-    _start(request, db, sub, settings)
-    return _out(sub, settings, who)
+    queued = _start(request, db, sub, settings)
+    out = _out(sub, settings, who)
+    if queued:  # say so: the fetch has not run yet and the screen would otherwise look unchanged
+        out.queued, out.queued_minutes = True, constants.SUBSCRIPTION_QUEUED_MINUTES
+    return out
 
 
 @router.post("/subscriptions/{sub_id}/pause")

@@ -77,6 +77,7 @@ export function SubscriptionsDialog({
               sub={sub}
               calendarColor={calendar.color}
               error={state.rowError[sub.id]}
+              note={state.notes[sub.id]}
               onAction={(action) => state.act(sub.id, action)}
               onEdit={() => setForm({ editing: sub })}
             />

@@ -9,6 +9,8 @@ type Props = {
   sub: Subscription;
   calendarColor: string;
   error: string | undefined;
+  /** What the last action said (a refresh that is only queued). */
+  note?: string;
   onAction: (action: 'refresh' | 'pause' | 'resume' | 'delete') => Promise<void>;
   onEdit: () => void;
 };
@@ -27,7 +29,7 @@ function skipped(sub: Subscription, t: ReturnType<typeof useT>['t']): string | n
   return `${t(copy.row.skipped, { count: total })}: ${reasons}`;
 }
 
-export function SubscriptionRow({ sub, calendarColor, error, onAction, onEdit }: Props) {
+export function SubscriptionRow({ sub, calendarColor, error, note, onAction, onEdit }: Props) {
   const { t, locale } = useT();
   const copy = keys.events.subscriptions;
   const when = (iso: string) => new Date(iso).toLocaleString(locale);
@@ -73,6 +75,11 @@ export function SubscriptionRow({ sub, calendarColor, error, onAction, onEdit }:
       {left ? <p className="text-muted-foreground">{left}</p> : null}
       {sub.may_use_internal_addresses ? (
         <p className="text-muted-foreground">{t(copy.row.internal)}</p>
+      ) : null}
+      {note ? (
+        <p role="status" className="text-muted-foreground" data-testid="subscription-queued">
+          {note}
+        </p>
       ) : null}
       {error ? (
         <p role="alert" className="text-destructive">

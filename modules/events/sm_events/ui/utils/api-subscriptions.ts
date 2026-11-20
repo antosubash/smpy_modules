@@ -25,6 +25,9 @@ export type Subscription = {
   may_use_internal_addresses: boolean;
   /** The token an edit sends back as `expected`. */
   version: string;
+  /** Only on a refresh-now answer: the fetch has not run yet and will within `queued_minutes`. */
+  queued?: boolean;
+  queued_minutes?: number | null;
 };
 export type SubscriptionInput = {
   url: string;

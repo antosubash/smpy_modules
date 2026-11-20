@@ -227,7 +227,7 @@ async def test_the_list_shows_status_for_managers_without_secrets(http):
         "id", "calendar_id", "url_display", "label", "color", "refresh_minutes",
         "effective_refresh_minutes", "public", "status", "error_code", "last_http_status",
         "last_fetched_at", "last_ok_at", "next_fetch_at", "consecutive_failures", "item_count",
-        "last_counts", "may_use_internal_addresses", "version",
+        "last_counts", "may_use_internal_addresses", "version", "queued", "queued_minutes",
     }  # fmt: skip
     assert URL not in str(item)
 
@@ -248,3 +248,31 @@ async def test_create_triggers_the_first_fetch_when_celery_is_eager(http, monkey
     assert (shown["status"], shown["item_count"]) == ("ok", 2)
     assert shown["last_ok_at"] is not None
     assert fetcher.calls[0]["policy"].intranet is False
+
+
+async def test_one_member_cannot_take_the_whole_tenant_allowance(http, monkeypatch):
+    monkeypatch.setattr(constants, "SUBSCRIPTIONS_PER_OWNER", 3)
+    cid = await calendar(http)
+    for n in range(3):  # at the limit
+        made = await add(http, cid, OWNER, url=f"https://o{n}.example.test/x.ics")
+        assert made.status_code == 201
+    over = await add(http, cid, OWNER, url="https://o3.example.test/x.ics")
+    assert (over.status_code, over.json()["code"]) == (409, "subscription_limit")  # past it
+    colleague = await add(http, cid, MANAGER, url="https://m0.example.test/x.ics")
+    assert colleague.status_code == 201  # another member's own count is separate
+    gone = (await add(http, cid, MANAGER, url="https://m1.example.test/x.ics")).json()["id"]
+    assert (await http.delete(f"{SUBS}/{gone}", headers=MANAGER)).status_code in (200, 204)
+
+
+@pytest.mark.parametrize("eager", [False, True])
+async def test_refresh_now_says_when_it_is_only_queued(http, monkeypatch, eager):
+    from sm_events.feeds.subscriptions import launch
+
+    monkeypatch.setattr(launch, "celery_eager", lambda: eager)
+    cid = await calendar(http)
+    sid = (await add(http, cid, OWNER)).json()["id"]
+    got = (await http.post(f"{SUBS}/{sid}/refresh", headers=OWNER)).json()
+    assert got["queued"] is (not eager)  # a message to a worker is queued; an inline run is not
+    assert got["queued_minutes"] == (None if eager else constants.SUBSCRIPTION_QUEUED_MINUTES)
+    other = (await http.get(f"{BASE}/{cid}/subscriptions", headers=OWNER)).json()[0]
+    assert other["queued"] is False  # only the refresh answer carries it

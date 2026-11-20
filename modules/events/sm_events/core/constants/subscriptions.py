@@ -33,6 +33,7 @@ __all__ = [
     "SCAN_FAILURE_CODES",
     "SOURCE_SUBSCRIPTIONS",
     "SUBSCRIPTIONS_PER_CALENDAR",
+    "SUBSCRIPTIONS_PER_OWNER",
     "SUBSCRIPTIONS_PER_TENANT",
     "SUBSCRIPTIONS_SOURCE_ICON",
     "SUBSCRIPTIONS_SOURCE_LABEL_KEY",
@@ -44,7 +45,6 @@ __all__ = [
     "SUBSCRIPTION_EXISTS_DETAIL",
     "SUBSCRIPTION_FAILURE_CODES",
     "SUBSCRIPTION_FETCH_SECONDS",
-    "SUBSCRIPTION_HOST_FLOOR_SECONDS",
     "SUBSCRIPTION_ITEMS_MAX",
     "SUBSCRIPTION_ITEM_LOCATION_MAX",
     "SUBSCRIPTION_ITEM_TITLE_MAX",
@@ -66,6 +66,7 @@ __all__ = [
     "SUBSCRIPTION_NOT_PAUSED_DETAIL",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_CODE",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_DETAIL",
+    "SUBSCRIPTION_QUEUED_MINUTES",
     "SUBSCRIPTION_REFRESH_NOW_SECONDS",
     "SUBSCRIPTION_SLOW_MAX",
     "SUBSCRIPTION_SLOW_SECONDS",
@@ -74,11 +75,13 @@ __all__ = [
     "SUBSCRIPTION_STATUSES",
     "SUBSCRIPTION_STATUS_MAX",
     "SUBSCRIPTION_STORE_CHUNK",
+    "SUBSCRIPTION_TARGET_KEPT_HOURS",
+    "SUBSCRIPTION_TARGET_SPACING_SECONDS",
     "SUBSCRIPTION_TENANT_ITEMS_MAX",
     "SUBSCRIPTION_TICK_BYTES",
+    "SUBSCRIPTION_TICK_CANDIDATES",
     "SUBSCRIPTION_TICK_FETCHES",
-    "SUBSCRIPTION_TICK_PER_CALENDAR",
-    "SUBSCRIPTION_TICK_PER_TENANT",
+    "SUBSCRIPTION_TICK_PER_HOST",
     "SUBSCRIPTION_TICK_SECONDS",
     "SUBSCRIPTION_URL_MAX",
     "SUBSCRIPTION_VERSION_MAX",
@@ -153,18 +156,26 @@ SUBSCRIPTION_DELETED_KEPT_DAYS: Final = 30
 
 # The beat (Ruling 15).
 SUBSCRIPTION_TICK_FETCHES: Final = 20
-SUBSCRIPTION_TICK_PER_TENANT: Final = 3
-"""Most subscriptions of one tenant one tick may start, chosen in SQL (oldest first, calendars in
-turn), so a tenant with a hundred overdue feeds cannot fill the tick."""
-SUBSCRIPTION_TICK_PER_CALENDAR: Final = 2
-SUBSCRIPTION_HOST_FLOOR_SECONDS: Final = 60
-"""Per tenant and address host: one attempt at a time and at most one a minute, counted from the
-moment an attempt is claimed and kept after the subscription is deleted, so adding and removing
-feeds cannot start unfloored fetches of a third party."""
-SUBSCRIPTION_SLOW_SECONDS: Final = 10
-"""A fetch that takes longer is slow: it costs its tenant the rest of the tick and pushes the
-feed's next fetch out (``SUBSCRIPTION_SLOW_MAX`` doublings at most, never beyond
-``SUBSCRIPTION_MAX_BACKOFF``); one fast success resets it."""
+SUBSCRIPTION_QUEUED_MINUTES: Final = 2
+"""What "refresh now" says when the fetch is queued and has not run yet: the beat takes it up on its
+next minute, and a slow fetch ahead of it can add one more."""
+SUBSCRIPTION_TICK_CANDIDATES: Final = 200
+"""Rows one tick reads (chosen fairly in SQL: owners and calendars in turn within a tenant, a
+tenant's first rows before anyone's second); the budgets below decide how many are fetched."""
+SUBSCRIPTION_TICK_PER_HOST: Final = 5
+"""Most subscriptions of one tenant on one address host one tick selects, so a provider's many
+feeds (all calendars of one service share a host) are served several at a time, not one."""
+SUBSCRIPTION_TARGET_SPACING_SECONDS: Final = 3
+"""Per tenant and validated server IP: connections are at least this far apart (a fetch that is
+early waits, up to this long), counted from the last connection and kept after a subscription is
+deleted. The most one tenant can aim at one server is one request per spacing, 20 a minute: the
+same as its write limit and as the 100 subscriptions' 300 s floors (100 / 300 s)."""
+SUBSCRIPTION_TARGET_KEPT_HOURS: Final = 1
+SUBSCRIPTION_SLOW_SECONDS: Final = 5
+"""A fetch that takes longer is slow: its score (``slow_count``) goes up, which orders the feed
+after the others and pushes its next fetch out (``SUBSCRIPTION_SLOW_MAX`` doublings at most, never
+beyond ``SUBSCRIPTION_MAX_BACKOFF``); each fast success lowers it by one. Separately the tick
+shares its seconds between tenants by seconds actually used, whatever any fetch's speed."""
 SUBSCRIPTION_SLOW_MAX: Final = 4
 SUBSCRIPTION_TICK_BYTES: Final = 50 * 1024 * 1024
 SUBSCRIPTION_TICK_SECONDS: Final = 45
@@ -179,6 +190,9 @@ it can overshoot by at most the number of claims racing at that instant."""
 # Limits (Ruling 23).
 SUBSCRIPTIONS_PER_CALENDAR: Final = 10
 SUBSCRIPTIONS_PER_TENANT: Final = 100
+SUBSCRIPTIONS_PER_OWNER: Final = 30
+"""Most live subscriptions one member (``created_by``) may hold, so one person cannot take the
+tenant's whole allowance."""
 SUBSCRIPTION_LABEL_MAX: Final = 100
 SUBSCRIPTION_ITEM_TITLE_MAX: Final = 300
 SUBSCRIPTION_BUSY_TITLE: Final = "Busy"

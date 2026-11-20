@@ -182,6 +182,19 @@ describe('SubscriptionsDialog', () => {
     await view.unmount();
   });
 
+  it('says so when a refresh is only queued', async () => {
+    const { view } = await open({
+      [`GET ${LIST}`]: [sub()],
+      'POST /api/events/subscriptions/s1/refresh': () =>
+        Response.json(sub({ status: 'pending', queued: true, queued_minutes: 2 }), { status: 202 }),
+    });
+    expect(document.querySelector('[data-testid="subscription-queued"]')).toBeNull();
+    await click(button('Refresh now') as HTMLElement);
+    await flush(50);
+    expect(text()).toContain('Queued: it will refresh within about 2 minutes.');
+    await view.unmount();
+  });
+
   it('shows the refresh_too_soon message for a 429', async () => {
     const { view } = await open({
       [`GET ${LIST}`]: [sub()],
