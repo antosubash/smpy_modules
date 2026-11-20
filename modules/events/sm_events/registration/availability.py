@@ -115,7 +115,9 @@ async def lookup(
     event row (Postgres), so a change that unpublishes or cancels it serialises with the caller."""
     stmt = public_events().where(Event.id == event_id)
     if lock:
-        stmt = stmt.with_for_update(read=True, of=Event)
+        # ``populate_existing``: an earlier read in this session (``describe``) already holds the
+        # row in the identity map, and a lock alone would hand back that stale instance.
+        stmt = stmt.with_for_update(read=True, of=Event).execution_options(populate_existing=True)
     event = (await db.execute(stmt)).scalars().first()
     if (
         event is None
@@ -124,7 +126,7 @@ async def lookup(
         or event.registration_target != target
     ):
         return None
-    occurrence = await load_resolved(db, event, key)
+    occurrence = await load_resolved(db, event, key, fresh=lock)
     return None if occurrence is None else Found(event, occurrence)
 
 

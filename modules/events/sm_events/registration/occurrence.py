@@ -105,8 +105,11 @@ def resolve_key(
     return ResolvedOccurrence(key, start, end, cancelled, day)
 
 
-async def load_resolved(db: Any, event: Event, key: str) -> ResolvedOccurrence | None:
-    """:func:`resolve_key` with the one override it needs read from the database."""
+async def load_resolved(
+    db: Any, event: Event, key: str, *, fresh: bool = False
+) -> ResolvedOccurrence | None:
+    """:func:`resolve_key` with the one override it needs read from the database; ``fresh`` re-reads
+    an override the session already holds (the read under the lock)."""
     original = original_start_of(event, key) if event.rrule is not None else None
     changes: list[OccurrenceOverride] = []
     if original is not None:
@@ -114,5 +117,7 @@ async def load_resolved(db: Any, event: Event, key: str) -> ResolvedOccurrence |
             OccurrenceOverride.event_id == event.id,
             OccurrenceOverride.original_start == original,
         )
+        if fresh:
+            stmt = stmt.execution_options(populate_existing=True)
         changes = list((await db.execute(stmt)).scalars().all())
     return resolve_key(event, changes, key)
