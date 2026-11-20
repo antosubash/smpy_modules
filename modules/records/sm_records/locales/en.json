@@ -922,7 +922,8 @@
     },
     "errors": {
       "form_expired": "This form has expired. Reload the page and try again.",
-      "rate_limited": "Too many attempts. Please wait {seconds} seconds and try again.",
+      "rate_limited": "Too many attempts. Please wait about {minutes} minutes and try again.",
+      "rate_limited_one": "Too many attempts. Please wait about 1 minute and try again.",
       "captcha_failed": "Please complete the security check and try again.",
       "captcha_unavailable": "The security check isn't available right now. Please try again in a few minutes.",
       "bad_origin": "This form can only be sent from this website.",

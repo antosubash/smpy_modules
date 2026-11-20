@@ -922,7 +922,8 @@
     },
     "errors": {
       "form_expired": "Dieses Formular ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es noch einmal.",
-      "rate_limited": "Zu viele Versuche. Bitte warten Sie {seconds} Sekunden und versuchen Sie es dann erneut.",
+      "rate_limited": "Zu viele Versuche. Bitte warten Sie etwa {minutes} Minuten und versuchen Sie es dann erneut.",
+      "rate_limited_one": "Zu viele Versuche. Bitte warten Sie etwa 1 Minute und versuchen Sie es dann erneut.",
       "captcha_failed": "Bitte schließen Sie die Sicherheitsprüfung ab und versuchen Sie es erneut.",
       "captcha_unavailable": "Die Sicherheitsprüfung ist gerade nicht verfügbar. Bitte versuchen Sie es in ein paar Minuten erneut.",
       "bad_origin": "Dieses Formular kann nur von dieser Website gesendet werden.",

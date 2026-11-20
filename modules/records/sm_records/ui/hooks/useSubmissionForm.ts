@@ -52,6 +52,7 @@ export function useSubmissionForm({
   const [captchaRound, setCaptchaRound] = useState(0);
   const captcha = useRef('');
   const inFlight = useRef(false);
+  const loadedAt = useRef(0);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [problem, setProblem] = useState<Problem | null>(null);
   const [changed, setChanged] = useState(false);
@@ -77,6 +78,7 @@ export function useSubmissionForm({
   const adopt = useCallback(
     (next: SubmissionDefinition, previous: FormValues = {}, keepCaptcha = false) => {
       setDefinition(next);
+      loadedAt.current = Date.now();
       setValues(valuesFor(next, previous));
       if (!keepCaptcha || !next.captcha) resetCaptcha();
     },
@@ -166,11 +168,21 @@ export function useSubmissionForm({
       }
     }
     const key = (result.code && BY_CODE[result.code]) || errors.generic;
-    refuse({ key, params: { seconds: result.retryAfter ?? 60 } });
+    const minutes = Math.max(1, Math.ceil((result.retryAfter ?? 60) / 60));
+    refuse({
+      key: result.code === 'rate_limited' && minutes === 1 ? errors.rate_limited_one : key,
+      params: { minutes },
+    });
   };
 
   const send = async (current: SubmissionDefinition, retried: boolean): Promise<void> => {
     setPhase('submitting');
+    if (!retried) {
+      // The server refuses a form younger than its minimum fill time, and every refusal counts
+      // against the per-IP limit: wait out what is left of it before the first send.
+      const age = (Date.now() - loadedAt.current) / 1000;
+      await wait(Math.max(0, (current.min_fill_seconds ?? 0) - age));
+    }
     let result: SubmitResult;
     try {
       result = await submitForm(typeKey, {
