@@ -154,6 +154,16 @@ async def _check_token(
     return rtype
 
 
+async def _charge_type(
+    request: Request, tenant: str, rtype: RecordType, settings: RecordsSettings
+) -> None:
+    await abuse.hit(
+        request,
+        abuse.rate_key(tenant, f"type={rtype.key}"),
+        settings.public_submissions_type_rate,
+    )
+
+
 async def submit(
     request: Request,
     db: AsyncSession,
@@ -180,12 +190,11 @@ async def submit(
         rtype = await _check_token(request, db, type_key, body, settings)
     # After the token: only a form this host signed counts against the type's
     # budget, so a flood of forged posts cannot use it up (or mint a counter
-    # per invented type key) and lock real visitors out.
-    await abuse.hit(
-        request,
-        abuse.rate_key(tenant, f"type={rtype.key}"),
-        settings.public_submissions_type_rate,
-    )
+    # per invented type key) and lock real visitors out. A registration is charged later, once
+    # the captcha and the form's own checks have passed (below): burning the form's total then
+    # costs an attacker one solved captcha per request instead of nothing.
+    if reg_token is None:
+        await _charge_type(request, tenant, rtype, settings)
     # After the token, so only a form this host signed costs a call to the
     # provider; before anything is read into a record or written.
     await captcha.verify(settings, body.captcha_response, ip)
@@ -204,6 +213,7 @@ async def submit(
     # write below validates with these verdicts instead of matching again.
     verdicts = await check_patterns(rtype, data)
     if reg_token is not None:
+        await _charge_type(request, tenant, rtype, settings)
         await register(request, db, rtype, data, address, name, reg_token, body, settings, verdicts)
         return
     if newsletter:

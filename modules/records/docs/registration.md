@@ -45,7 +45,7 @@ settings, shared with every other form:
   same 429 with `Retry-After` as every other form, identical for every address;
 - **per address:** `public_submissions_confirm_rate_per_email`, 3 mails a day per form.
 
-Confirming and cancelling are not submits and are never counted. An attacker can exhaust the form
+The form total is charged only after the token, the per-IP limit, the captcha and the form's own checks have passed, so burning it costs an attacker one solved captcha per request; a submit that fails any of them does not consume it. Without a captcha configured that order makes no difference, so a captcha is recommended for capacity-limited public registration. Confirming and cancelling are not submits and are never counted. An attacker can exhaust the form
 total for one window and lock new submits out until it passes; nobody loses a seat they held (a seat
 is taken at confirmation). For a large event's opening minute an operator should raise
 `public_submissions_type_rate` (for example `600/hour`) on the Settings screen beforehand, and may add

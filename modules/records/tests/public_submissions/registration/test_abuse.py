@@ -79,3 +79,38 @@ async def test_one_address_is_mailed_a_bounded_number_of_times(reg_site):
     }
     assert answers == {'{"ok":true}'}
     assert len([m for m in reg_site.outbox.sent if m.to == "same@example.org"]) == 3
+
+
+async def test_the_form_total_is_charged_only_after_the_captcha_passes(reg_site):
+    """N submits that fail the captcha leave the form's total untouched: burning it costs one
+    solved captcha per request."""
+    configure(
+        reg_site,
+        public_submissions_rate_per_ip="1000/minute",
+        public_submissions_type_rate="2/hour",
+        public_submissions_captcha_provider="turnstile",
+        public_submissions_captcha_site_key="k",
+        public_submissions_captcha_secret="s",
+    )
+    event = await seed_event(reg_site.db_state, uid="c@x", registration_capacity=10)
+    for n in range(5):
+        refused = await register(
+            reg_site, f"c{n}@example.org", event=event, token=await token(reg_site, event)
+        )
+        assert (refused.status_code, refused.json()["code"]) == (400, "captcha_failed")
+    configure(
+        reg_site,
+        public_submissions_rate_per_ip="1000/minute",
+        public_submissions_type_rate="2/hour",
+        public_submissions_captcha_provider="none",
+    )
+    got = [
+        (
+            await register(
+                reg_site, f"v{n}@example.org", event=event, token=await token(reg_site, event)
+            )
+        )
+        for n in range(3)
+    ]
+    assert [g.status_code for g in got] == [202, 202, 429]
+    assert got[2].headers.get("Retry-After")
