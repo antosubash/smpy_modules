@@ -16,10 +16,10 @@ from simple_module_db.deps import get_db
 
 from sm_events.core import constants
 from sm_events.core.clock import utcnow
+from sm_events.core.host_settings import public_base_url
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.subscriptions import launch, rules, service
-from sm_events.reminders.base_url import public_base_url
 from sm_events.web.endpoints.deps import Principal, get_settings, require_view
 from sm_events.web.endpoints.public import _urls
 from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut, SubscriptionPatch
