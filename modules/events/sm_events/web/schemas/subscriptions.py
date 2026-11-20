@@ -80,5 +80,5 @@ class SubscriptionOut(BaseModel):
     consecutive_failures: int
     item_count: int
     last_counts: dict[str, Any]
-    uses_internal_addresses: bool
+    may_use_internal_addresses: bool
     version: str

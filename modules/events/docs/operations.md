@@ -61,6 +61,18 @@ included, to `/setup`.
 exemption (`GET`/`HEAD` only), the rate limits and the 304. `tests/web/public/test_leaks*.py` is the
 leak harness: every public route is in its table, and a route that is not fails a test.
 
+## Subscriptions to external calendars (beat and worker)
+
+Subscriptions are refreshed in the background, so a host needs the same pieces as the reminders:
+a **beat** (`make beat`) that runs `events.refresh_subscriptions` every minute, and a **worker**
+on the `events` queue (`make worker`; one with `SM_SECRET_KEY` or the stored key, because the
+address is stored encrypted). Without a beat nothing refreshes on a schedule: a subscription is
+fetched only when someone adds it or presses Refresh, and only where tasks run inline
+(`SM_BG_TASKS_TASK_ALWAYS_EAGER`). Without a worker the due subscriptions stay "Waiting". With a
+worker that has no key, nothing is fetched and nothing is recorded against the feeds. Nothing in
+the application can tell whether the beat is running; the Subscriptions dialog shows a feed's
+"Next update" time, which stops moving when it is not.
+
 ## Subscriptions to internal calendars
 
 `allow_private_subscription_urls` (off by default) is a system setting: only someone with
@@ -77,8 +89,9 @@ Who may use an internal address is stored per subscription (`may_use_private`): 
 address is saved, from the saver's `events.manage`, and cleared when someone without it changes
 the address; it is never taken from a request. The worker applies it at every fetch and every
 redirect hop together with the setting above, and the setting being off always wins. If the saver
-later loses `events.manage` the flag stays until the address is edited; the status screen shows
-managers which subscriptions use internal addresses.
+later loses `events.manage` the flag stays until the address is edited; the Subscriptions dialog tells
+holders of `events.manage`, and only them, which subscriptions may use internal addresses (the API
+field `may_use_internal_addresses` is `false` for everyone else).
 
 The list of refused addresses is best-effort (providers add endpoints; a unique-local address that
 embeds a metadata IPv4 is refused too). Turn the switch on only for trusted networks.

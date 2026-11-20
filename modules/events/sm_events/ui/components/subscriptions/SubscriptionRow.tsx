@@ -71,7 +71,7 @@ export function SubscriptionRow({ sub, calendarColor, error, onAction, onEdit }:
         </p>
       ) : null}
       {left ? <p className="text-muted-foreground">{left}</p> : null}
-      {sub.uses_internal_addresses ? (
+      {sub.may_use_internal_addresses ? (
         <p className="text-muted-foreground">{t(copy.row.internal)}</p>
       ) : null}
       {error ? (

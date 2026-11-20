@@ -58,7 +58,8 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
     """Whether anonymous visitors may see its items (only on a public calendar)."""
 
     may_use_private: bool = flag()
-    """Whether the address may be an internal one: set at save from the saver's ``events.manage``
+    """(The API and the UI say ``may_use_internal_addresses``; the column keeps its first name.)
+    Whether the address may be an internal one: set at save from the saver's ``events.manage``
     (never from a request body) and re-evaluated when the address changes. The intranet setting
     must also be on, at every fetch and every redirect hop. Stays when the saver later loses the
     permission, until the address is edited."""
@@ -88,7 +89,10 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
 
     consecutive_failures: int = counter()
     generation: int = counter()
-    """Incremented once per full successful 200; items of an older generation are pruned."""
+    """Incremented once per full successful 200; items of an older generation are pruned. Not the
+    policy generation (``policy_generation`` / ``items_generation``, which say which address and
+    policy the stored items belong to), nor an item's ``seen_generation`` (the value of this
+    counter when the fetch last saw it)."""
     item_count: int = counter()
     last_counts: dict[str, Any] = json_col(dict)
     """``{stored, skipped, reasons: {code: n}}`` of the last stored fetch."""

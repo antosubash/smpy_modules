@@ -28,7 +28,7 @@ const sub = (over = {}) => ({
   consecutive_failures: 0,
   item_count: 214,
   last_counts: { stored: 214, skipped: 12, reasons: { unknown_timezone: 10, unsupported_rule: 2 } },
-  uses_internal_addresses: false,
+  may_use_internal_addresses: false,
   version: 'v1',
   ...over,
 });
@@ -163,7 +163,7 @@ describe('SubscriptionsDialog', () => {
 
   it('says when a subscription may use internal addresses, and only then', async () => {
     const { view } = await open({
-      [`GET ${LIST}`]: [sub({ uses_internal_addresses: true }), sub({ id: 's2', label: 'Other' })],
+      [`GET ${LIST}`]: [sub({ may_use_internal_addresses: true }), sub({ id: 's2', label: 'Other' })],
     });
     expect(text().match(/May use internal addresses/g)).toHaveLength(1);
     await view.unmount();

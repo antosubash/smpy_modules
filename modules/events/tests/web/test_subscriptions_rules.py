@@ -227,7 +227,7 @@ async def test_the_list_shows_status_for_managers_without_secrets(http):
         "id", "calendar_id", "url_display", "label", "color", "refresh_minutes",
         "effective_refresh_minutes", "public", "status", "error_code", "last_http_status",
         "last_fetched_at", "last_ok_at", "next_fetch_at", "consecutive_failures", "item_count",
-        "last_counts", "uses_internal_addresses", "version",
+        "last_counts", "may_use_internal_addresses", "version",
     }  # fmt: skip
     assert URL not in str(item)
 

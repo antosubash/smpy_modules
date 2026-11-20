@@ -48,8 +48,12 @@ def _context(request: Request, who, settings: EventsSettings) -> rules.Context:
     )
 
 
-def _out(sub, settings: EventsSettings) -> SubscriptionOut:
-    return service.to_out(sub, setting_minutes=settings.subscription_refresh_minutes)
+def _out(sub, settings: EventsSettings, who) -> SubscriptionOut:
+    return service.to_out(
+        sub,
+        setting_minutes=settings.subscription_refresh_minutes,
+        is_manager=who.has(constants.PERM_MANAGE),
+    )
 
 
 def _start(request: Request, db, sub, settings: EventsSettings) -> None:
@@ -72,7 +76,7 @@ async def list_subscriptions(
     db=Depends(get_db),
     settings: EventsSettings = Depends(get_settings),
 ) -> list[SubscriptionOut]:
-    return [_out(s, settings) for s in await service.list_for(db, who, calendar_id)]
+    return [_out(s, settings, who) for s in await service.list_for(db, who, calendar_id)]
 
 
 @router.post("/calendars/{calendar_id}/subscriptions", status_code=201)
@@ -88,7 +92,7 @@ async def create_subscription(
         db, who, calendar_id, body, _context(request, who, settings), now=utcnow()
     )
     _start(request, db, sub, settings)
-    return _out(sub, settings)
+    return _out(sub, settings, who)
 
 
 @router.patch("/subscriptions/{sub_id}")
@@ -105,7 +109,7 @@ async def update_subscription(
     )
     if sub.status == "pending" and "url" in body.model_fields_set:
         _start(request, db, sub, settings)
-    return _out(sub, settings)
+    return _out(sub, settings, who)
 
 
 @router.post("/subscriptions/{sub_id}/refresh", status_code=202)
@@ -118,7 +122,7 @@ async def refresh_subscription(
 ) -> SubscriptionOut:
     sub = await service.refresh_now(db, who, sub_id, now=utcnow())
     _start(request, db, sub, settings)
-    return _out(sub, settings)
+    return _out(sub, settings, who)
 
 
 @router.post("/subscriptions/{sub_id}/pause")
@@ -128,7 +132,7 @@ async def pause_subscription(
     db=Depends(get_db),
     settings: EventsSettings = Depends(get_settings),
 ) -> SubscriptionOut:
-    return _out(await service.pause(db, who, sub_id, now=utcnow()), settings)
+    return _out(await service.pause(db, who, sub_id, now=utcnow()), settings, who)
 
 
 @router.post("/subscriptions/{sub_id}/resume")
@@ -141,7 +145,7 @@ async def resume_subscription(
 ) -> SubscriptionOut:
     sub = await service.resume(db, who, sub_id, now=utcnow())
     _start(request, db, sub, settings)
-    return _out(sub, settings)
+    return _out(sub, settings, who)
 
 
 @router.delete("/subscriptions/{sub_id}", status_code=204)

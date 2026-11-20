@@ -158,16 +158,19 @@ async def test_a_manager_s_subscription_carries_the_flag_and_a_non_manager_s_doe
     cid = await calendar(http, OWNER_P)
     mine = (await add(http, cid, OWNER)).json()
     theirs = (await add(http, cid, MANAGER, url="https://other.example.test/a.ics")).json()
-    assert mine["uses_internal_addresses"] is False and theirs["uses_internal_addresses"] is True
+    assert (
+        mine["may_use_internal_addresses"] is False and theirs["may_use_internal_addresses"] is True
+    )
     # a non-manager changing the address of a manager's subscription clears the flag...
     edited = await http.patch(
         f"{SUBS}/{theirs['id']}", json={"url": "https://x.example.test/b.ics"}, headers=OWNER
     )
-    assert edited.status_code == 200 and edited.json()["uses_internal_addresses"] is False
+    assert edited.status_code == 200 and edited.json()["may_use_internal_addresses"] is False
     # ...while another edit leaves a manager's flag alone
     kept = (await add(http, cid, MANAGER, url="https://third.example.test/a.ics")).json()
     renamed = await http.patch(f"{SUBS}/{kept['id']}", json={"label": "Renamed"}, headers=OWNER)
-    assert renamed.json()["uses_internal_addresses"] is True
+    assert renamed.json()["may_use_internal_addresses"] is False  # not told to a non-manager
+    assert (await row(http, kept["id"])).may_use_private is True  # but kept
 
 
 async def test_writes_need_csrf(csrf_client):
@@ -186,3 +189,15 @@ async def test_writes_need_csrf(csrf_client):
         headers={**OWNER, "X-CSRF-Token": token},
     )
     assert ok.status_code == 201
+
+
+async def test_only_a_manager_is_told_that_an_address_may_be_internal(http):
+    cid = await calendar(http, OWNER_P)
+    theirs = (await add(http, cid, MANAGER, url="https://other.example.test/a.ics")).json()
+    assert theirs["may_use_internal_addresses"] is True  # the manager who saved it sees it
+    for headers in (OWNER, MANAGER):
+        got = await http.get(f"{BASE}/{cid}/subscriptions", headers=headers)
+        flag = got.json()[0]["may_use_internal_addresses"]
+        assert flag is (headers is MANAGER), headers  # the owner without manage gets false
+    edited = await http.patch(f"{SUBS}/{theirs['id']}", json={"label": "X"}, headers=OWNER)
+    assert edited.json()["may_use_internal_addresses"] is False

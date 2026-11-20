@@ -22,7 +22,7 @@ export type Subscription = {
   consecutive_failures: number;
   item_count: number;
   last_counts: { stored?: number; skipped?: number; reasons?: Record<string, number> };
-  uses_internal_addresses: boolean;
+  may_use_internal_addresses: boolean;
   /** The token an edit sends back as `expected`. */
   version: string;
 };

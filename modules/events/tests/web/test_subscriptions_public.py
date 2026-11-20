@@ -83,11 +83,11 @@ async def test_an_internal_address_cannot_be_public():
         made = (
             await add(client, cid, MANAGER_PUB, url="https://ok.example.test/a.ics", public=True)
         ).json()
-        assert made["uses_internal_addresses"] is False
+        assert made["may_use_internal_addresses"] is False
         assert (await row(client, made["id"])).may_use_private is False
         # an internal one made public loses the flag, and one needing it cannot be published
         internal = (await add(client, cid, MANAGER_PUB, url="http://10.0.0.5:8080/b.ics")).json()
-        assert internal["uses_internal_addresses"] is True
+        assert internal["may_use_internal_addresses"] is True
         got = await client.patch(
             f"{SUBS}/{internal['id']}", json={"public": True}, headers=MANAGER_PUB
         )

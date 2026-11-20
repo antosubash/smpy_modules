@@ -34,7 +34,7 @@ async def test_publishing_an_internal_subscription_drops_what_it_fetched(monkeyp
         made = (
             await add(client, cid, MANAGER_PUB, url="https://intranet.example.test/a.ics")
         ).json()
-        assert made["uses_internal_addresses"] is True
+        assert made["may_use_internal_addresses"] is True
         sub = await row(client, made["id"])
         async with client.db_state.session_factory() as db:
             await seed_item(
@@ -43,7 +43,7 @@ async def test_publishing_an_internal_subscription_drops_what_it_fetched(monkeyp
             await update_sub(db, etag='"v1"', last_modified="x", item_count=1)
             await db.commit()
         got = await client.patch(f"{SUBS}/{made['id']}", json={"public": True}, headers=MANAGER_PUB)
-        assert got.status_code == 200 and got.json()["uses_internal_addresses"] is False
+        assert got.status_code == 200 and got.json()["may_use_internal_addresses"] is False
         assert await _items(client) == []  # gone in the same transaction
         after = await row(client, made["id"])
         assert (after.etag, after.last_modified, after.item_count, after.status) == (
@@ -172,14 +172,14 @@ async def test_a_manager_switching_to_an_internal_address_drops_the_old_items(mo
         stub_launch(monkeypatch)
         cid = await calendar(client, OWNER_P, visibility="public")
         made = (await add(client, cid, PUBLISHER, url="https://a.example.test/a.ics")).json()
-        assert made["uses_internal_addresses"] is False
+        assert made["may_use_internal_addresses"] is False
         sub = await row(client, made["id"])
         async with client.db_state.session_factory() as db:
             await seed_item(db, sub, "s", datetime(2027, 3, 10, 9, tzinfo=UTC), title="Fetched")
             await db.commit()
         edit = {"url": "https://intranet.example.test/a.ics"}
         got = await client.patch(f"{SUBS}/{made['id']}", json=edit, headers=MANAGER_PUB)
-        assert got.json()["uses_internal_addresses"] is True
+        assert got.json()["may_use_internal_addresses"] is True
         assert await _items(client) == []
 
 

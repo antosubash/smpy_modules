@@ -218,7 +218,9 @@ async def list_for(db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID) -> l
     return await rules.live(db, calendar_id)
 
 
-def to_out(sub: Subscription, *, setting_minutes: int) -> SubscriptionOut:
+def to_out(sub: Subscription, *, setting_minutes: int, is_manager: bool = False) -> SubscriptionOut:
+    """The API shape. That an address may be internal says an intranet service exists, so only
+    ``events.manage`` holders are told (everyone else gets ``False``)."""
     return SubscriptionOut(
         id=sub.id,
         calendar_id=sub.calendar_id,
@@ -237,6 +239,6 @@ def to_out(sub: Subscription, *, setting_minutes: int) -> SubscriptionOut:
         consecutive_failures=sub.consecutive_failures,
         item_count=sub.item_count,
         last_counts=sub.last_counts,
-        uses_internal_addresses=sub.may_use_private,
+        may_use_internal_addresses=sub.may_use_private and is_manager,
         version=sub.updated_at.isoformat(),
     )
