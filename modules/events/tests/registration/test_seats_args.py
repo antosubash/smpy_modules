@@ -151,3 +151,42 @@ async def test_locale_fills_the_event_for_the_caller(db, cal):
     assert "Mittwoch" in got.event.when_text
     refused = await take(db, event, "h1", locale="de", target="nope")
     assert refused.event is None
+
+
+@pytest.mark.parametrize("name", ["provider", "holder"])
+async def test_length_bounds_at_the_limit_and_one_past(db, cal, name):
+    """``REGISTRATION_PROVIDER_MAX`` and ``REGISTRATION_HOLDER_MAX``: accepted at the limit,
+    refused (``ValueError``, nothing written) one past it."""
+    limit = {
+        "provider": constants.REGISTRATION_PROVIDER_MAX,
+        "holder": constants.REGISTRATION_HOLDER_MAX,
+    }[name]
+    event = await one_off(db, cal)
+
+    def args(size: int) -> dict:
+        return {
+            "tenant_id": "default",
+            "event_id": event.id,
+            "occurrence_key": str(event.id),
+            "provider": PROVIDER,
+            "target": KNOWN_TARGET,
+            "holder": "h1",
+            "now": NOW,
+            name: "x" * size,
+        }
+
+    # At the limit the value is valid: an unknown provider is refused as unavailable, not as bad input.
+    got = await admit(db, **args(limit))
+    assert got.admitted is (name == "holder")
+    with pytest.raises(ValueError):
+        await admit(db, **args(limit + 1))
+    base = {"tenant_id": "default", "provider": "x" * limit if name == "provider" else PROVIDER}
+    holders = ["x" * limit] if name == "holder" else ["h1"]
+    assert await release(db, holders=holders, **base) >= 0
+    with pytest.raises(ValueError):
+        await release(
+            db,
+            holders=["x" * (limit + 1)] if name == "holder" else ["h1"],
+            tenant_id="default",
+            provider="x" * (limit + 1) if name == "provider" else PROVIDER,
+        )
