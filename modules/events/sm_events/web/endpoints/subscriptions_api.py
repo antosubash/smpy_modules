@@ -52,6 +52,7 @@ def _out(sub, settings: EventsSettings, who) -> SubscriptionOut:
         sub,
         setting_minutes=settings.subscription_refresh_minutes,
         is_manager=who.has(constants.PERM_MANAGE),
+        internal_on=settings.allow_private_subscription_urls,
     )
 
 

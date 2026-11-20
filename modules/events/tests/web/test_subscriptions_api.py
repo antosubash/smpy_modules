@@ -25,6 +25,13 @@ async def http():
         yield client
 
 
+@pytest.fixture
+async def http_internal():
+    """A host with the intranet switch on: a manager's flag counts and is shown."""
+    async with app_client(allow_private_subscription_urls=True) as client:
+        yield client
+
+
 @pytest.mark.parametrize(
     ("who", "visibility", "status"),
     [
@@ -154,23 +161,27 @@ async def test_the_body_cannot_set_the_internal_flag_or_anything_unknown(http):
         assert (await add(http, cid, OWNER, **{field: "x"})).status_code == 422
 
 
-async def test_a_manager_s_subscription_carries_the_flag_and_a_non_manager_s_does_not(http):
-    cid = await calendar(http, OWNER_P)
-    mine = (await add(http, cid, OWNER)).json()
-    theirs = (await add(http, cid, MANAGER, url="https://other.example.test/a.ics")).json()
+async def test_a_manager_s_subscription_carries_the_flag_and_a_non_manager_s_does_not(
+    http_internal,
+):
+    cid = await calendar(http_internal, OWNER_P)
+    mine = (await add(http_internal, cid, OWNER)).json()
+    theirs = (await add(http_internal, cid, MANAGER, url="https://other.example.test/a.ics")).json()
     assert (
         mine["may_use_internal_addresses"] is False and theirs["may_use_internal_addresses"] is True
     )
     # a non-manager changing the address of a manager's subscription clears the flag...
-    edited = await http.patch(
+    edited = await http_internal.patch(
         f"{SUBS}/{theirs['id']}", json={"url": "https://x.example.test/b.ics"}, headers=OWNER
     )
     assert edited.status_code == 200 and edited.json()["may_use_internal_addresses"] is False
     # ...while another edit leaves a manager's flag alone
-    kept = (await add(http, cid, MANAGER, url="https://third.example.test/a.ics")).json()
-    renamed = await http.patch(f"{SUBS}/{kept['id']}", json={"label": "Renamed"}, headers=OWNER)
+    kept = (await add(http_internal, cid, MANAGER, url="https://third.example.test/a.ics")).json()
+    renamed = await http_internal.patch(
+        f"{SUBS}/{kept['id']}", json={"label": "Renamed"}, headers=OWNER
+    )
     assert renamed.json()["may_use_internal_addresses"] is False  # not told to a non-manager
-    assert (await row(http, kept["id"])).may_use_private is True  # but kept
+    assert (await row(http_internal, kept["id"])).may_use_private is True  # but kept
 
 
 async def test_writes_need_csrf(csrf_client):
@@ -191,27 +202,27 @@ async def test_writes_need_csrf(csrf_client):
     assert ok.status_code == 201
 
 
-async def test_only_a_manager_is_told_that_an_address_may_be_internal(http):
-    cid = await calendar(http, OWNER_P)
-    theirs = (await add(http, cid, MANAGER, url="https://other.example.test/a.ics")).json()
+async def test_only_a_manager_is_told_that_an_address_may_be_internal(http_internal):
+    cid = await calendar(http_internal, OWNER_P)
+    theirs = (await add(http_internal, cid, MANAGER, url="https://other.example.test/a.ics")).json()
     assert theirs["may_use_internal_addresses"] is True  # the manager who saved it sees it
     for headers in (OWNER, MANAGER):
-        got = await http.get(f"{BASE}/{cid}/subscriptions", headers=headers)
+        got = await http_internal.get(f"{BASE}/{cid}/subscriptions", headers=headers)
         flag = got.json()[0]["may_use_internal_addresses"]
         assert flag is (headers is MANAGER), headers  # the owner without manage gets false
-    edited = await http.patch(f"{SUBS}/{theirs['id']}", json={"label": "X"}, headers=OWNER)
+    edited = await http_internal.patch(f"{SUBS}/{theirs['id']}", json={"label": "X"}, headers=OWNER)
     assert edited.json()["may_use_internal_addresses"] is False
 
 
-async def test_a_non_manager_sees_one_generic_failure_for_an_internal_subscription(http):
+async def test_a_non_manager_sees_one_generic_failure_for_an_internal_subscription(http_internal):
     from datetime import UTC, datetime
 
     from sm_events.models import Subscription
     from sqlalchemy import update
 
-    cid = await calendar(http, OWNER_P)
-    theirs = (await add(http, cid, MANAGER, url="https://other.example.test/a.ics")).json()
-    async with http.db_state.session_factory() as db:
+    cid = await calendar(http_internal, OWNER_P)
+    theirs = (await add(http_internal, cid, MANAGER, url="https://other.example.test/a.ics")).json()
+    async with http_internal.db_state.session_factory() as db:
         await db.execute(
             update(Subscription).values(
                 status="error", error_code="not_a_calendar", last_http_status=None,
@@ -220,5 +231,5 @@ async def test_a_non_manager_sees_one_generic_failure_for_an_internal_subscripti
         )  # fmt: skip
         await db.commit()
     for headers, code in ((MANAGER, "not_a_calendar"), (OWNER, "url_unreachable")):
-        got = (await http.get(f"{BASE}/{cid}/subscriptions", headers=headers)).json()[0]
+        got = (await http_internal.get(f"{BASE}/{cid}/subscriptions", headers=headers)).json()[0]
         assert (got["id"], got["error_code"], got["last_http_status"]) == (theirs["id"], code, None)

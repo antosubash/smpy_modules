@@ -53,9 +53,13 @@ class _Job:
     claimed_at: datetime
     """The tick's time when the attempt was claimed: all an internal address's timestamps show."""
 
+    intranet: bool = False
+    """The effective policy: the flag AND the install switch (and not public): only then is the
+    address internal, and only then does it collapse what a failure shows."""
+
     @property
     def internal(self) -> bool:
-        return self.may_use_private and not self.public
+        return self.intranet
 
 
 @dataclass(frozen=True)
@@ -98,6 +102,7 @@ async def _claim(
                 sub.public,
                 sub.policy_generation,
                 now,
+                fetch_policy(settings, sub).intranet,
             )
             await finalize_session(db)
             return job

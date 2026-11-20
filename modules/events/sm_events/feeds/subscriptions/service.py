@@ -46,6 +46,7 @@ async def create(
     calendar = await validate.require_subscription_right(db, who, calendar_id, lock=True)
     rules.check_public(body.public, calendar, ctx)
     internal_ok = ctx.is_manager and not body.public  # a public subscription is never internal
+    flag_ok = internal_ok and ctx.settings.allow_private_subscription_urls  # and only with the switch
     url, display = validate.check_url_for_save(
         body.url,
         settings=ctx.settings,
@@ -94,7 +95,7 @@ async def create(
         refresh_minutes=body.refresh_minutes,
         public=body.public,
         may_use_private=policy.flag_after_save(
-            False, url_changed=True, saver_may_use_private=internal_ok
+            False, url_changed=True, saver_may_use_private=flag_ok
         ),
         created_at=now,
         updated_at=now,
@@ -153,11 +154,16 @@ async def update(
             sub.url_enc, sub.url_display = urls.seal(url), display
             sub.url_host = urls.host_of(url)
             moved = True
-            sub.may_use_private = policy.flag_after_save(
-                sub.may_use_private,
-                url_changed=True,
-                saver_may_use_private=ctx.is_manager and not public,
-            )
+        # Any save that carries an address re-decides the flag from the saver and the switch now:
+        # a subscription saved while the switch was off is not internal-capable until a manager
+        # saves its address again with the switch on, and a non-manager's save clears it.
+        sub.may_use_private = policy.flag_after_save(
+            sub.may_use_private,
+            url_changed=True,
+            saver_may_use_private=ctx.is_manager
+            and not public
+            and ctx.settings.allow_private_subscription_urls,
+        )
     if moved or sub.may_use_private != flag_before:
         await generation.restart(db, sub, now)  # the one place items and generation move
     sub.updated_at = now
@@ -233,10 +239,14 @@ async def list_for(db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID) -> l
     return await rules.live(db, calendar_id)
 
 
-def to_out(sub: Subscription, *, setting_minutes: int, is_manager: bool = False) -> SubscriptionOut:
+def to_out(
+    sub: Subscription, *, setting_minutes: int, is_manager: bool = False, internal_on: bool = False
+) -> SubscriptionOut:
     """The API shape. That an address may be internal says an intranet service exists, so only
-    ``events.manage`` holders are told (everyone else gets ``False``)."""
-    hidden = sub.may_use_private and not is_manager  # a non-manager may not learn what failed
+    ``events.manage`` holders are told, and only while the install switch is on (the effective
+    policy, not the stored flag alone); everyone else gets ``False``."""
+    internal = sub.may_use_private and internal_on and not sub.public
+    hidden = internal and not is_manager  # a non-manager may not learn what failed
     shown_code = "url_unreachable" if hidden and sub.error_code else sub.error_code
     return SubscriptionOut(
         id=sub.id,
@@ -256,6 +266,6 @@ def to_out(sub: Subscription, *, setting_minutes: int, is_manager: bool = False)
         consecutive_failures=sub.consecutive_failures,
         item_count=sub.item_count,
         last_counts=sub.last_counts,
-        may_use_internal_addresses=sub.may_use_private and is_manager,
+        may_use_internal_addresses=internal and is_manager,
         version=sub.updated_at.isoformat(),
     )

@@ -95,3 +95,12 @@ async def test_a_public_or_ordinary_subscription_keeps_the_precise_code(db_state
     for sid in (plain, public):
         sub = await load(db_state, sid)
         assert (sub.error_code, sub.last_http_status) == ("http_status", 503)
+
+
+async def test_with_the_switch_off_the_flag_changes_nothing_a_failure_shows(db_state):
+    """The effective policy is the flag AND the install switch: a manager-saved subscription on a
+    host with the switch off is an ordinary one."""
+    (sid,) = await seed(db_state, may_use_private=True)
+    await tick(db_state, Fetcher(failure("http_status", http_status=503)))  # switch off (default)
+    sub = await load(db_state, sid)
+    assert (sub.error_code, sub.last_http_status) == ("http_status", 503)
