@@ -169,23 +169,25 @@ test('the calendar block is read-only and shows only the chosen calendar', async
   await expect(grid.getByText(/Library programme/)).toHaveCount(0); // not a chosen calendar
   await expect(grid.getByText(seed.community.name)).toBeVisible(); // the filter names the one
   await page.getByRole('button', { name: 'List', exact: true }).click();
-  // Wait for the list view itself: the month grid's chips are still in the DOM for a moment after the
-  // click, and a 'Writing circle' seen there is not one in the list.
-  await expect(page.getByRole('button', { name: 'List', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await expect(grid.locator('.fc-list')).toBeVisible();
-  await expect(grid.locator('.fc-daygrid')).toHaveCount(0);
-  // The series starts a week or more ahead, which may be next month: step forward until it shows.
+  // Wait for the list view FullCalendar has actually drawn (the grid sets `data-view` on its datesSet):
+  // the month grid's chips stay in the DOM for a moment after the click, and a 'Writing circle'
+  // seen there is not one in the list.
+  const drawn = grid.locator('section.sm-ev-calendar');
+  await expect(drawn).toHaveAttribute('data-view', 'list');
+  const title = grid.getByTestId('calendar-title');
   const circle = grid.getByText('Writing circle').first();
-  for (let step = 0; step < 2; step++) {
-    const seen = await circle.waitFor({ state: 'visible', timeout: 3000 }).then(
-      () => true,
-      () => false,
-    );
-    if (seen) break;
+  const empty = grid.getByRole('status').filter({ hasText: 'Nothing in this range' });
+  // Each range has settled once it shows events or says it has none: never a bare wait.
+  const settled = () =>
+    expect.poll(async () => (await circle.isVisible()) || (await empty.isVisible())).toBe(true);
+  await settled();
+  // The series starts a week or more ahead, which may be next month: step forward until it shows.
+  for (let step = 0; step < 3 && !(await circle.isVisible()); step++) {
+    const before = await title.textContent();
     await grid.getByRole('button', { name: 'Next' }).click();
+    await expect(title).not.toHaveText(before ?? '');
+    await expect(drawn).toHaveAttribute('data-view', 'list');
+    await settled();
   }
   await expect(circle).toBeVisible();
   await expect(grid).not.toContainText('Poetry night');
