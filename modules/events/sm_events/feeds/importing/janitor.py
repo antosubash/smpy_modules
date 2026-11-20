@@ -28,7 +28,7 @@ from simple_module_db import mark_written
 from sqlalchemy import delete, distinct, or_, select
 
 from sm_events.core import constants
-from sm_events.core.tenancy import all_tenants, tenant_scope, valid_tenant
+from sm_events.core.tenancy import all_tenants, bound_tenant, tenant_scope, valid_tenant
 from sm_events.feeds.tokens.cleanup import sweep_revoked
 from sm_events.models import (
     EventImport,
@@ -98,19 +98,26 @@ async def _purge_subscriptions(db: Any, now: datetime) -> int:
     (a deleted one holds no address: it was emptied when it was deleted). Bounded per pass."""
     subs, items = Subscription.__table__, ExternalItem.__table__
     cutoff = now - timedelta(days=constants.SUBSCRIPTION_DELETED_KEPT_DAYS)
+    tenant = bound_tenant()  # Core: the statements carry their own predicate
     ids = list(
         (
             await db.execute(
                 select(subs.c.id)
-                .where(subs.c.is_deleted.is_(True), subs.c.deleted_at < cutoff)
+                .where(
+                    subs.c.tenant_id == tenant,
+                    subs.c.is_deleted.is_(True),
+                    subs.c.deleted_at < cutoff,
+                )
                 .limit(constants.SUBSCRIPTION_STORE_CHUNK)
                 .execution_options(include_deleted=True)
             )
         ).scalars()
     )
     if ids:
-        await db.execute(delete(items).where(items.c.subscription_id.in_(ids)))
-        await db.execute(delete(subs).where(subs.c.id.in_(ids)))
+        await db.execute(
+            delete(items).where(items.c.tenant_id == tenant, items.c.subscription_id.in_(ids))
+        )
+        await db.execute(delete(subs).where(subs.c.tenant_id == tenant, subs.c.id.in_(ids)))
         mark_written(db)  # Core DML: the ORM never sees it
     return len(ids)
 

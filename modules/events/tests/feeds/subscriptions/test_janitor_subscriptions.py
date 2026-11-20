@@ -62,3 +62,35 @@ async def test_purges_old_deleted_subscriptions_per_tenant(db_state):
         assert "old" not in items and {"live", "recent"} <= set(items)
     again = await janitor_async(db_state.session_factory, now=NOW, relaunch=lambda *a: None)
     assert again["subscriptions"] == 0
+
+
+async def test_one_tenants_pass_purges_only_its_own_rows(db_state):
+    from sm_events.feeds.importing.janitor import _purge_subscriptions
+
+    await _seed(db_state, "a")
+    await _seed(db_state, "b")
+    with tenant_scope("a"):
+        async with db_state.session_factory() as db:
+            assert await _purge_subscriptions(db, NOW) == 1
+            await db.commit()
+    subs_a, items_a = await _left(db_state, "a")
+    assert "old" not in subs_a and "old" not in items_a
+    subs_b, items_b = await _left(db_state, "b")
+    assert "old" in subs_b and "old" in items_b  # tenant b's pass has not run
+
+
+async def test_the_purge_statements_name_their_tenant(db_state):
+    """Core DML carries its own tenant predicate, whatever the framework adds."""
+    from sm_events.feeds.importing.janitor import _purge_subscriptions
+    from sqlalchemy import event
+
+    await _seed(db_state, "a")
+    seen: list[str] = []
+    engine = db_state.engine.sync_engine
+    event.listen(engine, "before_cursor_execute", lambda c, cur, stmt, *a: seen.append(stmt))
+    with tenant_scope("a"):
+        async with db_state.session_factory() as db:
+            await _purge_subscriptions(db, NOW)
+            await db.commit()
+    mine = [s for s in seen if s.startswith(("DELETE", "SELECT")) and "events_subscription" in s]
+    assert mine and all("tenant_id" in s for s in mine)
