@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
-
-import sm_events
 from sm_events.feeds.subscriptions import policy
+
+from tests.support.source_scan import constructions_of, package_sources
 
 
 def test_a_bare_policy_has_no_private_access_whatever_the_setting():
@@ -17,10 +15,24 @@ def test_a_bare_policy_has_no_private_access_whatever_the_setting():
 
 
 def test_no_production_code_builds_a_policy_outside_policy_py():
-    root = Path(sm_events.__file__).parent
     found = [
-        p.relative_to(root).as_posix()
-        for p in root.rglob("*.py")
-        if p.name != "policy.py" and re.search(r"\bPolicy\(", p.read_text())
+        path
+        for path, source in package_sources()
+        if path != "feeds/subscriptions/policy.py" and constructions_of(source, "Policy")
     ]
     assert found == []
+
+
+def test_the_scan_finds_an_aliased_or_copied_policy():
+    planted = {
+        "plain": "def f():\n    return Policy()\n",
+        "alias": "from x.policy import Policy as P\ndef f():\n    return P(allow_private=True)\n",
+        "module": "from x import policy\ndef f():\n    return policy.Policy()\n",
+        "replace": (
+            "import dataclasses\ndef f(policy):\n"
+            "    return dataclasses.replace(policy, intranet=True)\n"
+        ),
+    }
+    for spelling, source in planted.items():
+        assert constructions_of(source, "Policy"), spelling
+    assert constructions_of("def f(p):\n    return p.intranet\n", "Policy") == []

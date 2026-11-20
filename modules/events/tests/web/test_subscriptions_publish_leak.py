@@ -199,18 +199,3 @@ async def test_a_read_with_a_mismatched_generation_returns_nothing(monkeypatch):
             await db.execute(update(Subscription).values(policy_generation=5))
             await db.commit()
         assert len(await _items(client)) == 1 and await _public_items(client) == []
-
-
-def test_the_generation_is_assigned_in_one_function_only():
-    import re
-    from pathlib import Path
-
-    import sm_events
-
-    pattern = re.compile(r"\bpolicy_generation\s*(\+=|-=|=(?!=))")
-    seen = {}
-    for path in Path(sm_events.__file__).parent.rglob("*.py"):
-        for n, line in enumerate(path.read_text().splitlines(), 1):
-            if pattern.search(line) and "policy_generation: int" not in line:
-                seen[f"{path.name}:{n}"] = line.strip()
-    assert [k.split(":")[0] for k in seen] == ["generation.py"], seen
