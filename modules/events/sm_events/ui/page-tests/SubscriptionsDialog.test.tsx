@@ -137,6 +137,38 @@ describe('SubscriptionsDialog', () => {
     }
   });
 
+  it('a paused row offers Resume, cannot be refreshed and shows no next update', async () => {
+    const { calls, view } = await open({
+      [`GET ${LIST}`]: [sub({ status: 'paused' })],
+      'POST /api/events/subscriptions/s1/resume': () => Response.json(sub()),
+      'POST /api/events/subscriptions/s1/pause': () => Response.json(sub({ status: 'paused' })),
+    });
+    expect(button('Pause')).toBeUndefined();
+    expect((button('Refresh now') as HTMLButtonElement).disabled).toBe(true);
+    expect(text()).not.toContain('Next update');
+    await click(button('Resume') as HTMLElement);
+    await flush(50);
+    expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/resume'))).toBe(true);
+    expect(calls.some((c) => c.url.endsWith('/pause'))).toBe(false);
+    await view.unmount();
+  });
+
+  it('a running row offers Pause and shows the next update', async () => {
+    const { view } = await open({ [`GET ${LIST}`]: [sub()] });
+    expect(button('Resume')).toBeUndefined();
+    expect((button('Refresh now') as HTMLButtonElement).disabled).toBe(false);
+    expect(text()).toContain('Next update');
+    await view.unmount();
+  });
+
+  it('says when a subscription may use internal addresses, and only then', async () => {
+    const { view } = await open({
+      [`GET ${LIST}`]: [sub({ uses_internal_addresses: true }), sub({ id: 's2', label: 'Other' })],
+    });
+    expect(text().match(/May use internal addresses/g)).toHaveLength(1);
+    await view.unmount();
+  });
+
   it('shows the refresh_too_soon message for a 429', async () => {
     const { view } = await open({
       [`GET ${LIST}`]: [sub()],
