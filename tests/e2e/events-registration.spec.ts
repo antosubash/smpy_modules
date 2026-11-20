@@ -55,11 +55,11 @@ test('the organiser creates a form and sets the seats; a visitor registers; the 
 
   await page.goto(`/admin/events/edit/${event.id}`);
   const section = page.getByTestId('registration-section');
-  await section.getByLabel('On this site').check();
+  await section.getByLabel('On this site', { exact: true }).check();
   await section.getByRole('button', { name: 'Create a registration form' }).click();
-  await expect(section.getByLabel('Registration form')).not.toHaveValue('');
-  await section.getByLabel('Seats').fill('2');
-  await section.getByLabel('Show the remaining seats on the public page').check();
+  await expect(section.getByLabel('Registration form', { exact: true })).not.toHaveValue('');
+  await section.getByLabel('Seats', { exact: true }).fill('2');
+  await section.getByLabel('Show the remaining seats on the public page', { exact: true }).check();
   await shoot(section, '01-editor-registration');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -72,14 +72,15 @@ test('the organiser creates a form and sets the seats; a visitor registers; the 
   await expect(panel.getByText('2 seats left.')).toBeVisible();
   await shoot(visitor, '02-public-panel', { fullPage: true });
 
-  await panel.getByLabel(/name/i).first().fill('Ada Visitor');
+  await panel.getByLabel(/^name/i).first().fill('Ada Visitor');
   await panel
     .getByLabel(/email/i)
     .first()
     .fill(`ada-${uniqueSlug('v')}@example.org`);
-  await visitor.waitForTimeout(3500); // the form's minimum fill time
-  await panel.getByRole('button', { name: 'Register' }).click();
-  await expect(panel.getByText('Check your inbox')).toBeVisible();
+  // No sleep for the form's minimum fill time: a too-young token is refused as `form_expired` and
+  // the form fetches a fresh one and resends by itself once it is old enough.
+  await panel.getByRole('button', { name: 'Register', exact: true }).click();
+  await expect(panel.getByText('Check your inbox')).toBeVisible({ timeout: 20_000 });
   await expect(panel).not.toContainText(/already registered/i);
   await shoot(visitor, '03-checked-inbox');
 
