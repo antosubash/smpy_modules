@@ -197,7 +197,7 @@ async def submit(
     # pattern worker without bound: a higher attempts bucket first (before the provider call),
     # the strict total right after the captcha passes. With no captcha there is nothing that
     # proves a human, so it is charged first, exactly as for any other form.
-    guarded = reg_token is not None and settings.public_submissions_captcha_provider != "none"
+    guarded = reg_token is not None and captcha.enforced(settings)
     if guarded:
         await abuse.hit(
             request,

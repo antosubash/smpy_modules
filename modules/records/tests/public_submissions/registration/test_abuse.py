@@ -199,3 +199,26 @@ async def test_without_a_captcha_the_strict_budget_is_charged_first(reg_site, mo
     before = (counts.provider, counts.patterns)
     assert (await send(reg_site, event, 2, None)).status_code == 429
     assert (counts.provider, counts.patterns) == before  # refused before any costly step
+
+
+async def test_a_provider_without_its_key_charges_the_strict_budget_first(reg_site, monkeypatch):
+    """Configured but unusable (no site key): verify fails closed with 503, and since nothing can
+    prove a human the strict total is charged first, exactly as with no captcha."""
+    counts = Counting(monkeypatch)
+    configure(
+        reg_site,
+        **limits(
+            public_submissions_type_rate="2/hour",
+            public_submissions_captcha_provider="turnstile",
+        ),
+    )
+    event = await seed_event(reg_site.db_state, uid="kl@x", registration_capacity=50)
+    got = [(await send(reg_site, event, n, None)).status_code for n in range(3)]
+    assert got == [400, 400, 429]  # the third is refused by the strict total, before verify
+    assert counts.provider == 2 and counts.patterns == 0
+    from sm_records.core.settings import RecordsSettings
+    from sm_records.public_submissions import captcha
+
+    keyless = RecordsSettings(public_submissions_captcha_provider="turnstile")
+    assert captcha.enforced(keyless) is False
+    assert captcha.public_config(keyless) is None  # the widget and the order agree
