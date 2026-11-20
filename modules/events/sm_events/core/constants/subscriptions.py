@@ -136,7 +136,7 @@ SUBSCRIPTION_MAX_REFRESH_MINUTES: Final = 1440
 SUBSCRIPTION_MAX_BACKOFF: Final = timedelta(hours=24)
 SUBSCRIPTION_MAX_FAILURES: Final = 10
 SUBSCRIPTION_REFRESH_NOW_SECONDS: Final = 300
-SUBSCRIPTION_REFRESH_RATE: Final = "6/minute"
+SUBSCRIPTION_REFRESH_RATE: Final = "20/minute"
 """Per signed-in user, on every subscription's refresh route (the per-subscription floor is
 ``SUBSCRIPTION_REFRESH_NOW_SECONDS``)."""
 SUBSCRIPTION_DELETED_KEPT_DAYS: Final = 30

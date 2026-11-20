@@ -1032,7 +1032,7 @@
       "never_updated": "Not updated yet",
       "next_refresh": "Next update {when}",
       "events_count": "{count} events",
-      "internal": "Uses internal addresses",
+      "internal": "May use internal addresses",
       "skipped": "{count} events left out",
       "skipped_reason": "{reason} ({count})"
     },
