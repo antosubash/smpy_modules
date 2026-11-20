@@ -24,16 +24,24 @@ from tests.feeds.subscriptions.refresh_support import (
 pytestmark = pytest.mark.unbound_tenant
 
 
+async def _tenants(db_state, tenants, per_tenant=1):
+    """``per_tenant`` due feeds in each of ``tenants`` tenants (each tenant's share of a tick is
+    limited in SQL, so a budget test needs several)."""
+    for n in range(tenants):
+        for calendar in range(per_tenant):
+            await seed(db_state, tenant=f"t{n}", count=1, slug=f"x{calendar}")
+
+
 async def test_budget_fetch_count(db_state):
-    await seed(db_state, count=25)
+    await _tenants(db_state, 9, per_tenant=3)  # 27 chosen (3 each), 20 fit the tick
     fetcher = Fetcher()
     got = await tick(db_state, fetcher)
-    assert (got["fetched"], got["skipped_budget"]) == (20, 5)
+    assert (got["fetched"], got["skipped_budget"]) == (20, 7)
     assert len(fetcher.calls) == constants.SUBSCRIPTION_TICK_FETCHES
 
 
 async def test_budget_bytes(db_state, monkeypatch):
-    await seed(db_state, count=6)
+    await _tenants(db_state, 6)
     monkeypatch.setattr(constants, "SUBSCRIPTION_TICK_BYTES", len(FEED) * 2)
     got = await tick(db_state, Fetcher())
     assert (got["fetched"], got["skipped_budget"]) == (2, 4)
@@ -48,7 +56,7 @@ class Clock:
 
 
 async def test_budget_seconds(db_state):
-    await seed(db_state, count=5)
+    await _tenants(db_state, 5)
     clock = Clock()
 
     class Slow(Fetcher):
@@ -62,12 +70,20 @@ async def test_budget_seconds(db_state):
 
 
 async def test_fair_across_tenants(db_state):
-    await seed(db_state, tenant="a", count=15, slug="x", next_fetch_at=NOW - timedelta(hours=5))
-    await seed(db_state, tenant="b", count=15, slug="x", next_fetch_at=NOW - timedelta(hours=1))
+    for tenant, age in (("a", 5), ("b", 1)):  # a's feeds are far older, b still gets its share
+        for slug in ("x", "y"):
+            await seed(
+                db_state,
+                tenant=tenant,
+                count=5,
+                slug=slug,
+                next_fetch_at=NOW - timedelta(hours=age),
+            )
     fetcher = Fetcher()
     got = await tick(db_state, fetcher)
     hosts = [c["url"].split("//")[1][0] for c in fetcher.calls]
-    assert got["tenants"] == 2 and hosts.count("a") == hosts.count("b") == 10
+    share = constants.SUBSCRIPTION_TICK_PER_TENANT
+    assert got["tenants"] == 2 and hosts.count("a") == hosts.count("b") == share
 
 
 async def test_one_tenant_raising_does_not_stop_others(db_state, monkeypatch):

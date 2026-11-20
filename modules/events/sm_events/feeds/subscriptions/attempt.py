@@ -13,9 +13,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -55,6 +56,8 @@ class Attempt:
     outcome: str
     """``stored``, ``not_modified``, ``failed``, ``lease_lost``, ``busy`` or ``unavailable``."""
     received: int = 0
+    seconds: float = 0.0
+    """How long the fetch took (the beat charges a slow one to its tenant)."""
 
 
 async def _claim(
@@ -127,6 +130,19 @@ async def _fetch(
         del url
 
 
+def _charge_slowness(sub: Subscription, stamp: datetime, seconds: float, *, failed: bool) -> None:
+    """A slow fetch (``SUBSCRIPTION_SLOW_SECONDS``) pushes the next one out, doubling each time
+    in a row up to ``SUBSCRIPTION_SLOW_MAX`` and never beyond ``SUBSCRIPTION_MAX_BACKOFF``; a fast
+    one resets it. A failure already backs off on its own, so only the count moves then."""
+    if seconds <= constants.SUBSCRIPTION_SLOW_SECONDS:
+        sub.slow_count = 0
+        return
+    sub.slow_count = min(sub.slow_count + 1, constants.SUBSCRIPTION_SLOW_MAX)
+    if not failed and sub.next_fetch_at is not None:
+        wait = (sub.next_fetch_at - stamp) * 2**sub.slow_count
+        sub.next_fetch_at = stamp + min(wait, constants.SUBSCRIPTION_MAX_BACKOFF)
+
+
 def _internal_code(code: str) -> str:
     if code in constants.INTERNAL_NOTHING_ANSWERED:
         return "url_unreachable"
@@ -165,6 +181,7 @@ async def _store(
     outcome: FetchResult | FetchFailure,
     rng: random.Random,
     utc_now: Callable[[], datetime],
+    seconds: float = 0.0,
 ) -> Attempt:
     """Store the result (or record the failure) in one transaction fenced on the lease. A body
     is scanned and mapped first, in a thread, before any lock: an edit never waits for a parse."""
@@ -207,6 +224,7 @@ async def _store(
                 _record_failure(sub, failure, job, stamp, rng)
             else:
                 _record_success(sub, outcome, job, stamp, rng)  # type: ignore[arg-type]
+            _charge_slowness(sub, stamp, seconds, failed=failure is not None)
             if paused:
                 sub.status = "paused"
             await lease.release(db, sub)
@@ -230,13 +248,17 @@ async def attempt(
     fetcher: Callable[..., Any],
     rng: random.Random,
     utc_now: Callable[[], datetime],
+    clock: Callable[[], float] = time.monotonic,
 ) -> Attempt:
     job = await _claim(factory, tenant, sid, owner, now, settings)
     if job is None:
         return Attempt("busy")
+    started = clock()
     try:
         outcome = await _fetch(job, settings, fetcher)
     except RuntimeError as exc:  # no secret key: an operator's problem, not the feed's
         logger.warning("events subscription not opened (%s)", type(exc).__name__)
         return Attempt("unavailable")
-    return await _store(factory, tenant, sid, owner, job, outcome, rng, utc_now)
+    seconds = clock() - started
+    done = await _store(factory, tenant, sid, owner, job, outcome, rng, utc_now, seconds)
+    return replace(done, seconds=seconds)

@@ -75,6 +75,7 @@ async def create(
         created_by=who.user_id or "",
         url_enc=urls.seal(url),
         url_display=display,
+        url_host=urls.host_of(url),
         label=body.label,
         color=body.color,
         refresh_minutes=body.refresh_minutes,
@@ -137,6 +138,7 @@ async def update(
             raise SubscriptionExists
         if not rules.same_address([sub], url):  # a changed address, not the one it already has
             sub.url_enc, sub.url_display = urls.seal(url), display
+            sub.url_host = urls.host_of(url)
             moved = True
             sub.may_use_private = policy.flag_after_save(
                 sub.may_use_private,

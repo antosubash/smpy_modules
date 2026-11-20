@@ -12,7 +12,7 @@ store). A lease the holder never releases simply expires: the row is due again. 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import all_tenants as framework_all_tenants
@@ -25,7 +25,7 @@ from sm_events.core import constants
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Subscription
 
-__all__ = ["claim", "due", "fenced", "release"]
+__all__ = ["claim", "due", "fenced", "host_free", "release"]
 
 _LIVE = ("pending", "ok", "error")
 _SLOTS_LOCK = 7_310_017
@@ -42,6 +42,27 @@ def due(now: datetime) -> ColumnElement[bool]:
         table.c.next_fetch_at <= now,
         or_(table.c.lease_until.is_(None), table.c.lease_until < now),
     )
+
+
+def host_free(now: datetime) -> ColumnElement[bool]:
+    """No other subscription of the same tenant and address host (deleted ones included, so the
+    floor survives a delete) holds an unexpired lease or was claimed within the host floor.
+    Correlates to the ``events_subscription`` row it is attached to."""
+    table = Subscription.__table__
+    other = table.alias("other")
+    floor = now - timedelta(seconds=constants.SUBSCRIPTION_HOST_FLOOR_SECONDS)
+    busy = (
+        select(1)
+        .where(
+            other.c.tenant_id == table.c.tenant_id,
+            other.c.url_host == table.c.url_host,
+            other.c.id != table.c.id,
+            or_(other.c.lease_until > now, other.c.last_attempt_at > floor),
+        )
+        .correlate(table)
+        .exists()
+    )
+    return or_(table.c.url_host == "", ~busy)
 
 
 async def claim(db: Any, sub_id: uuid.UUID, *, owner: str, now: datetime) -> bool:
@@ -65,10 +86,14 @@ async def claim(db: Any, sub_id: uuid.UUID, *, owner: str, now: datetime) -> boo
             table.c.tenant_id == tenant,
             table.c.id == sub_id,
             due(now),
+            host_free(now),
             mine < constants.SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT,
             active < constants.SUBSCRIPTION_MAX_CONCURRENT_FETCHES,
         )
-        .values(lease_owner=owner, lease_until=now + constants.SUBSCRIPTION_LEASE)
+        .values(
+            lease_owner=owner, lease_until=now + constants.SUBSCRIPTION_LEASE, last_attempt_at=now
+        )
+        .execution_options(include_deleted=True)  # the floor counts deleted rows too
     )
     if db.sync_session.get_bind().dialect.name == "postgresql":
         # Counting and updating must not interleave across sessions, or two claims could each see

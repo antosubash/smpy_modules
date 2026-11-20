@@ -90,7 +90,12 @@ async def test_two_workers_one_fetch(db_state, db, monkeypatch):
     monkeypatch.setattr(constants, "SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT", 1000)
     cal = await seed_calendar(db)
     ids = [
-        (await seed_subscription(db, cal, label=f"s{n}", next_fetch_at=NOW)).id for n in range(20)
+        (
+            await seed_subscription(
+                db, cal, label=f"s{n}", url=f"https://h{n}.example/x.ics", next_fetch_at=NOW
+            )
+        ).id
+        for n in range(20)
     ]
     await db.commit()
 
@@ -112,7 +117,12 @@ async def test_an_install_wide_cap_on_simultaneous_fetches(db, monkeypatch):
     """Excess work waits: with the cap reached, a due subscription is not claimed."""
     monkeypatch.setattr(constants, "SUBSCRIPTION_MAX_CONCURRENT_FETCHES", 2)
     cal = await seed_calendar(db)
-    subs = [await seed_subscription(db, cal, label=f"s{n}", next_fetch_at=NOW) for n in range(4)]
+    subs = [
+        await seed_subscription(
+            db, cal, label=f"s{n}", url=f"https://h{n}.example/x.ics", next_fetch_at=NOW
+        )
+        for n in range(4)
+    ]
     assert await lease.claim(db, subs[0].id, owner="a", now=NOW)
     assert await lease.claim(db, subs[1].id, owner="a", now=NOW)
     assert await lease.claim(db, subs[2].id, owner="a", now=NOW) is False  # cap reached

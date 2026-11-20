@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import httpx
 
-from sm_events.core import crypto
+from sm_events.core import constants, crypto
 from sm_events.core.errors_subscriptions import SecretUnreadable
 
 __all__ = ["UrlUnreadable", "display_of", "seal", "unseal"]
@@ -42,6 +42,12 @@ def unseal(stored: str) -> str:
         return crypto.decrypt_value(stored, _FIELD)
     except SecretUnreadable:
         raise UrlUnreadable from None
+
+
+def host_of(url: str) -> str:
+    """The lower-case IDNA host of ``url`` (what the per-host floor groups by; it is already part
+    of the masked display)."""
+    return httpx.URL(url).raw_host.decode("ascii").lower()[: constants.URL_HOST_MAX]
 
 
 def display_of(url: str) -> str:

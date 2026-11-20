@@ -44,6 +44,7 @@ __all__ = [
     "SUBSCRIPTION_EXISTS_DETAIL",
     "SUBSCRIPTION_FAILURE_CODES",
     "SUBSCRIPTION_FETCH_SECONDS",
+    "SUBSCRIPTION_HOST_FLOOR_SECONDS",
     "SUBSCRIPTION_ITEMS_MAX",
     "SUBSCRIPTION_ITEM_LOCATION_MAX",
     "SUBSCRIPTION_ITEM_TITLE_MAX",
@@ -66,6 +67,8 @@ __all__ = [
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_CODE",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_DETAIL",
     "SUBSCRIPTION_REFRESH_NOW_SECONDS",
+    "SUBSCRIPTION_SLOW_MAX",
+    "SUBSCRIPTION_SLOW_SECONDS",
     "SUBSCRIPTION_STATE_CONFLICT_CODE",
     "SUBSCRIPTION_STATE_CONFLICT_DETAIL",
     "SUBSCRIPTION_STATUSES",
@@ -74,11 +77,14 @@ __all__ = [
     "SUBSCRIPTION_TENANT_ITEMS_MAX",
     "SUBSCRIPTION_TICK_BYTES",
     "SUBSCRIPTION_TICK_FETCHES",
+    "SUBSCRIPTION_TICK_PER_CALENDAR",
+    "SUBSCRIPTION_TICK_PER_TENANT",
     "SUBSCRIPTION_TICK_SECONDS",
     "SUBSCRIPTION_URL_MAX",
     "SUBSCRIPTION_VERSION_MAX",
     "SUBSCRIPTION_WRITE_RATE",
     "URL_DISPLAY_MAX",
+    "URL_HOST_MAX",
     "URL_REFUSAL_CODES",
     "URL_REFUSAL_DETAIL",
 ]
@@ -101,6 +107,7 @@ SUBSCRIPTION_STATUSES: Final = ("pending", "ok", "error", "paused", "disabled")
 # The address.
 SUBSCRIPTION_URL_MAX: Final = 2000
 URL_DISPLAY_MAX: Final = 300
+URL_HOST_MAX: Final = 255
 """``scheme://host[:port]/…``: the only form of the address the API, the logs and the screen
 carry. A host name is at most 253 characters."""
 
@@ -146,6 +153,19 @@ SUBSCRIPTION_DELETED_KEPT_DAYS: Final = 30
 
 # The beat (Ruling 15).
 SUBSCRIPTION_TICK_FETCHES: Final = 20
+SUBSCRIPTION_TICK_PER_TENANT: Final = 3
+"""Most subscriptions of one tenant one tick may start, chosen in SQL (oldest first, calendars in
+turn), so a tenant with a hundred overdue feeds cannot fill the tick."""
+SUBSCRIPTION_TICK_PER_CALENDAR: Final = 2
+SUBSCRIPTION_HOST_FLOOR_SECONDS: Final = 60
+"""Per tenant and address host: one attempt at a time and at most one a minute, counted from the
+moment an attempt is claimed and kept after the subscription is deleted, so adding and removing
+feeds cannot start unfloored fetches of a third party."""
+SUBSCRIPTION_SLOW_SECONDS: Final = 10
+"""A fetch that takes longer is slow: it costs its tenant the rest of the tick and pushes the
+feed's next fetch out (``SUBSCRIPTION_SLOW_MAX`` doublings at most, never beyond
+``SUBSCRIPTION_MAX_BACKOFF``); one fast success resets it."""
+SUBSCRIPTION_SLOW_MAX: Final = 4
 SUBSCRIPTION_TICK_BYTES: Final = 50 * 1024 * 1024
 SUBSCRIPTION_TICK_SECONDS: Final = 45
 SUBSCRIPTION_LEASE: Final = timedelta(minutes=2)

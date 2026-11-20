@@ -56,6 +56,7 @@ async def seed_subscription(db: Any, calendar: Calendar, **fields: Any) -> Subsc
         "created_by": "o",
         "url_enc": urls.seal(url),
         "url_display": urls.display_of(url),
+        "url_host": urls.host_of(url),
         "label": "Work",
         "next_fetch_at": now - timedelta(minutes=1),
     }

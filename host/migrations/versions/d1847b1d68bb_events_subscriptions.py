@@ -32,6 +32,7 @@ def upgrade() -> None:
         sa.Column("calendar_id", sa.Uuid(), nullable=False),
         sa.Column("created_by", sa.String(length=64), nullable=False),
         sa.Column("url_enc", sa.Text(), nullable=False),
+        sa.Column("url_host", sa.String(length=255), nullable=False),
         sa.Column("url_display", sa.String(length=300), nullable=False),
         sa.Column("label", sa.String(length=100), nullable=False),
         sa.Column("color", sa.String(length=7), nullable=True),
@@ -48,6 +49,8 @@ def upgrade() -> None:
         sa.Column("last_fetched_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("last_ok_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("next_fetch_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("last_attempt_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("slow_count", sa.Integer(), nullable=False),
         sa.Column("consecutive_failures", sa.Integer(), nullable=False),
         sa.Column("generation", sa.Integer(), nullable=False),
         sa.Column("item_count", sa.Integer(), nullable=False),
@@ -69,6 +72,9 @@ def upgrade() -> None:
         "events_subscription",
         ["tenant_id", "calendar_id"],
         unique=False,
+    )
+    op.create_index(
+        "ix_events_subscription_host", "events_subscription", ["tenant_id", "url_host"], unique=False
     )
     op.create_index(
         op.f("ix_events_subscription_calendar_id"),
@@ -153,6 +159,7 @@ def downgrade() -> None:
     )
     op.drop_table("events_external_item")
     op.drop_index(op.f("ix_events_subscription_tenant_id"), table_name="events_subscription")
+    op.drop_index("ix_events_subscription_host", table_name="events_subscription")
     op.drop_index("ix_events_subscription_due", table_name="events_subscription")
     op.drop_index(op.f("ix_events_subscription_calendar_id"), table_name="events_subscription")
     op.drop_index("ix_events_subscription_calendar", table_name="events_subscription")

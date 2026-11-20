@@ -27,6 +27,7 @@ from sm_events.core.constants import (
     SUBSCRIPTION_LEASE_OWNER_MAX,
     SUBSCRIPTION_STATUS_MAX,
     URL_DISPLAY_MAX,
+    URL_HOST_MAX,
 )
 from sm_events.models._base import Base
 from sm_events.models._cols import counter, dt_col, fk_uuid, flag, json_col, pk_uuid
@@ -38,6 +39,8 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
         # The beat's scan: due rows across every tenant, by status then time.
         Index("ix_events_subscription_due", "status", "next_fetch_at"),
         Index("ix_events_subscription_calendar", "tenant_id", "calendar_id"),
+        # The per-host floor looks a tenant's rows up by host.
+        Index("ix_events_subscription_host", "tenant_id", "url_host"),
     )
 
     id: uuid.UUID = pk_uuid()
@@ -46,6 +49,9 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
 
     url_enc: str = Field(sa_column=Column(Text, nullable=False))
     """``enc:v2:`` ciphertext of the address; ``""`` once the row is deleted."""
+    url_host: str = Field(default="", max_length=URL_HOST_MAX)
+    """The address's host (already in ``url_display``): what the per-host floor groups by. Kept
+    when the row is deleted, so the floor survives it."""
     url_display: str = Field(max_length=URL_DISPLAY_MAX)
     """``scheme://host[:port]/…``: everything of the address the console ever shows."""
 
@@ -86,6 +92,10 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
     last_fetched_at: datetime | None = dt_col()
     last_ok_at: datetime | None = dt_col()
     next_fetch_at: datetime | None = dt_col()
+    last_attempt_at: datetime | None = dt_col()
+    """When an attempt was last claimed (even one whose result was discarded): the host floor."""
+    slow_count: int = counter()
+    """Slow fetches in a row (``constants.SUBSCRIPTION_SLOW_SECONDS``); one fast success resets."""
 
     consecutive_failures: int = counter()
     generation: int = counter()

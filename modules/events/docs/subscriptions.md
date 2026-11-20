@@ -119,11 +119,24 @@ nothing and records nothing against the feeds.
 | Failures in a row before it stops | 10 | `SUBSCRIPTION_MAX_FAILURES` |
 | Longest backoff and longest honoured Retry-After or max-age | 24 hours | `SUBSCRIPTION_MAX_BACKOFF` |
 | Fetches per tick | 20 | `SUBSCRIPTION_TICK_FETCHES` |
+| Subscriptions one tenant may start per tick, per calendar | 3 / 2 | `SUBSCRIPTION_TICK_PER_TENANT` / `SUBSCRIPTION_TICK_PER_CALENDAR` |
+| One tenant's fetches of one address host, at most one at a time and one per | 60 s | `SUBSCRIPTION_HOST_FLOOR_SECONDS` |
+| A slow fetch (longer than 10 s) pushes the next one out, doublings at most | 10 s / 4 | `SUBSCRIPTION_SLOW_SECONDS` / `SUBSCRIPTION_SLOW_MAX` |
 | Bytes received per tick | 50 MiB | `SUBSCRIPTION_TICK_BYTES` |
 | Seconds per tick | 45 s | `SUBSCRIPTION_TICK_SECONDS` |
 | Lease | 2 minutes | `SUBSCRIPTION_LEASE` |
 | Simultaneous fetches, install-wide / per tenant | 8 / 2 | `SUBSCRIPTION_MAX_CONCURRENT_FETCHES` / `SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT` |
 | Deleted subscriptions kept | 30 days | `SUBSCRIPTION_DELETED_KEPT_DAYS` |
+
+**Fairness.** What one tick starts is chosen in SQL before anything is fetched: at most three
+subscriptions per tenant and two per calendar (calendars in turn, the oldest first, feeds that have
+been slow after the others) and one per address host, so a tenant with a hundred overdue feeds
+cannot fill the tick. A fetch that takes longer than 10 s (valid or not) ends its tenant's turn
+for the tick and pushes that feed's next fetch out (doubling up to four times, never beyond a day);
+one fast success resets it. A tenant's fetches of one address host run one at a time and at most
+one a minute, counted from when an attempt is claimed and kept after a subscription is deleted, so
+neither many feeds on one host nor adding and removing feeds in a loop can hammer a third party or
+hold the fetch slots. A new subscription on a host that was just fetched waits for the next beat.
 
 The interval is the subscription's own or `subscription_refresh_minutes` (default 60), kept
 between 15 and 1,440 minutes and jittered by 10 %. A server's `Cache-Control: max-age` and
