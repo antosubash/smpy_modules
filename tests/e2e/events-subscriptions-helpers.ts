@@ -16,8 +16,8 @@ export function seedItems(subscription: string, day: string, titles: string[]) {
       [
         'BEGIN:VEVENT',
         `UID:ext-${index}@feed`,
-        `DTSTART:${compact}T0${8 + index}0000Z`,
-        `DTEND:${compact}T0${9 + index}0000Z`,
+        `DTSTART:${compact}T${String(8 + index).padStart(2, '0')}0000Z`,
+        `DTEND:${compact}T${String(9 + index).padStart(2, '0')}0000Z`,
         `SUMMARY:${title}`,
         'URL:https://source.example/holiday',
         'END:VEVENT',

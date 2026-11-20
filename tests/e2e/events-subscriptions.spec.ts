@@ -107,22 +107,21 @@ test('removing a subscription says how many cached events go, singular and plura
 }) => {
   const day = wednesday(3);
   const calendar = await seedCalendar(page, { label: `Counted ${RUN}`, plain: true });
-  const sub = await subscribe(page, calendar.id, 'https://counted.localhost/a.ics', 'Counted');
+  const one = await subscribe(page, calendar.id, 'https://one.localhost/a.ics', 'Single');
+  const two = await subscribe(page, calendar.id, 'https://two.localhost/a.ics', 'Double');
+  seedItems(one.id, day, ['One']);
+  seedItems(two.id, day, ['One', 'Two']);
   await page.goto('/admin/events/calendars');
   await page.getByRole('button', { name: `Subscriptions of ${calendar.name}` }).click();
   const dialog = dialogOf(page);
-  for (const [titles, sentence] of [
-    [['One'], 'Its 1 cached event disappears from the calendar.'],
-    [['One', 'Two'], 'Its 2 cached events disappear from the calendar.'],
+  for (const [name, sentence] of [
+    ['Single', 'Its 1 cached event disappears from the calendar.'],
+    ['Double', 'Its 2 cached events disappear from the calendar.'],
   ] as const) {
-    seedItems(sub.id, day, [...titles]);
-    await page.reload();
-    await page.getByRole('button', { name: `Subscriptions of ${calendar.name}` }).click();
-    await dialog.getByRole('button', { name: 'Remove Counted' }).click();
+    await dialog.getByRole('button', { name: `Remove ${name}` }).click();
     const confirm = page.getByRole('alertdialog');
     await expect(confirm).toContainText(sentence);
     await confirm.getByRole('button', { name: 'Cancel' }).click();
-    await page.keyboard.press('Escape');
   }
 });
 
