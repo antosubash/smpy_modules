@@ -120,3 +120,30 @@ async def test_confirmation_refreshes_the_snapshot_to_the_moved_date(reg_site):
     (after,) = await regs(reg_site)
     stored = datetime.fromisoformat(after["data"]["sm_occurrence_start"])
     assert abs((stored.replace(tzinfo=stored.tzinfo or UTC) - new).total_seconds()) < 1
+
+
+async def test_my_registrations_are_ordered_by_the_events_current_start(reg_site):
+    from tests.public_submissions.registration.test_mine import sign_up
+    from tests.support.registration_http import seed_event
+
+    soon = datetime.now(UTC) + timedelta(days=10)
+    first = await seed_event(
+        reg_site.db_state, uid="o1@x", starts_at=soon, ends_at=soon + timedelta(hours=1)
+    )
+    second = await seed_event(
+        reg_site.db_state,
+        uid="o2@x",
+        starts_at=soon + timedelta(days=5),
+        ends_at=soon + timedelta(days=5, hours=1),
+    )
+    a = await sign_up(reg_site, address="test@example.com", event=first)
+    b = await sign_up(reg_site, address="test@example.com", event=second)
+    me(reg_site)
+    order = [
+        i["uuid"] for i in (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()["items"]
+    ]
+    assert order == [a["uuid"], b["uuid"]]
+    reg_site.event = first
+    await move(reg_site, soon + timedelta(days=30))  # the first event now comes last
+    got = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()["items"]
+    assert [i["uuid"] for i in got] == [b["uuid"], a["uuid"]]

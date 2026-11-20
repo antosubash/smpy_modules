@@ -109,7 +109,7 @@ export default function SubmissionAction({ action, token, locale, endpoint, copy
           </p>
         ) : (
           <>
-            <p className="mt-4 text-pretty text-muted-foreground">{copy.intro}</p>
+            <p className="mt-4 text-pretty text-foreground">{copy.intro}</p>
             <Button
               type="button"
               className="mt-6"

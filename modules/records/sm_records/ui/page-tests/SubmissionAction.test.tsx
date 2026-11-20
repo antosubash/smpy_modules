@@ -115,4 +115,13 @@ describe('SubmissionAction', () => {
     expect(view.button('Abonnement bestätigen')).toBeDefined(); // press again
     await view.unmount();
   });
+
+  it('keeps the description at full text contrast (the muted token fails in dark mode)', async () => {
+    vi.stubGlobal('fetch', answer(200, { status: 'confirmed' }));
+    const view = await mount(page());
+    const intro = [...view.all('p')].find((p) => p.textContent === COPY.intro);
+    expect(intro?.className).toContain('text-foreground');
+    expect(intro?.className).not.toContain('text-muted-foreground');
+    await view.unmount();
+  });
 });

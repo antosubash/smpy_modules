@@ -128,8 +128,14 @@ async def _items(
     db: AsyncSession, own: list[tuple[RecordType, Record]], locale: str, now: datetime
 ) -> list[MineItem]:
     starts = await start_module.resolve_many(db, bound_tenant(), [r.data or {} for _, r in own])
-    own = [pair for pair, begun in zip(own, starts, strict=True) if begun is None or begun > now]
-    own = own[:MAX_ITEMS]
+    kept = [
+        (pair, begun)
+        for pair, begun in zip(own, starts, strict=True)
+        if begun is None or begun > now
+    ]
+    kept.sort(key=lambda item: (item[1] is None, item[1] or now, item[0][1].uuid))
+    kept = kept[:MAX_ITEMS]
+    own = [pair for pair, _ in kept]
     facts: dict[tuple[uuid.UUID, str], Any] = {}
     if own and seats.available():
         refs = list(
@@ -143,7 +149,7 @@ async def _items(
             db, tenant_id=bound_tenant(), refs=refs, locale=locale
         )
     items = []
-    for rtype, record in own:
+    for (rtype, record), begun in kept:
         data = record.data or {}
         ref = (uuid.UUID(str(data["sm_event_id"])), str(data.get("sm_occurrence_key")))
         title, when_text, page_path = _title(record, facts.get(ref))
@@ -158,11 +164,12 @@ async def _items(
                 title=title,
                 when_text=when_text,
                 page_path=page_path,
-                starts_at=start if isinstance(start, str) else None,
+                starts_at=begun.isoformat()
+                if begun
+                else (start if isinstance(start, str) else None),
                 available=facts.get(ref) is not None or not seats.available(),
             )
         )
-    items.sort(key=lambda i: (i.starts_at or "", i.uuid))
     return items
 
 

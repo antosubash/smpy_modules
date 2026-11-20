@@ -110,6 +110,19 @@ it('double opt-in says to check the inbox; single opt-in says it is registered; 
   await b.unmount();
 });
 
+it('moves focus to the result after a successful submit', async () => {
+  server({ status: 200, body: open() }, { status: 202, body: { ok: true } });
+  const v = await mount(<RegistrationPanel {...props} />);
+  await settle();
+  await fillIn(v);
+  await send(v);
+  await settle();
+  const result = document.querySelector('[data-testid=registration-success]');
+  expect(result?.getAttribute('role')).toBe('status'); // a live region
+  expect(document.activeElement).toBe(result?.querySelector('h3'));
+  await v.unmount();
+});
+
 it('a 409 registration_full swaps to fully booked without a reload', async () => {
   const calls = server(
     { status: 200, body: open() },

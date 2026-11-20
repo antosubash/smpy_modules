@@ -7,7 +7,7 @@
  *  already registered: a submit answers one neutral thank-you, and what happened is told by mail.
  *  A refusal because the event filled up or closed meanwhile swaps the panel to that state. */
 import type { RegistrationPanelProps } from '@simple-module-py/events';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { FormBody } from '../components/public_submissions/form/RecordFormFields';
 import { type FocusTarget, useSubmissionForm } from '../hooks/useSubmissionForm';
 import { keys, useT } from '../utils/i18n';
@@ -83,6 +83,12 @@ export default function RegistrationPanel({
     onGone: (code) => setGone(code as keyof typeof GONE_TEXT),
     onFocus,
   });
+  // Focus moves to the result once a submit succeeds, so a keyboard or screen-reader user lands on
+  // it (its container is also a live region).
+  const success = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (form.phase === 'success') success.current?.focus();
+  }, [form.phase]);
   const info = view?.event;
   const state = view?.availability;
   const header = info ? (
@@ -107,7 +113,7 @@ export default function RegistrationPanel({
   } else if (form.phase === 'success') {
     body = (
       <div role="status" className="rounded-md border px-6 py-8" data-testid="registration-success">
-        <h3 id={`${base}-success`} tabIndex={-1} className="text-xl font-medium">
+        <h3 ref={success} id={`${base}-success`} tabIndex={-1} className="text-xl font-medium">
           {t(copy.success_title)}
         </h3>
         <p className="mt-2">
