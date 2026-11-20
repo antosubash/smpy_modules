@@ -19,7 +19,7 @@ from sm_events.core.clock import utcnow
 from sm_events.core.host_settings import public_base_url
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
-from sm_events.feeds.subscriptions import launch, rules, service
+from sm_events.feeds.subscriptions import launch, rules, service, shapes
 from sm_events.web.endpoints.deps import Principal, get_settings, require_view
 from sm_events.web.endpoints.public import _urls
 from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut, SubscriptionPatch
@@ -48,7 +48,7 @@ def _context(request: Request, who, settings: EventsSettings) -> rules.Context:
 
 
 def _out(sub, settings: EventsSettings, who) -> SubscriptionOut:
-    return service.to_out(
+    return shapes.to_out(
         sub,
         setting_minutes=settings.subscription_refresh_minutes,
         is_manager=who.has(constants.PERM_MANAGE),
@@ -86,7 +86,7 @@ async def list_subscriptions(
 async def subscription_capacity(
     calendar_id: uuid.UUID, who: Principal, db=Depends(get_db)
 ) -> dict[str, dict[str, int]]:
-    return await service.capacity(db, who, calendar_id)
+    return await shapes.capacity(db, who, calendar_id)
 
 
 @router.post("/calendars/{calendar_id}/subscriptions", status_code=201)

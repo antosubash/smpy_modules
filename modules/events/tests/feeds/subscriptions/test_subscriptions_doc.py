@@ -84,22 +84,26 @@ NOT_LIMITS = {
 
 def test_every_limit_constant_is_in_the_table_and_every_row_has_a_constant():
     from sm_events.core.constants import subscriptions as module
+    from sm_events.core.constants import subscriptions_beat as beat
 
     named = {n for _, names in _rows() for n in names}
     limits = {
         n
-        for n in dir(module)
+        for part in (module, beat)
+        for n in dir(part)
         if (
             n.isupper()
             and not n.startswith("_")
-            and isinstance(getattr(module, n), (int, float, timedelta))
-            and not isinstance(getattr(module, n), bool)
+            and isinstance(getattr(part, n), (int, float, timedelta))
+            and not isinstance(getattr(part, n), bool)
         )
         or n == "SUBSCRIPTION_WRITE_RATE"
     } - NOT_LIMITS
     assert limits - named == set(), "a limit the table does not state"
     assert named - set(dir(constants)) == set(), "a row that names no constant"
-    assert set(dir(module)) >= NOT_LIMITS, "an exemption for a constant that is gone"
+    assert (set(dir(module)) | set(dir(beat))) >= NOT_LIMITS, (
+        "an exemption for a constant that is gone"
+    )
 
 
 def test_the_table_names_every_bound_that_matters():

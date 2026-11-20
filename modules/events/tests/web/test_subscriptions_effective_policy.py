@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 from sm_events.core.settings import EventsSettings
-from sm_events.feeds.subscriptions import rules, service
+from sm_events.feeds.subscriptions import rules, service, shapes
 from sm_events.models import Subscription
 from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionPatch
 from sqlalchemy import select
@@ -51,7 +51,7 @@ async def test_saved_before_the_switch_is_not_internal_until_a_manager_saves_it_
     )
     assert sub.may_use_private is False  # switch off at save time: never stored
     # the switch is turned on later: the old subscription is still not internal-capable
-    out = service.to_out(sub, setting_minutes=60, is_manager=True, internal_on=True)
+    out = shapes.to_out(sub, setting_minutes=60, is_manager=True, internal_on=True)
     assert out.may_use_internal_addresses is False
     # a manager saves its address again with the switch on: now it is
     await service.update(
