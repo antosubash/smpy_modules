@@ -74,3 +74,20 @@ async def test_oversize_body(inner, resolver, caplog):  # noqa: F811
     resolver["feeds.example.test"] = [PUBLIC_IP]
     inner(lambda r: httpx.Response(200, content=b"X" * 300_000))
     assert (await _run("feeds.example.test", None, caplog)).code == "too_large"
+
+
+async def test_a_refused_address_logs_neither_the_name_nor_the_address(monkeypatch, caplog):
+    from sm_events.feeds.subscriptions import url_safety
+
+    def private(host, port, **kw):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.9.8.7", port))]
+
+    monkeypatch.setattr(url_safety.socket, "getaddrinfo", private)
+    with caplog.at_level(logging.DEBUG), pytest.raises(url_safety.UnsafeURLError):
+        policy.resolve_allowed(
+            httpx.URL("https://token-in-subdomain-77.example/x.ics"), policy.Policy()
+        )
+    assert caplog.records, "the refusal is still logged"
+    for record in caplog.records:
+        text = record.getMessage() + repr(record.__dict__)
+        assert "token-in-subdomain-77" not in text and "10.9.8.7" not in text
