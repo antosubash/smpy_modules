@@ -48,7 +48,6 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
     ``HEAD`` only, adds the rate limits, and the 404 a visitor gets is pagebuilder's (it is
     mounted here), not the sign-in screen."""
     from httpx import ASGITransport, AsyncClient
-    from sm_events.core import host_settings
     from simple_module_hosting.public_access import is_public
 
     app = booted_host
@@ -174,6 +173,7 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
     what the framework's forwarded-host allow-list accepts (nothing, here: the list is empty, so
     only ``Host`` counts) and the response varies on ``Host``."""
     from httpx import ASGITransport, AsyncClient
+    from sm_events.core import host_settings
 
     app = booted_host
 
