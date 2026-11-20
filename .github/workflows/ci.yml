@@ -132,9 +132,12 @@ jobs:
     # The records unit suite alone is ~3 min on SQLite (~4 min measured
     # against Postgres — postgres-2026-09-21.md § 3); the migration round
     # trip and perf smoke add a few minutes more, and pagebuilder, news and
-    # billing about as much again (#117). 30 gives room without chasing a
-    # hung step to the billable ceiling.
-    timeout-minutes: 30
+    # billing about as much again (#117). With the events module the job
+    # measured 29 min (events 8.5 min and records 8.5 min on Postgres) and
+    # was cancelled at 30 on the next PR, so the limit is 45: room for the
+    # suites as they are, still short of chasing a hung step to the
+    # billable ceiling.
+    timeout-minutes: 45
     services:
       # `postgres:16` is what postgres-2026-09-21.md verified against
       # (16.13). POSTGRES_DB pre-creates the database the migration round
