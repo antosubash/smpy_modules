@@ -52,8 +52,14 @@ async def items_in_window(
     at most ``limit + 1``; series at most ``SERIES_FETCH_MAX``, ``True`` when there were more."""
     if not subscription_ids:
         return [], [], False
+    current = select(col(Subscription.id)).where(
+        col(Subscription.id).in_(subscription_ids),
+        col(Subscription.items_generation) == col(Subscription.policy_generation),
+    )
+    if public_only:
+        current = current.where(col(Subscription.public).is_(True))  # public now, not once
     base = select(ExternalItem).where(
-        col(ExternalItem.subscription_id).in_(subscription_ids),
+        col(ExternalItem.subscription_id).in_(current),
         col(ExternalItem.span_start) < end,
         or_(col(ExternalItem.span_end).is_(None), col(ExternalItem.span_end) > start),
     )

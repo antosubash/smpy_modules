@@ -66,6 +66,9 @@ class Subscription(Base, SoftDeleteMixin, MultiTenantMixin, table=True):  # ty: 
     policy_generation: int = counter()
     """Bumped whenever ``public``, ``may_use_private`` or the address changes. A fetch records the
     value it started under and its result is discarded if the row has moved on."""
+    items_generation: int = counter()
+    """The ``policy_generation`` the stored items were fetched under. Every read returns items
+    only while it equals ``policy_generation``."""
 
     status: str = Field(default="pending", max_length=SUBSCRIPTION_STATUS_MAX)
     """One of ``constants.SUBSCRIPTION_STATUSES``."""

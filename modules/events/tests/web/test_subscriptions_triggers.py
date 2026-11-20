@@ -60,8 +60,10 @@ async def test_a_pause_resume_loop_cannot_start_a_fetch_each_time(http, launched
     for _ in range(20):
         await http.post(f"{SUBS}/{sid}/pause", headers=OWNER)
         answers.append((await http.post(f"{SUBS}/{sid}/resume", headers=OWNER)).status_code)
-    assert set(answers) == {429}  # within the floor of the pause
-    assert launched == []
+    assert set(answers) == {200}  # a mistaken pause is undone at once ...
+    assert launched == []  # ... but it is never fetched before the floor
+    sub = await row(http, sid)
+    assert sub.status == "pending" and sub.next_fetch_at >= utcnow() + timedelta(seconds=250)
 
 
 async def test_resume_during_an_unexpired_lease_does_not_clear_it(http, launched):
@@ -70,9 +72,10 @@ async def test_resume_during_an_unexpired_lease_does_not_clear_it(http, launched
     await _set(http, status="paused", lease_owner="worker", lease_until=until)
     await _set(http, updated_at=utcnow() - timedelta(hours=1))
     got = await http.post(f"{SUBS}/{sid}/resume", headers=OWNER)
-    assert (got.status_code, got.json()["code"]) == (429, "refresh_too_soon")
+    assert got.status_code == 200
     sub = await row(http, sid)
-    assert (sub.lease_owner, sub.status) == ("worker", "paused")
+    assert (sub.lease_owner, sub.status) == ("worker", "pending")
+    assert sub.next_fetch_at >= until  # due after the in-flight fetch
     async with http.db_state.session_factory() as db:
         assert await lease.claim(db, uuid.UUID(sid), owner="second", now=utcnow()) is False
 

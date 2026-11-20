@@ -125,3 +125,92 @@ async def test_a_public_read_never_returns_a_subscription_that_is_not_public_now
             await db.commit()
             page = await read(db, ANONYMOUS, *DAY)
         assert [i for i in page.items if i.source == "subscriptions"] == []
+
+
+PUBLISHER = OWNER_P  # may publish, may not manage: never grants internal access
+
+
+async def _internal_with_items(client, monkeypatch, *, public=False):
+    stub_launch(monkeypatch)
+    cid = await calendar(client, OWNER_P, visibility="public")
+    made = (await add(client, cid, MANAGER_PUB, url="https://intranet.example.test/a.ics")).json()
+    sub = await row(client, made["id"])
+    async with client.db_state.session_factory() as db:
+        await seed_item(db, sub, "s", datetime(2027, 3, 10, 9, tzinfo=UTC), title="Intranet")
+        await update_sub(db, etag='"v1"', item_count=1)
+        await db.commit()
+    return made["id"]
+
+
+async def _public_items(client):
+    async with client.db_state.session_factory() as db:
+        page = await read(db, ANONYMOUS, *DAY)
+    return [i for i in page.items if i.source == "subscriptions"]
+
+
+async def test_an_address_edit_by_a_non_manager_then_publish_shows_nothing(monkeypatch):
+    async with app_client(allow_private_subscription_urls=True) as client:
+        sid = await _internal_with_items(client, monkeypatch)
+        edit = {"url": "https://b.example.test/a.ics"}
+        assert (
+            await client.patch(f"{SUBS}/{sid}", json=edit, headers=PUBLISHER)
+        ).status_code == 200
+        assert await _items(client) == []  # the old address's items go with the edit
+        await client.patch(f"{SUBS}/{sid}", json={"public": True}, headers=PUBLISHER)
+        assert await _public_items(client) == [] and await _items(client) == []
+
+
+async def test_a_non_manager_publishing_an_internal_subscription_shows_nothing(monkeypatch):
+    async with app_client(allow_private_subscription_urls=True) as client:
+        sid = await _internal_with_items(client, monkeypatch)
+        await client.patch(f"{SUBS}/{sid}", json={"public": True}, headers=PUBLISHER)
+        assert await _public_items(client) == [] and await _items(client) == []
+
+
+async def test_a_manager_switching_to_an_internal_address_drops_the_old_items(monkeypatch):
+    async with app_client(allow_private_subscription_urls=True) as client:
+        stub_launch(monkeypatch)
+        cid = await calendar(client, OWNER_P, visibility="public")
+        made = (await add(client, cid, PUBLISHER, url="https://a.example.test/a.ics")).json()
+        assert made["uses_internal_addresses"] is False
+        sub = await row(client, made["id"])
+        async with client.db_state.session_factory() as db:
+            await seed_item(db, sub, "s", datetime(2027, 3, 10, 9, tzinfo=UTC), title="Fetched")
+            await db.commit()
+        edit = {"url": "https://intranet.example.test/a.ics"}
+        got = await client.patch(f"{SUBS}/{made['id']}", json=edit, headers=MANAGER_PUB)
+        assert got.json()["uses_internal_addresses"] is True
+        assert await _items(client) == []
+
+
+async def test_a_read_with_a_mismatched_generation_returns_nothing(monkeypatch):
+    async with app_client() as client:
+        stub_launch(monkeypatch)
+        cid = await calendar(client, OWNER_P, visibility="public")
+        made = (
+            await add(client, cid, MANAGER_PUB, url="https://a.example.test/a.ics", public=True)
+        ).json()
+        sub = await row(client, made["id"])
+        async with client.db_state.session_factory() as db:
+            await seed_item(db, sub, "s", datetime(2027, 3, 10, 9, tzinfo=UTC), title="Shown")
+            await db.commit()
+        assert [i.title for i in await _public_items(client)] == ["Shown"]
+        async with client.db_state.session_factory() as db:  # a path that forgot to delete
+            await db.execute(update(Subscription).values(policy_generation=5))
+            await db.commit()
+        assert len(await _items(client)) == 1 and await _public_items(client) == []
+
+
+def test_the_generation_is_assigned_in_one_function_only():
+    import re
+    from pathlib import Path
+
+    import sm_events
+
+    pattern = re.compile(r"\bpolicy_generation\s*(\+=|-=|=(?!=))")
+    seen = {}
+    for path in Path(sm_events.__file__).parent.rglob("*.py"):
+        for n, line in enumerate(path.read_text().splitlines(), 1):
+            if pattern.search(line) and "policy_generation: int" not in line:
+                seen[f"{path.name}:{n}"] = line.strip()
+    assert [k.split(":")[0] for k in seen] == ["generation.py"], seen

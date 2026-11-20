@@ -141,6 +141,7 @@ async def store_feed(
         await _swap(db, sub, values, generation, now or utcnow())
     counts = StoreCounts(len(values), sum(reasons.values()), dict(reasons))
     sub.generation = generation
+    sub.items_generation = sub.policy_generation  # what these items were fetched under
     sub.item_count = counts.stored
     sub.last_counts = {
         "stored": counts.stored,

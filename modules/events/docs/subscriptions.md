@@ -28,7 +28,7 @@ nowhere else.
 | Add | The address is checked (see below), stored encrypted and shown only as `https://host/…`. The first refresh runs at once on a host with Celery eager, otherwise on the next beat tick. |
 | Refresh now | Allowed once every 5 minutes per subscription and while no fetch is running; the screen shows the result as the subscription's status. |
 | Edit | Change the name, colour, interval or visibility; type a new address to replace the old one (the field starts empty and the address is never shown again). A new address is due again after the minimum interval. |
-| Pause / Resume | A paused subscription is not fetched and keeps showing what it has. A stopped one (ten failures in a row, or the server said *gone*) resumes once. |
+| Pause / Resume | A paused subscription is not fetched and keeps showing what it has. A stopped one (ten failures in a row, or the server said *gone*) resumes once, at once; its next fetch waits for the five-minute floor. |
 | Remove | Final: the stored address is overwritten and the cached events are deleted in the same transaction. |
 
 The address is a credential (private calendar links carry a token in the path or query): treat it
@@ -78,7 +78,7 @@ may use it only if its saver held `events.manage` when the address was saved**; 
 per subscription, cleared when someone without that right changes the address, never taken from a
 request, and stays when the saver later loses the permission until the address is edited. It is
 applied at every fetch and redirect hop together with the setting (the setting off always wins).
-A public subscription is never an internal one: turning one public deletes everything it stored from an internal address and fetches again under the public policy, and a fetch that started under another policy (public, internal access or the address changed meanwhile) stores nothing. With the switch on, anyone who may add a
+A public subscription is never an internal one: changing a subscription's address, its public setting or its internal access (any of them) deletes what it stored, so stored items always belong to its current address and policy, and it is fetched again; a fetch that started under another one stores nothing, and every read ignores items of an older one. With the switch on, anyone who may add a
 subscription and holds `events.manage` can make the server send GET requests to internal http(s)
 addresses, including services on its own private address, and see whether the answer parses as a
 calendar: turn it on only for trusted networks. The server's own addresses are not listed.

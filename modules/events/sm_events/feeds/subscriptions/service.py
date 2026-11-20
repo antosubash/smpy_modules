@@ -27,7 +27,7 @@ from sm_events.core.errors_subscriptions import (
     SubscriptionLimit,
 )
 from sm_events.core.tenancy import bound_tenant
-from sm_events.feeds.subscriptions import policy, rules, schedule, urls, validate
+from sm_events.feeds.subscriptions import generation, policy, rules, schedule, urls, validate
 from sm_events.models import ExternalItem, Subscription
 from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut, SubscriptionPatch
 
@@ -112,15 +112,12 @@ async def update(
     )
     if public and changes_shown and not ctx.can_publish:
         raise PublishRequired  # what the public sees is chosen with the publish right, every time
+    moved = body.public is not None and body.public != sub.public
+    flag_before = sub.may_use_private
     if public and body.public is not None and not sub.public:
         rules.check_public(True, calendar, ctx)
         rules.recheck_public(sub, ctx)  # an address needing internal access cannot be public
-        if sub.may_use_private:
-            # What it stored came from an internal address: none of it may reach the public.
-            await _forget_items(db, sub)
-            sub.may_use_private = False
-            rules.make_due(sub, now)
-        sub.policy_generation += 1
+        sub.may_use_private = False
     sub.public = public
     if body.label is not None:
         sub.label = body.label
@@ -140,14 +137,14 @@ async def update(
             raise SubscriptionExists
         if not rules.same_address([sub], url):  # a changed address, not the one it already has
             sub.url_enc, sub.url_display = urls.seal(url), display
-            sub.etag = sub.last_modified = None
-            sub.policy_generation += 1
+            moved = True
             sub.may_use_private = policy.flag_after_save(
                 sub.may_use_private,
                 url_changed=True,
                 saver_may_use_private=ctx.is_manager and not public,
             )
-            rules.make_due(sub, now)
+    if moved or sub.may_use_private != flag_before:
+        await generation.restart(db, sub, now)  # the one place items and generation move
     sub.updated_at = now
     await db.flush()
     return sub
@@ -165,16 +162,14 @@ async def pause(
 async def resume(
     db: Any, who: ResourcePrincipal, sub_id: uuid.UUID, *, now: datetime
 ) -> Subscription:
-    """Only from a pause or a stop; once, and not again inside the floor."""
+    """Only from a pause or a stop, and only once. It always succeeds (a pause made by mistake is
+    undone at once); the fetch itself waits for ``fetch_wait`` through ``next_fetch_at``."""
     sub, _ = await validate.load_subscription(db, who, sub_id, lock=True)
     if sub.status not in ("paused", "disabled"):
         raise Conflict(
             constants.SUBSCRIPTION_NOT_PAUSED_DETAIL, constants.SUBSCRIPTION_NOT_PAUSED_CODE
         )
-    wait = rules.fetch_wait(sub, now)
-    if wait > timedelta(0):
-        raise RefreshTooSoon(retry_after=int(wait.total_seconds()) + 1)
-    rules.make_due(sub, now)
+    rules.make_due(sub, now)  # due after the floor, never earlier: no extra fetch is possible
     sub.updated_at = now
     await db.flush()
     return sub
@@ -199,19 +194,6 @@ async def refresh_now(
     sub.status, sub.next_fetch_at, sub.updated_at = "pending", now, now
     await db.flush()
     return sub
-
-
-async def _forget_items(db: Any, sub: Subscription) -> None:
-    """Delete the stored items and the validators that would skip a refetch, in this transaction."""
-    items = ExternalItem.__table__
-    await db.execute(
-        sa_delete(items).where(
-            items.c.tenant_id == bound_tenant(), items.c.subscription_id == sub.id
-        )
-    )
-    mark_written(db)  # Core DML: the ORM never sees it
-    sub.item_count, sub.last_counts = 0, {}
-    sub.etag = sub.last_modified = None
 
 
 async def delete(db: Any, who: ResourcePrincipal, sub_id: uuid.UUID, *, now: datetime) -> None:
