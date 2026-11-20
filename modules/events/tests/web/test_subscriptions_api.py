@@ -233,3 +233,26 @@ async def test_a_non_manager_sees_one_generic_failure_for_an_internal_subscripti
     for headers, code in ((MANAGER, "not_a_calendar"), (OWNER, "url_unreachable")):
         got = (await http_internal.get(f"{BASE}/{cid}/subscriptions", headers=headers)).json()[0]
         assert (got["id"], got["error_code"], got["last_http_status"]) == (theirs["id"], code, None)
+
+
+async def test_every_subscriptions_answer_is_private_and_not_stored(http):
+    """The answers hold the masked address and the fetch status: no cache, shared or private,
+    keeps them (the private feed's own rule: ``private, no-store``)."""
+    cid = await calendar(http, OWNER_P)
+    made = await add(http, cid, OWNER)
+    sid = made.json()["id"]
+    answers = [
+        made,
+        await http.get(f"{BASE}/{cid}/subscriptions", headers=OWNER),
+        await http.patch(f"{SUBS}/{sid}", json={"label": "Renamed"}, headers=OWNER),
+        await http.post(f"{SUBS}/{sid}/pause", headers=OWNER),
+        await http.post(f"{SUBS}/{sid}/resume", headers=OWNER),
+        await http.post(f"{SUBS}/{sid}/refresh", headers=OWNER),
+        await http.patch(f"{SUBS}/{uuid.uuid4()}", json={"label": "x"}, headers=OWNER),  # a 404
+        await http.delete(f"{SUBS}/{sid}", headers=OWNER),
+    ]
+    for got in answers:
+        assert got.headers.get("cache-control") == "private, no-store", (
+            got.request.url,
+            got.status_code,
+        )
