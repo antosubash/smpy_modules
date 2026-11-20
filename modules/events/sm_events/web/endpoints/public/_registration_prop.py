@@ -19,9 +19,6 @@ from sm_events.web.schemas.public_event import NextOccurrence, PublicRegistratio
 
 __all__ = ["registration_prop"]
 
-UPCOMING_MAX = 5
-"""How many dates the bare page of a series offers to choose from."""
-
 
 def _key(event: Event, shown: ShownOccurrence | None, series: bool) -> str | None:
     if not series:
@@ -74,5 +71,5 @@ def registration_prop(
         occurrence_key=key,
         upcoming=[]
         if key is not None
-        else [o for o in upcoming if o.status != "cancelled"][:UPCOMING_MAX],
+        else [o for o in upcoming if o.status != "cancelled"][: constants.REGISTRATION_UPCOMING],
     )

@@ -23,7 +23,8 @@ happened is told by mail to that address only. A public event that is full, clos
 refuses everyone alike; one that is not public (or not this form's) answers like an invalid token.
 What the public availability may show is decided by the events module (the contract returns only
 what may be published, never raw counts): with the event's "show seats" off, the states are `open`,
-`full`, `closed` and `ended` only, no number and no `few_left`. With it on, a double opt-in form shows
+`not_open_yet`, `closed`, `full` and `cancelled` only (`unavailable` is the shared 404), no number
+and no `few_left`. With it on, a double opt-in form shows
 the exact `seats_left`; a single opt-in form shows `few_left` (a fifth of the capacity or fewer),
 never a number.
 
