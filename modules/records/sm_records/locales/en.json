@@ -1005,7 +1005,8 @@
       "attendees": "Open the attendee list",
       "create": "Create a registration form",
       "creating": "Creating...",
-      "create_failed": "The form could not be created."
+      "create_failed": "The form could not be created.",
+      "captcha_hint": "Limited seats on a public form: we recommend turning on a captcha for the registration form's site (Settings), so a script cannot use up the form's submit limit."
     },
     "mine": {
       "title": "My registrations",

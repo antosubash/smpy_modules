@@ -1005,7 +1005,8 @@
       "attendees": "Teilnehmerliste öffnen",
       "create": "Anmeldeformular erstellen",
       "creating": "Wird erstellt ...",
-      "create_failed": "Das Formular konnte nicht erstellt werden."
+      "create_failed": "Das Formular konnte nicht erstellt werden.",
+      "captcha_hint": "Begrenzte Plätze auf einem öffentlichen Formular: Wir empfehlen, in den Einstellungen ein Captcha einzuschalten, damit ein Skript das Sendelimit des Formulars nicht aufbrauchen kann."
     },
     "mine": {
       "title": "Meine Anmeldungen",

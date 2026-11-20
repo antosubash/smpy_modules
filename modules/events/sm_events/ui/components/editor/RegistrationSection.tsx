@@ -16,6 +16,7 @@ import { fieldErrorId, invalidProps } from '../../utils/field-errors';
 import { keys, useT } from '../../utils/i18n';
 import type { RegistrationForm } from '../../utils/registration-form';
 import type { RegistrationMode } from '../../utils/types-events';
+import { CapacityWarning, Counts } from './RegistrationCounts';
 
 const LEADS = [15, 60, 1440, 10080];
 const MODES: RegistrationMode[] = ['none', 'external', 'builtin'];
@@ -28,6 +29,8 @@ type Props = {
   disabled: boolean;
   eventId: string | null;
   timezone: string;
+  /** The saved event's revision: the counts are read again after a save. */
+  revision?: number;
 };
 
 /** The server's messages for paths under `registration.`, without the prefix. */
@@ -46,6 +49,7 @@ export function RegistrationSection({
   disabled,
   eventId,
   timezone,
+  revision = 0,
 }: Props) {
   const { t } = useT();
   const copy = keys.events.registration;
@@ -56,7 +60,11 @@ export function RegistrationSection({
   const canBuiltin = providers.length > 0 || value.mode === 'builtin';
   const provider = registrationFor(value.provider);
   const Section = provider?.EditorSection;
-  const counts = useRegistrationCounts(eventId, value.mode === 'builtin' && !value.hidden);
+  const counts = useRegistrationCounts(
+    eventId,
+    value.mode === 'builtin' && !value.hidden,
+    revision,
+  );
   const capacity = /^\d+$/.test(value.capacity) ? Number(value.capacity) : null;
   const set = (patch: Partial<RegistrationForm>, path?: string) => {
     onChange(patch);
@@ -227,59 +235,12 @@ export function RegistrationSection({
                   ))}
                 </NativeSelect>
               </div>
+              <CapacityWarning capacity={capacity} state={counts.state} />
               <Counts state={counts.state} retry={counts.retry} />
             </div>
           ) : null}
         </>
       )}
     </fieldset>
-  );
-}
-
-function Counts({
-  state,
-  retry,
-}: {
-  state: ReturnType<typeof useRegistrationCounts>['state'];
-  retry: () => void;
-}) {
-  const { t } = useT();
-  const copy = keys.events.registration;
-  if (state.kind === 'idle') return null;
-  return (
-    <div className="grid gap-2" data-testid="registration-counts">
-      <h3 className="text-sm font-medium">{t(copy.counts_title)}</h3>
-      {state.kind === 'loading' ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {t(copy.counts_loading)}
-        </p>
-      ) : state.kind === 'error' ? (
-        <p role="alert" className="text-sm text-destructive">
-          {t(copy.counts_error)}{' '}
-          <button type="button" className="underline" onClick={retry}>
-            {t(copy.counts_retry)}
-          </button>
-        </p>
-      ) : state.items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t(copy.counts_empty)}</p>
-      ) : (
-        <table className="text-sm">
-          <tbody>
-            {state.items.map((row) => (
-              <tr key={row.occurrence_key}>
-                <th scope="row" className="pr-4 text-left font-normal">
-                  {row.start_local ?? t(copy.counts_gone)}
-                </th>
-                <td>
-                  {row.capacity === null
-                    ? t(copy.counts_taken_open, { taken: row.taken })
-                    : t(copy.counts_taken, { taken: row.taken, capacity: row.capacity })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
   );
 }

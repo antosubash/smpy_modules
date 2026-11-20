@@ -17,11 +17,13 @@ function Harness({
   eventId = 'e1',
   errors = {},
   seen = [],
+  revision = 1,
 }: {
   start?: Partial<RegistrationForm>;
   eventId?: string | null;
   errors?: Record<string, string>;
   seen?: RegistrationForm[];
+  revision?: number;
 }) {
   const [value, setValue_] = useState<RegistrationForm>({ ...blankRegistration(), ...start });
   seen[0] = value;
@@ -33,6 +35,7 @@ function Harness({
       errors={errors}
       disabled={false}
       eventId={eventId}
+      revision={revision}
       timezone="Europe/Vienna"
     />
   );
@@ -129,7 +132,7 @@ it('shows taken of capacity per date, and a date that no longer exists', async (
   const view = await mount(<Harness start={{ mode: 'builtin', provider: ID }} />);
   await flush();
   const text = document.querySelector('[data-testid=registration-counts]')?.textContent ?? '';
-  expect(text).toContain('2026-07-01T10:00');
+  expect(text).toContain('1 Jul 2026');
   expect(text).toContain('3 of 10');
   expect(text).toContain('no longer exists');
   await view.unmount();
@@ -216,4 +219,79 @@ it('loads the plugins itself on a cold visit: a loading line, then the provider'
   expect(document.body.textContent).not.toContain('Loading registration options');
   await view.unmount();
   resetLoader();
+});
+
+it('warns, with the numbers, when the capacity is lowered below seats already taken', async () => {
+  registerRegistration({ id: ID });
+  stubFetch({
+    [`GET ${COUNTS}`]: {
+      items: [
+        {
+          occurrence_key: 'a',
+          start: 'x',
+          start_local: '2026-07-01T10:00',
+          taken: 8,
+          capacity: 10,
+        },
+        {
+          occurrence_key: 'b',
+          start: 'y',
+          start_local: '2026-07-08T10:00',
+          taken: 3,
+          capacity: 10,
+        },
+      ],
+      total: 2,
+    },
+  });
+  const view = await mount(<Harness start={{ mode: 'builtin', provider: ID, capacity: '10' }} />);
+  await flush();
+  expect(document.querySelector('[data-testid=capacity-warning]')).toBeNull();
+  await setValue(document.getElementById('event-registration-capacity') as HTMLInputElement, '5');
+  const warning = document.querySelector('[data-testid=capacity-warning]')?.textContent ?? '';
+  expect(warning).toContain('8');
+  expect(warning).toContain('5');
+  expect(warning).toContain('nobody is removed');
+  await view.unmount();
+});
+
+it('words the per-date counts as dates, not as raw timestamps', async () => {
+  registerRegistration({ id: ID });
+  stubFetch({
+    [`GET ${COUNTS}`]: {
+      items: [
+        {
+          occurrence_key: 'a',
+          start: 'x',
+          start_local: '2026-07-01T10:00',
+          taken: 3,
+          capacity: 10,
+        },
+      ],
+      total: 1,
+    },
+  });
+  const view = await mount(<Harness start={{ mode: 'builtin', provider: ID }} />);
+  await flush();
+  const counts = document.querySelector('[data-testid=registration-counts]')?.textContent ?? '';
+  expect(counts).not.toContain('2026-07-01T10:00');
+  expect(counts).toContain('Jul');
+  await view.unmount();
+});
+
+it('refreshes the counts when the event is saved (its revision changes)', async () => {
+  registerRegistration({ id: ID });
+  let calls = 0;
+  stubFetch({
+    [`GET ${COUNTS}`]: () => {
+      calls += 1;
+      return { items: [], total: 0 };
+    },
+  });
+  const view = await mount(<Harness start={{ mode: 'builtin', provider: ID }} revision={1} />);
+  await flush();
+  await view.render(<Harness start={{ mode: 'builtin', provider: ID }} revision={2} />);
+  await flush();
+  expect(calls).toBe(2);
+  await view.unmount();
 });

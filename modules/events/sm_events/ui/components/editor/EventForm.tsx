@@ -34,6 +34,7 @@ export function EventForm({
   onEdit,
   typeSection,
   eventId = null,
+  revision,
 }: {
   form: FormState;
   errors: Record<string, string>;
@@ -47,6 +48,8 @@ export function EventForm({
   typeSection?: ReactNode;
   /** The saved event, for the registration counts; `null` while it is being created. */
   eventId?: string | null;
+  /** The saved event's revision, so the registration counts refresh after a save. */
+  revision?: number;
 }) {
   const { t } = useT();
   const copy = keys.events.editor;
@@ -118,6 +121,7 @@ export function EventForm({
         errors={errors}
         disabled={disabled}
         eventId={eventId}
+        revision={revision}
         timezone={form.timezone}
       />
       <fieldset className="grid gap-4" disabled={disabled}>

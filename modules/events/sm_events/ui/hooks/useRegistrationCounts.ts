@@ -10,7 +10,12 @@ export type CountsState =
 
 /** Seats taken per date for a saved event, loaded when `enabled`. A failure is a state with a
  *  retry, never a thrown error: the counts are information, not part of saving. */
-export function useRegistrationCounts(eventId: string | null, enabled: boolean) {
+export function useRegistrationCounts(
+  eventId: string | null,
+  enabled: boolean,
+  /** Changes when the event is saved (its revision): the counts are read again. */
+  version: number | string = 0,
+) {
   const [state, setState] = useState<CountsState>({ kind: 'idle' });
   const [attempt, setAttempt] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` only re-runs the load
@@ -30,7 +35,7 @@ export function useRegistrationCounts(eventId: string | null, enabled: boolean) 
       },
     );
     return () => controller.abort();
-  }, [eventId, enabled, attempt]);
+  }, [eventId, enabled, attempt, version]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { state, retry };
 }

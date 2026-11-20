@@ -173,8 +173,9 @@
     "registrations_orphaned": "Diese Änderung würde einen Termin entfernen, für den es bereits Anmeldungen gibt. Verschieben oder stornieren Sie diese zuerst.",
     "registration_has_seats": "Es haben sich bereits Personen angemeldet, daher kann das Anmeldeformular nicht geändert werden. Stornieren Sie zuerst die Anmeldungen.",
     "seats_busy": "Die Anmeldungen sind gerade ausgelastet. Bitte versuchen Sie es erneut.",
-    "registration_capacity_invalid": "Geben Sie eine ganze Zahl an Plätzen ein, mindestens 1.",
-    "registration_window_invalid": "Geben Sie eine gültige Zeit ein, und lassen Sie die Anmeldung vor dem Schließen öffnen."
+    "registration_capacity_invalid": "Geben Sie eine ganze Zahl an Plätzen von 1 bis {max} ein.",
+    "registration_window_invalid": "Geben Sie eine gültige Zeit ein, zu der die Anmeldung öffnet.",
+    "registration_closes_invalid": "Die Anmeldung muss nach dem Öffnen schließen. Prüfen Sie die Schließzeit (und die Öffnungszeit)."
   },
   "categories": {
     "title": "Kategorien",
@@ -1028,6 +1029,7 @@
     "diff_external": "Link: {url}",
     "diff_builtin": "Auf dieser Website, {capacity} Plätze",
     "diff_builtin_open": "Auf dieser Website, ohne Begrenzung",
-    "loading_providers": "Anmeldeoptionen werden geladen ..."
+    "loading_providers": "Anmeldeoptionen werden geladen ...",
+    "capacity_warning": "Mindestens ein Termin hat bereits mehr Anmeldungen als diese Platzzahl ({taken} am {date}, Plätze {capacity}). Sie können trotzdem speichern: Niemand wird entfernt, aber dort kann sich niemand Neues anmelden, bis Plätze frei werden."
   }
 }

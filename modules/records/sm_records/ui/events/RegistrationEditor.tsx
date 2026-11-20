@@ -103,6 +103,11 @@ export default function RegistrationEditor({
           {t(copy.no_double_opt_in)}
         </p>
       ) : null}
+      {chosen && capacity !== null ? (
+        <p className="text-xs text-muted-foreground" data-testid="captcha-hint">
+          {t(copy.captcha_hint)}
+        </p>
+      ) : null}
       {chosen?.attendees_url ? (
         <a className="text-sm underline" href={chosen.attendees_url}>
           {t(copy.attendees)}

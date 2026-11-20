@@ -173,8 +173,9 @@
     "registrations_orphaned": "This change would remove a date that already has registrations. Move or cancel those registrations first.",
     "registration_has_seats": "Somebody has already registered, so the registration form cannot be changed. Cancel the registrations first.",
     "seats_busy": "The registrations are busy right now. Please try again.",
-    "registration_capacity_invalid": "Enter a whole number of seats, at least 1.",
-    "registration_window_invalid": "Enter a valid date and time, and let registration open before it closes."
+    "registration_capacity_invalid": "Enter a whole number of seats from 1 to {max}.",
+    "registration_window_invalid": "Enter a valid date and time for when registration opens.",
+    "registration_closes_invalid": "Registration must close after it opens. Check the closing time (and the opening time)."
   },
   "categories": {
     "title": "Categories",
@@ -1028,6 +1029,7 @@
     "diff_external": "Link: {url}",
     "diff_builtin": "On this site, {capacity} seats",
     "diff_builtin_open": "On this site, no seat limit",
-    "loading_providers": "Loading registration options..."
+    "loading_providers": "Loading registration options...",
+    "capacity_warning": "Some dates already have more registrations than this capacity (the most: {taken} on {date}; capacity {capacity}). You can still save: nobody is removed, but no one new can register there until seats free up."
   }
 }

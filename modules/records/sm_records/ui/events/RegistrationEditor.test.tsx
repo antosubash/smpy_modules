@@ -140,3 +140,14 @@ it('has no create button when read-only, and a failed load can be retried', asyn
   expect(select()).not.toBeNull();
   await view.unmount();
 });
+
+it('recommends a captcha for a limited event, whichever form is chosen', async () => {
+  const limited = await mount(<RegistrationEditor {...props({ target: 'b', capacity: 20 })} />);
+  await settle();
+  expect(document.querySelector('[data-testid=captcha-hint]')?.textContent).toContain('captcha');
+  await limited.unmount();
+  const open = await mount(<RegistrationEditor {...props({ target: 'b', capacity: null })} />);
+  await settle();
+  expect(document.querySelector('[data-testid=captcha-hint]')).toBeNull();
+  await open.unmount();
+});
