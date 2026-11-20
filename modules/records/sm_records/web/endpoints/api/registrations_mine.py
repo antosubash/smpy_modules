@@ -35,6 +35,7 @@ from sm_records.records.services._common import utcnow
 from sm_records.records.services.errors import NotFound
 from sm_records.web.deps import get_settings, request_db
 from sm_records.web.endpoints.api._errors import RecordsErrorRoute
+from sm_records.web.endpoints.api._responses import TYPE_WRITE, responses
 
 __all__ = ["router"]
 
@@ -70,7 +71,11 @@ def signed_in(request: Request) -> str:
     return str(user.id)
 
 
-router = APIRouter(route_class=RecordsErrorRoute, dependencies=[Depends(signed_in)])
+router = APIRouter(
+    route_class=RecordsErrorRoute,
+    dependencies=[Depends(signed_in)],
+    responses=responses(*TYPE_WRITE),
+)
 
 
 async def verified_address(request: Request, db: AsyncSession) -> str | None:

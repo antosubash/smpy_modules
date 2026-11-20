@@ -727,7 +727,8 @@
   },
   "menu": {
     "all_types": "Alle Datensatztypen",
-    "group_records": "Datensätze"
+    "group_records": "Datensätze",
+    "my_registrations": "Meine Anmeldungen"
   },
   "public_submissions": {
     "card_title": "Einsendungen über die Website",
@@ -1003,6 +1004,23 @@
       "create": "Anmeldeformular erstellen",
       "creating": "Wird erstellt ...",
       "create_failed": "Das Formular konnte nicht erstellt werden."
+    },
+    "mine": {
+      "title": "Meine Anmeldungen",
+      "intro": "Die Veranstaltungen, für die Sie angemeldet sind oder die Sie noch bestätigen müssen.",
+      "empty": "Sie haben keine bevorstehenden Anmeldungen.",
+      "unverified": "Ihre E-Mail-Adresse ist noch nicht bestätigt, daher können Ihre Anmeldungen nicht angezeigt werden. Bestätigen Sie sie zuerst.",
+      "pending": "Wartet auf Ihre Bestätigung",
+      "registered": "Angemeldet",
+      "cancel": "Anmeldung stornieren",
+      "cancel_confirm": "Diese Anmeldung stornieren? Ihr Platz geht an jemand anderen.",
+      "cancel_yes": "Ja, stornieren",
+      "cancel_no": "Behalten",
+      "cancelled": "Anmeldung storniert.",
+      "cancel_failed": "Die Anmeldung konnte nicht storniert werden. Bitte versuchen Sie es erneut.",
+      "load_failed": "Ihre Anmeldungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "loading": "Wird geladen ..."
     }
   }
 }

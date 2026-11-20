@@ -727,7 +727,8 @@
   },
   "menu": {
     "all_types": "All record types",
-    "group_records": "Records"
+    "group_records": "Records",
+    "my_registrations": "My registrations"
   },
   "public_submissions": {
     "card_title": "Website submissions",
@@ -1003,6 +1004,23 @@
       "create": "Create a registration form",
       "creating": "Creating...",
       "create_failed": "The form could not be created."
+    },
+    "mine": {
+      "title": "My registrations",
+      "intro": "The events you are registered for, or have yet to confirm.",
+      "empty": "You have no upcoming registrations.",
+      "unverified": "Your email address is not verified yet, so your registrations cannot be shown. Verify it first.",
+      "pending": "Waiting for your confirmation",
+      "registered": "Registered",
+      "cancel": "Cancel registration",
+      "cancel_confirm": "Cancel this registration? Your seat goes to someone else.",
+      "cancel_yes": "Yes, cancel",
+      "cancel_no": "Keep it",
+      "cancelled": "Registration cancelled.",
+      "cancel_failed": "The registration could not be cancelled. Please try again.",
+      "load_failed": "Your registrations could not be loaded.",
+      "retry": "Try again",
+      "loading": "Loading..."
     }
   }
 }

@@ -147,3 +147,12 @@ async def test_the_same_address_in_another_tenant_is_not_listed(reg_site):
     me(reg_site)
     got = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()
     assert len(got["items"]) == 1 and got["items"][0]["type_key"] == TYPE
+
+
+async def test_the_page_is_for_anyone_signed_in_and_is_in_the_menu(reg_site):
+    inertia = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+    anon = await reg_site.get("/admin/records/registrations/mine", headers=inertia)
+    assert anon.status_code in (401, 403)
+    for who in (ROLE_VIEWER, ADMIN):
+        got = await reg_site.get("/admin/records/registrations/mine", headers=roles(who) | inertia)
+        assert got.status_code == 200 and got.json()["component"] == "Records/MyRegistrations"

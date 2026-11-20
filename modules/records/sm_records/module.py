@@ -131,6 +131,21 @@ class RecordsModule(SubmissionHooks, ModuleBase):
                 group_key=constants.MENU_GROUP_KEY_TYPES,
             )
         )
+        from sm_records.public_submissions.registration import seats
+
+        if seats.available():  # registrations exist only with the events module
+            registry.add(
+                MenuItem(
+                    label=constants.MENU_MINE_LABEL,
+                    label_key=constants.MENU_MINE_LABEL_KEY,
+                    url=constants.MENU_MINE_URL,
+                    icon="calendar-check",
+                    order=constants.MENU_ORDER_TYPE + 1,
+                    section=MenuSection.ADMIN_SIDEBAR,
+                    group=constants.MENU_GROUP_TYPES,
+                    group_key=constants.MENU_GROUP_KEY_TYPES,
+                )
+            )
         # A type opting into its own entry (``show_in_menu``) is a runtime
         # fact, and each tenant has its own: a per-request provider (framework
         # 0.0.36, upstream #340) reads the request's tenant's types.
@@ -259,6 +274,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         from sm_records.web.endpoints.api.public_submissions_links import router as links
         from sm_records.web.endpoints.api.public_submissions_public import router as submissions
         from sm_records.web.endpoints.views import router as views
+        from sm_records.web.endpoints.views_mine import router as mine_views
 
         api_router.include_router(api)
         # Beside the admin router, not in it: anonymous, so without its tenant
@@ -267,4 +283,6 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         prefix = constants.PUBLIC_SUBMISSIONS_API_PREFIX.removeprefix(constants.ROUTE_PREFIX_API)
         for router in (links, submissions):
             api_router.include_router(router, prefix=prefix.rstrip("/"))
+        # First: ``/registrations/mine`` must not be taken for a record list or editor.
+        view_router.include_router(mine_views)
         view_router.include_router(views)

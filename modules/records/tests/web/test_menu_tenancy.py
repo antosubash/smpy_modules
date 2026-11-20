@@ -69,7 +69,9 @@ async def _sidebar(client: AsyncClient, active: str, *names: str) -> list[str]:
         "/admin/records/", headers={**roles(*names), _ACTIVE: active, **_INERTIA}
     )
     assert resp.status_code == 200, resp.text
-    return [item["label"] for item in resp.json()["props"]["menus"]["adminSidebar"]]
+    # "My registrations" is the events-gated entry (its own tests are in the registration suite).
+    labels = [item["label"] for item in resp.json()["props"]["menus"]["adminSidebar"]]
+    return [label for label in labels if label != "My registrations"]
 
 
 async def test_each_organisation_sees_its_own_types(multi):
