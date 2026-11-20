@@ -401,18 +401,18 @@ last-write-wins; event writes use `expected_revision`.
 
 The module is complete: ten parts, delivered in order, each with its own guide.
 
-| Part | Delivers | Guide |
-| --- | --- | --- |
-| 1 | Calendars with private, internal and public visibility, sharing, categories, settings, tenancy and the access policy | this page |
-| 2 | Events with texts, recurrence and overrides, the occurrences read, the workflow, scheduled publishing, the API, the Events list and editor | this page |
-| 3 | The `Calendar` component and the console grid: views, create, drag, resize, timezone | this page |
-| 4 | The public site: pages, calendar slug redirects, `.ics` feeds, JSON-LD, sitemap | [Public pages](public.md), [Operating](operations.md) |
-| 5 | Private feed links and `.ics` import | [Feeds](feeds.md), [Import](import.md) |
-| 6 | The extension registry, the plugin guide and the records date-field source | [Writing a plugin](extensions.md) |
-| 7 | Pagebuilder blocks and the newsletter event card | [Blocks and cards](blocks.md) |
-| 8 | Reminders | [Reminders](reminders.md) |
-| 9 | Registration through records | [Registration](registration.md) |
-| 10 | External ICS subscriptions: a calendar shows another calendar read-only | [Subscriptions](subscriptions.md) |
+| Part | Delivers | Guide | Pull request |
+| --- | --- | --- | --- |
+| 1 | Calendars with private, internal and public visibility, sharing, categories, settings, tenancy and the access policy | this page | #413 |
+| 2 | Events with texts, recurrence and overrides, the occurrences read, the workflow, scheduled publishing, the API, the Events list and editor | this page | #414 |
+| 3 | The `Calendar` component and the console grid: views, create, drag, resize, timezone | this page | #415 |
+| 4 | The public site: pages, calendar slug redirects, `.ics` feeds, JSON-LD, sitemap | [Public pages](public.md), [Operating](operations.md) | #418 |
+| 5 | Private feed links and `.ics` import | [Feeds](feeds.md), [Import](import.md) | #420 |
+| 6 | The extension registry, the plugin guide and the records date-field source | [Writing a plugin](extensions.md) | #421 |
+| 7 | Pagebuilder blocks and the newsletter event card | [Blocks and cards](blocks.md) | #424 |
+| 8 | Reminders | [Reminders](reminders.md) | #425 |
+| 9 | Registration through records | [Registration](registration.md) | this stack |
+| 10 | External ICS subscriptions: a calendar shows another calendar read-only | [Subscriptions](subscriptions.md) | this stack |
 
 ## Subscriptions
 

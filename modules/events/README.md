@@ -4,8 +4,13 @@ Owned calendars with private, internal or public visibility, calendar sharing,
 multilingual categories, and events for SimpleModule hosts. Events have texts in
 each content language, one-off, all-day and recurring schedules, overrides for
 single occurrences, a review and publishing workflow, and a bounded occurrences
-read, a console calendar, and (from PR 4) a public site: pages, ICS feeds, JSON-LD and a
-sitemap. The module is complete (ten parts). See the [guide](docs/index.md), [public pages](docs/public.md), [blocks and cards](docs/blocks.md), [operating](docs/operations.md) and the
+read, a console calendar, a public site (pages, ICS feeds, JSON-LD and a sitemap), private feed
+links and `.ics` import, pagebuilder blocks, reminders, registration through records and read-only
+subscriptions to external calendars. The module is complete (ten parts). See the
+[guide](docs/index.md), [public pages](docs/public.md), [feeds](docs/feeds.md),
+[import](docs/import.md), [blocks and cards](docs/blocks.md), [reminders](docs/reminders.md),
+[registration](docs/registration.md), [subscriptions](docs/subscriptions.md),
+[operating](docs/operations.md) and the
 [approved design](../../docs/superpowers/specs/2026-11-17-events-module-design.md).
 
 ## Install

@@ -356,16 +356,16 @@ Migrations are in `host/migrations/versions/`, the first with
 
 | PR | Delivers | Done |
 | --- | --- | --- |
-| 1 | Scaffold, tenancy, settings, calendars with visibility and sharing, the Calendars screen, host migration, docs | Done |
-| 2 | Events and texts, recurrence and overrides, the occurrences read, workflow, API, list and editor screens | Done |
-| 3 | The `Calendar` component and the console calendar: views, create, drag, resize, grid timezone | Done |
-| 4 | Public pages (with calendar slug redirects), public ICS, JSON-LD, sitemap, e2e spec | Done |
-| 5 | Private feed tokens and `.ics` upload | Done |
-| 6 | The extension registry, plugin guide, the records date-field source | Done |
-| 7 | Pagebuilder blocks and the newsletter card | Done |
-| 8 | Reminders | Done |
-| 9 | Registration through records | Done |
-| 10 | External ICS subscriptions | Done |
+| 1 | Scaffold, tenancy, settings, calendars with visibility and sharing, the Calendars screen, host migration, docs | Done (#413) |
+| 2 | Events and texts, recurrence and overrides, the occurrences read, workflow, API, list and editor screens | Done (#414) |
+| 3 | The `Calendar` component and the console calendar: views, create, drag, resize, grid timezone | Done (#415) |
+| 4 | Public pages (with calendar slug redirects), public ICS, JSON-LD, sitemap, e2e spec | Done (#418) |
+| 5 | Private feed tokens and `.ics` upload | Done (#420) |
+| 6 | The extension registry, plugin guide, the records date-field source | Done (#421) |
+| 7 | Pagebuilder blocks and the newsletter card | Done (#424) |
+| 8 | Reminders | Done (#425) |
+| 9 | Registration through records | Done (this stack) |
+| 10 | External ICS subscriptions | Done (this stack) |
 
 Each PR goes through `/ship`. The framework bump (#405) lands first. PR 1
 creates every table of PRs 1 and 2 in one labelled revision.
