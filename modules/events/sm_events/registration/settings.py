@@ -134,12 +134,17 @@ async def _keep_unreadable_form(
     db: Any, event: Event, reg: RegistrationIn, viewer: Any
 ) -> RegistrationIn:
     """An event whose form this editor may not read keeps it: they can change the other settings,
-    and a submitted form must be the stored one or empty; anything else is refused exactly as a
-    form that does not exist (same code, message and cost)."""
+    and a submitted form must be empty (the editor was shown none); anything else, **the stored one
+    included**, is refused exactly as a form that does not exist (same code, message and cost).
+    Accepting the stored one would tell a guesser that the guess is the hidden form's key."""
     if event.registration_mode != _BUILTIN or await access.target_readable(db, event, viewer):
         return reg
-    stored = (_BUILTIN, event.registration_provider, event.registration_target)
-    if (reg.mode, reg.provider, reg.target) not in (stored, (_BUILTIN, None, None)):
+    allowed = [(_BUILTIN, None, None)]
+    if registry.registration_provider(event.registration_provider or "") is None:
+        # The provider is gone, not the editor's rights: nothing to guess at, and the settings sent
+        # back unchanged are not a change (they could not be checked anyway).
+        allowed.append((_BUILTIN, event.registration_provider, event.registration_target))
+    if (reg.mode, reg.provider, reg.target) not in allowed:
         raise UnknownRegistrationTarget
     return reg.model_copy(
         update={
