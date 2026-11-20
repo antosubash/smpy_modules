@@ -12,7 +12,7 @@ from sm_events.feeds.subscriptions.url_safety import UnsafeURLError
 from tests.support.net import OTHER_PUBLIC_IP, PUBLIC_IP, PUBLIC_IPV6, resolver  # noqa: F401
 
 OFF = policy.Policy(allow_private=False)
-ON = policy.Policy(allow_private=True)
+ON = policy.Policy(allow_private=True, may_use_private=True)
 
 
 def _code(fn, *args, **kwargs) -> str:

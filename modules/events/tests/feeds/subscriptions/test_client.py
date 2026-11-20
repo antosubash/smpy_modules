@@ -57,7 +57,7 @@ async def test_connection_pinned_with_host_and_sni(resolver):  # noqa: F811
 async def test_a_non_default_port_survives_the_rewrite(resolver):  # noqa: F811
     resolver["cal.example"] = [PUBLIC_IP]
     seen: list[httpx.Request] = []
-    pol = policy.Policy(allow_private=True)
+    pol = policy.Policy(allow_private=True, may_use_private=True)
     await _transport(lambda r: httpx.Response(200), seen, pol).handle_async_request(
         _request("https://cal.example:8443/x")
     )

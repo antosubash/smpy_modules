@@ -15,7 +15,7 @@ from sm_events.feeds.subscriptions.errors import FetchFailure
 
 from tests.support.net import PUBLIC_IP, inner, resolver  # noqa: F401
 
-ON = policy.Policy(allow_private=True)
+ON = policy.Policy(allow_private=True, may_use_private=True)
 PATH = "/private/SECRET-TOKEN-123/basic.ics?key=SECRET2"
 SECRETS = ("SECRET-TOKEN-123", "SECRET2", "private/SECRET")
 

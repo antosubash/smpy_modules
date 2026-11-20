@@ -127,8 +127,9 @@ _PRIVATE: Final = tuple(
 class Policy:
     allow_private: bool = False
     """The ``allow_private_subscription_urls`` setting."""
-    may_use_private: bool = True
-    """``False`` for a save by someone without ``events.manage``: the switch does not apply."""
+    may_use_private: bool = False
+    """Whether the saver held ``events.manage``: without it the switch does not apply. ``False``
+    unless said otherwise; code builds a policy only through :func:`effective`."""
 
     @property
     def intranet(self) -> bool:

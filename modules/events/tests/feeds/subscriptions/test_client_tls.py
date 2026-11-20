@@ -17,7 +17,9 @@ from sm_events.feeds.subscriptions.url_safety import UnsafeURLError
 
 from tests.feeds.subscriptions.conftest import ICS
 
-ON = policy.Policy(allow_private=True)  # any port: the test server's is random
+ON = policy.Policy(
+    allow_private=True, may_use_private=True
+)  # any port: the test server's is random
 
 
 async def _get(transport: client.PinnedTransport, url: str) -> bytes:

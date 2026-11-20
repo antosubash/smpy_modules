@@ -49,7 +49,11 @@ async def fetch(url: str, *, intranet: bool = False, etag=None, last_modified=No
     kw.setdefault("max_bytes", 100_000)
     kw.setdefault("timeout", 5)
     return await fetch_feed(
-        url, policy=Policy(allow_private=intranet), etag=etag, last_modified=last_modified, **kw
+        url,
+        policy=Policy(allow_private=intranet, may_use_private=intranet),
+        etag=etag,
+        last_modified=last_modified,
+        **kw,
     )
 
 

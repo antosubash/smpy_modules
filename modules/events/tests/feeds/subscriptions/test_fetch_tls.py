@@ -10,7 +10,7 @@ from sm_events.feeds.subscriptions.errors import FetchFailure
 
 from tests.feeds.subscriptions.conftest import ICS
 
-ON = policy.Policy(allow_private=True)
+ON = policy.Policy(allow_private=True, may_use_private=True)
 
 
 async def _fetch(url: str, timeout: float = 5):
