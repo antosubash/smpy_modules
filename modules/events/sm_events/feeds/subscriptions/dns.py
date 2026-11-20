@@ -111,4 +111,4 @@ async def resolve_bounded(url: httpx.URL, policy: url_policy.Policy) -> tuple[st
     try:
         return await asyncio.wait_for(_run(job), DNS_TIMEOUT_SECONDS)
     except TimeoutError:
-        raise FetchFailure("timeout") from None
+        raise FetchFailure("url_unreachable") from None  # as an unresolvable name: no oracle

@@ -11,6 +11,9 @@ nowhere else.
 - It is **plain text**: a title, a time, a place and a link, no description, attendee, organiser,
   alarm or attachment. The link is shown only if the feed gave a web address (`http` or `https`),
   and opens in a new tab with `noopener noreferrer nofollow`.
+- An event the feed marks `CLASS:PRIVATE` or `CONFIDENTIAL` is stored as **Busy** with its time and
+  nothing else (no title, place or link), and is never shown on a public page, even for a public
+  subscription.
 - It is **read-only**: no edit, move, "remind me" or registration control exists for it.
 - It is **never re-published**: not in this site's `.ics` feeds (public, private links or a
   single event), not in the sitemap, the server-rendered pages or the JSON-LD, not as a newsletter
@@ -166,3 +169,14 @@ over a real **loopback TLS socket** with a throwaway CA injected through the tra
 seam, with the guard widened to loopback inside that test only. The fetcher always refuses
 loopback, so **the browser suite does not exercise a live fetch**: its external entries are written
 by `tests/e2e/support/seed_external.py` through the module's own store function.
+
+## Known limits
+
+- A public answer that included external items can be cached; after a subscription is made
+  private or deleted it stays visible until the cache time runs out.
+- With the intranet switch off, a name that does not resolve and one that resolves to a refused
+  address both answer `url_unreachable`, and so does a lookup that times out, so the answer maps
+  no internal zone (a connection that times out later is still `timeout`, except for an internal
+  address, see "Failure codes").
+- The internal flag (`may_use_internal_addresses`) stays when the person who saved the address
+  later loses `events.manage`, until the address is edited.

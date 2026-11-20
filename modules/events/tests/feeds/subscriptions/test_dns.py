@@ -46,8 +46,9 @@ async def test_a_hung_lookup_times_out_closed(hung_dns, monkeypatch):
     monkeypatch.setattr(dns, "DNS_TIMEOUT_SECONDS", 0.05)
     with pytest.raises(FetchFailure) as caught:
         await dns.resolve_bounded(_url("hung.example"), OFF)
-    assert caught.value.code == "timeout"
-    assert str(caught.value) == "timeout"
+    # a name that never answers looks like one that does not exist: no oracle for internal zones
+    assert caught.value.code == "url_unreachable"
+    assert str(caught.value) == "url_unreachable"
 
 
 async def test_saturated_dns_pool_fails_closed_without_queueing(hung_dns, monkeypatch, caplog):

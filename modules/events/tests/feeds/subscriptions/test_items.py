@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
+from sm_events.core import constants
 from sm_events.feeds.importing.values import ItemSkip
 from sm_events.feeds.subscriptions import items
 
@@ -104,3 +105,24 @@ def test_a_time_or_rule_the_module_refuses_skips_the_item():
         items.to_values(bad_times)
     with pytest.raises(ItemSkip):
         items.to_values(mapped_event.model_copy(update={"rrule": "FREQ=SECONDLY"}))
+
+
+@pytest.mark.parametrize("klass", ["PRIVATE", "CONFIDENTIAL"])
+def test_a_private_event_is_kept_as_busy_with_its_time_only(klass):
+    v = _one(
+        *vevent(
+            SUMMARY="Salary talk",
+            LOCATION="Room Secret",
+            URL="https://x.example/secret",
+            CLASS=klass,
+        )
+    )
+    assert v.private_class is True
+    assert (v.title, v.location, v.url) == (constants.SUBSCRIPTION_BUSY_TITLE, None, None)
+    assert v.starts_at == datetime(2026, 7, 1, 10, tzinfo=UTC)  # the time stays
+    assert "Salary" not in repr(v) and "Secret" not in repr(v)
+
+
+def test_a_public_event_keeps_its_text():
+    v = _one(*vevent(SUMMARY="Talk", LOCATION="Room", CLASS="PUBLIC"))
+    assert (v.private_class, v.title, v.location) == (False, "Talk", "Room")

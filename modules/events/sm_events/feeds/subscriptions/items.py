@@ -126,6 +126,14 @@ def to_values(mapped: MappedEvent) -> ItemValues:
         if mapped.url and len(mapped.url) <= constants.SUBSCRIPTION_ITEM_URL_MAX
         else None
     )
+    if mapped.private_class:  # the feed's own word: keep the time, never the text
+        title, location, url = constants.SUBSCRIPTION_BUSY_TITLE, None, None
+    else:
+        title = clean_line(mapped.title, constants.SUBSCRIPTION_ITEM_TITLE_MAX)
+        location = (
+            clean_line(mapped.venue_name or "", constants.SUBSCRIPTION_ITEM_LOCATION_MAX) or None
+        )
+        url = url if url and is_web_url(url) else None
     values = ItemValues(
         uid=mapped.uid,
         all_day=times.all_day,
@@ -137,10 +145,9 @@ def to_values(mapped: MappedEvent) -> ItemValues:
         overrides=overrides,
         span_start=span_start,
         span_end=span_end,
-        title=clean_line(mapped.title, constants.SUBSCRIPTION_ITEM_TITLE_MAX),
-        location=clean_line(mapped.venue_name or "", constants.SUBSCRIPTION_ITEM_LOCATION_MAX)
-        or None,
-        url=url if url and is_web_url(url) else None,
+        title=title,
+        location=location,
+        url=url,
         cancelled=mapped.cancelled,
         private_class=mapped.private_class,
     )

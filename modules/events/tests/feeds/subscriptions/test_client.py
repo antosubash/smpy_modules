@@ -176,7 +176,7 @@ async def test_dns_timeout_fails_closed(monkeypatch):
             await _transport(lambda r: httpx.Response(200)).handle_async_request(_request())
     finally:
         release.set()
-    assert caught.value.code == "timeout"
+    assert caught.value.code == "url_unreachable"
     assert time.monotonic() - started < constants.DNS_TIMEOUT_SECONDS + 1
 
 
