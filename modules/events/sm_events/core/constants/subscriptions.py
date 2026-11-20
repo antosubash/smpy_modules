@@ -92,7 +92,7 @@ __all__ = [
 SOURCE_SUBSCRIPTIONS: Final = "subscriptions"
 """The built-in read source's id (never stored in ``events_calendar.sources``)."""
 SUBSCRIPTIONS_SOURCE_LABEL_KEY: Final = "events.subscriptions.source"
-SUBSCRIPTIONS_SOURCE_ICON: Final = "rss"
+SUBSCRIPTIONS_SOURCE_ICON: Final = "globe"
 
 REFRESH_SUBSCRIPTIONS: Final = "events.refresh_subscriptions"
 REFRESH_SUBSCRIPTION: Final = "events.refresh_subscription"
