@@ -364,8 +364,8 @@ Migrations are in `host/migrations/versions/`, the first with
 | 6 | The extension registry, plugin guide, the records date-field source | Done (#421) |
 | 7 | Pagebuilder blocks and the newsletter card | Done (#424) |
 | 8 | Reminders | Done (#425) |
-| 9 | Registration through records | Done (this stack) |
-| 10 | External ICS subscriptions | Done (this stack) |
+| 9 | Registration through records | Done (#428) |
+| 10 | External ICS subscriptions | Done (#429) |
 
 Each PR goes through `/ship`. The framework bump (#405) lands first. PR 1
 creates every table of PRs 1 and 2 in one labelled revision.
