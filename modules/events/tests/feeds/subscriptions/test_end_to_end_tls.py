@@ -95,7 +95,7 @@ async def test_fetch_replace_break_and_remove(tls_server, db_state):
     status, code, titles = await _state(db_state, sid)
     assert (status, code, titles) == (
         "error",
-        "ics_invalid",
+        "not_a_calendar",
         ["Beta", "Gamma"],
     )  # previous items kept
 
