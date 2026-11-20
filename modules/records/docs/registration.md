@@ -84,3 +84,11 @@ goes only to that address, so the form is no oracle for who is registered.
   the registration is cancelled, trashed or purged); the reconcile job frees only seats that have no
   live registration, so it does **not** remove this one.
 
+- **Busy seats.** A repeated submit never calls the seat contract (a pending record takes its seat
+  only at its confirmation, a registered one already holds it), so it always answers the uniform 202.
+  A submit that would create a *new* record on a single opt-in form can answer `409 seats_busy` when
+  events could not settle its locks (rare, and a "try again"); an address that already holds a live
+  registration answers 202 at that moment. That is the one difference by address, it needs events to
+  be failing under contention, and it is pinned by `test_uniform_answer.py`. A full event answers
+  `registration_full` for everyone alike, before anything about the address is read.
+

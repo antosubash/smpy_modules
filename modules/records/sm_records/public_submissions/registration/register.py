@@ -219,18 +219,10 @@ async def register(
         existing = await _live_registration(db, rtype, email, token)
         if existing is not None:
             was_pending = (existing.data or {}).get("sm_status") == PENDING
-            # Decided from the *stored* status, never the form's current mode: a pending record
-            # (even on a form since switched to single opt-in) holds no seat and takes one only
-            # through its confirmation; a registered one gets the idempotent admit.
-            if not was_pending:
-                await seats.admit(
-                    db,
-                    tenant_id=tenant,
-                    event_id=token.event_id,
-                    occurrence_key=token.occurrence_key,
-                    target=rtype.key,
-                    holder=existing.uuid,
-                )
+            # No ``admit`` here, whatever the mode: a pending record takes its seat only through
+            # its confirmation and a registered one already holds its seat. So nothing on this
+            # branch can raise ``seats_busy`` that a new address would not, and the public answer
+            # for an address that already registered is always the uniform 202.
             outcome = ("registration" if was_pending else "already", existing)
         else:
             try:
