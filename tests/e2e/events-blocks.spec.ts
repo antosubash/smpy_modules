@@ -37,9 +37,12 @@ test.beforeAll(async ({ browser }) => {
   await login(admin);
   seed = await seedBlocks(admin);
   const chosen = [{ slug: seed.community.slug }];
+  // The list names this run's calendars: on a retry this hook seeds again, and an unrestricted list
+  // would show the first run's events beside these (every title is the same).
+  const mine = [seed.community, seed.library, seed.newYork].map(({ slug }) => ({ slug }));
   both = await blockPage(
     admin,
-    [upcoming({ layout: 'cards' }), calendarBlock({ calendars: chosen })],
+    [upcoming({ layout: 'cards', calendars: mine }), calendarBlock({ calendars: chosen })],
     { german: true },
   );
   listOnly = await blockPage(admin, [upcoming({ heading: 'Next up', count: 3 })]);
@@ -166,6 +169,14 @@ test('the calendar block is read-only and shows only the chosen calendar', async
   await expect(grid.getByText(/Library programme/)).toHaveCount(0); // not a chosen calendar
   await expect(grid.getByText(seed.community.name)).toBeVisible(); // the filter names the one
   await page.getByRole('button', { name: 'List', exact: true }).click();
+  // Wait for the list view itself: the month grid's chips are still in the DOM for a moment after the
+  // click, and a 'Writing circle' seen there is not one in the list.
+  await expect(page.getByRole('button', { name: 'List', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(grid.locator('.fc-list')).toBeVisible();
+  await expect(grid.locator('.fc-daygrid')).toHaveCount(0);
   // The series starts a week or more ahead, which may be next month: step forward until it shows.
   const circle = grid.getByText('Writing circle').first();
   for (let step = 0; step < 2; step++) {
