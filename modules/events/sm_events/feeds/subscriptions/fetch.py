@@ -158,6 +158,8 @@ async def _send(
         raise _failure(error) from None
     except (httpx.InvalidURL, ValueError, UnicodeError):
         raise FetchFailure("url_invalid") from None
+    except Exception:  # whatever the layer below raised can quote the address: only a code leaves
+        raise FetchFailure("connect_failed") from None
 
 
 async def _read(response: httpx.Response, max_bytes: int, deadline: float) -> bytes:
@@ -173,6 +175,8 @@ async def _read(response: httpx.Response, max_bytes: int, deadline: float) -> by
                 return bytes(body)
             except (TimeoutError, httpx.TransportError) as error:
                 raise _failure(error) from None
+            except Exception:
+                raise FetchFailure("connect_failed") from None
             body += chunk
             if len(body) > max_bytes:
                 raise FetchFailure("too_large")
@@ -238,7 +242,7 @@ async def _final(
     )
 
 
-async def fetch_feed(
+async def _fetch_feed(
     url: str,
     *,
     policy: url_policy.Policy,
@@ -280,3 +284,36 @@ async def fetch_feed(
         finally:
             await transport.aclose()
     raise AssertionError("unreachable")  # pragma: no cover - the last hop returns or raises
+
+
+async def fetch_feed(
+    url: str,
+    *,
+    policy: url_policy.Policy,
+    etag: str | None,
+    last_modified: str | None,
+    max_bytes: int,
+    timeout: float = constants.SUBSCRIPTION_FETCH_SECONDS,
+    transport_factory: Callable[[url_policy.Policy], httpx.AsyncBaseTransport] | None = None,
+) -> FetchResult:
+    """GET ``url`` (and at most ``SUBSCRIPTION_MAX_REDIRECTS`` redirects) under ``policy``.
+
+    ``etag`` / ``last_modified`` are the validators of the last 200; they are sent on the first
+    hop only. Raises :class:`FetchFailure` for everything that is not a 200 body or a 304, and
+    **only** that: what leaves carries a code and no cause or context, because the exception that
+    caused it can quote the address.
+    """
+    try:
+        return await _fetch_feed(
+            url,
+            policy=policy,
+            etag=etag,
+            last_modified=last_modified,
+            max_bytes=max_bytes,
+            timeout=timeout,
+            transport_factory=transport_factory,
+        )
+    except FetchFailure as failure:
+        failure.__cause__ = failure.__context__ = None
+        failure.__suppress_context__ = True
+        raise
