@@ -77,6 +77,16 @@ class SeatsBusy(Conflict):
     code = "seats_busy"
 
 
+async def admit(db: Any, **kwargs: Any) -> Any:
+    """Events' ``admit`` for the integration's provider; :class:`SeatsBusy` (a 409 in records' own
+    envelope, nothing half-done) if events is busy, like :func:`release`."""
+    module = integration()
+    try:
+        return await module.admit(db, **kwargs)
+    except module.SeatsBusy as exc:
+        raise SeatsBusy("the seats are busy; try again") from exc
+
+
 async def release(db: Any, *, tenant_id: str, holders: Sequence[str]) -> int:
     """Free these holders' seats; :class:`SeatsBusy` (the request rolls back) if events is busy."""
     module = integration()
@@ -167,7 +177,7 @@ async def on_restored(db: Any, rtype: Any, record: Any) -> None:
         return
     if not available():
         raise SubmissionRefused("event_unavailable", "the events module is not installed")
-    given = await integration().admit(
+    given = await admit(
         db,
         tenant_id=rtype.tenant_id,
         event_id=str(data.get("sm_event_id") or ""),

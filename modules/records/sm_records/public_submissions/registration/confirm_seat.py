@@ -49,7 +49,7 @@ async def take_seat(
         raise SubmissionRefused(
             codes.REGISTRATION_CLOSED, codes.TABLE[codes.REGISTRATION_CLOSED].message
         )
-    given = await seats.integration().admit(
+    given = await seats.admit(
         db,
         tenant_id=rtype.tenant_id,
         event_id=str(data.get("sm_event_id") or ""),

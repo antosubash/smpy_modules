@@ -215,8 +215,12 @@ async def register(
         takes_seat = fresh["sm_status"] == REGISTERED
         existing = await _live_registration(db, rtype, email, token)
         if existing is not None:
-            if takes_seat:  # the same locks and reads as a new one: an idempotent admit
-                await integration.admit(
+            was_pending = (existing.data or {}).get("sm_status") == PENDING
+            # Decided from the *stored* status, never the form's current mode: a pending record
+            # (even on a form since switched to single opt-in) holds no seat and takes one only
+            # through its confirmation; a registered one gets the idempotent admit.
+            if not was_pending:
+                await seats.admit(
                     db,
                     tenant_id=tenant,
                     event_id=token.event_id,
@@ -224,7 +228,6 @@ async def register(
                     target=rtype.key,
                     holder=existing.uuid,
                 )
-            was_pending = (existing.data or {}).get("sm_status") == PENDING
             outcome = ("registration" if was_pending else "already", existing)
         else:
             try:
@@ -238,7 +241,7 @@ async def register(
                     system=fresh,
                 )
                 if takes_seat:
-                    given = await integration.admit(
+                    given = await seats.admit(
                         db,
                         tenant_id=tenant,
                         event_id=token.event_id,
@@ -252,6 +255,8 @@ async def register(
                 outcome = ("registration", record)
             except ValidationFailed as exc:
                 raise SubmissionRefused("invalid", exc.detail, errors=exc.errors) from exc
+            except seats.SeatsBusy:
+                raise  # try again: not a conflict of the record
             except Conflict as exc:
                 raise SubmissionRefused("conflict", exc.detail) from exc
             except _Declined as declined:
