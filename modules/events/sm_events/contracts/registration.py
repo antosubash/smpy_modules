@@ -51,6 +51,7 @@ __all__ = [
     "EVENT_UNAVAILABLE",
     "REGISTRATION_CLOSED",
     "REGISTRATION_FULL",
+    "SEAT_RELEASE_MAX",
     "Admission",
     "Availability",
     "RegistrationEvent",
@@ -64,6 +65,8 @@ __all__ = [
     "summaries",
 ]
 
+SEAT_RELEASE_MAX = constants.SEAT_RELEASE_MAX
+"""How many holders one ``release`` call takes: a caller with more splits its calls."""
 _RETRYABLE = frozenset({"40P01", "40001"})  # deadlock detected, serialization failure
 
 
@@ -161,9 +164,7 @@ async def release_target(db: AsyncSession, *, tenant_id: str, provider: str, tar
     """Free every seat of a target (its form was deleted); the number freed."""
     return await _guarded(
         db,
-        lambda: _release.release_target(
-            db, tenant_id=tenant_id, provider=provider, target=target
-        ),
+        lambda: _release.release_target(db, tenant_id=tenant_id, provider=provider, target=target),
     )
 
 

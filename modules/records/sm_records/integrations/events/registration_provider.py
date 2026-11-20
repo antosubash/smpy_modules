@@ -31,6 +31,7 @@ from sm_records.core import constants
 from sm_records.core.tenancy import bound_tenant, tenant_scope
 from sm_records.models import tables_for
 from sm_records.public_submissions.registration.access import can_use, can_view
+from sm_records.public_submissions.registration.status import SEATED
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.types import get_type, list_types
 
@@ -108,7 +109,7 @@ async def _recipients(ctx: RegistrationContext, holders: Sequence[str]) -> Mappi
             )
             for record in (await ctx.db.execute(stmt)).scalars():
                 data: dict[str, Any] = record.data or {}
-                if data.get("sm_status") == "registered" and data.get("sm_email"):
+                if data.get("sm_status") in SEATED and data.get("sm_email"):
                     found[wanted[record.uuid]] = Registrant(
                         email=str(data["sm_email"]),
                         name=str(data.get("sm_name") or ""),

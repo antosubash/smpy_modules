@@ -26,6 +26,7 @@ from typing import Any
 
 from sm_records.contracts.public_submissions import KIND_REGISTRATION
 from sm_records.public_submissions.errors import SubmissionRefused
+from sm_records.public_submissions.registration.status import SEATED
 from sm_records.records.services.errors import Conflict
 
 __all__ = [
@@ -69,9 +70,6 @@ def available() -> bool:
     return True
 
 
-_LIVE = ("pending", "registered")
-
-
 class SeatsBusy(Conflict):
     """Events could not settle a release within its bounded restarts (``seats_busy``): nothing was
     changed, and the answer is "try again" (a 409), never a 500."""
@@ -97,7 +95,6 @@ async def release_target(db: Any, *, tenant_id: str, target: str) -> int:
 
 
 _BATCH = "sm_records.seat_release_batch"
-_PER_CALL = 1000  # events' own bound on one release
 
 
 @asynccontextmanager
@@ -121,8 +118,9 @@ async def batched(db: Any) -> AsyncIterator[None]:
         by_tenant.setdefault(tenant, []).append(holder)
     for tenant, holders in by_tenant.items():
         unique = list(dict.fromkeys(holders))
-        for start in range(0, len(unique), _PER_CALL):
-            await release(db, tenant_id=tenant, holders=unique[start : start + _PER_CALL])
+        per_call = integration().SEAT_RELEASE_MAX  # events' own bound on one release
+        for start in range(0, len(unique), per_call):
+            await release(db, tenant_id=tenant, holders=unique[start : start + per_call])
 
 
 def batch_mark(db: Any) -> int:
@@ -165,7 +163,7 @@ async def on_restored(db: Any, rtype: Any, record: Any) -> None:
     if not is_registration(rtype):
         return
     data = record.data or {}
-    if data.get("sm_status") != "registered":  # pending holds no seat, cancelled needs none
+    if data.get("sm_status") not in SEATED:  # pending holds no seat, cancelled needs none
         return
     if not available():
         raise SubmissionRefused("event_unavailable", "the events module is not installed")

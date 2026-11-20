@@ -32,6 +32,7 @@ from sm_records.core import events
 from sm_records.core.tenancy import bound_tenant
 from sm_records.models import tables_for
 from sm_records.public_submissions.registration import seats
+from sm_records.public_submissions.registration.status import SEATED
 from sm_records.records.services._lock import lock_type
 from sm_records.records.services.types import list_types
 
@@ -41,7 +42,6 @@ logger = logging.getLogger(__name__)
 
 PAGE: Final = 100
 MAX_PAGES: Final = 50
-_LIVE: Final = ("registered",)  # a pending registration holds no seat: its seat is drift
 
 
 def page_released(count: int) -> None:
@@ -59,7 +59,9 @@ async def _live_holders(session: Any, types: list[Any], holders: list[str]) -> s
             cls.uuid.in_(list(wanted)), cls.tenant_id == tenant, cls.type_id == rtype.id
         )  # the soft-delete filter hides the trashed: they are not live
         for record in (await session.execute(stmt)).scalars():
-            if (record.data or {}).get("sm_status") in _LIVE:
+            if (record.data or {}).get(
+                "sm_status"
+            ) in SEATED:  # a pending registration holds no seat: its seat is drift
                 live.add(wanted[record.uuid])
     return live
 

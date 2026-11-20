@@ -43,6 +43,7 @@ from sm_records.public_submissions.address_lock import lock_addresses
 from sm_records.public_submissions.definition import EMAIL_KEY
 from sm_records.public_submissions.errors import SubmissionRefused
 from sm_records.public_submissions.registration.confirm_seat import take_seat
+from sm_records.public_submissions.registration.status import REGISTERED
 from sm_records.public_submissions.subscribe import CONFIRMED, PENDING, UNSUBSCRIBED, changed
 from sm_records.public_submissions.transition import Change, Outcome, transition
 from sm_records.records.services import records as record_service
@@ -90,7 +91,7 @@ async def confirm(
     # A registration is *registered*, not "confirmed", and it is no newsletter subscription: its
     # confirmation announces nothing to the newsletter's listeners.
     registration = (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION
-    done = "registered" if registration else CONFIRMED
+    done = REGISTERED if registration else CONFIRMED
 
     def derive(row: Record) -> Change | None:
         data = row.data or {}

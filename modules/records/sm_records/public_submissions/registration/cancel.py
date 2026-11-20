@@ -26,6 +26,7 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links
 from sm_records.public_submissions.registration import seats
+from sm_records.public_submissions.registration.status import CANCELLED, LIVE
 from sm_records.public_submissions.transition import Change, transition
 from sm_records.records.services import records as record_service
 from sm_records.records.services._common import utcnow
@@ -33,9 +34,6 @@ from sm_records.records.services.errors import NotFound
 from sm_records.records.services.types import get_type
 
 __all__ = ["CANCELLED", "cancel", "cancel_by_link", "occurrence_started"]
-
-CANCELLED = "cancelled"
-_LIVE = ("pending", "registered")
 
 
 def occurrence_started(data: dict[str, Any], now: datetime) -> bool:
@@ -68,7 +66,7 @@ async def cancel(
 
     def derive(row: Record) -> Change | None:
         data = row.data or {}
-        if row.is_deleted or data.get("sm_status") not in _LIVE or occurrence_started(data, stamp):
+        if row.is_deleted or data.get("sm_status") not in LIVE or occurrence_started(data, stamp):
             return None
         if still is not None and not still(row):
             return None

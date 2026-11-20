@@ -28,6 +28,7 @@ from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions.registration import cancel as cancelling
 from sm_records.public_submissions.registration import seats
+from sm_records.public_submissions.registration.status import LIVE
 from sm_records.public_submissions.subscribe import normalise
 from sm_records.records.index.query import Filter, FilterOp, filtered
 from sm_records.records.services import types as type_service
@@ -40,7 +41,6 @@ from sm_records.web.endpoints.api._responses import TYPE_WRITE, responses
 __all__ = ["router"]
 
 EMAIL_KEY = "sm_email"
-LIVE = ("pending", "registered")
 MAX_ITEMS = 100
 NOT_FOUND = "registration not found"
 

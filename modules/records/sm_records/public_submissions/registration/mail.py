@@ -44,6 +44,7 @@ from sm_records.public_submissions.delivery import SessionFactory, load
 from sm_records.public_submissions.mail import template
 from sm_records.public_submissions.mail_runner import queue, ui_locale
 from sm_records.public_submissions.registration.origin import event_base
+from sm_records.public_submissions.registration.status import LIVE, PENDING
 from sm_records.public_submissions.sending import send_all
 from sm_records.public_submissions.tokens import host_secret, public_base_url
 from sm_records.records.services._common import utcnow
@@ -60,7 +61,6 @@ logger = logging.getLogger(__name__)
 _CONFIRM_PAGE = links.CONFIRM_REGISTRATION_PAGE
 
 SUBJECT_MAX: Final = 200
-_PENDING: Final = "pending"
 _DROPPED: Final = frozenset({"Cc", "Cf", "Zl", "Zp"})
 
 
@@ -111,7 +111,7 @@ def message(
 ) -> MailMessage:
     """The mail for ``record`` with its links minted now."""
     data = record.data or {}
-    pending = data.get("sm_status") == _PENDING
+    pending = data.get("sm_status") == PENDING
     hold = int(
         (rtype.public_submissions or {}).get("pending_hold_hours") or DEFAULT_PENDING_HOLD_HOURS
     )
@@ -187,7 +187,7 @@ async def _send(
         return
     rtype, record = loaded
     data = record.data or {}
-    if data.get("sm_status") not in (_PENDING, "registered") or not data.get("sm_email"):
+    if data.get("sm_status") not in LIVE or not data.get("sm_email"):
         logger.info("records: %s registration %s is not live; not mailed", rtype.key, record.uuid)
         return
     mail = message(

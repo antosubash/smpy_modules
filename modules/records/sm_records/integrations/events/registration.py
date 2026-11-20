@@ -19,6 +19,7 @@ __all__ = [
     "PROVIDER_ID",
     "REGISTRATION_CLOSED",
     "REGISTRATION_FULL",
+    "SEAT_RELEASE_MAX",
     "SeatsBusy",
     "admit",
     "describe",
@@ -33,6 +34,7 @@ REGISTRATION_FULL = seats.REGISTRATION_FULL
 REGISTRATION_CLOSED = seats.REGISTRATION_CLOSED
 EVENT_UNAVAILABLE = seats.EVENT_UNAVAILABLE
 SeatsBusy = seats.SeatsBusy
+SEAT_RELEASE_MAX = seats.SEAT_RELEASE_MAX
 
 
 async def describe(

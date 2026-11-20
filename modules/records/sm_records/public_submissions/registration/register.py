@@ -42,7 +42,8 @@ from sm_records.public_submissions.definition import (
     page_locale,
 )
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.public_submissions.registration import mail, seats
+from sm_records.public_submissions.registration import codes, mail, seats
+from sm_records.public_submissions.registration.status import LIVE, PENDING, REGISTERED
 from sm_records.public_submissions.registration.tokens import RegistrationToken
 from sm_records.public_submissions.subscribe import normalise
 from sm_records.public_submissions.tokens import host_secret, ip_hash
@@ -54,29 +55,22 @@ from sm_records.records.services._payload import carry_system, field_defs, valid
 from sm_records.records.services.errors import Conflict, ValidationFailed
 from sm_records.schema._text_checks import checked
 
-__all__ = ["PENDING", "REGISTERED", "register"]
+__all__ = ["register"]
 
-PENDING = "pending"
-REGISTERED = "registered"
 NAME_KEY = "sm_name"
-_REFUSED = {
-    "registration_full": "this event is fully booked",
-    "registration_closed": "registration for this event is closed",
-    "event_unavailable": "this event is no longer available",
-}
 
 
 def _refuse(code: str) -> SubmissionRefused:
-    return SubmissionRefused(code, _REFUSED[code])
+    return SubmissionRefused(code, codes.TABLE[code].message)
 
 
 def _availability_refusal(state: str) -> str | None:
     if state == "unavailable":
-        return "event_unavailable"
+        return codes.EVENT_UNAVAILABLE
     if state in ("cancelled", "closed", "not_open_yet"):
-        return "registration_closed"
+        return codes.REGISTRATION_CLOSED
     if state == "full":  # the same for everyone, a registered person included
-        return "registration_full"
+        return codes.REGISTRATION_FULL
     return None
 
 
@@ -154,7 +148,7 @@ async def _live_registration(
         return None
     stmt = select(cls).where(cls.id.in_(ids), cls.tenant_id == tenant, cls.type_id == rtype.id)
     for record in (await db.execute(stmt)).scalars():
-        if (record.data or {}).get("sm_status") in (PENDING, REGISTERED):
+        if (record.data or {}).get("sm_status") in LIVE:
             return record
     return None
 
@@ -165,13 +159,6 @@ class _Declined(Exception):  # noqa: N818 - control flow inside the savepoint
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
-
-
-_NOTICE = {
-    "registration_full": "full",
-    "registration_closed": "closed",
-    "event_unavailable": "closed",
-}
 
 
 async def _discard(db: AsyncSession) -> None:
@@ -261,7 +248,7 @@ async def register(
                         locale=lang,
                     )
                     if not given.admitted:
-                        raise _Declined(given.code or "event_unavailable")
+                        raise _Declined(codes.known(given.code))
                 outcome = ("registration", record)
             except ValidationFailed as exc:
                 raise SubmissionRefused("invalid", exc.detail, errors=exc.errors) from exc
@@ -270,7 +257,7 @@ async def register(
             except _Declined as declined:
                 await _discard(db)  # nothing is stored, and nothing announces a record
                 await db.refresh(rtype)  # the rollback expired it; the mail below reads it
-                outcome = (_NOTICE[declined.code], None)
+                outcome = (codes.TABLE[declined.code].notice, None)
     kind, record = outcome
     if await budget_wait(request, rtype, email, settings) != 0:
         return  # over the address's own budget: still the one 202, nothing sent

@@ -22,17 +22,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.public_submissions.registration import seats
+from sm_records.public_submissions.registration import codes, seats
+from sm_records.public_submissions.registration.status import PENDING
 from sm_records.public_submissions.row_lock import lock_record
 
 __all__ = ["take_seat"]
 
 _EXPIRED = "this link has expired or is no longer valid; sign up again"
-_REASON = {
-    "registration_full": "this event is now fully booked",
-    "registration_closed": "registration for this event is closed",
-    "event_unavailable": "registration for this event is closed",
-}
 
 
 async def take_seat(
@@ -47,10 +43,12 @@ async def take_seat(
     data = row.data or {}
     if row.is_deleted or not holds(row):
         raise SubmissionRefused("link_expired", _EXPIRED)
-    if data.get("sm_status") != "pending":
+    if data.get("sm_status") != PENDING:
         return
     if not seats.available():
-        raise SubmissionRefused("registration_closed", _REASON["registration_closed"])
+        raise SubmissionRefused(
+            codes.REGISTRATION_CLOSED, codes.TABLE[codes.REGISTRATION_CLOSED].message
+        )
     given = await seats.integration().admit(
         db,
         tenant_id=rtype.tenant_id,
@@ -60,6 +58,5 @@ async def take_seat(
         holder=row.uuid,
     )
     if not given.admitted:
-        code = given.code or "event_unavailable"
-        known = code if code in _REASON else "registration_closed"
-        raise SubmissionRefused(known, _REASON[known])
+        code = codes.known(given.code)
+        raise SubmissionRefused(code, codes.TABLE[code].message)
