@@ -44,7 +44,7 @@ async def main(url: str, subscription_id: str, feed: Path) -> None:
                 counts = await store_feed(
                     db, sub, calendar_tz=calendar.default_timezone, body=feed.read_bytes()
                 )
-                # leave it as a good first refresh would, and eligible for an immediate "refresh now"
+                # leave it as a good first refresh would, eligible for an immediate "refresh now"
                 sub.status, sub.error_code, sub.last_fetched_at = "ok", None, None
                 await db.commit()
         print(f"stored {counts.stored}, skipped {counts.skipped}")
