@@ -142,7 +142,9 @@ function CalendarForm({
     >
       <DialogHeader>
         <DialogTitle>{t(calendar ? copy.edit : copy.new)}</DialogTitle>
-        <DialogDescription>{t(copy.form_description)}</DialogDescription>
+        <DialogDescription className="dark:text-zinc-400">
+          {t(copy.form_description)}
+        </DialogDescription>
       </DialogHeader>
       <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={save}>
         <div className="grid gap-2">

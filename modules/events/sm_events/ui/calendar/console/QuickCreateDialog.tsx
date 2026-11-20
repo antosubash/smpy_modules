@@ -60,7 +60,9 @@ export function QuickCreateDialog({ slot, onClose, ...rest }: Props) {
         >
           <DialogHeader>
             <DialogTitle>{t(copy.title)}</DialogTitle>
-            <DialogDescription>{t(copy.description)}</DialogDescription>
+            <DialogDescription className="dark:text-zinc-400">
+              {t(copy.description)}
+            </DialogDescription>
           </DialogHeader>
           <QuickCreateForm slot={slot} onClose={onClose} {...rest} />
         </DialogContent>

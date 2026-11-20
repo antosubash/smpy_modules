@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from tests.support.access import principal
 from tests.support.calendars import MANAGER
+from tests.support.calendars import OWNER as OWNER_HTTP
 from tests.support.subscriptions import seed_calendar
 from tests.support.subscriptions_http import add, app_client, calendar, row, stub_launch
 
@@ -66,3 +67,31 @@ async def test_saved_before_the_switch_is_not_internal_until_a_manager_saves_it_
         ctx(switch=True, manager=False), now=cal.created_at,
     )  # fmt: skip
     assert stored.may_use_private is False
+
+
+async def test_an_internal_subscription_shows_its_next_update_to_the_minute(monkeypatch):
+    from datetime import UTC, datetime
+
+    from sm_events.models import Subscription
+    from sqlalchemy import update
+
+    async with app_client(allow_private_subscription_urls=True) as client:
+        stub_launch(monkeypatch)
+        cid = await calendar(client)
+        internal = (await add(client, cid, MANAGER, url="https://i.example.test/a.ics")).json()
+        plain = (await add(client, cid, OWNER_HTTP, url="https://p.example.test/a.ics")).json()
+        async with client.db_state.session_factory() as db:
+            await db.execute(
+                update(Subscription).values(
+                    next_fetch_at=datetime(2027, 1, 2, 3, 4, 56, 789, tzinfo=UTC)
+                )
+            )
+            await db.commit()
+        got = {
+            s["id"]: s
+            for s in (
+                await client.get(f"/api/events/calendars/{cid}/subscriptions", headers=MANAGER)
+            ).json()
+        }
+        assert got[internal["id"]]["next_fetch_at"].startswith("2027-01-02T03:04:00")  # coarse
+        assert got[plain["id"]]["next_fetch_at"].startswith("2027-01-02T03:04:56")  # as stored

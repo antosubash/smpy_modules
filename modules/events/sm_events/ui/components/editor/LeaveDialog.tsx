@@ -27,7 +27,9 @@ export function LeaveDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t(copy.leave_title)}</AlertDialogTitle>
-          <AlertDialogDescription>{t(copy.leave_description)}</AlertDialogDescription>
+          <AlertDialogDescription className="dark:text-zinc-400">
+            {t(copy.leave_description)}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{t(copy.leave_stay)}</AlertDialogCancel>

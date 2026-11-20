@@ -71,7 +71,9 @@ function RejectForm({ onReject, onDone }: { onReject: Reject; onDone: () => void
     >
       <DialogHeader>
         <DialogTitle>{t(copy.reject_title)}</DialogTitle>
-        <DialogDescription>{t(copy.reject_description)}</DialogDescription>
+        <DialogDescription className="dark:text-zinc-400">
+          {t(copy.reject_description)}
+        </DialogDescription>
       </DialogHeader>
       <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={submit}>
         <div className="grid gap-2">

@@ -132,6 +132,24 @@ describe('SubscriptionsDialog', () => {
     await view.unmount();
   });
 
+  it('returns focus to the control that opened the form when it closes', async () => {
+    const { view } = await open({ [`GET ${LIST}`]: [sub()] });
+    await click(button('Add a subscription') as HTMLElement);
+    await flush(20);
+    await press(dialog(), { key: 'Escape' });
+    await flush(30);
+    expect(document.activeElement).toBe(button('Add a subscription'));
+    const edit = [...document.querySelectorAll('button')].find((b) =>
+      b.getAttribute('aria-label')?.startsWith('Edit'),
+    ) as HTMLElement;
+    await click(edit);
+    await flush(20);
+    await click(button('Cancel') as HTMLElement);
+    await flush(30);
+    expect(document.activeElement).toBe(edit); // that row's Edit, not the dialog container
+    await view.unmount();
+  });
+
   it('puts focus in the address field, closes the form on the first Escape and the dialog on the next, and returns focus to the trigger', async () => {
     const { view } = await open({ [`GET ${LIST}`]: [] });
     const trigger = document.querySelector('[data-testid="events-subscriptions"]') as HTMLElement;

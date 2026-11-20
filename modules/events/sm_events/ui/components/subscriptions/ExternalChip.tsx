@@ -9,8 +9,9 @@ export default function ExternalChip(props: EventChipProps) {
   const { Default, occurrence } = props;
   return (
     <span
-      className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden"
+      className="flex min-w-0 max-w-full flex-1 items-center gap-1 overflow-hidden"
       data-testid="external-chip"
+      title={occurrence.title}
     >
       <ExternalLink aria-hidden="true" className="size-3 shrink-0" />
       <Default {...props} />

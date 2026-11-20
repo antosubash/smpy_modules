@@ -70,7 +70,9 @@ def to_out(
         last_http_status=None if hidden else sub.last_http_status,
         last_fetched_at=sub.last_fetched_at,
         last_ok_at=sub.last_ok_at,
-        next_fetch_at=sub.next_fetch_at,
+        next_fetch_at=sub.next_fetch_at.replace(second=0, microsecond=0)
+        if internal and sub.next_fetch_at
+        else sub.next_fetch_at,
         consecutive_failures=sub.consecutive_failures,
         item_count=sub.item_count,
         last_counts=sub.last_counts,

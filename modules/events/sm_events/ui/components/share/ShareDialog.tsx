@@ -83,7 +83,9 @@ export function ShareDialog({
       >
         <DialogHeader>
           <DialogTitle>{t(keys.events.share.title)}</DialogTitle>
-          <DialogDescription>{t(keys.events.share.description)}</DialogDescription>
+          <DialogDescription className="dark:text-zinc-400">
+            {t(keys.events.share.description)}
+          </DialogDescription>
         </DialogHeader>
 
         <section className="space-y-2" aria-label={t(keys.events.share.current)}>

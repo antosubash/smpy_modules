@@ -71,7 +71,9 @@ export function SubscribeDialog({
       >
         <DialogHeader>
           <DialogTitle>{t(copy.title)}</DialogTitle>
-          <DialogDescription>{t(copy.description)}</DialogDescription>
+          <DialogDescription className="dark:text-zinc-400">
+            {t(copy.description)}
+          </DialogDescription>
         </DialogHeader>
 
         {calendar.visibility === 'public' && (

@@ -167,7 +167,9 @@ function MoveForm({
     >
       <DialogHeader>
         <DialogTitle>{t(copy.move_title)}</DialogTitle>
-        <DialogDescription>{t(copy.move_description, { timezone })}</DialogDescription>
+        <DialogDescription className="dark:text-zinc-400">
+          {t(copy.move_description, { timezone })}
+        </DialogDescription>
       </DialogHeader>
       <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={submit}>
         {box('move-start', 'start', from, setFrom, t(keys.events.editor.start))}

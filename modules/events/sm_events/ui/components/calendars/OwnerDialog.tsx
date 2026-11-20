@@ -76,7 +76,9 @@ export function OwnerDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{t(copy.transfer)}</DialogTitle>
-          <DialogDescription>{t(copy.transfer_description)}</DialogDescription>
+          <DialogDescription className="dark:text-zinc-400">
+            {t(copy.transfer_description)}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={save} noValidate className="grid gap-4">
           <Label htmlFor="owner-search">{t(keys.events.share.search_label)}</Label>

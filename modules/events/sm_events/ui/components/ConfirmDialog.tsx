@@ -69,7 +69,9 @@ export function ConfirmDialog({
       <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
+          <AlertDialogDescription className="dark:text-zinc-400">
+            {description}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         {error && (
           <p className="text-sm text-destructive dark:text-red-400" role="alert">

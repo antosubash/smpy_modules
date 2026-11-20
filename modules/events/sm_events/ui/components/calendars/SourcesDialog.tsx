@@ -151,7 +151,9 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
       >
         <DialogHeader>
           <DialogTitle>{withName(t, copy.title, calendar.name)}</DialogTitle>
-          <DialogDescription>{t(copy.description)}</DialogDescription>
+          <DialogDescription className="dark:text-zinc-400">
+            {t(copy.description)}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={save} noValidate className="grid gap-4">
           {available === null && !error ? <p role="status">{t(copy.loading)}</p> : null}

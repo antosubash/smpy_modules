@@ -30,6 +30,7 @@ import { login, moduleCsrfHeader } from './helpers';
  */
 
 test.use({ viewport: { width: 1440, height: 1100 } });
+const RUN = Date.now().toString(36); // calendar names stay unique when the spec reruns on one database
 const SECRET_URL = 'https://localhost/private/SECRET-TOKEN-123/basic.ics?key=SECRET2';
 const CSRF_VIEW = '/admin/events/calendars';
 let problems: string[] = [];
@@ -57,7 +58,10 @@ async function subscribe(page: Page, calendarId: string, url: string, label: str
 const dialogOf = (page: Page) => page.getByRole('dialog');
 
 test('add, see the masked address and the status, edit and remove', async ({ page }) => {
-  const calendar = await seedCalendar(page, { label: 'Neighbourhood hub calendar', plain: true });
+  const calendar = await seedCalendar(page, {
+    label: `Neighbourhood hub calendar ${RUN}`,
+    plain: true,
+  });
   await page.goto('/admin/events/calendars');
   await page.getByRole('button', { name: `Subscriptions of ${calendar.name}` }).click();
   const dialog = dialogOf(page);
@@ -91,9 +95,35 @@ test('add, see the masked address and the status, edit and remove', async ({ pag
 
   await row.getByRole('button', { name: 'Remove Holidays' }).click();
   const confirm = page.getByRole('alertdialog');
-  await expect(confirm).toContainText('cached events disappear from the calendar');
+  // nothing was stored (the guarded fetch refused loopback): no count sentence at all
+  await expect(confirm).toContainText('Nothing is cached yet.');
+  await expect(confirm).not.toContainText('cached event');
   await confirm.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(dialog.getByText('This calendar has no subscriptions yet.')).toBeVisible();
+});
+
+test('removing a subscription says how many cached events go, singular and plural', async ({
+  page,
+}) => {
+  const day = wednesday(3);
+  const calendar = await seedCalendar(page, { label: `Counted ${RUN}`, plain: true });
+  const sub = await subscribe(page, calendar.id, 'https://counted.localhost/a.ics', 'Counted');
+  await page.goto('/admin/events/calendars');
+  await page.getByRole('button', { name: `Subscriptions of ${calendar.name}` }).click();
+  const dialog = dialogOf(page);
+  for (const [titles, sentence] of [
+    [['One'], 'Its 1 cached event disappears from the calendar.'],
+    [['One', 'Two'], 'Its 2 cached events disappear from the calendar.'],
+  ] as const) {
+    seedItems(sub.id, day, [...titles]);
+    await page.reload();
+    await page.getByRole('button', { name: `Subscriptions of ${calendar.name}` }).click();
+    await dialog.getByRole('button', { name: 'Remove Counted' }).click();
+    const confirm = page.getByRole('alertdialog');
+    await expect(confirm).toContainText(sentence);
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+    await page.keyboard.press('Escape');
+  }
 });
 
 test('an address that cannot be used gets the one message, and nothing is stored', async ({
@@ -154,7 +184,7 @@ test('external entries on the calendar are marked and read-only, and never in it
   const day = wednesday(3);
   const calendar = await seedCalendar(page, {
     visibility: 'public',
-    label: 'Town hall calendar',
+    label: `Town hall calendar ${RUN}`,
     plain: true,
   });
   const own = await seedEvent(page, {
@@ -241,7 +271,7 @@ test('a refresh that fails keeps the cached entries and shows the code', async (
 });
 
 test('German and the phone layout', async ({ page, context }) => {
-  const calendar = await seedCalendar(page, { label: 'Kalender Rathaus', plain: true });
+  const calendar = await seedCalendar(page, { label: `Kalender Rathaus ${RUN}`, plain: true });
   await subscribe(page, calendar.id, 'https://german.localhost/a.ics', 'Feiertage');
   await context.addCookies([
     { name: 'locale', value: 'de', url: new URL('/', page.url()).toString() },

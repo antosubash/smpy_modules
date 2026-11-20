@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it } from 'vitest';
 import { DefaultDetail } from '../calendar/DetailPopover';
+import ExternalChip from '../components/subscriptions/ExternalChip';
 import ExternalDetail from '../components/subscriptions/ExternalDetail';
 import { mount } from './test-dom';
 
@@ -102,5 +103,21 @@ it('offers no edit, move, remind or register control', async () => {
   );
   expect(view.all('button')).toHaveLength(0);
   expect(view.all('button, input, select, [role="button"], [draggable="true"]')).toHaveLength(0);
+  await view.unmount();
+});
+
+it('keeps the full title on the chip when it is clipped', async () => {
+  const long = { ...external, title: 'W'.repeat(400) };
+  const view = await mount(
+    <ExternalChip
+      view="day"
+      timeText="10:00"
+      occurrence={long}
+      Default={() => <span data-testid="default">x</span>}
+    />,
+  );
+  const chip = document.querySelector('[data-testid="external-chip"]') as HTMLElement;
+  expect(chip.getAttribute('title')).toBe(long.title); // the full title, whatever the clip
+  expect(chip.className).toContain('overflow-hidden');
   await view.unmount();
 });

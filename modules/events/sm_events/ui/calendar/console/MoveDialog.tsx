@@ -72,7 +72,9 @@ export function MoveDialog({ occurrence, returnFocus, restoreFocus, onSubmit, on
         >
           <DialogHeader>
             <DialogTitle>{t(copy.title)}</DialogTitle>
-            <DialogDescription>{t(copy.description, { zone: shown.timezone })}</DialogDescription>
+            <DialogDescription className="dark:text-zinc-400">
+              {t(copy.description, { zone: shown.timezone })}
+            </DialogDescription>
           </DialogHeader>
           {occurrence && <MoveForm occurrence={occurrence} onSubmit={onSubmit} onClose={onClose} />}
         </DialogContent>

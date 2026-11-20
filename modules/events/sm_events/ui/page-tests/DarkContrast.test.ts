@@ -15,6 +15,17 @@ function sources(dir: string): string[] {
 }
 
 describe('dark mode contrast', () => {
+  it('gives every dialog description the lighter dark-mode text', () => {
+    const bare: string[] = [];
+    for (const path of sources(ROOT)) {
+      const text = readFileSync(path, 'utf8');
+      for (const match of text.matchAll(/<(?:Alert)?DialogDescription(?=[\s>])([^>]*)>/g)) {
+        if (!match[1].includes('dark:text-zinc-400')) bare.push(path.slice(ROOT.length + 1));
+      }
+    }
+    expect(bare).toEqual([]);
+  });
+
   it('never uses the bare muted or destructive text token', () => {
     const bare: string[] = [];
     for (const path of sources(ROOT)) {

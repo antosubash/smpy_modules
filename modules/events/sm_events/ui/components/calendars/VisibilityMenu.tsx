@@ -59,7 +59,9 @@ export function VisibilityMenu({ calendar, onSaved }: { calendar: Calendar; onSa
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{t(keys.events.calendars.visibility)}</DialogTitle>
-          <DialogDescription>{t(keys.events.calendars.visibility_description)}</DialogDescription>
+          <DialogDescription className="dark:text-zinc-400">
+            {t(keys.events.calendars.visibility_description)}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={save} className="grid gap-4">
           <Label htmlFor="visibility-value">{t(keys.events.calendars.visibility)}</Label>

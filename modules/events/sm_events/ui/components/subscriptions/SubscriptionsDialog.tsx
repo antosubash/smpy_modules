@@ -37,6 +37,22 @@ export function SubscriptionsDialog({
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const [form, setForm] = useState<Form>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  /** Open the form from `from` (the Add button or a row's Edit) and remember it. */
+  const openForm = (editing: Subscription | null, from: HTMLElement | null) => {
+    opener.current = from;
+    setForm({ editing });
+  };
+  /** Close the form and put focus back on the control that opened it (Add comes back with the
+   *  form closed, so a detached opener falls back to it). */
+  const closeForm = () => {
+    setForm(null);
+    setTimeout(() => {
+      const back = opener.current?.isConnected ? opener.current : addButton.current;
+      back?.focus();
+    }, 0);
+  };
   const state = useSubscriptions(calendar.id, open, onGone);
   const room = state.capacity;
   // Why Add is off: the calendar's, the member's or the tenant's allowance is used up.
@@ -72,7 +88,7 @@ export function SubscriptionsDialog({
         onEscapeKeyDown={(event) => {
           if (form) {
             event.preventDefault(); // the first Escape closes the form, the next the dialog
-            setForm(null);
+            closeForm();
           }
         }}
         onCloseAutoFocus={(event) => {
@@ -82,7 +98,9 @@ export function SubscriptionsDialog({
       >
         <DialogHeader>
           <DialogTitle>{withName(t, copy.title, calendar.name)}</DialogTitle>
-          <DialogDescription>{t(copy.description)}</DialogDescription>
+          <DialogDescription className="dark:text-zinc-400">
+            {t(copy.description)}
+          </DialogDescription>
         </DialogHeader>
         {state.loading && state.items.length === 0 ? <p role="status">{t(copy.loading)}</p> : null}
         {state.error ? (
@@ -102,7 +120,7 @@ export function SubscriptionsDialog({
               error={state.rowError[sub.id]}
               note={state.notes[sub.id]}
               onAction={(action) => state.act(sub.id, action)}
-              onEdit={() => setForm({ editing: sub })}
+              onEdit={(from) => openForm(sub, from)}
             />
           ))}
         </ul>
@@ -115,18 +133,19 @@ export function SubscriptionsDialog({
             canPublish={canPublish}
             defaultMinutes={defaultMinutes}
             onDone={() => {
-              setForm(null);
+              closeForm();
               void state.reload();
             }}
-            onCancel={() => setForm(null)}
+            onCancel={closeForm}
           />
         ) : (
           <>
             <Button
+              ref={addButton}
               type="button"
               disabled={full !== null}
               aria-describedby={full ? 'events-sub-full' : undefined}
-              onClick={() => setForm({ editing: null })}
+              onClick={(e) => openForm(null, e.currentTarget)}
             >
               {t(copy.add)}
             </Button>

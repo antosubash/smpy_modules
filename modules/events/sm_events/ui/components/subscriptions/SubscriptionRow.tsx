@@ -12,7 +12,7 @@ type Props = {
   /** What the last action said (a refresh that is only queued). */
   note?: string;
   onAction: (action: 'refresh' | 'pause' | 'resume' | 'delete') => Promise<void>;
-  onEdit: () => void;
+  onEdit: (from: HTMLElement) => void;
 };
 
 /** The reasons items were left out, as words ("unknown time zone (10), unsupported repeat rule (2)"). */
@@ -32,7 +32,8 @@ function skipped(sub: Subscription, t: ReturnType<typeof useT>['t']): string | n
 export function SubscriptionRow({ sub, calendarColor, error, note, onAction, onEdit }: Props) {
   const { t, locale } = useT();
   const copy = keys.events.subscriptions;
-  const when = (iso: string) => new Date(iso).toLocaleString(locale);
+  const when = (iso: string) =>
+    new Date(iso).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
   const left = skipped(sub, t);
   const paused = sub.status === 'paused';
   return (
@@ -119,7 +120,7 @@ export function SubscriptionRow({ sub, calendarColor, error, note, onAction, onE
           size="sm"
           variant="outline"
           aria-label={t(copy.edit_for, { name: sub.label })}
-          onClick={onEdit}
+          onClick={(e) => onEdit(e.currentTarget)}
         >
           {t(copy.edit)}
         </Button>
