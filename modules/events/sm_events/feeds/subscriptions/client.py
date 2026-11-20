@@ -30,6 +30,7 @@ import httpx
 
 from sm_events.core import constants
 from sm_events.feeds.subscriptions import dns
+from sm_events.feeds.subscriptions.errors import FetchFailure
 from sm_events.feeds.subscriptions.netsafe import harden
 from sm_events.feeds.subscriptions.policy import Policy
 
@@ -68,15 +69,24 @@ class PinnedTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         host, ips = await dns.resolve_bounded(request.url, self._policy)
-        if self._gate is not None:
-            # The floor is on the server, not the name: the smallest validated IP stands for it.
-            await self._gate(min(ips, key=str))
         inner = self._inner_for(request.url)
         extensions = dict(request.extensions)
         if request.url.scheme == "https":
             extensions["sni_hostname"] = host
         last_error: httpx.TransportError | None = None
+        held_back: FetchFailure | None = None
         for ip in ips[: constants.MAX_ADDRESSES_PER_HOP]:
+            if self._gate is not None:
+                # The floor is on the server, so it is checked on each address about to be
+                # connected to: a connect that fails still used that address's attempt, and an
+                # address over its floor is not connected to (the next one gets its own check).
+                try:
+                    await self._gate(ip)
+                except FetchFailure as later:
+                    if later.code != "try_later":
+                        raise
+                    held_back = later
+                    continue
             pinned = httpx.Request(
                 method=request.method,
                 url=request.url.copy_with(host=ip),
@@ -89,6 +99,8 @@ class PinnedTransport(httpx.AsyncBaseTransport):
             except (httpx.ConnectError, httpx.ConnectTimeout) as error:
                 logger.info("Pinned address failed to connect, trying the next")
                 last_error = error
+        if held_back is not None:  # an address was not contacted: try again after its floor
+            raise held_back  # (not the feed's failure, even if another address refused)
         assert last_error is not None  # resolution never returns no addresses
         raise last_error
 

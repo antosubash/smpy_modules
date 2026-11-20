@@ -194,3 +194,46 @@ async def test_the_gate_admits_one_caller_per_floor_window_even_concurrently(db_
     # a whole floor later the next caller is admitted
     gate = TargetGate(db_state.session_factory, "default", lambda: NOW + FLOOR)
     await gate(PUBLIC_IP)
+
+
+async def test_decoy_addresses_do_not_buy_free_connections_to_the_real_server(
+    db_state,
+    resolver,  # noqa: F811
+    inner,  # noqa: F811
+):
+    """Each name answers [its own unreachable decoy, the shared target]: the floor is checked on
+    every address a fetch connects to, so the target still gets one connection per window."""
+    hosts = [f"d{n}.example" for n in range(20)]
+    for n, host in enumerate(hosts):
+        resolver[host] = [f"93.184.1.{n + 1}", PUBLIC_IP]  # the decoy sorts before the target
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host != PUBLIC_IP:
+            raise httpx.ConnectError("refused")  # the decoy does not answer
+        return ics()
+
+    seen = inner(handler)
+    ids = await _seed_hosts(db_state, hosts)
+    results = await _refresh_all(db_state, ids, NOW)
+    assert [r.url.host for r in seen].count(PUBLIC_IP) == 1
+    assert results.count("stored") == 1
+    for sid in ids:  # a decoy that refused is that address's attempt, not the feed's fault
+        assert (await load(db_state, sid)).consecutive_failures == 0
+
+
+async def test_an_address_over_the_floor_is_skipped_not_hammered(
+    db_state,
+    resolver,  # noqa: F811
+    inner,  # noqa: F811
+):
+    for host in ("one.example", "two.example", "three.example"):
+        resolver[host] = ["93.184.9.1", PUBLIC_IP]
+    seen = inner(lambda r: ics())
+    ids = await _seed_hosts(db_state, ["one.example", "two.example", "three.example"])
+    results = await _refresh_all(db_state, ids, NOW)
+    # one: its first address. two: the first is over the floor, so it moves on to the second,
+    # which has its own fresh floor. three: both are over theirs, so nothing is contacted.
+    assert results == ["stored", "stored", "deferred"]
+    assert [r.url.host for r in seen] == ["93.184.9.1", PUBLIC_IP]
+    sub = await load(db_state, ids[2])
+    assert (sub.status, sub.error_code, sub.consecutive_failures) == ("pending", None, 0)
