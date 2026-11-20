@@ -249,6 +249,7 @@ async def test_every_subscriptions_answer_is_private_and_not_stored(http):
         await http.post(f"{SUBS}/{sid}/resume", headers=OWNER),
         await http.post(f"{SUBS}/{sid}/refresh", headers=OWNER),
         await http.patch(f"{SUBS}/{uuid.uuid4()}", json={"label": "x"}, headers=OWNER),  # a 404
+        await http.patch(f"{SUBS}/{sid}", json={"label": "x" * 500}, headers=OWNER),  # a 422
         await http.delete(f"{SUBS}/{sid}", headers=OWNER),
     ]
     for got in answers:

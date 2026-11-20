@@ -162,8 +162,10 @@ class EventsModule(ModuleBase):
         """Remember the current request for the ``events.calendar`` loader, which
         the framework's sharing router calls without one."""
         from sm_events.core.tenancy.request_context import RequestContextMiddleware
+        from sm_events.web.no_store import NoStoreSubscriptions
 
         app.add_middleware(RequestContextMiddleware)
+        app.add_middleware(NoStoreSubscriptions)
 
     def register_resource_types(self, registry: ResourceTypeRegistry) -> None:
         from sm_events.core.access import resource_types

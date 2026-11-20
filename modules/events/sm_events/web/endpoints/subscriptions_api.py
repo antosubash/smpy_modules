@@ -24,14 +24,7 @@ from sm_events.web.endpoints.deps import Principal, get_settings, require_view
 from sm_events.web.endpoints.public import _urls
 from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut, SubscriptionPatch
 
-
-def _no_store(response: Response) -> None:
-    """Every answer holds the masked address and the fetch status: kept by no cache (the private
-    feed's rule, ``private, no-store``)."""
-    response.headers["Cache-Control"] = "private, no-store"
-
-
-router = APIRouter(tags=["subscriptions"], dependencies=[require_view, Depends(_no_store)])
+router = APIRouter(tags=["subscriptions"], dependencies=[require_view])
 
 _ID = "[^/]+"  # whatever spelling of a UUID the route accepts (hex, braces, urn:uuid:)
 _CALENDAR_SUBS = rf"calendars/{_ID}/subscriptions"
