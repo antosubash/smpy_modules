@@ -32,13 +32,13 @@ from sm_records.records.services._common import utcnow
 from sm_records.records.services.errors import NotFound
 from sm_records.records.services.types import get_type
 
-__all__ = ["CANCELLED", "cancel", "cancel_by_link"]
+__all__ = ["CANCELLED", "cancel", "cancel_by_link", "occurrence_started"]
 
 CANCELLED = "cancelled"
 _LIVE = ("pending", "registered")
 
 
-def _started(data: dict[str, Any], now: datetime) -> bool:
+def occurrence_started(data: dict[str, Any], now: datetime) -> bool:
     raw = data.get("sm_occurrence_start")
     try:
         start = datetime.fromisoformat(raw) if isinstance(raw, str) else raw
@@ -68,7 +68,7 @@ async def cancel(
 
     def derive(row: Record) -> Change | None:
         data = row.data or {}
-        if row.is_deleted or data.get("sm_status") not in _LIVE or _started(data, stamp):
+        if row.is_deleted or data.get("sm_status") not in _LIVE or occurrence_started(data, stamp):
             return None
         if still is not None and not still(row):
             return None
