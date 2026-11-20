@@ -937,7 +937,9 @@
       "sm_status": {
         "pending": "Bestätigung ausstehend",
         "confirmed": "Bestätigt",
-        "unsubscribed": "Abgemeldet"
+        "unsubscribed": "Abgemeldet",
+        "registered": "Angemeldet",
+        "cancelled": "Storniert"
       },
       "sm_spam": {
         "links": "Zu viele Links",

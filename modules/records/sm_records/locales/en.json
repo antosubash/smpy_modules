@@ -937,7 +937,9 @@
       "sm_status": {
         "pending": "Pending confirmation",
         "confirmed": "Confirmed",
-        "unsubscribed": "Unsubscribed"
+        "unsubscribed": "Unsubscribed",
+        "registered": "Registered",
+        "cancelled": "Cancelled"
       },
       "sm_spam": {
         "links": "Too many links",

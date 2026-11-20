@@ -226,4 +226,18 @@ describe('RecordCell', () => {
     expect(out).toContain('media-42');
     expect(out).not.toContain('<img');
   });
+
+  it('translates a registration status (a system select) instead of printing its stored word', () => {
+    const status = field({
+      key: 'sm_status',
+      type: 'select',
+      system: 'readonly',
+      options: { choices: [{ value: 'registered', label: 'registered' }] },
+    });
+    expect(html(status, 'registered')).toContain('Registered');
+    expect(html(status, 'cancelled')).toContain('Cancelled');
+    expect(
+      html(field({ type: 'select', options: { choices: [{ value: 'a', label: 'Alpha' }] } }), 'a'),
+    ).toContain('Alpha');
+  });
 });

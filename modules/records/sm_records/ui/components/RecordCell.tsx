@@ -8,6 +8,11 @@ import { MediaCell } from './media/MediaCell';
 
 type Choice = { value: string; label: string };
 
+const SYSTEM_VALUES = keys.records.public_submissions.system_values as Record<
+  string,
+  Record<string, string> | undefined
+>;
+
 /** How many characters of a text-ish value a cell prints before an ellipsis;
  *  the whole value stays in the cell's `title`. */
 const CELL_CHARS = 60;
@@ -157,8 +162,12 @@ export function RecordCell({
         <span>{typeof value === 'string' ? formatDateTime(value, locale) : String(value)}</span>
       );
 
-    case 'select':
-      return <span>{choiceLabel(field, value)}</span>;
+    case 'select': {
+      // A system select (a registration's status) is worded by this module's catalogue.
+      const system =
+        field.system && typeof value === 'string' ? SYSTEM_VALUES[field.key]?.[value] : undefined;
+      return <span>{system ? t(system) : choiceLabel(field, value)}</span>;
+    }
 
     case 'media':
       return <MediaCell value={value} />;
