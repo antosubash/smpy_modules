@@ -44,6 +44,7 @@ class _Job:
     minutes: int
     calendar_tz: str
     may_use_private: bool
+    public: bool
 
 
 @dataclass(frozen=True)
@@ -81,9 +82,19 @@ async def _claim(
                 ),
                 calendar.default_timezone,
                 sub.may_use_private,
+                sub.public,
             )
             await finalize_session(db)
             return job
+
+
+def fetch_policy(settings: EventsSettings, sub: Any) -> Any:
+    """The one policy a fetch (and every redirect hop) runs under: internal addresses need the
+    setting **and** the saver's right, and a public subscription never has them."""
+    return effective(
+        settings.allow_private_subscription_urls,
+        may_use_private=sub.may_use_private and not sub.public,
+    )
 
 
 async def _fetch(
@@ -98,9 +109,7 @@ async def _fetch(
     try:
         return await fetcher(
             url,
-            policy=effective(
-                settings.allow_private_subscription_urls, may_use_private=job.may_use_private
-            ),
+            policy=fetch_policy(settings, job),
             etag=job.etag,
             last_modified=job.last_modified,
             max_bytes=effective_max_bytes(settings),

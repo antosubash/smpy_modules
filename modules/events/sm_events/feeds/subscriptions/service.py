@@ -11,7 +11,6 @@ any other edit leaves it. The URL is sealed at once and shown only as ``url_disp
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -26,81 +25,13 @@ from sm_events.core.errors_subscriptions import (
     RefreshTooSoon,
     SubscriptionExists,
     SubscriptionLimit,
-    SubscriptionNotPublicCalendar,
 )
-from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
-from sm_events.feeds.subscriptions import policy, schedule, urls, validate
-from sm_events.models import Calendar, ExternalItem, Subscription, Visibility
+from sm_events.feeds.subscriptions import policy, rules, schedule, urls, validate
+from sm_events.models import ExternalItem, Subscription
 from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut, SubscriptionPatch
 
 __all__ = ["create", "delete", "list_for", "pause", "refresh_now", "resume", "to_out", "update"]
-
-
-class Context:
-    """What a save needs beyond the principal: settings, the saver's rights and this site's own
-    host names (for the own-feed refusal)."""
-
-    def __init__(
-        self,
-        settings: EventsSettings,
-        *,
-        is_manager: bool,
-        can_publish: bool,
-        own_hosts: Collection[str] = (),
-        public_prefix: str = "",
-    ) -> None:
-        self.settings, self.is_manager, self.can_publish = settings, is_manager, can_publish
-        self.own_hosts, self.public_prefix = own_hosts, public_prefix
-
-
-def _check_public(public: bool, calendar: Calendar, ctx: Context) -> None:
-    if not public:
-        return
-    if not ctx.can_publish:
-        raise PublishRequired
-    if calendar.visibility != Visibility.PUBLIC.value:
-        raise SubscriptionNotPublicCalendar
-
-
-async def _live(db: Any, calendar_id: uuid.UUID) -> list[Subscription]:
-    stmt = select(Subscription).where(Subscription.calendar_id == calendar_id)  # type: ignore[arg-type]
-    return list((await db.execute(stmt.order_by(Subscription.label, Subscription.id))).scalars())  # type: ignore[arg-type]
-
-
-def _same_address(held: list[Subscription], url: str, *, skip: uuid.UUID | None = None) -> bool:
-    for sub in held:
-        if sub.id == skip:
-            continue
-        try:
-            if urls.unseal(sub.url_enc) == url:
-                return True
-        except urls.UrlUnreadable:
-            continue  # an unreadable one cannot be compared: it never blocks a new address
-    return False
-
-
-def fetch_wait(sub: Subscription, now: datetime) -> timedelta:
-    """How long until a fetch of ``sub`` may start: the one decision every trigger asks (refresh
-    now, resume, a new address). The floor since the last attempt, an unexpired lease (an
-    in-flight fetch finishes; the new work is due after it) and, for a paused subscription, the
-    floor since it was paused (so pause and resume cannot be looped into fetches)."""
-    floor = timedelta(seconds=constants.SUBSCRIPTION_REFRESH_NOW_SECONDS)
-    waits = [timedelta(0)]
-    if sub.last_fetched_at is not None:
-        waits.append(sub.last_fetched_at + floor - now)
-    if sub.lease_until is not None and sub.lease_until > now:
-        waits.append(sub.lease_until - now)
-    if sub.status == "paused":
-        waits.append(sub.updated_at + floor - now)
-    return max(waits)
-
-
-def _make_due(sub: Subscription, now: datetime) -> None:
-    """Back to ``pending`` and due once ``fetch_wait`` allows. Never touches a lease."""
-    wait = fetch_wait(sub, now)
-    sub.status, sub.error_code, sub.last_http_status = "pending", None, None
-    sub.consecutive_failures, sub.next_fetch_at = 0, now + wait
 
 
 async def create(
@@ -108,20 +39,21 @@ async def create(
     who: ResourcePrincipal,
     calendar_id: uuid.UUID,
     body: SubscriptionIn,
-    ctx: Context,
+    ctx: rules.Context,
     *,
     now: datetime,
 ) -> Subscription:
     calendar = await validate.require_subscription_right(db, who, calendar_id, lock=True)
-    _check_public(body.public, calendar, ctx)
+    rules.check_public(body.public, calendar, ctx)
+    internal_ok = ctx.is_manager and not body.public  # a public subscription is never internal
     url, display = validate.check_url_for_save(
         body.url,
         settings=ctx.settings,
-        is_manager=ctx.is_manager,
+        is_manager=internal_ok,
         own_hosts=ctx.own_hosts,
         public_prefix=ctx.public_prefix,
     )
-    held = await _live(db, calendar.id)
+    held = await rules.live(db, calendar.id)
     if len(held) >= constants.SUBSCRIPTIONS_PER_CALENDAR:
         raise SubscriptionLimit
     total = (
@@ -136,7 +68,7 @@ async def create(
     ).scalar_one()
     if total >= constants.SUBSCRIPTIONS_PER_TENANT:
         raise SubscriptionLimit
-    if _same_address(held, url):
+    if rules.same_address(held, url):
         raise SubscriptionExists
     sub = Subscription(
         calendar_id=calendar.id,
@@ -148,12 +80,12 @@ async def create(
         refresh_minutes=body.refresh_minutes,
         public=body.public,
         may_use_private=policy.flag_after_save(
-            False, url_changed=True, saver_may_use_private=ctx.is_manager
+            False, url_changed=True, saver_may_use_private=internal_ok
         ),
         created_at=now,
         updated_at=now,
     )
-    _make_due(sub, now)
+    rules.make_due(sub, now)
     db.add(sub)
     await db.flush()
     return sub
@@ -164,7 +96,7 @@ async def update(
     who: ResourcePrincipal,
     sub_id: uuid.UUID,
     body: SubscriptionPatch,
-    ctx: Context,
+    ctx: rules.Context,
     *,
     now: datetime,
 ) -> Subscription:
@@ -172,9 +104,21 @@ async def update(
     if body.expected is not None and body.expected != sub.updated_at.isoformat():
         raise Stale
     sent = body.model_fields_set
-    if "public" in sent and body.public is not None:
-        _check_public(body.public, calendar, ctx)
-        sub.public = body.public
+    public = sub.public if body.public is None else body.public
+    changes_shown = (
+        (body.public is not None and body.public != sub.public)
+        or body.url is not None
+        or (body.label is not None and body.label != sub.label)
+    )
+    if public and changes_shown and not ctx.can_publish:
+        raise PublishRequired  # what the public sees is chosen with the publish right, every time
+    if public and body.public is not None and not sub.public:
+        rules.check_public(True, calendar, ctx)
+        rules.recheck_public(
+            sub, ctx
+        )  # an address that needs internal access cannot be shown publicly
+        sub.may_use_private = False
+    sub.public = public
     if body.label is not None:
         sub.label = body.label
     for field in ("color", "refresh_minutes"):
@@ -184,20 +128,22 @@ async def update(
         url, display = validate.check_url_for_save(
             body.url,
             settings=ctx.settings,
-            is_manager=ctx.is_manager,
+            is_manager=ctx.is_manager and not public,
             own_hosts=ctx.own_hosts,
             public_prefix=ctx.public_prefix,
         )
-        held = await _live(db, calendar.id)
-        if _same_address(held, url, skip=sub.id):
+        held = await rules.live(db, calendar.id)
+        if rules.same_address(held, url, skip=sub.id):
             raise SubscriptionExists
-        if not _same_address([sub], url):  # a changed address, not the one it already has
+        if not rules.same_address([sub], url):  # a changed address, not the one it already has
             sub.url_enc, sub.url_display = urls.seal(url), display
             sub.etag = sub.last_modified = None
             sub.may_use_private = policy.flag_after_save(
-                sub.may_use_private, url_changed=True, saver_may_use_private=ctx.is_manager
+                sub.may_use_private,
+                url_changed=True,
+                saver_may_use_private=ctx.is_manager and not public,
             )
-            _make_due(sub, now)
+            rules.make_due(sub, now)
     sub.updated_at = now
     await db.flush()
     return sub
@@ -221,10 +167,10 @@ async def resume(
         raise Conflict(
             constants.SUBSCRIPTION_NOT_PAUSED_DETAIL, constants.SUBSCRIPTION_NOT_PAUSED_CODE
         )
-    wait = fetch_wait(sub, now)
+    wait = rules.fetch_wait(sub, now)
     if wait > timedelta(0):
         raise RefreshTooSoon(retry_after=int(wait.total_seconds()) + 1)
-    _make_due(sub, now)
+    rules.make_due(sub, now)
     sub.updated_at = now
     await db.flush()
     return sub
@@ -241,7 +187,7 @@ async def refresh_now(
         raise Conflict(
             constants.SUBSCRIPTION_STATE_CONFLICT_DETAIL, constants.SUBSCRIPTION_STATE_CONFLICT_CODE
         )
-    wait = fetch_wait(sub, now)
+    wait = rules.fetch_wait(sub, now)
     if wait > timedelta(0):
         raise RefreshTooSoon(retry_after=int(wait.total_seconds()) + 1)
     if sub.status in ("disabled", "error"):
@@ -270,7 +216,7 @@ async def delete(db: Any, who: ResourcePrincipal, sub_id: uuid.UUID, *, now: dat
 
 async def list_for(db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID) -> list[Subscription]:
     await validate.require_subscription_right(db, who, calendar_id)
-    return await _live(db, calendar_id)
+    return await rules.live(db, calendar_id)
 
 
 def to_out(sub: Subscription, *, setting_minutes: int) -> SubscriptionOut:

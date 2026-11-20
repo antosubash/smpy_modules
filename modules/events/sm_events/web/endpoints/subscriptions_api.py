@@ -17,7 +17,7 @@ from sm_events.core import constants
 from sm_events.core.clock import utcnow
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import bound_tenant
-from sm_events.feeds.subscriptions import launch, service
+from sm_events.feeds.subscriptions import launch, rules, service
 from sm_events.reminders.base_url import public_base_url
 from sm_events.web.endpoints.deps import Principal, get_settings, require_view
 from sm_events.web.endpoints.public import _urls
@@ -33,13 +33,13 @@ PATH_PATTERN = (
 RATE = constants.SUBSCRIPTION_REFRESH_RATE
 
 
-def _context(request: Request, who, settings: EventsSettings) -> service.Context:
+def _context(request: Request, who, settings: EventsSettings) -> rules.Context:
     from urllib.parse import urlsplit
 
     hosts = {request.url.hostname or ""}
     if base := public_base_url(request.app):
         hosts.add(urlsplit(base).hostname or "")
-    return service.Context(
+    return rules.Context(
         settings,
         is_manager=who.has(constants.PERM_MANAGE),
         can_publish=who.has(constants.PERM_PUBLISH),
