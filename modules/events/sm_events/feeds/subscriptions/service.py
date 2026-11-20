@@ -46,7 +46,9 @@ async def create(
     calendar = await validate.require_subscription_right(db, who, calendar_id, lock=True)
     rules.check_public(body.public, calendar, ctx)
     internal_ok = ctx.is_manager and not body.public  # a public subscription is never internal
-    flag_ok = internal_ok and ctx.settings.allow_private_subscription_urls  # and only with the switch
+    flag_ok = (
+        internal_ok and ctx.settings.allow_private_subscription_urls
+    )  # and only with the switch
     url, display = validate.check_url_for_save(
         body.url,
         settings=ctx.settings,

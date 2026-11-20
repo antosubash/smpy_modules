@@ -81,3 +81,14 @@ def test_subscription_defaults():
     for name in ("subscription_refresh_minutes", "allow_private_subscription_urls"):
         extra = EventsSettings.model_fields[name].json_schema_extra or {}
         assert "requires_restart" not in extra  # read per fetch, applies at once
+
+
+def test_the_intranet_switch_warning_is_a_group_heading_the_screen_always_shows():
+    """The settings screen hides a boolean's description while a stored value overrides it
+    (framework behaviour, see .skill-state/ship/upstream-settings-bool-description.md), so the
+    warning is also the field's group heading."""
+    from sm_events.core.settings import EventsSettings
+
+    extra = EventsSettings.model_fields["allow_private_subscription_urls"].json_schema_extra
+    assert isinstance(extra, dict) and "internal addresses" in str(extra["group"])
+    assert EventsSettings().allow_private_subscription_urls is False

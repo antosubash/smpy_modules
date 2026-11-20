@@ -71,7 +71,17 @@ class EventsSettings(DbBackedSettings):
     """How often a subscribed calendar is fetched again, in minutes, unless a subscription sets
     its own. Read where it is used and kept between 15 and 1440, whatever is stored here."""
 
-    allow_private_subscription_urls: bool = False
+    allow_private_subscription_urls: bool = Field(
+        default=False,
+        json_schema_extra={
+            # A group heading is the one thing the settings screen always shows next to a field:
+            # a boolean's own description is hidden while a stored value overrides it.
+            "group": (
+                "Warning: with the switch below on, managers can make this server request "
+                "internal addresses (see the subscriptions guide)"
+            )
+        },
+    )
     """Lets a subscription use an address on this site's own network (private ranges such as
     10.x or 192.168.x, plain ``http://`` and any port). Never lets one reach this server's
     loopback, link-local or cloud-metadata addresses. WARNING: with this on, anyone who may
