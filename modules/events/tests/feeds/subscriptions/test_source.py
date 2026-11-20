@@ -183,7 +183,10 @@ async def test_paused_error_disabled_still_shown_and_deleted_hidden(db, cal):
 
 
 async def test_fields(db, sub):
-    await seed_item(db, sub, "uid-1", utc(2027, 3, 10, 9), title="Hello", url="https://a.example/x")
+    await seed_item(
+        db, sub, "uid-1", utc(2027, 3, 10, 9), title="Hello", url="https://a.example/x",
+        location="Room 4",
+    )  # fmt: skip
     await seed_item(
         db,
         sub,
@@ -206,6 +209,7 @@ async def test_fields(db, sub):
         False,
         "https://a.example/x",
     )
+    assert one.location == "Room 4"  # the stored place travels with the entry
     assert (one.event_id, one.type, one.source, one.calendar_id) == (
         None,
         "event",

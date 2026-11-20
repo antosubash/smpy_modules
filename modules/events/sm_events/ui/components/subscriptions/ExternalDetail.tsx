@@ -33,6 +33,11 @@ export default function ExternalDetail({ occurrence: o, gridTimeZone }: DetailPr
       </h3>
       <p>{timeText(o, gridTimeZone, locale)}</p>
       {own ? <p className="text-muted-foreground">{own}</p> : null}
+      {o.location ? (
+        <p data-testid="external-location">
+          <Name>{o.location}</Name>
+        </p>
+      ) : null}
       <p className="text-muted-foreground">{t(copy.from_label, { label: o.origin_label ?? '' })}</p>
       {isWebUrl(o.url) ? (
         <p>

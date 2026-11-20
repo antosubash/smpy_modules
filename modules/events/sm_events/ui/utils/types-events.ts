@@ -251,6 +251,8 @@ export type Occurrence = {
   original_start: string | null;
   event_status: string | null;
   origin_label?: string | null;
+  /** An external entry's place (plain text). */
+  location?: string | null;
 };
 export type OccurrencePage = {
   items: Occurrence[];

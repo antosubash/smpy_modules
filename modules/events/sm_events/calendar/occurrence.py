@@ -43,6 +43,9 @@ class Occurrence(BaseModel):
     origin_label: str | None = None
     """Where an external entry comes from (a subscription's label, plain text); ``None`` for
     this module's own events."""
+    location: str | None = None
+    """An external entry's place, one line of plain text cleaned when it was stored (never
+    markup); ``None`` for this module's own events and for an entry without one."""
 
 
 class PluginOccurrence(Occurrence):

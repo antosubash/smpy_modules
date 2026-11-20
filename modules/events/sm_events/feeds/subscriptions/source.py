@@ -91,6 +91,7 @@ class _Builder:
             editable=False,
             original_start=original_start,
             origin_label=sub.label,
+            location=item.location,
         )
 
 

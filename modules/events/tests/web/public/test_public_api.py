@@ -59,7 +59,7 @@ async def test_no_internal_fields(public_locales_client, fx):
         assert set(item) == {
             "source", "key", "calendar_id", "start", "end", "all_day", "timezone", "start_date",
             "end_date", "title", "lang", "color", "url", "status", "type", "editable", "event_id",
-            "original_start", "event_status", "origin_label",
+            "original_start", "event_status", "origin_label", "location",
         }  # fmt: skip
     assert "draft" not in got.text.lower() and "in_review" not in got.text
 

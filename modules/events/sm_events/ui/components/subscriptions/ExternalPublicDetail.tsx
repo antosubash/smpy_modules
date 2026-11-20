@@ -13,6 +13,9 @@ export default function ExternalPublicDetail({ occurrence }: PublicDetailProps) 
       <p className="text-muted-foreground">
         {t(copy.from_label, { label: occurrence.origin_label ?? '' })}
       </p>
+      {occurrence.location ? (
+        <p data-testid="external-public-location">{occurrence.location}</p>
+      ) : null}
       {isWebUrl(occurrence.url) ? (
         <a
           href={occurrence.url}

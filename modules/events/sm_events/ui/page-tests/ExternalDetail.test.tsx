@@ -39,6 +39,17 @@ const props = (over: Record<string, unknown> = {}) => ({
   Default: DefaultDetail,
 });
 
+it('shows the stored place as literal text', async () => {
+  const view = await mount(<ExternalDetail {...props({ location: 'Room <b>4</b>' })} />);
+  const place = document.querySelector('[data-testid="external-location"]');
+  expect(place?.textContent).toBe('Room <b>4</b>');
+  expect(place?.querySelector('b')).toBeNull();
+  await view.unmount();
+  const none = await mount(<ExternalDetail {...props({ location: null })} />);
+  expect(document.querySelector('[data-testid="external-location"]')).toBeNull();
+  await none.unmount();
+});
+
 it('renders title and text as literal text, never as markup', async () => {
   const view = await mount(
     <ExternalDetail {...props({ title: '<img src=x onerror=alert(1)>' })} />,
