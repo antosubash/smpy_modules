@@ -172,6 +172,34 @@ describe('SubscriptionsDialog', () => {
     await view.unmount();
   });
 
+  it('keeps focus on Add through the reload that turns the empty list into a list', async () => {
+    let made = false;
+    const { view } = await open({
+      // the answer after saving is slow: the list appears well after the form has closed
+      [`GET ${LIST}`]: async () => {
+        if (made) await new Promise((resolve) => setTimeout(resolve, 120));
+        return made ? [sub()] : [];
+      },
+      [`POST ${LIST}`]: () => {
+        made = true;
+        return Response.json(sub(), { status: 201 });
+      },
+    });
+    await click(button('Add a subscription') as HTMLElement);
+    await setValue(
+      document.getElementById('events-sub-url') as HTMLInputElement,
+      'https://a.example/x.ics',
+    );
+    await setValue(document.getElementById('events-sub-label') as HTMLInputElement, 'Holidays');
+    await click(button('Save') as HTMLElement);
+    await flush(30); // the form is closed, the list has not arrived
+    expect(document.querySelector('[data-testid="subscription-row"]')).toBeNull();
+    await flush(300); // now it has
+    expect(document.querySelector('[data-testid="subscription-row"]')).not.toBeNull();
+    expect(document.activeElement).toBe(button('Add a subscription'));
+    await view.unmount();
+  });
+
   it('puts focus in the address field, closes the form on the first Escape and the dialog on the next, and returns focus to the trigger', async () => {
     const { view } = await open({ [`GET ${LIST}`]: [] });
     const trigger = document.querySelector('[data-testid="events-subscriptions"]') as HTMLElement;

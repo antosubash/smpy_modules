@@ -38,6 +38,7 @@ export function SubscriptionsDialog({
   const trigger = useRef<HTMLButtonElement>(null);
   const [form, setForm] = useState<Form>(null);
   const [restore, setRestore] = useState(0);
+  const wantFocus = useRef(false);
   const opener = useRef<HTMLElement | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   /** Open the form from `from` (the Add button or a row's Edit) and remember it. */
@@ -49,15 +50,25 @@ export function SubscriptionsDialog({
    *  form closed, so a detached opener falls back to it). */
   const closeForm = () => {
     setForm(null);
+    wantFocus.current = true;
     setRestore((n) => n + 1);
   };
-  // After the commit that removed the form (not a timer: React may render it later than any
-  // timeout, and the dialog would take focus for itself first).
+  // After the commit that removed the form, and again after each later commit until the list
+  // that follows a save has arrived (the first subscription turns an empty list into one, and the
+  // dialog takes focus for itself whenever the focused control goes away): focus goes to the
+  // control that opened the form, or to the Add button that is in the document by then. It is
+  // never taken from a control the person has moved to.
   useEffect(() => {
-    if (restore === 0) return;
-    const back = opener.current?.isConnected ? opener.current : addButton.current;
-    back?.focus();
-  }, [restore]);
+    if (!wantFocus.current) return;
+    const active = document.activeElement;
+    const stranded =
+      !active || active === document.body || active.getAttribute('role') === 'dialog';
+    if (stranded) {
+      const back = opener.current?.isConnected ? opener.current : addButton.current;
+      back?.focus();
+    }
+    if (!state.loading && restore > 0) wantFocus.current = false;
+  });
   const state = useSubscriptions(calendar.id, open, onGone);
   const room = state.capacity;
   // Why Add is off: the calendar's, the member's or the tenant's allowance is used up.
