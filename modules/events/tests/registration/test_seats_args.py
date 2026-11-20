@@ -175,7 +175,7 @@ async def test_length_bounds_at_the_limit_and_one_past(db, cal, name):
             name: "x" * size,
         }
 
-    # At the limit the value is valid: an unknown provider is refused as unavailable, not as bad input.
+    # At the limit the value is valid: an unknown provider is refused as unavailable, not as input.
     got = await admit(db, **args(limit))
     assert got.admitted is (name == "holder")
     with pytest.raises(ValueError):
