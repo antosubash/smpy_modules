@@ -69,13 +69,19 @@ function MyRegistrations() {
         {state.items.map((item) => (
           <li key={item.uuid} className="rounded-md border p-4" data-testid="mine-item">
             <p className="font-medium">
-              {item.page_path ? <a href={item.page_path}>{item.title}</a> : item.title}
+              {!item.available ? (
+                t(copy.gone)
+              ) : item.page_path ? (
+                <a href={item.page_path}>{item.title}</a>
+              ) : (
+                item.title
+              )}
             </p>
-            {item.when_text ? <p className="text-sm">{item.when_text}</p> : null}
+            {item.available && item.when_text ? <p className="text-sm">{item.when_text}</p> : null}
             <p className="text-sm text-muted-foreground">
               {t(item.status === 'pending' ? copy.pending : copy.registered)}
             </p>
-            {asking === item.uuid ? (
+            {!item.available ? null : asking === item.uuid ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm">{t(copy.cancel_confirm)}</span>
                 <Button disabled={busy} onClick={() => void cancel(item.uuid)}>

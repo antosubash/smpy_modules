@@ -1022,7 +1022,8 @@
       "cancel_failed": "Die Anmeldung konnte nicht storniert werden. Bitte versuchen Sie es erneut.",
       "load_failed": "Ihre Anmeldungen konnten nicht geladen werden.",
       "retry": "Erneut versuchen",
-      "loading": "Wird geladen ..."
+      "loading": "Wird geladen ...",
+      "gone": "Diese Veranstaltung ist nicht mehr verfügbar."
     }
   }
 }

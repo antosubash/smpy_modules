@@ -21,6 +21,7 @@ const item = (uuid: string, status: 'pending' | 'registered' = 'registered') => 
   when_text: 'Wed 1 Jul, 10:00',
   page_path: '/events/x',
   starts_at: null,
+  available: true,
 });
 const text = () => document.body.textContent ?? '';
 beforeEach(() =>
@@ -95,5 +96,18 @@ it('a failed load can be retried', async () => {
   await click(v.button('Try again'));
   await settle();
   expect(v.all('[data-testid=mine-item]')).toHaveLength(2);
+  await v.unmount();
+});
+
+it('a row whose event is gone says so and offers no cancel', async () => {
+  vi.mocked(api.listMine).mockResolvedValue({
+    verified: true,
+    items: [{ ...item('g'), available: false, when_text: null, page_path: null }],
+  });
+  const v = await mount(<MyRegistrations />);
+  await settle();
+  expect(text()).toContain('This event is no longer available');
+  expect(v.button('Cancel registration')).toBeUndefined();
+  expect(text()).not.toContain('Event g');
   await v.unmount();
 });

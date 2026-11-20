@@ -98,3 +98,13 @@ goes only to that address, so the form is no oracle for who is registered.
   access (every read re-checks the public gate). Public surfaces naming events by slug instead is a
   tracked follow-up.
 
+## When an event is trashed or deleted
+
+Registrations are records and outlive the event. **Trashed or unpublished:** the registration records
+and their seats are untouched (restoring the event brings it all back); events stops answering for
+the occurrence, so a submit for it is the usual invalid-form answer and "My registrations" lists the
+row as "This event is no longer available", with no cancel button. **Purged:** events deletes the
+event's seats and counters with it (a cascade); the registration records stay until their retention
+runs (retention asks events first, and falls back to the stored date when it cannot say), and the
+reconcile job finds no seat to repair. The organiser still sees those records in the registrants list.
+

@@ -56,6 +56,10 @@ class MineItem(SQLModel):
     when_text: str | None = None
     page_path: str | None = None
     starts_at: str | None = None
+    available: bool = True
+    """``False``: events no longer answers for the occurrence (the event was trashed, unpublished or
+    deleted). The row is kept so the person sees it, as "no longer available"; there is nothing to
+    open and the screen offers no cancel."""
 
 
 class MineOut(SQLModel):
@@ -155,6 +159,7 @@ async def _items(
                 when_text=when_text,
                 page_path=page_path,
                 starts_at=start if isinstance(start, str) else None,
+                available=facts.get(ref) is not None or not seats.available(),
             )
         )
     items.sort(key=lambda i: (i.starts_at or "", i.uuid))

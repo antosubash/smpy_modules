@@ -1022,7 +1022,8 @@
       "cancel_failed": "The registration could not be cancelled. Please try again.",
       "load_failed": "Your registrations could not be loaded.",
       "retry": "Try again",
-      "loading": "Loading..."
+      "loading": "Loading...",
+      "gone": "This event is no longer available."
     }
   }
 }

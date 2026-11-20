@@ -156,3 +156,28 @@ async def test_the_page_is_for_anyone_signed_in_and_is_in_the_menu(reg_site):
     for who in (ROLE_VIEWER, ADMIN):
         got = await reg_site.get("/admin/records/registrations/mine", headers=roles(who) | inertia)
         assert got.status_code == 200 and got.json()["component"] == "Records/MyRegistrations"
+
+
+async def test_a_trashed_event_is_listed_as_no_longer_available(reg_site):
+    """When events no longer answers for the occurrence the row stays (the person sees it and the
+    screen offers no cancel); the record and its seat are untouched (see docs/registration.md)."""
+    from sm_events.core.tenancy import tenant_scope
+    from sm_events.models import Event
+    from sqlalchemy import update
+
+    await sign_up(reg_site)
+    me(reg_site)
+    live = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()["items"]
+    assert [i["available"] for i in live] == [True]
+    with tenant_scope("default"):
+        async with reg_site.db_state.session_factory() as db:
+            await db.execute(
+                update(Event)
+                .where(Event.id == uuid.UUID(reg_site.event["event_id"]))
+                .values(is_deleted=True)
+            )
+            await db.commit()
+    gone = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()["items"]
+    assert [(i["available"], i["status"]) for i in gone] == [(False, "pending")]
+    assert gone[0]["page_path"] is None and gone[0]["when_text"] is None
+    assert len(await regs(reg_site)) == 1  # the registration itself is kept

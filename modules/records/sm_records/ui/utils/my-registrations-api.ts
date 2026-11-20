@@ -11,6 +11,8 @@ export type MineItem = {
   when_text: string | null;
   page_path: string | null;
   starts_at: string | null;
+  /** `false`: events no longer answers for it; shown as unavailable, with no cancel. */
+  available: boolean;
 };
 export type Mine = { verified: boolean; items: MineItem[] };
 
