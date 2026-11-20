@@ -25,6 +25,7 @@ EXPECTED = [
     "REGISTRATION_CLOSED",
     "REGISTRATION_FULL",
     "RegistrationEvent",
+    "SEAT_RELEASE_MAX",
     "SeatRef",
     "SeatsBusy",
     "admit",
