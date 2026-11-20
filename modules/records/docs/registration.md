@@ -70,3 +70,17 @@ a registered one an "already registered" mail that carries a cancel link, both w
 own budget (3 mails a day per form; past it nothing is sent and the answer is unchanged). The mail
 goes only to that address, so the form is no oracle for who is registered.
 
+## Limits of what the public surface hides
+
+- **Timing.** A submit for a new address writes a record (an insert, its index rows and a revision);
+  one for an address that already holds a live registration for that occurrence writes none. The
+  answer and the mail routing are identical, but the latency gap can tell an observer, with many
+  careful measurements, whether an address already registered. It is not removed (doing the same
+  writes on both paths would mean storing a record we then discard); the per-address mail bound and
+  the per-IP limits keep the number of measurements small.
+- **A calendar made private or trashed while an admit is in flight.** Admit locks the event row, not
+  the calendar's, so at most one admit already in flight can land after the change. The registration
+  then belongs to an event that is no longer public. It is kept like any other (it is released when
+  the registration is cancelled, trashed or purged); the reconcile job frees only seats that have no
+  live registration, so it does **not** remove this one.
+
