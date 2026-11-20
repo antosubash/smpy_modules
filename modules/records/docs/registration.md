@@ -91,4 +91,10 @@ goes only to that address, so the form is no oracle for who is registered.
   registration answers 202 at that moment. That is the one difference by address, it needs events to
   be failing under contention, and it is pinned by `test_uniform_answer.py`. A full event answers
   `registration_full` for everyone alike, before anything about the address is read.
+- **The event's internal id is in the registration token and the panel.** The token (and the panel's
+  route and props) carry the event's internal id and occurrence key: signed, so they cannot be
+  forged or pointed at another event, but not secret. This leaks nothing today: an event that is
+  hidden, a draft, private or unknown answers the same 404 as any other, and the id alone gives no
+  access (every read re-checks the public gate). Public surfaces naming events by slug instead is a
+  tracked follow-up.
 
