@@ -17,7 +17,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import finalize_session
@@ -31,6 +31,7 @@ from sm_events.feeds.subscriptions import lease, schedule, store, urls
 from sm_events.feeds.subscriptions.errors import FetchFailure
 from sm_events.feeds.subscriptions.fetch import FetchResult
 from sm_events.feeds.subscriptions.policy import effective
+from sm_events.feeds.subscriptions.target_gate import TargetGate
 from sm_events.models import Calendar, Subscription
 
 __all__ = ["Attempt", "attempt"]
@@ -105,7 +106,7 @@ def fetch_policy(settings: EventsSettings, sub: Any) -> Any:
 
 
 async def _fetch(
-    job: _Job, settings: EventsSettings, fetcher: Callable[..., Any]
+    job: _Job, settings: EventsSettings, fetcher: Callable[..., Any], gate: Any = None
 ) -> FetchResult | FetchFailure:
     """The guarded fetch, with no database session open. Returns a failure rather than raising
     one; a missing secret key raises (the caller stops the pass)."""
@@ -120,6 +121,7 @@ async def _fetch(
             etag=job.etag,
             last_modified=job.last_modified,
             max_bytes=effective_max_bytes(settings),
+            gate=gate,
         )
     except FetchFailure as failure:
         return failure
@@ -220,6 +222,14 @@ async def _store(
                 except Exception as exc:  # the class only; the savepoint left the items alone
                     logger.warning("events subscription store failed (%s)", type(exc).__name__)
                     failure = FetchFailure("internal")
+            if failure is not None and failure.code == "try_later":
+                # A server this tenant just contacted: not the feed's fault. Wait out the floor;
+                # nothing is recorded against the subscription and nothing is shown.
+                wait = failure.retry_after or constants.SUBSCRIPTION_HOST_FLOOR_SECONDS
+                sub.next_fetch_at = stamp + timedelta(seconds=wait + rng.randint(0, 5))
+                await lease.release(db, sub)
+                await finalize_session(db)
+                return Attempt("deferred")
             if failure is not None:
                 _record_failure(sub, failure, job, stamp, rng)
             else:
@@ -255,7 +265,8 @@ async def attempt(
         return Attempt("busy")
     started = clock()
     try:
-        outcome = await _fetch(job, settings, fetcher)
+        gate = TargetGate(factory, tenant, utc_now)  # the floor is on the server, per hop
+        outcome = await _fetch(job, settings, fetcher, gate)
     except RuntimeError as exc:  # no secret key: an operator's problem, not the feed's
         logger.warning("events subscription not opened (%s)", type(exc).__name__)
         return Attempt("unavailable")

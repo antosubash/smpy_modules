@@ -249,6 +249,7 @@ SUBSCRIPTION_FAILURE_CODES: Final = (
     "unexpected_content_type",
     *SCAN_FAILURE_CODES,
     "not_a_calendar",
+    "try_later",
     "internal",
 )
 

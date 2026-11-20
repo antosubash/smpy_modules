@@ -28,6 +28,7 @@ from sm_events.models.event import Event
 from sm_events.models.event_text import EventText
 from sm_events.models.external_item import ExternalItem
 from sm_events.models.feed_token import FeedToken
+from sm_events.models.fetch_target import FetchTarget
 from sm_events.models.imports import EventImport, EventImportItem
 from sm_events.models.occurrence_override import OccurrenceOverride
 from sm_events.models.redirect import Redirect
@@ -53,6 +54,7 @@ __all__ = [
     "EventText",
     "ExternalItem",
     "FeedToken",
+    "FetchTarget",
     "OccurrenceOverride",
     "OverrideKind",
     "Redirect",

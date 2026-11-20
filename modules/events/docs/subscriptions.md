@@ -120,7 +120,7 @@ nothing and records nothing against the feeds.
 | Longest backoff and longest honoured Retry-After or max-age | 24 hours | `SUBSCRIPTION_MAX_BACKOFF` |
 | Fetches per tick | 20 | `SUBSCRIPTION_TICK_FETCHES` |
 | Subscriptions one tenant may start per tick, per calendar | 3 / 2 | `SUBSCRIPTION_TICK_PER_TENANT` / `SUBSCRIPTION_TICK_PER_CALENDAR` |
-| One tenant's fetches of one address host, at most one at a time and one per | 60 s | `SUBSCRIPTION_HOST_FLOOR_SECONDS` |
+| One tenant's fetches of one server (the validated IP, every redirect hop included), at most one per | 60 s | `SUBSCRIPTION_HOST_FLOOR_SECONDS` |
 | A slow fetch (longer than 10 s) pushes the next one out, doublings at most | 10 s / 4 | `SUBSCRIPTION_SLOW_SECONDS` / `SUBSCRIPTION_SLOW_MAX` |
 | Bytes received per tick | 50 MiB | `SUBSCRIPTION_TICK_BYTES` |
 | Seconds per tick | 45 s | `SUBSCRIPTION_TICK_SECONDS` |
@@ -133,10 +133,17 @@ subscriptions per tenant and two per calendar (calendars in turn, the oldest fir
 been slow after the others) and one per address host, so a tenant with a hundred overdue feeds
 cannot fill the tick. A fetch that takes longer than 10 s (valid or not) ends its tenant's turn
 for the tick and pushes that feed's next fetch out (doubling up to four times, never beyond a day);
-one fast success resets it. A tenant's fetches of one address host run one at a time and at most
-one a minute, counted from when an attempt is claimed and kept after a subscription is deleted, so
-neither many feeds on one host nor adding and removing feeds in a loop can hammer a third party or
-hold the fetch slots. A new subscription on a host that was just fetched waits for the next beat.
+one fast success resets it. A tenant contacts one server at most once a minute, and the rule
+follows the address actually connected to, not the name typed: before connecting, the fetch records
+the validated IP (for the first request and every redirect hop; the smallest of a name's addresses
+stands for it) in one atomic statement, and a request that finds it contacted within the minute ends
+the fetch as "try later": the feed is simply due again after the floor, nothing is shown, and it
+counts neither as a failure nor as slow. So wildcard subdomains, a trailing dot, an IP in another
+spelling and many names redirecting to one server all share one floor. The record holds only the
+tenant, the IP and a time (no URL, name or secret), is purged by the janitor after a day and never
+logged. Per address name, the same minute is applied to the SQL-side selection as a cheap
+pre-filter, and survives deleting a subscription, so adding and removing feeds in a loop cannot
+hammer a third party or hold the fetch slots.
 
 The interval is the subscription's own or `subscription_refresh_minutes` (default 60), kept
 between 15 and 1,440 minutes and jittered by 10 %. A server's `Cache-Control: max-age` and
@@ -158,7 +165,8 @@ address answers with a calendar; the setting's description says so. Anyone witho
 Shown translated, never as a message from the server: `url_invalid`, `url_scheme`,
 `url_userinfo`, `url_port`, `url_unreachable` (a refused or missing host, one answer), `url_own_feed`,
 `url_unreadable` (the stored address no longer opens: the key was rotated away; enter it again),
-`not_a_calendar` (only for an internal address, see below),
+`not_a_calendar` (only for an internal address, see below), `try_later` (a server contacted within
+the minute: never stored or shown, the feed is only rescheduled),
 `too_many_redirects`, `insecure_redirect`, `timeout`, `connect_failed`, `tls_failed`,
 `http_status` (with the server's number), `gone` (stops at once), `too_large`,
 `unsupported_encoding`, `unexpected_content_type`, the scanner's own (`ics_invalid`,

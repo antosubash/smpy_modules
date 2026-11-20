@@ -199,6 +199,8 @@ async def refresh_async(
             counts["fetched"] += 1
         elif done.outcome in ("not_modified", "failed", "lease_lost"):
             counts[done.outcome] += 1
+        elif done.outcome == "deferred":
+            counts["skipped_budget"] += 1  # a server just contacted: waits out its floor
         elif done.outcome == "busy":
             counts["lease_lost"] += 1  # another worker took it first
         elif done.outcome == "unavailable":

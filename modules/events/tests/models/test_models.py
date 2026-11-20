@@ -34,6 +34,7 @@ TABLES = {
     "events_registration_seat",
     "events_subscription",
     "events_external_item",
+    "events_fetch_target",
 }
 
 

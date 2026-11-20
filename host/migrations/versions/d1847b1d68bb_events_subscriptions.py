@@ -92,6 +92,28 @@ def upgrade() -> None:
         op.f("ix_events_subscription_tenant_id"), "events_subscription", ["tenant_id"], unique=False
     )
     op.create_table(
+        "events_fetch_target",
+        sa.Column("tenant_id", sa.String(length=50), nullable=False),
+        sa.Column(
+            "id",
+            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
+            autoincrement=True,
+            nullable=False,
+        ),
+        sa.Column("ip", sa.String(length=45), nullable=False),
+        sa.Column("last_attempt_at", sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        "ix_events_fetch_target_attempt", "events_fetch_target", ["last_attempt_at"], unique=False
+    )
+    op.create_index(
+        op.f("ix_events_fetch_target_tenant_id"), "events_fetch_target", ["tenant_id"], unique=False
+    )
+    op.create_index(
+        "uq_events_fetch_target_ip", "events_fetch_target", ["tenant_id", "ip"], unique=True
+    )
+    op.create_table(
         "events_external_item",
         sa.Column("tenant_id", sa.String(length=50), nullable=False),
         sa.Column(
@@ -152,6 +174,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index("uq_events_fetch_target_ip", table_name="events_fetch_target")
+    op.drop_index(op.f("ix_events_fetch_target_tenant_id"), table_name="events_fetch_target")
+    op.drop_index("ix_events_fetch_target_attempt", table_name="events_fetch_target")
+    op.drop_table("events_fetch_target")
     op.drop_index("ix_events_external_item_window", table_name="events_external_item")
     op.drop_index(op.f("ix_events_external_item_tenant_id"), table_name="events_external_item")
     op.drop_index(

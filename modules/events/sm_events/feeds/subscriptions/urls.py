@@ -9,6 +9,9 @@ closed: there is no path on which a bad prefix or an empty value is used as the 
 
 from __future__ import annotations
 
+import contextlib
+import ipaddress
+
 import httpx
 
 from sm_events.core import constants, crypto
@@ -47,7 +50,10 @@ def unseal(stored: str) -> str:
 def host_of(url: str) -> str:
     """The lower-case IDNA host of ``url`` (what the per-host floor groups by; it is already part
     of the masked display)."""
-    return httpx.URL(url).raw_host.decode("ascii").lower()[: constants.URL_HOST_MAX]
+    host = httpx.URL(url).raw_host.decode("ascii").lower().rstrip(".")
+    with contextlib.suppress(ValueError):  # an IP literal in any spelling is one key
+        host = str(ipaddress.ip_address(host.strip("[]")))
+    return host[: constants.URL_HOST_MAX]
 
 
 def display_of(url: str) -> str:

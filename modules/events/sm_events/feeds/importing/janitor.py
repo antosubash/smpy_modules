@@ -36,6 +36,7 @@ from sm_events.models import (
     EventImportItem,
     ExternalItem,
     FeedToken,
+    FetchTarget,
     ReminderSent,
     Subscription,
 )
@@ -52,7 +53,7 @@ async def _tenants(factory: Any, now: datetime) -> list[str]:
     found: set[str] = set()
     with unscoped():
         async with factory() as db:
-            for model in (EventImport, FeedToken, Subscription):
+            for model in (EventImport, FeedToken, Subscription, FetchTarget):
                 stmt = all_tenants(select(distinct(model.tenant_id)))
                 found.update((await db.execute(stmt)).scalars())
             old = all_tenants(
@@ -122,6 +123,18 @@ async def _purge_subscriptions(db: Any, now: datetime) -> int:
     return len(ids)
 
 
+async def _purge_targets(db: Any, now: datetime) -> None:
+    """Server-contact records older than a day (nothing in them but an IP and a time)."""
+    table = FetchTarget.__table__
+    await db.execute(
+        delete(table).where(
+            table.c.tenant_id == bound_tenant(),
+            table.c.last_attempt_at < now - timedelta(days=1),
+        )
+    )
+    mark_written(db)  # Core DML: the ORM never sees it
+
+
 async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[int], int, int, int]:
     from simple_module_db import finalize_session
 
@@ -132,6 +145,7 @@ async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[i
             tokens = await sweep_revoked(db, now=now)
             ledger = await reminder_cleanup.prune_ledger(db, now=now)
             purged = await _purge_subscriptions(db, now)
+            await _purge_targets(db, now)
             mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
     return deleted, lost, tokens, ledger, purged

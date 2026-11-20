@@ -26,8 +26,9 @@ Every failure is a :class:`FetchFailure` carrying a code, with the library's exc
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from importlib import metadata
 from typing import Final, Literal
@@ -207,6 +208,7 @@ async def _fetch_feed(
     max_bytes: int,
     timeout: float = constants.SUBSCRIPTION_FETCH_SECONDS,
     transport_factory: Callable[[url_policy.Policy], httpx.AsyncBaseTransport] | None = None,
+    gate: Callable[[str], Awaitable[None]] | None = None,
 ) -> FetchResult:
     """GET ``url`` (and at most ``SUBSCRIPTION_MAX_REDIRECTS`` redirects) under ``policy``.
 
@@ -214,7 +216,7 @@ async def _fetch_feed(
     hop only. Raises :class:`FetchFailure` for everything that is not a 200 body or a 304.
     """
     deadline = asyncio.get_running_loop().time() + timeout
-    factory = transport_factory or PinnedTransport
+    factory = transport_factory or functools.partial(PinnedTransport, gate=gate)
     try:
         current = url_policy.normalise(url)
     except UnsafeURLError as error:
@@ -251,6 +253,7 @@ async def fetch_feed(
     max_bytes: int,
     timeout: float = constants.SUBSCRIPTION_FETCH_SECONDS,
     transport_factory: Callable[[url_policy.Policy], httpx.AsyncBaseTransport] | None = None,
+    gate: Callable[[str], Awaitable[None]] | None = None,
 ) -> FetchResult:
     """GET ``url`` (and at most ``SUBSCRIPTION_MAX_REDIRECTS`` redirects) under ``policy``.
 
@@ -268,6 +271,7 @@ async def fetch_feed(
             max_bytes=max_bytes,
             timeout=timeout,
             transport_factory=transport_factory,
+            gate=gate,
         )
     except FetchFailure as failure:
         failure.__cause__ = failure.__context__ = None

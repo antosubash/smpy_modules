@@ -24,7 +24,7 @@ through an ``httpx.AsyncClient``, which logs every request line with its full UR
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 import httpx
 
@@ -49,9 +49,14 @@ class PinnedTransport(httpx.AsyncBaseTransport):
     """Validate every request's host and connect only to its checked IPs."""
 
     def __init__(
-        self, policy: Policy, *, inner: Callable[[], httpx.AsyncBaseTransport] | None = None
+        self,
+        policy: Policy,
+        *,
+        inner: Callable[[], httpx.AsyncBaseTransport] | None = None,
+        gate: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self._policy = policy
+        self._gate = gate  # awaited with the server's IP before any connection; may raise
         self._factory = inner or inner_transport
         self._inners: dict[tuple[str, str, int | None], httpx.AsyncBaseTransport] = {}
 
@@ -63,6 +68,9 @@ class PinnedTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         host, ips = await dns.resolve_bounded(request.url, self._policy)
+        if self._gate is not None:
+            # The floor is on the server, not the name: the smallest validated IP stands for it.
+            await self._gate(min(ips, key=str))
         inner = self._inner_for(request.url)
         extensions = dict(request.extensions)
         if request.url.scheme == "https":

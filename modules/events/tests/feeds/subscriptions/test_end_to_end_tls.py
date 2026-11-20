@@ -11,8 +11,8 @@ import pytest
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import tenant_scope
 from sm_events.feeds.subscriptions import fetch, refresh, service
-from sm_events.models import ExternalItem, Subscription
-from sqlalchemy import select, update
+from sm_events.models import ExternalItem, FetchTarget, Subscription
+from sqlalchemy import delete, select, update
 
 from tests.support.access import principal
 from tests.support.occurrences import read
@@ -43,6 +43,7 @@ async def _refresh(db_state, sid):
                     next_fetch_at=NOW, last_fetched_at=None, lease_until=None
                 )
             )
+            await db.execute(delete(FetchTarget))  # as if the server's floor had passed
             await db.commit()
     return await refresh.refresh_one_async(
         db_state.session_factory, tenant_id="default", subscription_id=sid, now=NOW,
