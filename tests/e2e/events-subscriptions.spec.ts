@@ -57,7 +57,7 @@ async function subscribe(page: Page, calendarId: string, url: string, label: str
 const dialogOf = (page: Page) => page.getByRole('dialog');
 
 test('add, see the masked address and the status, edit and remove', async ({ page }) => {
-  const calendar = await seedCalendar(page, { label: 'Team calendar', plain: true });
+  const calendar = await seedCalendar(page, { label: 'Neighbourhood hub calendar', plain: true });
   await page.goto('/admin/events/calendars');
   await page.getByRole('button', { name: `Subscriptions of ${calendar.name}` }).click();
   const dialog = dialogOf(page);
@@ -154,7 +154,7 @@ test('external entries on the calendar are marked and read-only, and never in it
   const day = wednesday(3);
   const calendar = await seedCalendar(page, {
     visibility: 'public',
-    label: 'Town calendar',
+    label: 'Town hall calendar',
     plain: true,
   });
   const own = await seedEvent(page, {
@@ -238,7 +238,7 @@ test('a refresh that fails keeps the cached entries and shows the code', async (
 });
 
 test('German and the phone layout', async ({ page, context }) => {
-  const calendar = await seedCalendar(page, { label: 'Kalender Stadt', plain: true });
+  const calendar = await seedCalendar(page, { label: 'Kalender Rathaus', plain: true });
   await subscribe(page, calendar.id, 'https://localhost/a.ics', 'Feiertage');
   await context.addCookies([
     { name: 'locale', value: 'de', url: new URL('/', page.url()).toString() },
