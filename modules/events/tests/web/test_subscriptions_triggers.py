@@ -134,3 +134,27 @@ async def test_the_twenty_first_write_in_a_minute_is_refused():
     answers = [(await store.hit("user:u", spec)).allowed for _ in range(21)]
     assert answers == [True] * 20 + [False]  # at the limit passes, past it is refused
     assert (await InProcessWindowStore(clock=lambda: 1000.0).hit("user:other", spec)).allowed
+
+
+@pytest.mark.parametrize("spelling", ["plain", "hex", "braces", "urn", "upper"])
+def test_the_rate_limit_matches_every_id_form_the_route_accepts(spelling):
+    one = uuid.uuid4()
+    form = {
+        "plain": str(one),
+        "hex": one.hex,
+        "braces": "{" + str(one) + "}",
+        "urn": f"urn:uuid:{one}",
+        "upper": str(one).upper(),
+    }[spelling]
+    from pydantic import TypeAdapter
+
+    assert TypeAdapter(uuid.UUID).validate_python(form) == one  # the route takes it
+    registry = RateLimitRegistry()
+    EventsModule().register_rate_limits(registry)
+    for method, path in (
+        ("POST", f"/api/events/calendars/{form}/subscriptions"),
+        ("PATCH", f"/api/events/subscriptions/{form}"),
+        ("POST", f"/api/events/subscriptions/{form}/refresh"),
+        ("POST", f"/api/events/subscriptions/{form}/resume"),
+    ):
+        assert registry.match(method, path) is not None, (method, path)
