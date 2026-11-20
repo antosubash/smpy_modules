@@ -19,6 +19,7 @@ from simple_module_db import all_tenants as framework_all_tenants
 from simple_module_db import mark_written
 from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.sql.elements import ColumnElement
+from sqlmodel import col
 
 from sm_events.core import constants
 from sm_events.core.tenancy import bound_tenant
@@ -84,10 +85,10 @@ async def fenced(db: Any, sub_id: uuid.UUID, *, owner: str, now: datetime) -> Su
     stmt = (
         select(Subscription)
         .where(
-            Subscription.tenant_id == bound_tenant(),  # type: ignore[arg-type]
-            Subscription.id == sub_id,  # type: ignore[arg-type]
-            Subscription.lease_owner == owner,  # type: ignore[arg-type]
-            Subscription.lease_until > now,  # type: ignore[arg-type]
+            col(Subscription.tenant_id) == bound_tenant(),
+            col(Subscription.id) == sub_id,
+            col(Subscription.lease_owner) == owner,
+            col(Subscription.lease_until) > now,
         )
         .with_for_update()
         .execution_options(populate_existing=True)

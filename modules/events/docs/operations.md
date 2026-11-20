@@ -57,7 +57,8 @@ included, to `/setup`.
 
 ## Extra checks
 
-`host/tests/test_events_wiring.py` boots the real host and checks the routes, the anonymous
+`host/tests/test_events_wiring.py` checks the mounted pages, menu and tables, and
+`host/tests/test_events_booted.py` boots the real host and checks the routes, the anonymous
 exemption (`GET`/`HEAD` only), the rate limits and the 304. `tests/web/public/test_leaks*.py` is the
 leak harness: every public route is in its table, and a route that is not fails a test.
 

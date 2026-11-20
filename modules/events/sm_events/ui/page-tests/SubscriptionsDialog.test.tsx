@@ -163,9 +163,22 @@ describe('SubscriptionsDialog', () => {
 
   it('says when a subscription may use internal addresses, and only then', async () => {
     const { view } = await open({
-      [`GET ${LIST}`]: [sub({ may_use_internal_addresses: true }), sub({ id: 's2', label: 'Other' })],
+      [`GET ${LIST}`]: [
+        sub({ may_use_internal_addresses: true }),
+        sub({ id: 's2', label: 'Other' }),
+      ],
     });
     expect(text().match(/May use internal addresses/g)).toHaveLength(1);
+    await view.unmount();
+  });
+
+  it('counts one event in the singular', async () => {
+    const { view } = await open({ [`GET ${LIST}`]: [sub({ item_count: 1, last_counts: {} })] });
+    expect(text()).toContain('1 event');
+    expect(text()).not.toContain('1 events');
+    await click(button('Remove') as HTMLElement);
+    await flush(20);
+    expect(document.body.textContent).toContain('Its 1 cached event disappears');
     await view.unmount();
   });
 

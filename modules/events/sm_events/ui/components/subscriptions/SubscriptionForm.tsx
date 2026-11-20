@@ -161,10 +161,10 @@ export function SubscriptionForm({
       ) : null}
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
-          {t(pending ? copy.saving : copy.save)}
+          {t(pending ? keys.events.common.saving : keys.events.common.save)}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          {t(copy.cancel)}
+          {t(keys.events.common.cancel)}
         </Button>
       </div>
     </form>

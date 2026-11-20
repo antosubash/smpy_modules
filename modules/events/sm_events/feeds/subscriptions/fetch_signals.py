@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import re
 import ssl
-from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Final
 
 import httpx
 
+from sm_events.core.clock import utcnow
 from sm_events.feeds.subscriptions import policy as url_policy
 from sm_events.feeds.subscriptions.errors import FetchFailure
 from sm_events.feeds.subscriptions.url_safety import UnsafeURLError
@@ -36,7 +36,7 @@ def retry_after(response: httpx.Response) -> int | None:
         seconds = (
             int(raw)
             if raw.isdigit()
-            else int((parsedate_to_datetime(raw) - datetime.now(UTC)).total_seconds())
+            else int((parsedate_to_datetime(raw) - utcnow()).total_seconds())
         )
     except (TypeError, ValueError, OverflowError):
         return None

@@ -9,6 +9,7 @@ exist. The address is accepted once and never returned: only ``url_display``.
 from __future__ import annotations
 
 import uuid
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request, Response
 from simple_module_db.deps import get_db
@@ -34,8 +35,6 @@ RATE = constants.SUBSCRIPTION_WRITE_RATE
 
 
 def _context(request: Request, who, settings: EventsSettings) -> rules.Context:
-    from urllib.parse import urlsplit
-
     hosts = {request.url.hostname or ""}
     if base := public_base_url(request.app):
         hosts.add(urlsplit(base).hostname or "")
