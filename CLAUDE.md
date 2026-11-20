@@ -215,7 +215,7 @@ confirmation** for a double opt-in form (a submit takes none and answers one neu
 every address), and at submit for a single opt-in form (whose public availability shows states,
 never a number). The routes under `/api/records/submissions/` that carry a **registration token**
 (`{digest}.{issued}.{nonce}.{event_id}.{occurrence_key}.{mac}`, HMAC purpose `registration`; the
-event comes only from it) are the FOURTH documented token-bound anonymous surface, with the
+event comes only from it) are records' form-token surface (the first documented exception), with these extra routes: the
 confirm and cancel links (`/records/submissions/confirm-registration`, `/cancel`; GET pages are
 inert, only the POST acts). The submit route is bounded by per-IP, a per-form total
 (`public_submissions_type_rate`, charged only after the captcha passes), a per-address mail bound
