@@ -40,7 +40,7 @@ export function useListColumns({
   currentSort,
   goTo,
 }: {
-  type: Pick<TypeRead, 'key' | 'fields' | 'display_field'>;
+  type: Pick<TypeRead, 'key' | 'fields' | 'display_field' | 'public_submissions'>;
   showLocale: boolean;
   /** The page has a media library (`media_api`): only then does the
    *  default view add the first media field's thumbnails. */

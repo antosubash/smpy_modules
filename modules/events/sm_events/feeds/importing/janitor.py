@@ -28,6 +28,7 @@ from simple_module_db import mark_written
 from sqlalchemy import delete, distinct, or_, select
 
 from sm_events.core import constants
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import all_tenants, bound_tenant, tenant_scope, valid_tenant
 from sm_events.feeds.tokens.cleanup import sweep_revoked
 from sm_events.models import (
@@ -39,7 +40,6 @@ from sm_events.models import (
     Subscription,
 )
 from sm_events.reminders import cleanup as reminder_cleanup
-from sm_events.reminders import limits
 
 __all__ = ["janitor_async"]
 
@@ -132,6 +132,7 @@ async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[i
             tokens = await sweep_revoked(db, now=now)
             ledger = await reminder_cleanup.prune_ledger(db, now=now)
             purged = await _purge_subscriptions(db, now)
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
     return deleted, lost, tokens, ledger, purged
 

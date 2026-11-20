@@ -80,6 +80,8 @@ describe('records without events', () => {
       'events-extensions.ts',
       'ui/events/RecordDateDetail.tsx',
       'ui/events/RecordDatesSettings.tsx',
+      'ui/events/RegistrationEditor.tsx',
+      'ui/events/RegistrationPanel.tsx',
     ]);
     expect(EXTENSIONS).toContain('events-extensions.ts');
   });

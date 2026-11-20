@@ -8,8 +8,9 @@ from datetime import timedelta
 import pytest
 from simple_module_core.mail import install_mail_sender
 from simple_module_db.query_filter import EngineTenancy, bind_engine_policy
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import tenant_scope
-from sm_events.reminders import candidates, limits, tick
+from sm_events.reminders import candidates, tick
 
 from tests.pg_support import USING_POSTGRES
 from tests.reminders.support import ORIGIN, bulk_follows

@@ -15,7 +15,7 @@ from tests.support.app_harness import ADMIN, roles
 from tests.support.registration_http import (
     TYPE,
     record_url,
-    register,
+    register_confirmed,
     regs,
     seat_counts,
     seed_event,
@@ -70,8 +70,8 @@ async def run(site, **kw) -> int:
 
 
 async def test_reconcile_frees_leaked(reg_site):
-    await register(reg_site, "live@example.org")
-    await register(reg_site, "gone@example.org")
+    await register_confirmed(reg_site, "live@example.org")
+    await register_confirmed(reg_site, "gone@example.org")
     items = {r["data"]["sm_email"]: r for r in await regs(reg_site)}
     cancel = await reg_site.post(
         record_url(items["gone@example.org"]["uuid"], "/submission/cancel"), headers=roles(ADMIN)
@@ -84,7 +84,9 @@ async def test_reconcile_frees_leaked(reg_site):
     assert await run(reg_site) == 2
     assert await seat_counts(reg_site) == (1, 1)
     assert [
-        r["data"]["sm_email"] for r in await regs(reg_site) if r["data"]["sm_status"] == "pending"
+        r["data"]["sm_email"]
+        for r in await regs(reg_site)
+        if r["data"]["sm_status"] == "registered"
     ] == ["live@example.org"]
     assert await run(reg_site) == 0  # idempotent
 
@@ -92,7 +94,7 @@ async def test_reconcile_frees_leaked(reg_site):
 async def test_it_pages(reg_site):
     for _ in range(5):
         await leak(reg_site, str(uuid.uuid4()))
-    await register(reg_site, "live@example.org")
+    await register_confirmed(reg_site, "live@example.org")
     pages: list[int] = []
     real = reconcile.page_released
     reconcile.page_released = lambda n: pages.append(n)  # type: ignore[assignment]
@@ -105,7 +107,7 @@ async def test_it_pages(reg_site):
 
 
 async def test_a_trashed_registration_leaking_a_seat_is_freed(reg_site):
-    await register(reg_site, "a@example.org")
+    await register_confirmed(reg_site, "a@example.org")
     (record,) = await regs(reg_site)
     await reg_site.delete(record_url(record["uuid"]), headers=roles(ADMIN))
     await leak(reg_site, str(uuid.UUID(record["uuid"])))
@@ -114,7 +116,7 @@ async def test_a_trashed_registration_leaking_a_seat_is_freed(reg_site):
 
 async def test_it_never_admits(reg_site):
     event = await seed_event(reg_site.db_state, uid="n@x", registration_capacity=5)
-    await register(reg_site, "a@example.org", event=event)
+    await register_confirmed(reg_site, "a@example.org", event=event)
     with tenant_scope("default"):
         async with reg_site.db_state.session_factory() as db:
             from sqlalchemy import delete

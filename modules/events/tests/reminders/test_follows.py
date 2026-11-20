@@ -275,3 +275,19 @@ async def test_one_user_in_every_spelling_of_their_id(db):
     assert len((await db.execute(select(EventFollow.event_id).distinct())).all()) == 2
     await follows.delete_follow(db, principal(forms[1], "events.view"), event.id)
     assert await _rows(db, canonical_user_id(uid)) == [(other.id.hex, 60)]
+
+
+async def test_an_event_with_nothing_left_to_remind_of_says_it_is_over(db):
+    """``over``: no uncancelled occurrence is coming, so "Remind me" has nothing to offer."""
+    cals = await world(db)
+    past = await published(db, cals["I"], starts_at=NOW - timedelta(days=2))
+    coming = await published(db, cals["I"], starts_at=NOW + timedelta(days=2))
+    cancelled = await published(db, cals["I"], starts_at=NOW + timedelta(days=2), cancelled=True)
+    for event, over in ((past, True), (coming, False), (cancelled, True)):
+        state = await follows.get_follow(db, U, event.id, settings=SETTINGS, now=NOW)
+        assert state.over is over, event.starts_at
+    series = await seed_event(
+        db, cals["I"], title="Weekly", status="published", rrule="FREQ=WEEKLY",
+        starts_at=NOW - timedelta(days=30),
+    )  # fmt: skip
+    assert (await follows.get_follow(db, U, series.id, settings=SETTINGS, now=NOW)).over is False

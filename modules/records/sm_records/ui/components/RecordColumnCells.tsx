@@ -2,7 +2,7 @@ import { TableHead } from '@simple-module-py/ui/components/ui/table';
 import { disambiguateLabels } from '../utils/filters';
 import { keys, type Translate, useT } from '../utils/i18n';
 import type { EnvelopeColumnKey, ListColumn, ResolvedColumns, SortState } from '../utils/listing';
-import type { RecordRead } from '../utils/types';
+import type { FieldDef, RecordRead } from '../utils/types';
 import { EMPTY_CELL, formatDateTime } from '../utils/values';
 import { RecordCell } from './RecordCell';
 import {
@@ -30,6 +30,18 @@ export function envelopeLabel(t: Translate, key: EnvelopeColumnKey): string {
   }
 }
 
+const SYSTEM_LABELS = keys.records.public_submissions.system_labels as Record<
+  string,
+  string | undefined
+>;
+
+/** A system field (``sm_status``, ``sm_occurrence_start``, ...) is worded by this module's own
+ *  catalogue, in the console's language; an operator-declared field keeps its own label. */
+function fieldLabel(t: Translate, field: FieldDef): string {
+  const known = field.system ? SYSTEM_LABELS[field.key] : undefined;
+  return known ? t(known) : field.label;
+}
+
 /**
  * Every column's header (and card) label, keyed by column key — the same
  * strings the Columns panel and the filter bar show. A declared field
@@ -50,7 +62,7 @@ export function columnLabels(
     disambiguateLabels(
       columns.map((column) => ({
         key: column.key,
-        label: column.kind === 'field' ? column.field.label : envelopeLabel(t, column.key),
+        label: column.kind === 'field' ? fieldLabel(t, column.field) : envelopeLabel(t, column.key),
       })),
     ).map((entry) => [entry.key, entry.label]),
   );

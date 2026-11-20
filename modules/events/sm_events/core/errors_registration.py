@@ -22,8 +22,17 @@ _SERVICE_UNAVAILABLE = 503
 
 
 class InvalidRegistration(Invalid):
+    """The settings are not valid. ``reason`` (one of ``constants.INVALID_REGISTRATION_REASONS``)
+    gives the refusal its own code and wording, so the editor can say what is wrong; ``field`` says
+    where. Without a reason the generic code stands."""
+
     code = constants.INVALID_REGISTRATION_CODE
     detail = constants.INVALID_REGISTRATION_DETAIL
+
+    def __init__(self, *args: object, reason: str | None = None, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        if reason is not None:
+            self.code, self.detail = constants.INVALID_REGISTRATION_REASONS[reason]
 
 
 class RegistrationUnavailable(Invalid):

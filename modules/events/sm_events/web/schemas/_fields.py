@@ -14,7 +14,7 @@ from sm_events.core.text_safety import (
     LINE_SEPARATORS,
     MULTILINE_OK,
 )
-from sm_events.core.web_urls import is_web_url
+from sm_events.core.web_urls import is_site_image, is_web_url
 
 Slug = Annotated[str, Field(max_length=constants.SLUG_MAX, pattern=constants.SLUG_PATTERN)]
 TextSlug = Annotated[str, Field(max_length=constants.TEXT_SLUG_MAX, pattern=constants.SLUG_PATTERN)]
@@ -76,3 +76,16 @@ def http_url(value: str) -> str:
 
 
 HttpUrl = Annotated[str, Field(max_length=constants.URL_MAX), AfterValidator(http_url)]
+
+
+def image_ref(value: str) -> str:
+    """An image reference: a path on the site (``/media/...``) or an absolute http(s) address. Which
+    absolute addresses the site may show is decided where the origin is known (the write path)."""
+    if value.startswith("/"):
+        if not is_site_image(value):
+            raise ValueError("not a valid path on this site")
+        return value
+    return http_url(value)
+
+
+ImageRef = Annotated[str, Field(max_length=constants.URL_MAX), AfterValidator(image_ref)]

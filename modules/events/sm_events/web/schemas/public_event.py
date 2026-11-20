@@ -53,6 +53,22 @@ class NextOccurrence(BaseModel):
     status: Status
 
 
+class PublicRegistrationOut(BaseModel):
+    """Where to register, and for which occurrence. The page is cached and the same for everyone,
+    so it carries no seat information of any kind: the registration panel asks live."""
+
+    mode: str
+    url: str | None
+    """``external`` only: the link."""
+    provider: str | None
+    target: str | None
+    """``builtin`` only: the provider's own name for the form."""
+    occurrence_key: str | None
+    """The occurrence this page registers for; ``None`` on a series' page with no date chosen."""
+    upcoming: list[NextOccurrence]
+    """That bare page's next dates to choose from (at most five, none cancelled)."""
+
+
 class SeriesOut(BaseModel):
     """A recurring event: the normalised rule and the first start, so the client can summarise
     it, and the next occurrences."""
@@ -103,6 +119,7 @@ class PublicEventProps(BaseModel):
     parent: ParentLink | None
     sub_events: list[PublicListItem]
     registration_url: str | None
+    registration: PublicRegistrationOut
     ics_url: str
     canonical_url: str
     alternates: list[AlternateOut]

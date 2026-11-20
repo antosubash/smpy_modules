@@ -65,7 +65,9 @@ async def worker_client(tmp_path) -> AsyncIterator[AsyncClient]:
 async def _sidebar(client: AsyncClient, *names: str) -> list[dict]:
     resp = await client.get("/admin/records/", headers={**roles(*names), **_INERTIA})
     assert resp.status_code == 200, resp.text
-    return resp.json()["props"]["menus"]["adminSidebar"]
+    items = resp.json()["props"]["menus"]["adminSidebar"]
+    # "My registrations" is the events-gated entry (tested with the registration suite).
+    return [item for item in items if item["label"] != "My registrations"]
 
 
 async def test_create_carries_show_in_menu_and_defaults_to_off(client):

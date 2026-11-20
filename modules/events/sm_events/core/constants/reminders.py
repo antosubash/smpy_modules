@@ -1,6 +1,7 @@
 """Reminders (PR 8): the codes, states, names and column widths.
 
-The numeric bounds (lead times, limits, budgets) live in :mod:`sm_events.reminders.limits`.
+The numeric bounds (lead times, limits, budgets) live in
+:mod:`sm_events.core.constants.reminders_limits`.
 """
 
 from __future__ import annotations
@@ -26,8 +27,9 @@ __all__ = [
     "REMINDERS_UNAVAILABLE_DETAIL",
     "REMINDERS_URL",
     "REMINDER_CODE_MAX",
+    "REMINDER_CODE_SEND_TIMEOUT",
+    "REMINDER_CODE_TOO_LATE",
     "REMINDER_SEND_FAILED",
-    "REMINDER_SEND_TIMEOUT",
     "REMINDER_STATES",
     "REMINDER_USER_MAX",
     "SETTINGS_URL",
@@ -54,7 +56,9 @@ REMINDER_CODE_MAX: Final = 32
 # ``failed`` are final.
 REMINDER_STATES: Final = ("claimed", "sending", "sent", "failed")
 REMINDER_SEND_FAILED: Final = "send_failed"
-REMINDER_SEND_TIMEOUT: Final = "send_timeout"
+REMINDER_CODE_SEND_TIMEOUT: Final = "send_timeout"
+REMINDER_CODE_TOO_LATE: Final = "too_late"
+"""A due reminder that went stale unsent (too many were due at once): a terminal row, never mail."""
 
 # Why reminders cannot be delivered, in the order they are checked.
 AVAILABILITY_REASONS: Final = (
@@ -62,7 +66,6 @@ AVAILABILITY_REASONS: Final = (
     "no_public_base_url",
     "no_mail_transport",
     "console_mail",
-    "worker_access_unavailable",
 )
 
 # Refusals.

@@ -93,8 +93,8 @@ export function MyReminders() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t(copy.col_event)}</TableHead>
-                <TableHead>{t(copy.col_calendar)}</TableHead>
-                <TableHead>{t(copy.col_next)}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t(copy.col_calendar)}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t(copy.col_next)}</TableHead>
                 <TableHead>{t(copy.col_leads)}</TableHead>
                 <TableHead>{t(copy.col_actions)}</TableHead>
               </TableRow>
@@ -177,14 +177,15 @@ function Row({
   onSaved: () => void;
   onRemove: () => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const copy = keys.events.reminders.page;
   if (item.hidden) {
     return (
       <TableRow data-testid="hidden-follow">
-        <TableCell colSpan={4} className="text-muted-foreground">
-          {t(copy.hidden_event)}
-        </TableCell>
+        <TableCell className="text-muted-foreground">{t(copy.hidden_event)}</TableCell>
+        <TableCell className="hidden sm:table-cell" />
+        <TableCell className="hidden sm:table-cell" />
+        <TableCell />
         <TableCell>
           <Button
             variant="outline"
@@ -201,10 +202,13 @@ function Row({
   const title = item.title ?? '';
   return (
     <TableRow>
-      <TableCell className="min-w-48 max-w-xs whitespace-normal [overflow-wrap:anywhere]">
+      <TableCell className="min-w-32 max-w-xs whitespace-normal [overflow-wrap:anywhere] sm:min-w-48">
         <Name>{title}</Name>
-        {item.lang ? (
-          <span className="ml-2 rounded border px-1 text-xs uppercase" aria-hidden="true">
+        {item.lang && locale && item.lang !== locale.split('-')[0] ? (
+          <span
+            className="ml-2 whitespace-nowrap rounded border px-1 text-xs uppercase"
+            aria-hidden="true"
+          >
             {item.lang}
           </span>
         ) : null}
@@ -212,7 +216,7 @@ function Row({
           <p className="text-xs text-destructive">{t(keys.events.errors.reminders_no_access)}</p>
         ) : null}
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden sm:table-cell">
         {item.calendar ? (
           <>
             <span
@@ -224,7 +228,7 @@ function Row({
           </>
         ) : null}
       </TableCell>
-      <TableCell>{when(item.next_start)}</TableCell>
+      <TableCell className="hidden sm:table-cell">{when(item.next_start)}</TableCell>
       <TableCell>
         {editing && item.event_id ? (
           <EditLeads
@@ -238,7 +242,7 @@ function Row({
         )}
       </TableCell>
       <TableCell>
-        <div className="flex gap-2 whitespace-nowrap">
+        <div className="flex flex-col gap-2 whitespace-nowrap sm:flex-row">
           <Button
             variant="outline"
             size="sm"

@@ -35,6 +35,7 @@ from urllib.parse import urlsplit
 from simple_module_core.mail import MailMessage, MailSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_records.contracts.public_submissions import DEFAULT_PENDING_HOLD_HOURS
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links, strings
@@ -42,23 +43,23 @@ from sm_records.public_submissions.confirmation import recipient_key
 from sm_records.public_submissions.delivery import SessionFactory, load
 from sm_records.public_submissions.mail import template
 from sm_records.public_submissions.mail_runner import queue, ui_locale
+from sm_records.public_submissions.registration import seats
 from sm_records.public_submissions.registration.origin import event_base
+from sm_records.public_submissions.registration.status import LIVE, PENDING
 from sm_records.public_submissions.sending import send_all
 from sm_records.public_submissions.tokens import host_secret, public_base_url
 from sm_records.records.services._common import utcnow
 
 __all__ = [
-    "NoticeDue",
     "RegistrationDue",
     "message",
-    "queue_notice_mail",
     "queue_registration_mail",
 ]
 
 logger = logging.getLogger(__name__)
+_CONFIRM_PAGE = links.CONFIRM_REGISTRATION_PAGE
 
 SUBJECT_MAX: Final = 200
-_PENDING: Final = "pending"
 _DROPPED: Final = frozenset({"Cc", "Cf", "Zl", "Zp"})
 
 
@@ -109,8 +110,10 @@ def message(
 ) -> MailMessage:
     """The mail for ``record`` with its links minted now."""
     data = record.data or {}
-    pending = data.get("sm_status") == _PENDING
-    hold = int((rtype.public_submissions or {}).get("pending_hold_hours") or ttl_hours)
+    pending = data.get("sm_status") == PENDING
+    hold = int(
+        (rtype.public_submissions or {}).get("pending_hold_hours") or DEFAULT_PENDING_HOLD_HOURS
+    )
     exp = int((time.time() if now is None else now) + min(ttl_hours, hold) * 3600)
     claims = {
         "tenant": rtype.tenant_id,
@@ -123,10 +126,13 @@ def message(
     blocks = []
     if pending:
         confirm = links.sign(secret, links.CONFIRM, exp=exp, **claims)
-        expires = datetime.fromtimestamp(exp, UTC).strftime("%Y-%m-%d %H:%M UTC")
+        # In the mail's language and the event's zone (labelled), never ISO.
+        expires = seats.integration().format_instant(
+            value=datetime.fromtimestamp(exp, UTC), timezone=event.timezone, locale=locale
+        )
         blocks.append(
             f"{_text('confirm', locale)}\n"
-            f"{links.url(base_url, links.CONFIRM, confirm, locale)}\n\n"
+            f"{links.url(base_url, links.CONFIRM, confirm, locale, page=_CONFIRM_PAGE)}\n\n"
             f"{_text('expiry', locale, expires=expires)}\n\n"
         )
     cancel = links.sign(secret, links.CANCEL, **claims)
@@ -183,7 +189,7 @@ async def _send(
         return
     rtype, record = loaded
     data = record.data or {}
-    if data.get("sm_status") not in (_PENDING, "registered") or not data.get("sm_email"):
+    if data.get("sm_status") not in LIVE or not data.get("sm_email"):
         logger.info("records: %s registration %s is not live; not mailed", rtype.key, record.uuid)
         return
     mail = message(
@@ -231,60 +237,3 @@ async def queue_registration_mail(
         kind=kind,
     )
     await queue(db, app, due, partial(_send, host_secret(app), app), durable=False)
-
-
-@dataclass
-class NoticeDue:
-    """In-process only: a mail to an address that registered **nothing** (a full, closed or busy
-    occurrence), so there is no record. It carries the address for the one send and is never logged
-    or published."""
-
-    tenant_id: str
-    to: str
-    locale: str
-    base_url: str
-    event: Any
-    reason: str
-    type_key: str = "-"
-    uuid: str = "-"
-    attempt: str = ""
-
-
-def notice_message(due: NoticeDue, locale: str) -> MailMessage:
-    site = urlsplit(due.base_url).netloc or due.base_url
-    title = _line(due.event.title)
-    body = (
-        f"{_text(f'notice_{due.reason}', locale, title=title, site=site)}\n\n"
-        f"{_text('notice_why', locale, site=site)}\n"
-    )
-    subject = _line(_text("notice_subject", locale, title=title, site=site))[:SUBJECT_MAX]
-    return MailMessage(to=due.to, subject=subject, text=body)
-
-
-async def _send_notice(
-    db: AsyncSession, sender: MailSender, due: NoticeDue, settings: RecordsSettings, factory: Any
-) -> None:
-    await sender.send(notice_message(due, strings.catalogue_locale(due.locale)))
-
-
-async def queue_notice_mail(
-    db: AsyncSession,
-    request: Any,
-    rtype: RecordType,
-    address: str,
-    event: Any,
-    reason: str,
-    locale: str,
-) -> None:
-    """Tell ``address`` (stored nowhere) why its registration was not saved, once ``db`` commits.
-    ``reason`` is ``full``, ``closed`` or ``busy``."""
-    app = request.app
-    due = NoticeDue(
-        tenant_id=rtype.tenant_id,
-        to=address,
-        locale=locale,
-        base_url=public_base_url(app),
-        event=event,
-        reason=reason,
-    )
-    await queue(db, app, due, _send_notice, durable=False)

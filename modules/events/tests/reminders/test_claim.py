@@ -6,10 +6,10 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Event, ReminderSent
 from sm_events.reminders import claim as ledger
-from sm_events.reminders import limits
 from sm_events.reminders.candidates import Candidate
 from sqlalchemy import select, update
 

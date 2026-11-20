@@ -5,9 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sm_events.core.constants import reminders_limits as limits
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import ReminderSent
-from sm_events.reminders import limits, stats
+from sm_events.reminders import stats
 
 from tests.reminders.support import published, world
 

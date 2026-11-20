@@ -71,6 +71,43 @@ export type Override = {
   note: string | null;
 };
 export type SubEvent = { id: string; title: string; start_local: string };
+export type RegistrationCount = {
+  occurrence_key: string;
+  /** `null`: the date no longer exists on the calendar but still holds seats. */
+  start: string | null;
+  start_local: string | null;
+  taken: number;
+  capacity: number | null;
+};
+export type RegistrationMode = 'none' | 'external' | 'builtin';
+/** An event's registration settings as the API returns them. */
+export type RegistrationOut = {
+  mode: RegistrationMode;
+  url: string | null;
+  provider: string | null;
+  target: string | null;
+  capacity: number | null;
+  opens_at_local: string | null;
+  closes_at_local: string | null;
+  show_seats: boolean;
+  reminder_minutes: number | null;
+  /** The editor may edit the event but not read the form: provider and target are withheld. */
+  target_hidden: boolean;
+  /** `false`: this host has no such provider; the settings are kept and cannot be changed. */
+  provider_installed: boolean | null;
+};
+/** What the API takes: a full replacement of the event's settings. */
+export type RegistrationIn = {
+  mode: RegistrationMode;
+  url?: string | null;
+  provider?: string | null;
+  target?: string | null;
+  capacity?: number | null;
+  opens_at_local?: string | null;
+  closes_at_local?: string | null;
+  show_seats?: boolean;
+  reminder_minutes?: number | null;
+};
 export type EventDetail = EventBase & {
   uid: string;
   recurrence_until: string | null;
@@ -83,6 +120,7 @@ export type EventDetail = EventBase & {
   organiser: string | null;
   image: string | null;
   registration_url: string | null;
+  registration: RegistrationOut;
   extra: Record<string, unknown>;
   created_at: string;
   updated_at: string | null;
@@ -105,7 +143,8 @@ export type EventFields = {
   category_id: string | null;
   organiser: string | null;
   image: string | null;
-  registration_url: string | null;
+  /** The whole registration settings; left out, the stored ones stay as they are. */
+  registration?: RegistrationIn;
 };
 export type EventCreate = EventFields & {
   calendar_id: string;

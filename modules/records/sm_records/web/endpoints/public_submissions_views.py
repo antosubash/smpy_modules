@@ -41,15 +41,25 @@ _COPY_KEYS: Final = {
     links.CANCEL: ("title", "intro", "button", "done"),
 }
 _COMMON_KEYS: Final = ("sending", "failed")
+_REGISTRATION_CONFIRM: Final = "confirm_registration"
+_REGISTRATION_CONFIRM_KEYS: Final = (*_COPY_KEYS[links.CONFIRM], "full", "closed", "busy")
 
 
-def _copy(action: str, locale: str) -> dict[str, str]:
-    words = {key: strings.text(f"landing.{action}.{key}", locale) for key in _COPY_KEYS[action]}
+def _copy(action: str, locale: str, section: str | None = None) -> dict[str, str]:
+    keys = _REGISTRATION_CONFIRM_KEYS if section else _COPY_KEYS[action]
+    words = {key: strings.text(f"landing.{section or action}.{key}", locale) for key in keys}
     words.update({key: strings.text(f"landing.{key}", locale) for key in _COMMON_KEYS})
     return words
 
 
-async def _page(request: Request, inertia: InertiaDep, action: str, t: str, lang: str) -> Response:
+async def _page(
+    request: Request,
+    inertia: InertiaDep,
+    action: str,
+    t: str,
+    lang: str,
+    section: str | None = None,
+) -> Response:
     locale = strings.catalogue_locale(lang)
     token = t if len(t) <= links.MAX_LINK_TOKEN else ""
     response = await inertia.render(
@@ -59,7 +69,7 @@ async def _page(request: Request, inertia: InertiaDep, action: str, t: str, lang
             "token": token,
             "locale": locale,
             "endpoint": f"{constants.PUBLIC_SUBMISSIONS_API_PREFIX}{action}",
-            "copy": _copy(action, locale),
+            "copy": _copy(action, locale, section),
         },
     )
     if not request.headers.get("x-inertia"):
@@ -79,6 +89,18 @@ async def confirm_page(
 ) -> Response:
     """The *Confirm subscription* button. Changes nothing until pressed."""
     return await _page(request, inertia, links.CONFIRM, t, lang)
+
+
+@router.get("/confirm-registration", response_model=None)
+async def confirm_registration_page(
+    request: Request,
+    inertia: InertiaDep,
+    t: str = Query(default=""),
+    lang: str = Query(default="", alias="l"),
+) -> Response:
+    """The *Confirm registration* button: the confirm action with a registration's own words.
+    Changes nothing until pressed."""
+    return await _page(request, inertia, links.CONFIRM, t, lang, _REGISTRATION_CONFIRM)
 
 
 @router.get("/unsubscribe", response_model=None)

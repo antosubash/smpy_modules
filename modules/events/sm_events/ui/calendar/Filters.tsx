@@ -2,7 +2,7 @@
  *  words, so colour is never the only cue), and optional category and type filters. */
 import { keys, useT } from '../utils/i18n';
 import { Name } from '../utils/isolate';
-import type { CalendarInfo, CalendarState, FilterOption } from './types';
+import { type CalendarInfo, type CalendarState, type FilterOption, NO_SOURCES } from './types';
 
 type Props = {
   state: CalendarState;
@@ -15,6 +15,19 @@ type Props = {
 
 const toggle = (list: string[], id: string): string[] =>
   list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+
+/** The sources' state after toggling ``id``. No filter (an empty list) is every box checked, so a
+ *  box is always read against that: unchecking one names the others, checking the last one back is
+ *  no filter again, and unchecking the last is the "none" marker (nothing is shown). */
+export function toggleSource(current: string[], all: string[], id: string): string[] {
+  const active = (current.length === 0 ? all : current).filter((x) => all.includes(x));
+  const next = active.includes(id) ? active.filter((x) => x !== id) : [...active, id];
+  if (next.length === all.length) return [];
+  return next.length === 0 ? [NO_SOURCES] : next;
+}
+
+const sourceChecked = (current: string[], id: string): boolean =>
+  current.length === 0 || (!current.includes(NO_SOURCES) && current.includes(id));
 
 function Swatch({ color }: { color?: string | null }) {
   return (
@@ -103,8 +116,16 @@ export function Filters({ state, calendars, categories, types, sources = [], onC
             <Check
               key={entry.id}
               color={entry.color}
-              checked={state.sources.includes(entry.id)}
-              onChange={() => onChange({ sources: toggle(state.sources, entry.id) })}
+              checked={sourceChecked(state.sources, entry.id)}
+              onChange={() =>
+                onChange({
+                  sources: toggleSource(
+                    state.sources,
+                    sources.map((s) => s.id),
+                    entry.id,
+                  ),
+                })
+              }
             >
               <Name>{entry.label}</Name>
             </Check>

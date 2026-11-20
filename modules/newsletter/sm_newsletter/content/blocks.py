@@ -19,9 +19,15 @@ from pydantic import (
     model_validator,
 )
 
+from sm_newsletter.content.card_text import EXCERPT_MAX, LOCALE_MAX, PLACE_MAX, TITLE_MAX
 from sm_newsletter.content.merge import MAX_FALLBACK, check_merge
 from sm_newsletter.content.richtext import clean
-from sm_newsletter.content.urls import check_image, check_link
+from sm_newsletter.content.urls import (
+    check_image,
+    check_link,
+    check_site_image,
+    check_site_path,
+)
 from sm_newsletter.core.errors import InvalidBody
 from sm_newsletter.core.headers import check_header_text
 
@@ -70,6 +76,10 @@ Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 Link = Annotated[str, AfterValidator(check_link)]
 ImageUrl = Annotated[str, AfterValidator(check_image)]
 Merged = AfterValidator(_merge)
+# An event card links only into the site (its snapshot is always site-relative), so a forged body
+# cannot make a card that looks like an event of this site point anywhere else.
+SitePath = Annotated[str, AfterValidator(check_site_path)]
+SiteImage = Annotated[str, AfterValidator(check_site_image)]
 
 
 class _Props(BaseModel):
@@ -110,11 +120,11 @@ class SpacerProps(_Props):
 
 class CardProps(_Props):
     source_id: Annotated[int, Field(gt=0)]
-    title: Annotated[str, Field(max_length=300)] = ""
-    excerpt: Annotated[str, Field(max_length=1000)] = ""
+    title: Annotated[str, Field(max_length=TITLE_MAX)] = ""
+    excerpt: Annotated[str, Field(max_length=EXCERPT_MAX)] = ""
     image_url: ImageUrl = ""
     url: Link
-    locale: Annotated[str, Field(max_length=16)] = ""
+    locale: Annotated[str, Field(max_length=LOCALE_MAX)] = ""
     snapshot_at: AwareDatetime
 
 
@@ -134,12 +144,12 @@ class EventCardProps(_Props):
     again; the renderer never prints it."""
 
     source_id: Annotated[str, Field(pattern=UUID_RE)]
-    title: Annotated[str, Field(max_length=300)] = ""
-    excerpt: Annotated[str, Field(max_length=1000)] = ""
-    image_url: ImageUrl = ""
-    url: Link
-    ics_url: Link
-    locale: Annotated[str, Field(max_length=16)] = ""
+    title: Annotated[str, Field(max_length=TITLE_MAX)] = ""
+    excerpt: Annotated[str, Field(max_length=EXCERPT_MAX)] = ""
+    image_url: SiteImage = ""
+    url: SitePath
+    ics_url: SitePath
+    locale: Annotated[str, Field(max_length=LOCALE_MAX)] = ""
     starts_at: AwareDatetime
     ends_at: AwareDatetime
     all_day: bool = False
@@ -147,7 +157,7 @@ class EventCardProps(_Props):
     end_date: date | None = None
     timezone: Annotated[str, Field(min_length=1, max_length=64), AfterValidator(_zone)]
     attendance_mode: Literal["in_person", "online", "hybrid"] = "in_person"
-    place: Annotated[str, Field(max_length=500)] = ""
+    place: Annotated[str, Field(max_length=PLACE_MAX)] = ""
     cancelled: bool = False
     snapshot_at: AwareDatetime
 

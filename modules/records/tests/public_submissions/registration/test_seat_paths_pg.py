@@ -21,9 +21,11 @@ from tests.support.registration_http import (
     load_registration,
     record_url,
     register,
+    register_confirmed,
     regs,
     seat_counts,
     seed_event,
+    single_opt_in,
 )
 
 pytestmark = [
@@ -67,10 +69,13 @@ async def live_seats_match_records(site) -> int:
 
 
 async def test_restore_racing_a_submit_for_the_last_seat_pg(reg_site):
+    await single_opt_in(reg_site)  # seats are taken at submit here, so submits race for them
     for n in range(ROUNDS):
         event = await seed_event(reg_site.db_state, uid=f"r{n}@x", registration_capacity=1)
         tokens = [await token(reg_site, event) for _ in range(2)]
-        await register(reg_site, f"a{n}@example.org", event=event, token=tokens[0])
+        await register_confirmed(
+            reg_site, f"a{n}@example.org", event=event, token=tokens[0], consent=True
+        )
         first = next(
             r for r in await regs(reg_site) if r["data"]["sm_email"] == f"a{n}@example.org"
         )
@@ -78,16 +83,16 @@ async def test_restore_racing_a_submit_for_the_last_seat_pg(reg_site):
         restore, submit = await asyncio.wait_for(
             asyncio.gather(
                 reg_site.post(record_url(first["uuid"], "/restore"), **A),
-                register(reg_site, f"b{n}@example.org", event=event, token=tokens[1]),
+                register(reg_site, f"b{n}@example.org", event=event, token=tokens[1], consent=True),
             ),
             90,
         )
-        won = (restore.status_code == 200) + (submit.status_code == 202)
-        assert won == 1, (restore.status_code, submit.status_code)  # one seat, one winner
+        # the loser of the race for the one seat is told by mail (the submit is a neutral 202)
+        live = [r for r in await regs(reg_site) if r["data"]["sm_status"] == "registered"]
+        assert len(live) == 1 and (restore.status_code == 200) == (live[0]["uuid"] == first["uuid"])
+        assert submit.status_code == 202
         if restore.status_code != 200:
             assert restore.json()["code"] == "registration_full"
-        else:
-            assert submit.json()["code"] == "registration_full"
         # clean the event's records so the next round's "live == held" check is about this one
         for r in await regs(reg_site):
             await reg_site.delete(record_url(r["uuid"]), **A)
@@ -95,15 +100,18 @@ async def test_restore_racing_a_submit_for_the_last_seat_pg(reg_site):
 
 
 async def test_submit_racing_a_cancel_pg(reg_site):
+    await single_opt_in(reg_site)  # seats are taken at submit here, so submits race for them
     for n in range(ROUNDS):
         event = await seed_event(reg_site.db_state, uid=f"c{n}@x", registration_capacity=1)
         tokens = [await token(reg_site, event) for _ in range(2)]
-        await register(reg_site, f"a{n}@example.org", event=event, token=tokens[0])
+        await register_confirmed(
+            reg_site, f"a{n}@example.org", event=event, token=tokens[0], consent=True
+        )
         mine = next(r for r in await regs(reg_site) if r["data"]["sm_email"] == f"a{n}@example.org")
         cancel, submit = await asyncio.wait_for(
             asyncio.gather(
                 reg_site.post(record_url(mine["uuid"], "/submission/cancel"), **A),
-                register(reg_site, f"b{n}@example.org", event=event, token=tokens[1]),
+                register(reg_site, f"b{n}@example.org", event=event, token=tokens[1], consent=True),
             ),
             90,
         )
@@ -116,8 +124,8 @@ async def test_submit_racing_a_cancel_pg(reg_site):
 async def test_two_cancels_free_one_seat_pg(reg_site):
     event = await seed_event(reg_site.db_state, uid="d@x", registration_capacity=5)
     tokens = [await token(reg_site, event) for _ in range(2)]
-    await register(reg_site, "a@example.org", event=event, token=tokens[0])
-    await register(reg_site, "b@example.org", event=event, token=tokens[1])
+    await register_confirmed(reg_site, "a@example.org", event=event, token=tokens[0])
+    await register_confirmed(reg_site, "b@example.org", event=event, token=tokens[1])
     mine = next(r for r in await regs(reg_site) if r["data"]["sm_email"] == "a@example.org")
     got = await asyncio.wait_for(
         asyncio.gather(
@@ -132,7 +140,7 @@ async def test_two_cancels_free_one_seat_pg(reg_site):
 async def test_submits_racing_the_type_delete_pg(reg_site):
     event = await seed_event(reg_site.db_state, uid="t@x", registration_capacity=50)
     first = await token(reg_site, event)
-    await register(reg_site, "seed@example.org", event=event, token=first)
+    await register_confirmed(reg_site, "seed@example.org", event=event, token=first)
     tokens = [await token(reg_site, event) for _ in range(5)]
     jobs = [
         reg_site.delete(f"/api/records/types/{TYPE}?confirm_record_count=1", **A),

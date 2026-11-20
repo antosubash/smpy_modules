@@ -19,7 +19,24 @@ interface Props {
   copy: Copy;
 }
 
-type State = 'ready' | 'sending' | 'done' | 'already' | 'expired' | 'failed';
+type State =
+  | 'ready'
+  | 'sending'
+  | 'done'
+  | 'already'
+  | 'expired'
+  | 'full'
+  | 'closed'
+  | 'busy'
+  | 'failed';
+
+/** A registration's confirmation the event no longer takes (`registration_full`, ...). */
+const REFUSED: Record<string, State> = {
+  registration_full: 'full',
+  registration_closed: 'closed',
+  event_unavailable: 'closed',
+  seats_busy: 'busy',
+};
 
 /** What a `POST` answered, as one of the page's states. */
 async function send(endpoint: string, token: string): Promise<State> {
@@ -30,6 +47,10 @@ async function send(endpoint: string, token: string): Promise<State> {
     body: JSON.stringify({ t: token }),
   });
   if (response.status === 410) return 'expired';
+  if (response.status === 409) {
+    const refusal = (await response.json().catch(() => ({}))) as { code?: string };
+    return REFUSED[refusal.code ?? ''] ?? 'failed';
+  }
   if (!response.ok) return 'failed';
   const body = (await response.json().catch(() => ({}))) as { status?: string };
   return body.status === 'already_confirmed' ? 'already' : 'done';
@@ -60,8 +81,10 @@ export default function SubmissionAction({ action, token, locale, endpoint, copy
     done: copy.done,
     already: copy.already,
     expired: copy.expired,
+    full: copy.full,
+    closed: copy.closed,
   };
-  const finished = state === 'done' || state === 'already' || state === 'expired';
+  const finished = state in result;
 
   return (
     <main
@@ -86,7 +109,7 @@ export default function SubmissionAction({ action, token, locale, endpoint, copy
           </p>
         ) : (
           <>
-            <p className="mt-4 text-pretty text-muted-foreground">{copy.intro}</p>
+            <p className="mt-4 text-pretty text-foreground">{copy.intro}</p>
             <Button
               type="button"
               className="mt-6"
@@ -95,9 +118,9 @@ export default function SubmissionAction({ action, token, locale, endpoint, copy
             >
               {state === 'sending' ? copy.sending : copy.button}
             </Button>
-            {state === 'failed' && (
+            {(state === 'failed' || state === 'busy') && (
               <p className="mt-4 text-destructive text-sm" role="alert">
-                {copy.failed}
+                {state === 'busy' ? copy.busy : copy.failed}
               </p>
             )}
           </>

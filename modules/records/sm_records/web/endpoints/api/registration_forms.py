@@ -11,6 +11,8 @@ record list, behind records' own grants: this route shows a key, a label and a l
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+from simple_module_core.permissions import WILDCARD
+from simple_module_hosting.permissions import resolved_permissions_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
@@ -44,7 +46,17 @@ class RegistrationFormRow(SQLModel):
     key: str
     label: str
     enabled: bool
+    double_opt_in: bool
+    """``False``: seats are taken at submit with no confirmation, so anyone can take seats without
+    confirming an address (the event editor warns)."""
     attendees_url: str
+
+
+class RegistrationFormList(SQLModel):
+    items: list[RegistrationFormRow]
+    can_create: bool
+    """The create call would admit this caller (``records.manage_types``): the editor offers
+    "Create a registration form" only then."""
 
 
 class RegistrationFormCreated(SQLModel):
@@ -63,24 +75,27 @@ def _defaults() -> dict[str, object]:
     }
 
 
-@router.get(
-    "/registration-forms", response_model=list[RegistrationFormRow], dependencies=[require_view]
-)
+@router.get("/registration-forms", response_model=RegistrationFormList, dependencies=[require_view])
 async def list_registration_forms(
     request: Request, db: AsyncSession = Depends(request_db)
-) -> list[RegistrationFormRow]:
+) -> RegistrationFormList:
     roles = caller_roles(request)
-    return [
+    held = resolved_permissions_for(request)
+    rows = [
         RegistrationFormRow(
             key=rtype.key,
             label=rtype.label,
             enabled=bool((rtype.public_submissions or {}).get("enabled")),
+            double_opt_in=bool((rtype.public_submissions or {}).get("double_opt_in", True)),
             attendees_url=f"{constants.VIEW_PREFIX}/{rtype.key}",
         )
         for rtype in sorted(await type_service.list_types(db), key=lambda t: t.key)
         if (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION
         and can_view(rtype, roles, {constants.PERM_VIEW})  # require_view already held
     ]
+    return RegistrationFormList(
+        items=rows, can_create=WILDCARD in held or constants.PERM_MANAGE_TYPES in held
+    )
 
 
 @router.post(

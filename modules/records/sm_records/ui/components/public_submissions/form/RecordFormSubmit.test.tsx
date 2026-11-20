@@ -145,7 +145,7 @@ describe('RecordFormRender — sending', () => {
     expect(input(view, 'email')?.getAttribute('aria-invalid')).toBe('true');
     expect(view.host.textContent).toContain('Please check this value.');
     await send(view);
-    expect(view.find('[role="alert"]')?.textContent).toContain('wait 42 seconds');
+    expect(view.find('[role="alert"]')?.textContent).toContain('wait about 1 minute');
     await view.unmount();
   });
 

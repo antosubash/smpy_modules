@@ -11,20 +11,13 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useEffect, useId, useRef, useState } from 'react';
 import { keys, useT } from '../utils/i18n';
 import { leadLabel, leadsSummary } from './leadText';
+import { AVAILABILITY_REASONS } from './reasons';
 import { useFollow } from './useFollow';
-
-const REASONS: Record<string, string> = {
-  disabled: keys.events.reminders.delivery.reason_disabled,
-  no_public_base_url: keys.events.reminders.delivery.reason_no_public_base_url,
-  no_mail_transport: keys.events.reminders.delivery.reason_no_mail_transport,
-  console_mail: keys.events.reminders.delivery.reason_console_mail,
-  worker_access_unavailable: keys.events.reminders.delivery.reason_worker_access_unavailable,
-};
 
 export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: string }) {
   const { t, locale } = useT();
   const copy = keys.events.reminders.control;
-  const { state, saving, error, save, clearError } = useFollow(eventId);
+  const { state, saving, error, atCap, save, clearError } = useFollow(eventId);
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<number[]>([]);
   const panel = useId();
@@ -40,12 +33,21 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
     return (
       <p className="text-xs text-muted-foreground" data-testid="remind-unavailable">
         {t(copy.unavailable)}
-        {state.reason && REASONS[state.reason] ? ` ${t(REASONS[state.reason])}` : ''}
+        {state.reason && AVAILABILITY_REASONS[state.reason]
+          ? ` ${t(AVAILABILITY_REASONS[state.reason])}`
+          : ''}
       </p>
     );
   }
   const { follow, status } = state;
   const following = follow.leads.length > 0;
+  if (follow.over && !following) {
+    return (
+      <p className="text-xs text-muted-foreground" data-testid="remind-over">
+        {t(copy.over)}
+      </p>
+    );
+  }
   const close = () => {
     setOpen(false);
     clearError();
@@ -94,7 +96,7 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
             close();
           }}
         >
-          {!follow.deliverable ? (
+          {!follow.deliverable && !following ? (
             <p role="status" className="text-xs text-destructive">
               {t(keys.events.errors.reminders_no_access)}
             </p>
@@ -138,7 +140,12 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
           </p>
           {error ? (
             <p role="alert" className="text-xs text-destructive">
-              {error}
+              {error}{' '}
+              {atCap ? (
+                <a className="underline" href="/admin/events/reminders">
+                  {t(copy.see_list)}
+                </a>
+              ) : null}
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">

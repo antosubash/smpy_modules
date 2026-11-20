@@ -75,6 +75,10 @@ class RegistrationEvent:
     """The language of ``title`` and of the two paths."""
 
 
+FEW_LEFT_DIVISOR = 5
+"""A fifth of the capacity or fewer is "few left"."""
+
+
 @dataclass(frozen=True)
 class Availability:
     state: str
@@ -82,15 +86,25 @@ class Availability:
     opens_at: datetime | None
     closes_at: datetime | None
     event: RegistrationEvent | None
-    capacity: int | None = None
-    """The event's seat limit (``None``: unlimited, or unavailable). For the provider's own
-    bounds (how many unconfirmed holds one occurrence may carry); not for a public page."""
+    opens_text: str | None = None
+    closes_text: str | None = None
+    """The window's ends as text in the event's zone with its label, like ``event.when_text``: a
+    page must not word them in the visitor's own zone beside an event time in another."""
+    few_left: bool = False
+    """A fifth of the seats or fewer remain (at least one seat counts). Computed only for an event
+    that shows seats; never raw counts: the contract returns what a caller may publish."""
 
 
 @dataclass(frozen=True)
 class Found:
     event: Event
     occurrence: ResolvedOccurrence
+
+
+def _window_text(event: Event, value: datetime | None, locale: str) -> str | None:
+    if value is None:
+        return None
+    return formatting.format_instant(value=value, timezone=event.timezone, locale=locale)
 
 
 def _absent() -> Availability:
@@ -111,7 +125,9 @@ async def lookup(
     event row (Postgres), so a change that unpublishes or cancels it serialises with the caller."""
     stmt = public_events().where(Event.id == event_id)
     if lock:
-        stmt = stmt.with_for_update(read=True, of=Event)
+        # ``populate_existing``: an earlier read in this session (``describe``) already holds the
+        # row in the identity map, and a lock alone would hand back that stale instance.
+        stmt = stmt.with_for_update(read=True, of=Event).execution_options(populate_existing=True)
     event = (await db.execute(stmt)).scalars().first()
     if (
         event is None
@@ -120,7 +136,7 @@ async def lookup(
         or event.registration_target != target
     ):
         return None
-    occurrence = await load_resolved(db, event, key)
+    occurrence = await load_resolved(db, event, key, fresh=lock)
     return None if occurrence is None else Found(event, occurrence)
 
 
@@ -220,13 +236,18 @@ async def describe(
         taken = await _taken(db, eid, key)
         state = state_of(found, taken, now or utcnow())
         left = None
+        few = False
         if event.registration_show_seats and event.registration_capacity is not None:
-            left = max(event.registration_capacity - taken, 0)
+            capacity = event.registration_capacity
+            left = max(capacity - taken, 0)
+            few = 0 < left <= max(1, capacity // FEW_LEFT_DIVISOR)
         return Availability(
             state=state,
             seats_left=left,
             opens_at=event.registration_opens_at,
             closes_at=event.registration_closes_at,
             event=await registration_event(db, event, found.occurrence, lang),
-            capacity=event.registration_capacity,
+            few_left=few,
+            opens_text=_window_text(event, event.registration_opens_at, lang),
+            closes_text=_window_text(event, event.registration_closes_at, lang),
         )

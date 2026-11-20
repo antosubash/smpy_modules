@@ -71,8 +71,6 @@ async def _trash(
         db, record, RevisionEvent.DELETE, limit=settings.revision_limit, actor=actor
     )
     await apply_delta(db, rtype, before=record, after=None, now=now)
-    # Its seat goes in this transaction, after the locks the trash already holds.
-    await seats.on_trashed(db, [(record, rtype)])
 
 
 async def soft_delete_record(
@@ -132,6 +130,9 @@ async def soft_delete_record(
         await apply_set_null(db, ref, target_uuid, actor=actor, settings=settings)
     for doomed, doomed_type in trash:
         await _trash(db, doomed, doomed_type, actor=actor, settings=settings)
+    # Every seat of the cascade is freed by ONE call, in this transaction, after the locks the
+    # trash already holds (one ascending acquisition, never one call per record).
+    await seats.on_trashed(db, list(trash))
     events.emit(db, *events.trashed(rtype, record, trash))
     return list(trash)
 

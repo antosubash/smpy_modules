@@ -16,10 +16,10 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_events.content.public_read import event_by_slug, resolve_event_redirect
-from sm_events.core import constants
+from sm_events.core import clock, constants
 from sm_events.core.settings import EventsSettings
 from sm_events.web.endpoints.deps import get_settings
-from sm_events.web.endpoints.public import _cache, _clock, _head, _urls
+from sm_events.web.endpoints.public import _cache, _head, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
 from sm_events.web.endpoints.public._event_context import load_context, validator_parts
 from sm_events.web.endpoints.public._event_props import build_props, description_for_head
@@ -80,7 +80,7 @@ def event_router(locale: str) -> APIRouter:
             return await missing()
         upcoming = (
             next_occurrences(
-                event, ctx.overrides, now=_clock.now(), limit=constants.NEXT_OCCURRENCES
+                event, ctx.overrides, now=clock.now(), limit=constants.NEXT_OCCURRENCES
             )
             if event.rrule and shown is None
             else []
@@ -95,11 +95,16 @@ def event_router(locale: str) -> APIRouter:
             return unchanged
         props = build_props(ctx, shown, upcoming, lambda path: _urls.absolute(request, path))
         response = await inertia.render(constants._PAGE_PUBLIC_EVENT, props.model_dump(mode="json"))
+        head_image = props.image
+        if head_image and head_image.startswith("/"):  # og:image needs an absolute address
+            head_image = _urls.absolute(request, head_image)
         head = _head.event_head(
             title=text.seo_title or text.title,
             description=description_for_head(ctx) or fallback_description(props),
             canonical=props.canonical_url,
-            image=props.image,
+            image=_urls.absolute(request, props.image)
+            if (props.image or "").startswith("/")
+            else props.image,
             index_in_search=props.index_in_search,
             json_ld=props.json_ld,
             locale=locale,

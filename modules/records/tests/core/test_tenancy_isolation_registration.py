@@ -50,6 +50,7 @@ async def acme_registration(tmp_path) -> AsyncIterator[tuple[AsyncClient, dict, 
         public_submissions_min_fill_seconds=0
     )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        client.app = app  # type: ignore[attr-defined]
         client.headers.update(as_(ACME))
         made = await create(client, TYPE, fields=reg_fields(), config=reg_config())
         assert made.status_code == 201, made.text
@@ -176,11 +177,56 @@ async def test_the_cancel_page_reads_nothing_of_any_tenant(acme_registration):
 async def test_registration_forms_are_per_tenant(acme_registration):
     client, _, _ = acme_registration
     url = f"{API.removesuffix('/types')}/registration-forms"
-    assert [f["key"] for f in (await client.get(url, headers=as_(ACME))).json()] == [TYPE]
-    assert (await client.get(url, headers=as_(GLOBEX))).json() == []
+    assert [f["key"] for f in (await client.get(url, headers=as_(ACME))).json()["items"]] == [TYPE]
+    assert (await client.get(url, headers=as_(GLOBEX))).json()["items"] == []
     made = await client.post(url, headers=as_(GLOBEX))
     assert (made.status_code, made.json()) == (
         201,
         {"key": TYPE},
     )  # acme's is not "taken" for globex
-    assert [f["key"] for f in (await client.get(url, headers=as_(ACME))).json()] == [TYPE]
+    assert [f["key"] for f in (await client.get(url, headers=as_(ACME))).json()["items"]] == [TYPE]
+
+
+@covers("GET /records/submissions/confirm-registration")
+async def test_the_confirm_registration_page_reads_nothing_of_any_tenant(acme_registration):
+    client, _, _ = acme_registration
+    inertia = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+    pages = [
+        (
+            await client.get(
+                "/records/submissions/confirm-registration?t=abc", headers={**inertia, **extra}
+            )
+        ).json()["props"]
+        for extra in ({}, reader(ACME), reader(GLOBEX))
+    ]
+    assert pages[0] == pages[1] == pages[2] and pages[0]["token"] == "abc"
+    assert pages[0]["copy"]["full"] and pages[0]["copy"]["busy"]
+
+
+@covers(
+    "GET /api/records/registrations/mine",
+    "POST /api/records/registrations/mine/{record_uuid}/cancel",
+    "GET /admin/records/registrations/mine",
+)
+async def test_my_registrations_are_per_tenant(acme_registration):
+    """The same verified address is listed, and cancellable, only in the tenant it registered in."""
+    from simple_module_core.user_directory import set_user_directory
+
+    from tests.public_submissions.registration.test_mine import Directory
+
+    client, _, _ = acme_registration
+    set_user_directory(client.app, Directory(email="a@example.org"))  # type: ignore[attr-defined]
+    url = "/api/records/registrations/mine"
+    mine = (await client.get(url, headers=as_(ACME))).json()
+    assert mine["verified"] is True and len(mine["items"]) == 1
+    assert (await client.get(url, headers=as_(GLOBEX))).json()["items"] == []
+    uuid = client.record["uuid"]  # type: ignore[attr-defined]
+    got = await client.post(f"{url}/{uuid}/cancel", headers=as_(GLOBEX))
+    assert got.status_code == 404  # acme's registration is not globex's to cancel
+    inertia = {"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+    for tenant in (ACME, GLOBEX):
+        page = await client.get(
+            "/admin/records/registrations/mine", headers={**as_(tenant), **inertia}
+        )
+        assert page.status_code == 200 and page.json()["component"] == "Records/MyRegistrations"
+    assert (await client.get(url)).status_code in (401, 403)

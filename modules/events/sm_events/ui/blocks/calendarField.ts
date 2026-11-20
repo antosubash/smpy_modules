@@ -5,7 +5,7 @@
  *  lists exactly what a block can render, so the picker needs no console permission and cannot
  *  offer a calendar the public may not see. */
 
-import { keys, type Translate } from '../utils/i18n';
+import { keys, type Translate, translate } from '../utils/i18n';
 import { fetchBlockCalendars } from './api-blocks';
 import { CALENDARS_MAX } from './limits';
 
@@ -27,7 +27,9 @@ export function calendarsField(tr: Translate, label: string, options: Option[]) 
       },
     },
     defaultItemProps: { slug: '' },
-    getItemSummary: (item: { slug?: string }) => item.slug || tr(copy.fields.calendar),
+    // Called by Puck on every render of the field, long after the labels above were built: it
+    // translates then, never at build time (`tr` may be the identity of the static fields).
+    getItemSummary: (item: { slug?: string }) => item.slug || translate(copy.fields.calendar),
   };
 }
 

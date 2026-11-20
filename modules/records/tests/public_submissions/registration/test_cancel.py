@@ -16,7 +16,7 @@ from tests.support.registration_http import (
     TYPE,
     follow,
     reg_links,
-    register,
+    register_confirmed,
     regs,
     seed_event,
     single_opt_in,
@@ -40,7 +40,7 @@ async def cancel_token(site) -> str:
 
 
 async def test_cancel_link(reg_site):
-    await register(reg_site)
+    await register_confirmed(reg_site)
     token = await cancel_token(reg_site)
     before = (await regs(reg_site))[0]["data"]["sm_nonce"]
     resp = await follow(reg_site, "cancel", token)
@@ -53,10 +53,10 @@ async def test_cancel_link(reg_site):
 
 
 async def test_every_other_answer_is_the_same_page_and_changes_nothing(reg_site):
-    await register(reg_site)
+    await register_confirmed(reg_site)
     token = await cancel_token(reg_site)
     other = await seed_event(reg_site.db_state, uid="o@x")
-    await register(reg_site, "other@example.org", event=other)
+    await register_confirmed(reg_site, "other@example.org", event=other)
     secret = "submissions-test-secret"
     (record,) = [r for r in await regs(reg_site) if r["data"]["sm_email"] == "guest@example.org"]
     forged = [
@@ -104,21 +104,21 @@ async def test_an_occurrence_that_has_started_cannot_be_cancelled(reg_site, monk
 
     from sm_records.public_submissions.registration import cancel as cancel_module
 
-    await register(reg_site)
+    await register_confirmed(reg_site)
     token = await cancel_token(reg_site)
     monkeypatch.setattr(cancel_module, "_now", lambda: datetime(2100, 1, 1, tzinfo=UTC))
     resp = await follow(reg_site, "cancel", token)
     assert (resp.status_code, resp.json()) == (200, GONE)  # the same page
-    assert (await regs(reg_site))[0]["data"]["sm_status"] == "pending"
+    assert (await regs(reg_site))[0]["data"]["sm_status"] == "registered"
     assert await taken(reg_site) == (1, 1)
 
 
 async def test_get_is_inert(reg_site):
-    await register(reg_site)
+    await register_confirmed(reg_site)
     token = await cancel_token(reg_site)
     page = await reg_site.get("/records/submissions/cancel", params={"t": token, "l": "en"})
     assert page.status_code == 200 and page.headers["cache-control"] == "no-store"
-    assert (await regs(reg_site))[0]["data"]["sm_status"] == "pending"
+    assert (await regs(reg_site))[0]["data"]["sm_status"] == "registered"
     api = await reg_site.get(f"{SUBMISSIONS}/cancel", params={"t": token})
     assert api.status_code in (404, 405)
     assert await taken(reg_site) == (1, 1)
@@ -126,17 +126,19 @@ async def test_get_is_inert(reg_site):
 
 async def test_cancel_after_confirmation_and_register_again(reg_site):
     await single_opt_in(reg_site)
-    await register(reg_site, consent=True)
+    await register_confirmed(reg_site, consent=True)
     assert (await follow(reg_site, "cancel", await cancel_token(reg_site))).json() == GONE
     assert await taken(reg_site) == (0, 0)
-    assert (await register(reg_site, consent=True)).status_code == 202  # a cancelled one may return
+    assert (
+        await register_confirmed(reg_site, consent=True)
+    ).status_code == 202  # a cancelled one may return
     records = await regs(reg_site)
     assert sorted(r["data"]["sm_status"] for r in records) == ["cancelled", "registered"]
     assert await taken(reg_site) == (1, 1)
 
 
 async def test_admin_cancel(reg_site):
-    await register(reg_site)
+    await register_confirmed(reg_site)
     (record,) = await regs(reg_site)
     url = f"/api/records/types/{TYPE}/records/{record['uuid']}/submission/cancel"
     resp = await reg_site.post(url, headers=roles(ADMIN))

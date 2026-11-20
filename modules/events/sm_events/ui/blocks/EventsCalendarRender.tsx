@@ -18,8 +18,8 @@ import { PageLocale } from '../utils/PageLocale';
 import { type BlockCalendars, fetchBlockCalendars } from './api-blocks';
 import { BlockBoundary } from './BlockBoundary';
 import { type EventsCalendarProps, minHeight, VIEWS } from './calendarProps';
-import { oneOf, slugsOf } from './limits';
-import { usePageLocale } from './usePageLocale';
+import { oneOf, selectionOf } from './limits';
+import { useContentLocale } from './useContentLocale';
 
 export const OCCURRENCES_URL = '/api/events/public/occurrences';
 const copy = keys.events.blocks;
@@ -28,11 +28,16 @@ type WithPuck = { puck?: { isEditing?: boolean } };
 
 type Loaded = { answer: BlockCalendars | null; failed: boolean; loading: boolean };
 
-function useCalendars(slugs: string[], locale: string): Loaded {
+function useCalendars(slugs: string[], bad: boolean, locale: string): Loaded {
   const [state, setState] = useState<Loaded>({ answer: null, failed: false, loading: true });
-  const key = `${slugs.join('\u0000')}|${locale}`;
+  const key = `${bad}|${slugs.join('\u0000')}|${locale}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for the query it names
   useEffect(() => {
+    if (bad) {
+      // An unreadable selection means nothing: no calendar is asked for.
+      setState({ answer: null, failed: false, loading: false });
+      return;
+    }
     const controller = new AbortController();
     fetchBlockCalendars(slugs, locale, controller.signal)
       .then((answer) => setState({ answer, failed: false, loading: false }))
@@ -46,9 +51,9 @@ function useCalendars(slugs: string[], locale: string): Loaded {
 
 function Inner(props: EventsCalendarProps & WithPuck) {
   const { t } = useT();
-  const locale = usePageLocale();
-  const slugs = slugsOf(props.calendars);
-  const { answer, failed, loading } = useCalendars(slugs, locale ?? '');
+  const locale = useContentLocale();
+  const { slugs, bad } = selectionOf(props.calendars);
+  const { answer, failed, loading } = useCalendars(slugs, bad, locale ?? '');
   const height = minHeight(props.height);
   const view = oneOf(props.defaultView, VIEWS, 'month');
   const editing = props.puck?.isEditing === true;
@@ -64,38 +69,50 @@ function Inner(props: EventsCalendarProps & WithPuck) {
   );
   const categories = useMemo<PublicCategory[]>(() => answer?.categories ?? [], [answer]);
   const ids = useMemo(() => calendars.map((c) => c.id), [calendars]);
-  if (loading)
-    return <div data-events-calendar="" style={{ minHeight: height }} aria-busy="true" />;
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-4">
+        <div data-events-calendar="" style={{ minHeight: height }} aria-busy="true" />
+      </div>
+    );
+  }
   if (failed || calendars.length === 0) {
     const missing = slugs.length - calendars.length;
-    return editing && !failed && missing > 0 ? (
-      <p className="text-sm text-muted-foreground" data-editor-only="">
-        {t(copy.editor_hint.unresolved, { count: missing })}
+    const hint = bad
+      ? t(copy.editor_hint.selection_unreadable)
+      : !failed && missing > 0
+        ? t(copy.editor_hint.unresolved, { count: missing })
+        : null;
+    return editing && hint ? (
+      <p className="container mx-auto px-4 py-2 text-sm text-muted-foreground" data-editor-only="">
+        {hint}
       </p>
     ) : (
       <></>
     );
   }
   return (
-    <section
-      data-events-calendar=""
-      style={{ minHeight: height }}
-      aria-label={t(copy.calendar.label)}
-    >
-      <PublicCalendarGrid
-        apiUrl={OCCURRENCES_URL}
-        calendars={calendars}
-        categories={categories}
-        defaultTimezone={answer?.default_timezone ?? 'UTC'}
-        initial={{ view }}
-        limitTo={slugs.length > 0 ? ids : undefined}
-      />
-    </section>
+    <div className="container mx-auto px-4 py-4">
+      <section
+        data-events-calendar=""
+        style={{ minHeight: height }}
+        aria-label={t(copy.calendar.label)}
+      >
+        <PublicCalendarGrid
+          apiUrl={OCCURRENCES_URL}
+          calendars={calendars}
+          categories={categories}
+          defaultTimezone={answer?.default_timezone ?? 'UTC'}
+          initial={{ view }}
+          limitTo={slugs.length > 0 ? ids : undefined}
+        />
+      </section>
+    </div>
   );
 }
 
 export function EventsCalendarRender(props: EventsCalendarProps & WithPuck) {
-  const locale = usePageLocale();
+  const locale = useContentLocale();
   const inner = (
     <BlockBoundary>
       <Inner {...props} />

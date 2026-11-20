@@ -203,6 +203,27 @@ tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
 publish in the worker emits no bus event. Its `core/worker.py` is a parity-checked
 copy of newsletter's (family "worker runtime").
 
+**Event registration (events seats, records people).** Events owns the seats
+(`events_registration_count` is the lock target, `events_registration_seat` is unique per
+tenant, provider and holder) and records owns the person (the record IS the registration, kind
+`registration`); they meet only in `sm_events.contracts.registration`, which runs in the caller's
+transaction and never commits. **Lock order, everywhere:** records' type and row locks, then the
+event row (`FOR SHARE`), then counter rows in ascending id (`FOR UPDATE`), then seats; `release`
+restarts under the union of what it needs, bounded, and ends in `SeatsBusy` (409 `seats_busy`).
+A database deadlock inside the contract is also `SeatsBusy`. **A seat is taken at the
+confirmation** for a double opt-in form (a submit takes none and answers one neutral 202 for
+every address), and at submit for a single opt-in form (whose public availability shows states,
+never a number). The routes under `/api/records/submissions/` that carry a **registration token**
+(`{digest}.{issued}.{nonce}.{event_id}.{occurrence_key}.{mac}`, HMAC purpose `registration`; the
+event comes only from it) are records' form-token surface (the first documented exception), with these extra routes: the
+confirm and cancel links (`/records/submissions/confirm-registration`, `/cancel`; GET pages are
+inert, only the POST acts). The submit route is bounded by per-IP, a per-form total
+(`public_submissions_type_rate`, charged only after the captcha passes), a per-address mail bound
+and the optional captcha; raise the total before a large event opens. Mail links come from the
+configured origin only, never a request header. "My registrations" (`/api/records/registrations/mine`)
+matches the caller's address as the account directory reports it verified. Docs:
+`modules/records/docs/registration.md`.
+
 **Events private feeds and the .ics import.** `/events/feed/{token}.ics` is the THIRD documented
 token-bound public route (after newsletter's `/u/` and records' form token): it binds the token
 row's tenant and answers one padded 404 for every token state. Tokens are never logged (the
@@ -225,6 +246,17 @@ start; never clear an unexpired lease. External items are plain text with no des
 render them as HTML, never re-export them (feeds build plugin calls only), never remind or card
 them. The browser suite does not fetch (loopback is always refused): seed through
 `tests/e2e/support/seed_external.py`. Docs: `modules/events/docs/subscriptions.md`.
+
+**Events reminders are at most once.** `events.reminders` claims a row in `events_reminder_sent`
+(unique per tenant, event, occurrence, start, recipient and lead) and commits it before the send. A
+`sending` row is never reclaimed and a failed send is never retried; only an expired `claimed` row
+(nothing handed to the transport) may be reclaimed. Recipients are re-checked at send time and fail
+closed (`reminders/recipients.py`), through a headless app the worker builds (`reminders/worker_app.py`:
+no lifespan, never provisions a secret key) whose principal grants no more than a request would (upstream
+#1005: the membership role is unreadable, so such a user is told in the request, never silently). Follows
+are personal: tenant- and user-bound, managers see counts only. User ids match **exactly** unless they are
+UUIDs (`core/user_ids.py`). Mail goes only through `simple_module_core.mail`, links come from the live
+`public_base_url`. Docs: `modules/events/docs/reminders.md`.
 
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
@@ -546,7 +578,7 @@ itself; suite-wide settings belong in `tests/e2e/start-test-server.sh`. Locally,
 (`scripts/e2e_shards.mjs`: one template database copied per shard, each with its
 own host, port and upload directories); `make e2e-bundle` stays serial. The
 `E2E (Playwright)` job merges the shards' reports and is the one status that
-covers all of them. `newsletter.spec.ts` is opt-in with `E2E_NEWSLETTER=1`. It runs only in
+covers all of them. `newsletter.spec.ts` and `newsletter-events.spec.ts` are opt-in with `E2E_NEWSLETTER=1`. It runs only in
 its own CI job, `E2E (newsletter)`, against a non-bundle host with
 `SM_ENVIRONMENT=development` (framework 0.0.42 serves `testing` pages from the Vite dev
 server under the strict production CSP, so the console is blank), because its dispatch hook

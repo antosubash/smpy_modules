@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 
-from sm_events.reminders.limits import REMINDER_CATCHUP, REMINDER_EARLY
+from sm_events.core.constants.reminders_limits import REMINDER_CATCHUP, REMINDER_EARLY
 
 __all__ = ["due_at", "is_due", "is_stale", "next_due", "start_window"]
 

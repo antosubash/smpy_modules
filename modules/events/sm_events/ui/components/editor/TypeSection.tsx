@@ -5,6 +5,7 @@
  *  props. */
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
+import { useEventExtensions } from '../../extensions/load';
 import { PluginBoundary } from '../../extensions/PluginBoundary';
 import { eventType } from '../../extensions/registry';
 import { translateKey } from '../../extensions/translateKey';
@@ -53,7 +54,9 @@ export function TypeSection({
   const { t } = useT();
   const copy = keys.events.types;
   const label = (id: string) => translateKey(t, types.find((o) => o.id === id)?.label_key, id);
+  const loaded = useEventExtensions(); // a direct visit has not loaded the plugins yet
   const Section = installed ? eventType(type)?.EditorSection : undefined;
+  const waiting = installed && !loaded && type !== 'event' && !Section;
   const showType = types.length >= 2 || type !== 'event';
   return (
     <div className="grid gap-4">
@@ -80,6 +83,11 @@ export function TypeSection({
           data-testid="type-not-installed"
         >
           {t(copy.not_installed)}
+        </p>
+      ) : null}
+      {waiting ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t(copy.loading_section)}
         </p>
       ) : null}
       {Section ? (

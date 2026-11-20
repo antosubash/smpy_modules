@@ -29,6 +29,7 @@ from sm_events.calendar.plugins import registry
 from sm_events.calendar.plugins.registration_types import RegistrationTargetInfo
 from sm_events.calendar.times import localize, parse_local, supported_instant
 from sm_events.core import constants
+from sm_events.core.constants.reminders_limits import REMINDER_LEADS
 from sm_events.core.errors_registration import (
     InvalidRegistration,
     RegistrationUnavailable,
@@ -37,7 +38,6 @@ from sm_events.core.errors_registration import (
 from sm_events.core.tenancy import bound_tenant
 from sm_events.models import Event
 from sm_events.registration import access, guards, provider_call
-from sm_events.reminders.limits import REMINDER_LEADS
 from sm_events.web.schemas.registration import RegistrationIn
 
 __all__ = ["Applied", "apply_legacy_url", "apply_registration", "resolve"]
@@ -54,28 +54,28 @@ class Applied(NamedTuple):
     """What the provider said about the target, when it was asked."""
 
 
-def _bad(field: str) -> InvalidRegistration:
-    return InvalidRegistration(field=f"{_FIELD}.{field}")
+def _bad(field: str, reason: str | None = None) -> InvalidRegistration:
+    return InvalidRegistration(field=f"{_FIELD}.{field}", reason=reason)
 
 
 def _check_shape(reg: RegistrationIn) -> None:
     """Only ``builtin`` takes a provider, a target, a capacity, a window or a reminder; only
     ``external`` takes a URL."""
     if reg.mode == _EXTERNAL and reg.url is None:
-        raise _bad("url")
+        raise _bad("url", "url_required")
     if reg.mode != _EXTERNAL and reg.url is not None:
-        raise _bad("url")
+        raise _bad("url", "option_not_allowed")
     if reg.mode == _BUILTIN:
         if reg.target is None:
-            raise _bad("target")
+            raise _bad("target", "target_required")
         return
     for name in ("provider", "target", "capacity", "opens_at_local", "closes_at_local"):
         if getattr(reg, name) is not None:
-            raise _bad(name)
+            raise _bad(name, "option_not_allowed")
     if reg.show_seats:
-        raise _bad("show_seats")
+        raise _bad("show_seats", "option_not_allowed")
     if reg.reminder_minutes is not None:
-        raise _bad("reminder_minutes")
+        raise _bad("reminder_minutes", "option_not_allowed")
 
 
 def _instant(text: str | None, zone: ZoneInfo, field: str) -> datetime | None:
@@ -84,7 +84,7 @@ def _instant(text: str | None, zone: ZoneInfo, field: str) -> datetime | None:
     try:
         return supported_instant(localize(parse_local(text, zone, f"{_FIELD}.{field}"), zone))
     except ValueError:
-        raise _bad(field) from None
+        raise _bad(field, "time_invalid") from None
 
 
 def _window(reg: RegistrationIn, timezone: str) -> tuple[datetime | None, datetime | None]:
@@ -92,7 +92,7 @@ def _window(reg: RegistrationIn, timezone: str) -> tuple[datetime | None, dateti
     opens = _instant(reg.opens_at_local, zone, "opens_at_local")
     closes = _instant(reg.closes_at_local, zone, "closes_at_local")
     if opens is not None and closes is not None and opens >= closes:
-        raise _bad("closes_at_local")
+        raise _bad("closes_at_local", "closes_before_opens")
     return opens, closes
 
 
@@ -102,11 +102,11 @@ def _check_builtin(reg: RegistrationIn) -> None:
     if not registry.registration_providers():
         raise RegistrationUnavailable
     if reg.provider is None:
-        raise _bad("provider")
+        raise _bad("provider", "provider_required")
     if registry.registration_provider(reg.provider) is None:
         raise RegistrationUnavailable
     if reg.reminder_minutes is not None and reg.reminder_minutes not in REMINDER_LEADS:
-        raise _bad("reminder_minutes")
+        raise _bad("reminder_minutes", "reminder_invalid")
 
 
 def _values(reg: RegistrationIn, window: tuple[datetime | None, datetime | None]) -> dict[str, Any]:
@@ -134,12 +134,17 @@ async def _keep_unreadable_form(
     db: Any, event: Event, reg: RegistrationIn, viewer: Any
 ) -> RegistrationIn:
     """An event whose form this editor may not read keeps it: they can change the other settings,
-    and a submitted form must be the stored one or empty; anything else is refused exactly as a
-    form that does not exist (same code, message and cost)."""
+    and a submitted form must be empty (the editor was shown none); anything else, **the stored one
+    included**, is refused exactly as a form that does not exist (same code, message and cost).
+    Accepting the stored one would tell a guesser that the guess is the hidden form's key."""
     if event.registration_mode != _BUILTIN or await access.target_readable(db, event, viewer):
         return reg
-    stored = (_BUILTIN, event.registration_provider, event.registration_target)
-    if (reg.mode, reg.provider, reg.target) not in (stored, (_BUILTIN, None, None)):
+    allowed = [(_BUILTIN, None, None)]
+    if registry.registration_provider(event.registration_provider or "") is None:
+        # The provider is gone, not the editor's rights: nothing to guess at, and the settings sent
+        # back unchanged are not a change (they could not be checked anyway).
+        allowed.append((_BUILTIN, event.registration_provider, event.registration_target))
+    if (reg.mode, reg.provider, reg.target) not in allowed:
         raise UnknownRegistrationTarget
     return reg.model_copy(
         update={

@@ -89,12 +89,16 @@ async def registration_view(
             event_id=event_id,
             occurrence_key=key,
         )
+    double = bool((rtype.public_submissions or {}).get("double_opt_in", True))
     return RegistrationView(
         availability=RegistrationAvailability(
             state=state,  # type: ignore[arg-type]
-            seats_left=found.seats_left,
+            seats_left=found.seats_left if double else None,
+            few_left=found.few_left and not double,
             opens_at=_iso(found.opens_at),
             closes_at=_iso(found.closes_at),
+            opens_text=found.opens_text,
+            closes_text=found.closes_text,
         ),
         event=RegistrationEventInfo(
             title=found.event.title,

@@ -16,8 +16,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
-from datetime import UTC, datetime
-from typing import Any
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +25,8 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
 from sm_records.public_submissions import links
 from sm_records.public_submissions.registration import seats
+from sm_records.public_submissions.registration import start as start_module
+from sm_records.public_submissions.registration.status import CANCELLED, LIVE
 from sm_records.public_submissions.transition import Change, transition
 from sm_records.records.services import records as record_service
 from sm_records.records.services._common import utcnow
@@ -33,20 +34,6 @@ from sm_records.records.services.errors import NotFound
 from sm_records.records.services.types import get_type
 
 __all__ = ["CANCELLED", "cancel", "cancel_by_link"]
-
-CANCELLED = "cancelled"
-_LIVE = ("pending", "registered")
-
-
-def _started(data: dict[str, Any], now: datetime) -> bool:
-    raw = data.get("sm_occurrence_start")
-    try:
-        start = datetime.fromisoformat(raw) if isinstance(raw, str) else raw
-    except ValueError:
-        return False
-    if not isinstance(start, datetime):
-        return False
-    return (start if start.tzinfo else start.replace(tzinfo=UTC)) <= now
 
 
 def _now() -> datetime:
@@ -65,10 +52,16 @@ async def cancel(
     """Cancel ``record`` if it is a live registration whose occurrence has not started (and, with
     ``still``, that the caller's claim still holds for); whether *this* call cancelled it."""
     stamp = now or _now()
+    # Events' resolved start (a moved occurrence), not the snapshot taken at submit.
+    start = await start_module.resolved_start(db, rtype.tenant_id, record.data or {})
 
     def derive(row: Record) -> Change | None:
         data = row.data or {}
-        if row.is_deleted or data.get("sm_status") not in _LIVE or _started(data, stamp):
+        if (
+            row.is_deleted
+            or data.get("sm_status") not in LIVE
+            or (start is not None and start <= stamp)
+        ):
             return None
         if still is not None and not still(row):
             return None

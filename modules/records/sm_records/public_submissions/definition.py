@@ -31,6 +31,7 @@ from sm_records.core import locales
 from sm_records.core.constants import LOCALE_PATTERN
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import RecordType
+from sm_records.public_submissions import strings
 from sm_records.public_submissions.captcha import public_config
 from sm_records.public_submissions.spec import SUBMITTABLE_TYPES
 from sm_records.public_submissions.tokens import sign_form
@@ -99,11 +100,11 @@ def consent_text(config: dict[str, Any], settings: RecordsSettings, locale: str 
     return next((text for text in texts.values() if text), "")
 
 
-def _field(entry: Any) -> SubmissionField:
+def _field(entry: Any, label: str | None = None) -> SubmissionField:
     return SubmissionField(
         key=entry.key,
         type=entry.type.value,
-        label=entry.label,
+        label=label or entry.label,
         help=entry.help,
         required=entry.required,
         choices=list((entry.options or {}).get("choices") or []),
@@ -139,7 +140,12 @@ def _shown(
         # The visitor fills the name and the address, in that order, before the questions the
         # type asks (their keys are the system fields' own: ``sm_`` is reserved).
         by_key = {entry.key: entry for entry in field_defs(rtype)}
-        fields[0:0] = [_field(by_key[REGISTRATION_NAME_KEY]), _field(by_key[EMAIL_KEY])]
+        # The two system fields' labels are the visitor's language's, not the stored English ones.
+        lang = page_locale(locale)
+        fields[0:0] = [
+            _field(by_key[key], strings.text(f"form_labels.{key}", lang))
+            for key in (REGISTRATION_NAME_KEY, EMAIL_KEY)
+        ]
     consent_cfg = config.get("consent") or {}
     text = consent_text(config, settings, page_locale(locale))
     consent = (

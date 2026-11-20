@@ -14,7 +14,17 @@ EVENTS = "modules/events/sm_events"
 
 NEWSLETTER = "modules/newsletter/sm_newsletter"
 
+RECORDS = "modules/records/sm_records"
+
 PUBLIC_FAMILIES: tuple[Family, ...] = (
+    Family(
+        "catalogue reader for server-side strings (records, events)",
+        (
+            Copy(f"{RECORDS}/public_submissions/strings.py", {"sm_records": "sm_pkg"}),
+            Copy(f"{EVENTS}/reminders/strings.py", {"sm_events": "sm_pkg"}),
+        ),
+        shared=("FALLBACK", "_flatten", "_catalogue", "_available", "catalogue_locale"),
+    ),
     Family(
         "tenant a host resolved, for a token link (newsletter, events)",
         (
@@ -62,5 +72,21 @@ PUBLIC_FAMILIES: tuple[Family, ...] = (
             ),
         ),
         shared=("_find",),
+    ),
+    Family(
+        "block label localiser (TypeScript, #423)",
+        (
+            Copy(f"{PB}/ui/components/localizeConfig.ts"),
+            Copy(f"{EVENTS}/ui/blocks/localizeFields.ts"),
+        ),
+        shared=("LabelledOption", "LabelledField", "mapValues", "localizeField"),
+    ),
+    Family(
+        "page content locale hook (TypeScript, #423)",
+        (
+            Copy(f"{NEWS}/ui/hooks/useContentLocale.ts"),
+            Copy(f"{EVENTS}/ui/blocks/useContentLocale.ts"),
+        ),
+        shared=("LocaleCarryingProps", "useContentLocale"),
     ),
 )

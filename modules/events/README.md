@@ -9,7 +9,7 @@ links and `.ics` import, pagebuilder blocks, reminders, registration through rec
 subscriptions to external calendars. The module is complete (ten parts). See the
 [guide](docs/index.md), [public pages](docs/public.md), [feeds](docs/feeds.md),
 [import](docs/import.md), [blocks and cards](docs/blocks.md), [reminders](docs/reminders.md),
-[registration](docs/registration.md), [subscriptions](docs/subscriptions.md),
+[registration](../records/docs/registration.md), [subscriptions](docs/subscriptions.md),
 [operating](docs/operations.md) and the
 [approved design](../../docs/superpowers/specs/2026-11-17-events-module-design.md).
 
@@ -49,6 +49,15 @@ With the `pagebuilder` extra, events adds an "Upcoming events" list and a read-o
 calendar" to pagebuilder's palette. They show only published events of public calendars,
 fetched when the page is viewed. `sm_events.contracts.cards` gives newsletter the same public
 projection for its Event card. See [blocks and cards](docs/blocks.md).
+
+## Reminders
+
+A signed-in user follows a published event ("Remind me") with one or more lead times (15 minutes, 1
+hour, 1 day, 1 week) and gets one email per occurrence and lead, at most once, from the `events.reminders`
+beat. It needs a worker and beat serving the `events` queue, a mail transport that delivers and the host's
+`public_base_url`; the control says why in words when reminders cannot be delivered. The worker grants no
+more access than a request would, so a user whose only right is the tenant membership role is told no mail
+will come (upstream #1005). See [Reminders](docs/reminders.md).
 
 ## Usage
 
@@ -181,7 +190,7 @@ with its own validated `extra`, and contribute chips, details, editor and settin
 items. An admin turns a source on per calendar (Calendars, **Sources**). A plugin call runs on its own
 database connection with a time budget and validated, bounded output, and a failing source is reported in the
 calendar instead of failing it. See [the plugin guide](docs/extensions.md). Events publishes nine bus
-events, also durably through the `background_tasks` outbox. 
+events, also durably through the `background_tasks` outbox. The delivery list is in the [guide](docs/index.md#status).
 
 ## Public pages
 

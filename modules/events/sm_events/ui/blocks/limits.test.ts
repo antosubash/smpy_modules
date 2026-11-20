@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 import {
   CALENDARS_MAX,
   clampCount,
+  countProblem,
   oneOf,
+  selectionOf,
   slugsOf,
   UPCOMING_DEFAULT,
   UPCOMING_MAX,
@@ -48,5 +50,62 @@ describe('limits', () => {
     expect(slugsOf(Array.from({ length: 30 }, (_, i) => ({ slug: `c${i}` })))).toHaveLength(
       CALENDARS_MAX,
     );
+  });
+});
+
+describe('selectionOf: only an absent or empty selection means every calendar', () => {
+  it('reads a well-formed selection', () => {
+    expect(selectionOf([{ slug: 'a' }, { slug: ' b ' }])).toEqual({
+      slugs: ['a', 'b'],
+      bad: false,
+    });
+  });
+
+  it('an absent or empty selection, or only blank rows, is no selection (every public calendar)', () => {
+    for (const value of [undefined, null, [], [{ slug: '' }], [{ slug: '  ' }]]) {
+      expect(selectionOf(value)).toEqual({ slugs: [], bad: false });
+    }
+  });
+
+  it('a selection that cannot be read is bad: it means nothing, never everything', () => {
+    for (const value of [
+      'team',
+      'a,b',
+      7,
+      {},
+      { slug: 'a' },
+      ['team'],
+      [7],
+      [null],
+      [{}],
+      [{ name: 'a' }],
+      [{ slug: 7 }],
+      [{ slug: 'a' }, null],
+      [{ slug: 'a' }, 'b'],
+    ]) {
+      expect(selectionOf(value).bad, JSON.stringify(value)).toBe(true);
+    }
+  });
+
+  it('more than the cap is bad too, and says nothing is dropped silently', () => {
+    const many = Array.from({ length: CALENDARS_MAX + 1 }, (_, i) => ({ slug: `c${i}` }));
+    expect(selectionOf(many).bad).toBe(true);
+    expect(selectionOf(many.slice(0, CALENDARS_MAX)).bad).toBe(false);
+  });
+});
+
+describe('countProblem: integers from 1 to the maximum, nothing clamped', () => {
+  it('accepts a whole number in range', () => {
+    for (const n of [1, 5, UPCOMING_MAX]) expect(countProblem(n)).toBeNull();
+  });
+
+  it('names what is wrong, for 0, a negative, too many, a fraction and not a number', () => {
+    expect(countProblem(0)).toBe('range');
+    expect(countProblem(-3)).toBe('range');
+    expect(countProblem(99)).toBe('range');
+    expect(countProblem(2.7)).toBe('integer');
+    expect(countProblem(Number.NaN)).toBe('integer');
+    expect(countProblem(undefined)).toBe('integer');
+    expect(countProblem('5')).toBe('integer');
   });
 });

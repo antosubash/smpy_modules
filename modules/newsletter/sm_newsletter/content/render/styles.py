@@ -80,3 +80,4 @@ CARD_BADGE = (
     f"display:inline-block;margin:12px 0 0;padding:2px 8px;font-family:{FONT};font-size:12px;"
     "font-weight:bold;color:#b91c1c;border:1px solid #b91c1c;border-radius:4px"
 )
+CARD_SEP = f"font-family:{FONT};font-size:15px;color:{MUTED}"

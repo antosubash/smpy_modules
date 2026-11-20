@@ -11,6 +11,7 @@ import { keys, useT } from '../../utils/i18n';
 import type { Category } from '../../utils/types';
 import { ATTENDANCE_MODES, type AttendanceMode } from '../../utils/types-events';
 import { categoryName } from '../events/EventFilters';
+import { RegistrationSection } from './RegistrationSection';
 import { TimesFields } from './TimesFields';
 
 type Text =
@@ -20,8 +21,7 @@ type Text =
   | 'latitude'
   | 'longitude'
   | 'organiser'
-  | 'image'
-  | 'registration_url';
+  | 'image';
 
 /** The fields that are not language-specific: when, where, category and flags. */
 export function EventForm({
@@ -33,6 +33,8 @@ export function EventForm({
   onChange,
   onEdit,
   typeSection,
+  eventId = null,
+  revision,
 }: {
   form: FormState;
   errors: Record<string, string>;
@@ -44,6 +46,10 @@ export function EventForm({
   onEdit: (path: string) => void;
   /** The type picker and the plugin's section, when the page has types to offer. */
   typeSection?: ReactNode;
+  /** The saved event, for the registration counts; `null` while it is being created. */
+  eventId?: string | null;
+  /** The saved event's revision, so the registration counts refresh after a save. */
+  revision?: number;
 }) {
   const { t } = useT();
   const copy = keys.events.editor;
@@ -108,6 +114,16 @@ export function EventForm({
           {text('longitude', t(copy.longitude), { type: 'number', max: 0 })}
         </div>
       </fieldset>
+      <RegistrationSection
+        value={form.registration}
+        onChange={(patch) => onChange({ registration: { ...form.registration, ...patch } })}
+        onEdit={onEdit}
+        errors={errors}
+        disabled={disabled}
+        eventId={eventId}
+        revision={revision}
+        timezone={form.timezone}
+      />
       <fieldset className="grid gap-4" disabled={disabled}>
         <legend className="mb-2 text-sm font-medium">{t(copy.more)}</legend>
         <div className="grid gap-2">
@@ -131,8 +147,8 @@ export function EventForm({
           <FieldError id={fieldErrorId('event-category')}>{errors.category_id}</FieldError>
         </div>
         {text('organiser', t(copy.organiser), { max: 200 })}
-        {text('image', t(copy.image), { type: 'url', max: 2048 })}
-        {text('registration_url', t(copy.registration_url), { type: 'url', max: 2048 })}
+        {text('image', t(copy.image), { max: 2048 })}
+        <p className="-mt-4 text-xs text-muted-foreground">{t(copy.image_hint)}</p>
         <div className="flex items-center gap-2">
           <Checkbox
             id="event-cancelled"

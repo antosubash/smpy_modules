@@ -30,37 +30,54 @@ def test_each_value_in_the_table_matches_its_constant():
             assert str(actual) == value, name
 
 
-def test_the_table_names_the_bounds_a_block_and_a_card_obey():
+def test_the_table_and_the_constants_name_each_other():
+    """Both ways: every constant a block or a card obeys is in the table, and every name in the
+    table is a constant."""
     named = {n for _, names in _rows() for n in names}
-    assert {
-        "PUBLIC_BLOCKS_API",
-        "UPCOMING_BLOCK_MAX",
-        "UPCOMING_BLOCK_DEFAULT",
-        "BLOCK_CALENDARS_MAX",
-        "MAX_EVENT_SEARCH_LIMIT",
-        "CARD_SEARCH_SCAN",
-        "CARD_READ_ROUNDS",
-    } <= named
+    ruled = {
+        n
+        for n in dir(constants)
+        if n.startswith(("UPCOMING_BLOCK_", "BLOCK_", "CARD_"))
+        or n in {"PUBLIC_BLOCKS_API", "MAX_EVENT_SEARCH_LIMIT"}
+    }
+    assert ruled == named, ruled ^ named
 
 
-def test_the_card_fields_in_the_doc_are_the_cards():
+def _card_fields_in_the_doc() -> set[str]:
+    text = DOC.read_text()
+    start = text.index("**The fields of a card**")
+    paragraph = text[start : text.index("\n\n", start)]
+    return {n for n in re.findall(r"`([^`]*)`", paragraph) if re.fullmatch(r"[a-z_]+", n)} - {
+        "none"
+    }
+
+
+def test_the_card_fields_in_the_doc_are_the_cards_both_ways():
     from sm_events.contracts.cards import EventCard
 
-    text = DOC.read_text()
-    for name in EventCard.model_fields:
-        assert f"`{name}`" in text, name
+    assert _card_fields_in_the_doc() == set(EventCard.model_fields)
 
 
-def test_the_block_props_in_the_doc_are_the_blocks():
-    text = DOC.read_text()
-    for prop in (
-        "heading",
-        "calendars",
-        "category",
-        "count",
-        "layout",
-        "showImages",
-        "defaultView",
-        "height",
-    ):
-        assert f"`{prop}`" in text, prop
+UI = Path(__file__).resolve().parents[3] / "sm_events" / "ui" / "blocks"
+
+
+def _ts_type_keys(file: str, name: str) -> set[str]:
+    source = (UI / file).read_text()
+    body = source[source.index(f"export type {name} = {{") :].split("};", 1)[0]
+    return set(re.findall(r"^  (\w+)\??:", body, re.MULTILINE))
+
+
+def _doc_props(block: str) -> set[str]:
+    for line in DOC.read_text().splitlines():
+        if line.startswith(f"| `{block}` |"):
+            cell = line.split("|")[2]
+            # The values in parentheses are not props.
+            return set(re.findall(r"`(\w+)`", re.sub(r"\([^)]*\)", "", cell)))
+    raise AssertionError(block)
+
+
+def test_the_block_props_in_the_doc_are_the_blocks_both_ways():
+    assert _doc_props("UpcomingEvents") == _ts_type_keys(
+        "UpcomingEventsRender.tsx", "UpcomingEventsProps"
+    )
+    assert _doc_props("EventsCalendar") == _ts_type_keys("calendarProps.ts", "EventsCalendarProps")

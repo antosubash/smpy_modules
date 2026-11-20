@@ -6,7 +6,7 @@ import { resetReported } from '../extensions/PluginBoundary';
 import { clearExtensions, registerEventType } from '../extensions/registry';
 import type { PublicDetailProps } from '../extensions/types';
 import type { PublicEventProps } from '../public/types';
-import { flush } from './support';
+import { flush, NO_REGISTRATION } from './support';
 import { mount } from './test-dom';
 
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
@@ -40,6 +40,7 @@ function props(overrides: Partial<PublicEventProps> = {}): PublicEventProps {
     parent: null,
     sub_events: [],
     registration_url: null,
+    registration: NO_REGISTRATION,
     ics_url: '/events/talk.ics',
     canonical_url: 'https://x.example/events/talk',
     alternates: [],

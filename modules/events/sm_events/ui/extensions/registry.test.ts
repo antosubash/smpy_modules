@@ -3,8 +3,11 @@ import {
   clearExtensions,
   eventType,
   registerEventType,
+  registerRegistration,
   registerSource,
   registerToolbarItem,
+  registrationFor,
+  registrations,
   source,
   toolbarItems,
 } from './registry';
@@ -23,6 +26,19 @@ describe('registry', () => {
     expect(() =>
       registerToolbarItem({ id: 't', placement: 'start', surfaces: ['public'], Component: lazy }),
     ).toThrow(/t/);
+  });
+
+  it('registers a registration provider by id, lazily, once', () => {
+    registerRegistration({ id: 'acme:forms', EditorSection: lazy, PublicPanel: lazy });
+    expect(() => registerRegistration({ id: 'acme:forms' })).toThrow(/acme:forms/);
+    expect(() => registerRegistration({ id: '' })).toThrow();
+    const found = registrationFor('acme:forms');
+    expect(found?.EditorSection).toBe(registrationFor('acme:forms')?.EditorSection);
+    expect(found?.PublicPanel).toBeDefined();
+    expect(registrationFor('nope')).toBeUndefined();
+    registerRegistration({ id: 'a:first' });
+    expect(registrations().map((r) => r.id)).toEqual(['a:first', 'acme:forms']);
+    registerEventType({ id: 'acme:forms' }); // a type may share an id with a registration
   });
 
   it('refuses an empty id', () => {

@@ -3,21 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@simple-module-py/ui/components/ui/card';
 import { useEffect, useState } from 'react';
 import { leadsSummary } from '../../reminders/leadText';
+import { AVAILABILITY_REASONS, FAILED_CODES } from '../../reminders/reasons';
 import { errorText } from '../../utils/api';
 import { type Delivery, deliveryStatus } from '../../utils/api-reminders';
 import { keys, useT } from '../../utils/i18n';
-
-const REASONS: Record<string, string> = {
-  disabled: keys.events.reminders.delivery.reason_disabled,
-  no_public_base_url: keys.events.reminders.delivery.reason_no_public_base_url,
-  no_mail_transport: keys.events.reminders.delivery.reason_no_mail_transport,
-  console_mail: keys.events.reminders.delivery.reason_console_mail,
-  worker_access_unavailable: keys.events.reminders.delivery.reason_worker_access_unavailable,
-};
-const FAILED: Record<string, string> = {
-  send_failed: keys.events.reminders.delivery.failed_code_send_failed,
-  send_timeout: keys.events.reminders.delivery.failed_code_send_timeout,
-};
 
 export function DeliveryCard({ settingsUrl }: { settingsUrl: string }) {
   const { t } = useT();
@@ -50,8 +39,8 @@ export function DeliveryCard({ settingsUrl }: { settingsUrl: string }) {
             <p role="status">
               {data.available
                 ? t(copy.ok)
-                : data.reason && REASONS[data.reason]
-                  ? t(REASONS[data.reason])
+                : data.reason && AVAILABILITY_REASONS[data.reason]
+                  ? t(AVAILABILITY_REASONS[data.reason])
                   : t(keys.events.reminders.control.unavailable)}
             </p>
             <p>{t(copy.defaults, { leads: leadsSummary(t, data.defaults) })}</p>
@@ -64,7 +53,7 @@ export function DeliveryCard({ settingsUrl }: { settingsUrl: string }) {
             <ul>
               <li>{t(copy.sent, { count: data.counts.sent })}</li>
               {Object.entries(data.counts.failed).map(([code, count]) => (
-                <li key={code}>{t(FAILED[code] ?? copy.failed, { count })}</li>
+                <li key={code}>{t(FAILED_CODES[code] ?? copy.failed, { count })}</li>
               ))}
               <li>{t(copy.unfinished, { count: data.counts.unfinished })}</li>
             </ul>

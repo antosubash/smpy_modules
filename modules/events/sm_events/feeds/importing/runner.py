@@ -37,7 +37,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from simple_module_core.resources import ResourcePrincipal
-from simple_module_db import finalize_session, no_tenant
+from simple_module_db import finalize_session, mark_written, no_tenant
 from sqlalchemy import select
 from sqlalchemy.orm import defer
 
@@ -76,6 +76,7 @@ class _Slice:
             imp = await self._load(db)
             stored = ResourcePrincipal(imp.created_by, frozenset(imp.grants or ()))
             now = await importer(self.tenant_id, imp.created_by)
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
         if now is None:
             raise ImportFailure(constants.IMPORTER_GONE, "importer")
@@ -112,6 +113,7 @@ class _Slice:
                 owner=self.owner,
                 now=self.now(),
             )
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
             return answer
 
@@ -124,6 +126,7 @@ class _Slice:
                 now=self.now(),
                 locales=self.locales,
             )
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
 
     async def batch(self) -> bool:
@@ -162,12 +165,14 @@ class _Slice:
                 result = await apply_batch(db, imp, items, locales=self.locales, now=now)
             last = len(items) < constants.IMPORT_APPLY_BATCH
             await self.fence(db, _values(result, now, last))
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
             return last
 
     async def release(self) -> None:
         async with self.factory() as db:
             await self.fence(db, {"lease_owner": None, "lease_until": self.now()})
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
 
     async def fail(self, code: str) -> bool:
@@ -187,6 +192,7 @@ class _Slice:
                 await self.fence(db, values)
             except LeaseLost:
                 return False
+            mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
             return True
 

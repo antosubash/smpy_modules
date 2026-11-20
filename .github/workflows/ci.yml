@@ -618,7 +618,7 @@ jobs:
           uv-version: ${{ env.UV_VERSION }}
 
       # With E2E_NEWSLETTER=1, playwright.config.ts matches newsletter.spec.ts
-      # only; every other run, the `e2e-shard` jobs included, ignores it.
+      # and newsletter-events.spec.ts only; every other run, the `e2e-shard` jobs included, ignores it.
       - name: Run newsletter Playwright tests
         run: npm run test:e2e
 
@@ -694,9 +694,9 @@ jobs:
       SM_SECRET_KEY: bg-smoke-secret-key-not-for-production-use
       SM_USERS_BOOTSTRAP_EMAIL: admin@example.com
       SM_USERS_BOOTSTRAP_PASSWORD: changeme1
-      # The unsubscribe link a campaign carries is built from it; a campaign
-      # without one is refused at scheduling.
-      SM_PUBLIC_BASE_URL: http://127.0.0.1:8000
+      # No SM_PUBLIC_BASE_URL on purpose: the public address is stored in the database (the
+      # step below), the documented way, so the worker proves it reads it from there (the
+      # unsubscribe link of a campaign and every reminder link are built from it).
       # host/worker.py is imported as `worker` (the Makefile's CELERY line).
       PYTHONPATH: host
     steps:
@@ -729,6 +729,8 @@ jobs:
             from_address news@example.org \
             from_name "BG smoke" \
             physical_address "1 Test Street, 12345 Testville"
+          uv run --no-sync python scripts/set_setting.py host \
+            public_base_url http://127.0.0.1:8000
           uv run --no-sync python scripts/set_setting.py file_storage \
             fs_root_path "$RUNNER_TEMP/files"
 

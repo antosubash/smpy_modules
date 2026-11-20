@@ -154,6 +154,21 @@ async def _check_token(
     return rtype
 
 
+async def _charge_type(
+    request: Request,
+    tenant: str,
+    rtype: RecordType,
+    settings: RecordsSettings,
+    event_id: str | None = None,
+) -> None:
+    """The form's strict total. A registration form serves many events, so its total is per event:
+    ``event_id`` is the one the *verified* token names, never anything the body says."""
+    where = rtype.key if event_id is None else f"{rtype.key}:event={event_id}"
+    await abuse.hit(
+        request, abuse.rate_key(tenant, f"type={where}"), settings.public_submissions_type_rate
+    )
+
+
 async def submit(
     request: Request,
     db: AsyncSession,
@@ -164,7 +179,9 @@ async def submit(
     tenant = bound_tenant()
     ip = abuse.client_ip(request)
     await abuse.hit(
-        request, abuse.rate_key(tenant, f"ip={ip}"), settings.public_submissions_rate_per_ip
+        request,
+        abuse.rate_key(tenant, f"ip={abuse.ip_bucket(ip)}"),
+        settings.public_submissions_rate_per_ip,
     )
     if body.hp.strip():
         logger.info(
@@ -173,22 +190,47 @@ async def submit(
         return
     reg_token = None
     if registration_check.is_registration_token(body.token):
-        rtype, reg_token = await registration_check.check_token(
-            request, db, type_key, body, settings
-        )
+        try:
+            rtype, reg_token = await registration_check.check_token(
+                request, db, type_key, body, settings
+            )
+        except SubmissionRefused as refused:
+            if refused.code == "form_expired":
+                # A token that does not verify names no event: every one is charged to the same
+                # per-tenant bucket, so forgeries cannot mint buckets or spend a real form's budget.
+                await abuse.hit(
+                    request,
+                    abuse.rate_key(tenant, "registration-invalid-token"),
+                    abuse.scaled(settings.public_submissions_type_rate, abuse.ATTEMPTS_MULTIPLE),
+                )
+            raise
     else:
         rtype = await _check_token(request, db, type_key, body, settings)
     # After the token: only a form this host signed counts against the type's
     # budget, so a flood of forged posts cannot use it up (or mint a counter
     # per invented type key) and lock real visitors out.
-    await abuse.hit(
-        request,
-        abuse.rate_key(tenant, f"type={rtype.key}"),
-        settings.public_submissions_type_rate,
-    )
+    #
+    # A registration with a captcha configured is bounded in two steps so the strict total costs
+    # an attacker one solved captcha per request, yet nobody can call the provider or run the
+    # pattern worker without bound: a higher attempts bucket first (before the provider call),
+    # the strict total right after the captcha passes. With no captcha there is nothing that
+    # proves a human, so it is charged first, exactly as for any other form.
+    guarded = reg_token is not None and captcha.enforced(settings)
+    if guarded:
+        await abuse.hit(
+            request,
+            abuse.rate_key(tenant, f"type-attempts={rtype.key}:event={reg_token.event_id}"),
+            abuse.scaled(settings.public_submissions_type_rate, abuse.ATTEMPTS_MULTIPLE),
+        )
+    else:
+        await _charge_type(
+            request, tenant, rtype, settings, reg_token.event_id if reg_token else None
+        )
     # After the token, so only a form this host signed costs a call to the
     # provider; before anything is read into a record or written.
     await captcha.verify(settings, body.captcha_response, ip)
+    if guarded and reg_token is not None:
+        await _charge_type(request, tenant, rtype, settings, reg_token.event_id)
     sent = dict(body.data)
     newsletter = rtype.public_submissions.get("kind") == KIND_SUBSCRIPTION
     address = sent.pop(EMAIL_KEY, None) if newsletter or reg_token is not None else None

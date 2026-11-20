@@ -42,17 +42,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 from sqlalchemy import select, update
 from sqlalchemy.dialects import postgresql, sqlite
 
+from sm_events.core.constants.reminders_limits import REMINDER_CLAIM_LEASE
 from sm_events.core.tenancy import tenant_scope
 from sm_events.models import Event, ReminderSent
 from sm_events.models.enums import EventStatus
 from sm_events.reminders.candidates import Candidate
-from sm_events.reminders.limits import REMINDER_CLAIM_LEASE
 
-__all__ = ["Claim", "begin_send", "claim", "mark_failed", "mark_sent"]
+__all__ = ["FAILED", "Claim", "begin_send", "claim", "insert_for", "mark_failed", "mark_sent"]
 
 _T = ReminderSent.__table__
 _E = Event.__table__
@@ -69,7 +69,8 @@ class Claim:
     claimed_at: datetime
 
 
-def _insert(db: Any) -> Any:
+def insert_for(db: Any) -> Any:
+    """The dialect's ``insert`` (it has ``on_conflict_do_nothing``)."""
     name = db.get_bind().dialect.name
     if name == "postgresql":
         return postgresql.insert
@@ -107,7 +108,7 @@ async def _claim(db: Any, c: Candidate, tenant_id: str, now: datetime) -> Claim 
     if not await _guard(db, c, tenant_id):
         return None
     insert = (
-        _insert(db)(_T)
+        insert_for(db)(_T)
         .values(
             tenant_id=tenant_id,
             event_id=c.event_id,
@@ -145,6 +146,7 @@ async def claim(factory: Any, c: Candidate, *, tenant_id: str, now: datetime) ->
     with tenant_scope(tenant_id):
         async with factory() as db:
             got = await _claim(db, c, tenant_id, now)
+            mark_written(db)  # Core DML: say so, whatever the session class listens for
             await finalize_session(db)
     return got
 
@@ -153,6 +155,7 @@ async def _mark(factory: Any, tenant_id: str, statement: Any) -> bool:
     with tenant_scope(tenant_id):
         async with factory() as db:
             changed = (await db.execute(statement)).rowcount
+            mark_written(db)
             await finalize_session(db)
     return bool(changed)
 

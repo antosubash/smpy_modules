@@ -96,3 +96,12 @@ field `may_use_internal_addresses` is `false` for everyone else).
 
 The list of refused addresses is best-effort (providers add endpoints; a unique-local address that
 embeds a metadata IPv4 is refused too). Turn the switch on only for trusted networks.
+
+## Reminders
+
+`events.reminders` runs every minute on the `events` queue (a queued tick expires after 55 s, so a
+backlog is dropped, never run late). It needs a worker, a beat, a mail sender that delivers and the
+host's `public_base_url`; see [Reminders](reminders.md). Nothing detects a missing beat: check that
+`events.reminders` appears in the worker log each minute (`events.reminders: N tenant(s), N sent, ...`,
+counts only). `events.janitor` also prunes the ledger. The first build of the worker's headless app
+takes about 16 s and 200 MB per process.

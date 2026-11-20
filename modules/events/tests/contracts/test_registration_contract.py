@@ -25,6 +25,7 @@ EXPECTED = [
     "REGISTRATION_CLOSED",
     "REGISTRATION_FULL",
     "RegistrationEvent",
+    "SEAT_RELEASE_MAX",
     "SeatRef",
     "SeatsBusy",
     "admit",
@@ -33,6 +34,7 @@ EXPECTED = [
     "release_target",
     "seat_holders",
     "summaries",
+    "format_instant",
 ]
 
 

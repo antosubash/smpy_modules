@@ -29,10 +29,11 @@ that language's prefix.
 
 **The fields of a card**, and nothing else: `id`, `title`, `summary` (plain text, `""` when none),
 `starts_at` and `ends_at` (aware UTC), `all_day`, `start_date` and `end_date` (all-day only, the end
-exclusive), `timezone`, `occurrence_start` (series only), `attendance_mode`, `venue_name`,
-`address`, `image_url` (an absolute http(s) address, else `""`), `path` and `ics_path`
+exclusive), `timezone`, `attendance_mode`, `venue_name`,
+`address`, `image_url` (a path on the site, else `""`), `path` and `ics_path`
 (site-relative), `locale` and `cancelled`. The caller formats the dates in its own language and
-makes the paths absolute from its own public origin.
+makes the paths absolute from its own public origin. An image is carded only when it is a path on the
+site (the pages' policy loads images from their own origin only), never an off-site address.
 
 **`id` is the event's internal id.** It exists so a consumer can look the card up again. It must
 never be rendered into public HTML, an email, a feed or page JSON: the public surface is keyed by

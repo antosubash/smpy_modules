@@ -42,6 +42,8 @@ from sm_records.public_submissions import links
 from sm_records.public_submissions.address_lock import lock_addresses
 from sm_records.public_submissions.definition import EMAIL_KEY
 from sm_records.public_submissions.errors import SubmissionRefused
+from sm_records.public_submissions.registration.confirm_seat import take_seat
+from sm_records.public_submissions.registration.status import REGISTERED
 from sm_records.public_submissions.subscribe import CONFIRMED, PENDING, UNSUBSCRIBED, changed
 from sm_records.public_submissions.transition import Change, Outcome, transition
 from sm_records.records.services import records as record_service
@@ -89,7 +91,9 @@ async def confirm(
     # A registration is *registered*, not "confirmed", and it is no newsletter subscription: its
     # confirmation announces nothing to the newsletter's listeners.
     registration = (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION
-    done = "registered" if registration else CONFIRMED
+    done = REGISTERED if registration else CONFIRMED
+
+    resolved_start: Any = None
 
     def derive(row: Record) -> Change | None:
         data = row.data or {}
@@ -99,9 +103,19 @@ async def confirm(
             return None
         if data.get("sm_status") != PENDING:
             raise _expired()
-        return {"sm_status": done, "sm_confirmed_at": utcnow()}, None
+        change: dict[str, Any] = {"sm_status": done, "sm_confirmed_at": utcnow()}
+        if resolved_start is not None:
+            change["sm_occurrence_start"] = resolved_start  # refreshed: the event may have moved
+        return change, None
 
     try:
+        if registration:  # the seat, then ``registered``: one transaction, the global lock order
+            resolved_start = await take_seat(
+                db,
+                rtype,
+                record,
+                lambda row: links.matches(secret, link, (row.data or {}).get("sm_nonce")),
+            )
         outcome = await transition(db, rtype, record, derive, settings=settings)
     except NotFound:  # purged since the lookup, like a trashed row
         raise _expired() from None

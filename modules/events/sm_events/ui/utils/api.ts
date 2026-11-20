@@ -72,6 +72,7 @@ export function errorText(error: unknown, gone?: string): string {
     range_too_long: keys.events.errors.range_too_long,
     invalid_range: keys.events.errors.invalid_range,
     unknown_category: keys.events.errors.unknown_category,
+    image_off_site: keys.events.errors.image_off_site,
     unknown_type: keys.events.errors.unknown_type,
     invalid_parent: keys.events.errors.invalid_parent,
     immutable_field: keys.events.errors.immutable_field,
@@ -92,6 +93,19 @@ export function errorText(error: unknown, gone?: string): string {
     invalid_lead: keys.events.errors.invalid_lead,
     reminders_unavailable: keys.events.errors.reminders_unavailable,
     reminders_no_access: keys.events.errors.reminders_no_access,
+    invalid_registration: keys.events.errors.invalid_registration,
+    registration_unavailable: keys.events.errors.registration_unavailable,
+    unknown_registration_target: keys.events.errors.unknown_registration_target,
+    registrations_orphaned: keys.events.errors.registrations_orphaned,
+    registration_has_seats: keys.events.errors.registration_has_seats,
+    seats_busy: keys.events.errors.seats_busy,
+    registration_closes_before_opens: keys.events.errors.registration_closes_before_opens,
+    registration_time_invalid: keys.events.errors.registration_time_invalid,
+    registration_url_required: keys.events.errors.registration_url_required,
+    registration_target_required: keys.events.errors.registration_target_required,
+    registration_provider_required: keys.events.errors.registration_provider_required,
+    registration_reminder_invalid: keys.events.errors.registration_reminder_invalid,
+    registration_option_not_allowed: keys.events.errors.registration_option_not_allowed,
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);

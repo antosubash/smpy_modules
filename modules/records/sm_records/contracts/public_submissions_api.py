@@ -128,9 +128,16 @@ class RegistrationAvailability(SQLModel):
 
     state: Literal["cancelled", "not_open_yet", "closed", "full", "open"]
     seats_left: int | None = None
-    """Only when the event chose to show it."""
+    """An exact number, only for a double opt-in form whose event chose to show seats: there a
+    submit takes no seat, so the number does not move when an unknown address registers."""
+    few_left: bool = False
+    """A threshold state for every other form (a single opt-in form takes its seat at submit, so a
+    public number would tell whether an address was new): few seats remain."""
     opens_at: str | None = None
     closes_at: str | None = None
+    opens_text: str | None = None
+    closes_text: str | None = None
+    """The window's ends worded in the event's zone with its label, like the event's own time."""
 
 
 class RegistrationEventInfo(SQLModel):

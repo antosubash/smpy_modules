@@ -6,6 +6,7 @@ import type { ToolbarSlotProps } from '../calendar/types';
 import type {
   EventTypeRegistration,
   LazyComponent,
+  RegistrationRegistration,
   SourceRegistration,
   ToolbarItemRegistration,
   ToolbarSurface,
@@ -17,6 +18,7 @@ type Wrapped<R> = {
 };
 export type ResolvedType = Wrapped<EventTypeRegistration>;
 export type ResolvedSource = Wrapped<SourceRegistration>;
+export type ResolvedRegistration = Wrapped<RegistrationRegistration>;
 export type ResolvedToolbarItem = Omit<ToolbarItemRegistration, 'Component'> & {
   Component: Lazy<ToolbarSlotProps>;
 };
@@ -24,6 +26,7 @@ export type ResolvedToolbarItem = Omit<ToolbarItemRegistration, 'Component'> & {
 const types = new Map<string, ResolvedType>();
 const sources = new Map<string, ResolvedSource>();
 const toolbar = new Map<string, ResolvedToolbarItem>();
+const providers = new Map<string, ResolvedRegistration>();
 
 function wrap<R extends { id: string }>(registration: R): Wrapped<R> {
   const out: Record<string, unknown> = { id: registration.id };
@@ -48,12 +51,19 @@ export function registerEventType(registration: EventTypeRegistration): void {
 export function registerSource(registration: SourceRegistration): void {
   put(sources, 'source', registration.id, wrap(registration));
 }
+export function registerRegistration(registration: RegistrationRegistration): void {
+  put(providers, 'registration provider', registration.id, wrap(registration));
+}
 export function registerToolbarItem(registration: ToolbarItemRegistration): void {
   put(toolbar, 'toolbar item', registration.id, wrap(registration) as ResolvedToolbarItem);
 }
 
 export const eventType = (id: string): ResolvedType | undefined => types.get(id);
 export const source = (id: string): ResolvedSource | undefined => sources.get(id);
+export const registrationFor = (id: string): ResolvedRegistration | undefined => providers.get(id);
+/** Every registered provider, by id: the editor offers built-in registration only when one exists. */
+export const registrations = (): ResolvedRegistration[] =>
+  [...providers.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 export function toolbarItems(
   placement: 'start' | 'end',
@@ -69,4 +79,5 @@ export function clearExtensions(): void {
   types.clear();
   sources.clear();
   toolbar.clear();
+  providers.clear();
 }

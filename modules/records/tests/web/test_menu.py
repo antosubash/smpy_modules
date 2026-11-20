@@ -196,7 +196,8 @@ async def test_register_menu_items_adds_the_hub_and_one_provider():
     registry = MenuRegistry()
     module.register_menu_items(registry)
 
-    assert [item.label for item in registry.all_items] == ["All record types"]
+    # The second entry exists because the events module is installed in this workspace.
+    assert [item.label for item in registry.all_items] == ["All record types", "My registrations"]
     # Before startup there is no database: the provider contributes nothing.
     assert await registry.collect_provider_items(_request(user=_user("v"), held=_VIEW)) == []
 

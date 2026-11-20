@@ -5,14 +5,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from sm_events.web.endpoints.public import _clock, _private_feed
+from sm_events.core import clock
+from sm_events.web.endpoints.public import _private_feed
 
 NOW = datetime(2026, 4, 1, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
 def _fixed_clock(monkeypatch):
-    monkeypatch.setattr(_clock, "now", lambda: NOW)
+    monkeypatch.setattr(clock, "now", lambda: NOW)
 
 
 @pytest.fixture(autouse=True)

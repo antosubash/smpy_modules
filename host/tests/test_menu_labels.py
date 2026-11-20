@@ -77,7 +77,7 @@ async def _menu(app, locale: str) -> list[dict]:
 
 async def test_every_entry_has_a_label_key(app):
     items = await _ours(app)
-    assert len(items) == 20
+    assert len(items) == 21  # 20 + records' "My registrations", present because events is installed
     missing = [i.label for i in items if not i.label_key.startswith(_OUR_NAMESPACES)]
     assert not missing, f"menu items without a module label_key: {missing}"
     no_group_key = [i.label for i in items if i.group and not i.group_key]

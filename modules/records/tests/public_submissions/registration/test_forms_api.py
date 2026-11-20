@@ -42,11 +42,24 @@ async def test_list_shows_registration_types_the_caller_may_view(reg_site):
         allowed_roles=[ROLE_EDITOR],
     )
     assert made.status_code == 201, made.text
-    seen = (await reg_site.get(URL, headers=roles(ROLE_EDITOR))).json()
+    seen = (await reg_site.get(URL, headers=roles(ROLE_EDITOR))).json()["items"]
     assert [row["key"] for row in seen] == ["event_registrations", "private_regs"]
     row = seen[0]
-    assert set(row) == {"key", "label", "enabled", "attendees_url"}
+    assert set(row) == {"key", "label", "enabled", "double_opt_in", "attendees_url"}
+    assert row["double_opt_in"] is True
     assert row["enabled"] is True and row["attendees_url"] == f"/admin/records/{TYPE}"
-    viewer = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()
+    viewer = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()["items"]
     assert [r["key"] for r in viewer] == ["event_registrations"]  # the editor-only one is hidden
     assert (await reg_site.get(URL)).status_code in (401, 403)
+
+
+async def test_the_list_says_whether_the_caller_may_create(reg_site):
+    """The editor shows "Create a registration form" only to someone the create call would admit."""
+    can = {}
+    for name, who in (("admin", ADMIN), ("editor", ROLE_EDITOR), ("viewer", ROLE_VIEWER)):
+        body = (await reg_site.get(URL, headers=roles(who))).json()
+        can[name] = body["can_create"]
+        assert set(body) == {"items", "can_create"}
+    assert can == {"admin": True, "editor": False, "viewer": False}
+    made = await reg_site.post(URL, headers=roles(ROLE_EDITOR))
+    assert made.status_code in (401, 403)  # what the flag said

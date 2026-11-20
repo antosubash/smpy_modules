@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { errorText, isGone } from '../utils/api';
+import { ApiError, errorText, isGone } from '../utils/api';
 import {
   deleteFollow,
   type Follow,
@@ -24,6 +24,7 @@ export function useFollow(eventId: string) {
   const [state, setState] = useState<FollowState>({ kind: 'loading' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [atCap, setAtCap] = useState(false);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export function useFollow(eventId: string) {
       if (state.kind !== 'ready' || saving) return false;
       const before = state;
       setError(null);
+      setAtCap(false);
       setSaving(true);
       setState({ ...before, follow: { ...before.follow, leads, next_due: {} } });
       try {
@@ -74,7 +76,10 @@ export function useFollow(eventId: string) {
         if (!alive.current) return false;
         setState(before); // put back what the server did not accept
         if (isGone(e)) setState({ kind: 'hidden' });
-        else setError(errorText(e));
+        else {
+          setError(errorText(e));
+          setAtCap(e instanceof ApiError && e.code === 'follow_limit');
+        }
         return false;
       } finally {
         if (alive.current) setSaving(false);
@@ -83,7 +88,17 @@ export function useFollow(eventId: string) {
     [eventId, saving, state],
   );
 
-  return { state, saving, error, save, clearError: () => setError(null) };
+  return {
+    state,
+    saving,
+    error,
+    atCap,
+    save,
+    clearError: () => {
+      setError(null);
+      setAtCap(false);
+    },
+  };
 }
 
 /** Stopping is a DELETE (always allowed, even while reminders are unavailable). */

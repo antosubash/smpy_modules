@@ -97,7 +97,8 @@ Rules for a package:
 commit), and scheduled by beat when it recurs. The send itself is not durable,
 so work that must not be lost keeps its state in its own rows and a beat task
 that picks up what a lost message left behind (images' `images.reconcile`,
-newsletter's `newsletter.import_janitor`). That is what images and newsletter
+newsletter's `newsletter.import_janitor`; events' `events.reminders` mails a reminder at most once,
+claiming its ledger row before it sends). That is what images, newsletter and events
 do, and the one path every deployment runs the same way: a worker
 pool sized on its own, retries with backoff, one scheduler however many web
 replicas there are. CI's `Background tasks (Redis + Celery worker)` job runs

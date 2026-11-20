@@ -189,6 +189,35 @@ Each ruling below is **my call** unless it cites the spec. The maintainer may ov
 **Errors**
 36. Events: 422 `invalid_registration`, `registration_unavailable` (503 when the provider times out), `unknown_registration_target`; 409 `registrations_orphaned`, `registration_has_seats`. Contract codes: `registration_full`, `registration_closed`, `event_unavailable`, as constants exported from `sm_events.contracts.registration`. Records: 409 `registration_full`, `registration_closed`, `event_unavailable` on submit and restore; 422 `events_unavailable` on creating the kind; 409 `wrong_kind` on the admin cancel. All use the `{"detail","code"}` envelope and the records error tables.
 
+## Amendment (security review, 2026-11-19): the seat is taken when the address is confirmed
+
+Supersedes Ruling 21 step 4, Ruling 22's "the seat is held while pending" and the pending purge
+paragraph of Ruling 23. Decided by the maintainer after review.
+
+- **Double opt-in form: the seat is taken at the confirmation, not at submit.** A submit creates the
+  pending record and mails the confirmation; it holds no seat, moves no public count and answers the
+  one neutral 202 for a new, pending, confirmed or cancelled address. The confirm POST takes the seat
+  (`admit`) and marks the record registered in one transaction under the global lock order; if the
+  event filled up meanwhile the record stays pending (no waitlist) and the page says "now full".
+  Unconfirmed records are removed by the retention sweep after the pending TTL
+  (`pending_hold_hours`, default one hour, one constant for every reader); they hold nothing.
+- **Single opt-in form: the seat is taken at submit** (nothing later to attach it to). Anyone can take
+  seats without confirming an address there; bounded only by the per-IP limit, the per-address mail
+  bound and the captcha. The editor warns about it. Its public availability shows states only
+  (open / few left / full), never an integer, so a public number cannot tell whether an address was
+  new; the exact `seats_left` is public only for double opt-in forms with show-seats on.
+- **Abuse bounds** (records' own, shared with every submission form): per IP 5 per 10 minutes (IPv6 by
+  /64), per address 3 mails a day per form. **The form's total (`public_submissions_type_rate`, 60 per
+  hour) applies to registrations too, per event**: keyed by the event the verified token names, and
+  charged only after the captcha has passed (a separate per-event attempts bucket, ten times the rate,
+  is charged before the provider is called; with no usable captcha the total is charged first). A token
+  that fails verification is charged to one per-tenant bucket. Mails go to whatever address was typed:
+  records has no suppression list, the same as its existing submission confirmations.
+- **Events that are not public answer a submit like an invalid token** (400 `form_expired`); a public
+  event that is full, closed or cancelled says so.
+- **Lock order** and releases: one release call per bulk/cascade/purge turn; a database deadlock inside
+  the contract is `SeatsBusy` (retry), never a 500.
+
 ## Global Constraints
 
 - Machine load: run `~/.claude/bin/wait-for-headroom` before **every** pytest, vitest, tsc, alembic or `uv sync`/`npm install` run, and stop and report if it exits 1. Use `-n 8` (`PYTEST_WORKERS=8`) at most, and run pytest in the **foreground**. Run **targeted tests only**, never `make test-py` or a full suite: `/ship` runs those once. Use `/usr/bin/ps`, never `ps`. No dev server, no browser here; the e2e spec is written and run once at the end of batch D by the batch D implementer after the headroom check, then the server is stopped.

@@ -27,7 +27,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import all_tenants as unscoped
-from simple_module_db import finalize_session
+from simple_module_db import finalize_session, mark_written
 from sqlalchemy import delete
 
 from sm_events.core import constants, user_ids
@@ -55,6 +55,7 @@ async def _run(
     with scope:
         async with factory() as session:
             removed = (await session.execute(statement)).rowcount
+            mark_written(session)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(session)
     return int(removed or 0)
 

@@ -1,58 +1,77 @@
 """Dates and times for the mail: in the EVENT's zone, in the follower's language.
 
-The zone is named (``CEST``) because the reader may be anywhere; nothing is said about the
-reader's own zone (the framework keeps none, and a guessed one would be wrong). All-day events
-are dates only, a multi-day one a range of dates; a timed event on one day is
-``date, start - end zone``, across days ``date start - date end``.
+The wording is the newsletter event card's, so the same event reads the same in both mails
+(``scripts/tests/test_when_line_parity.py`` runs one case table through both): CLDR's narrow
+no-break spaces become plain ones, an all-day event is dates only (a multi-day one a range), a
+timed one on a single day is ``date, start-end zone`` and across days ``date, start zone - date,
+end zone``. The zone is named by its tzdata abbreviation (``CEST``) because the reader may be
+anywhere; nothing is said about the reader's own zone.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from typing import Final
 from zoneinfo import ZoneInfo
 
 from babel.dates import format_date, format_time
 
+from sm_events.core import timezones
 from sm_events.reminders import strings
 
-__all__ = ["format_when", "short_date"]
+__all__ = ["format_when", "short_date", "zone_of"]
 
-DASH = chr(0x2013)  # an en dash, spelled so no tool rewrites it
+_EN: Final = chr(0x2013)  # an en dash, spelled so no tool rewrites it
+_DASH: Final = f" {_EN} "
+_SPACES: Final = str.maketrans({chr(0x202F): " ", chr(0xA0): " "})  # CLDR's narrow no-break spaces
 
 
-def _zone(name: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(name)
-    except Exception:  # an unknown name: UTC, loudly named, rather than a wrong local time
-        return ZoneInfo("UTC")
+def zone_of(name: str) -> ZoneInfo:
+    """The event's zone; an unknown name is UTC (warned once), not a wrong local time."""
+    return ZoneInfo(timezones.effective(name))
+
+
+def _day(value: datetime, locale: str) -> str:
+    return format_date(value.date(), format="full", locale=locale).translate(_SPACES)
 
 
 def short_date(value: datetime, *, timezone: str, locale: str) -> str:
-    zone = _zone(timezone)
-    return format_date(value.astimezone(zone).date(), format="medium", locale=locale)
+    local = value.astimezone(zone_of(timezone))
+    return format_date(local.date(), format="medium", locale=locale)
 
 
-def _time(value: datetime, zone: ZoneInfo, locale: str) -> str:
-    return format_time(value.astimezone(UTC), format="short", tzinfo=zone, locale=locale)
+def _time(value: datetime, locale: str) -> str:
+    return format_time(value, format="short", locale=locale).translate(_SPACES)
+
+
+def format_instant(*, value: datetime, timezone: str, locale: str) -> str:
+    """One instant the way :func:`format_when` words a time: the day, the time and the zone label,
+    in the event's zone and the reader's language (a window's opening, say)."""
+    zone, loc = zone_of(timezone), strings.catalogue_locale(locale)
+    local = value.astimezone(zone)
+    return f"{_day(local, loc)}, {_time(local, loc)} {local.tzname() or timezone}"
 
 
 def format_when(
     *, start: datetime, end: datetime, all_day: bool, timezone: str, locale: str
 ) -> str:
-    zone, loc = _zone(timezone), strings.catalogue_locale(locale)
+    zone, loc = zone_of(timezone), strings.catalogue_locale(locale)
     first, last = start.astimezone(zone), end.astimezone(zone)
     if all_day:
-        day1 = first.date()
-        day2 = (last - timedelta(microseconds=1)).date()
-        text = format_date(day1, format="full", locale=loc)
-        if day2 > day1:
-            text += f" {DASH} {format_date(day2, format='full', locale=loc)}"
+        day1 = first
+        day2 = last - timedelta(microseconds=1)
+        text = _day(day1, loc)
+        if day2.date() > day1.date():
+            text += f"{_DASH}{_day(day2, loc)}"
         return strings.text("when_all_day", loc, date=text)
-    date1 = format_date(first.date(), format="full", locale=loc)
-    time1, time2 = _time(first, zone, loc), _time(last, zone, loc)
-    zone1, zone2 = first.tzname() or "", last.tzname() or ""
-    left = f"{date1}, {time1}" + (f" {zone1}" if zone1 != zone2 else "")
+    zone1, zone2 = first.tzname() or timezone, last.tzname() or timezone
     if first.date() == last.date():
-        return f"{left} {DASH} {time2} {zone2}"
-    date2 = format_date(last.date(), format="full", locale=loc)
-    return f"{left} {DASH} {date2}, {time2} {zone2}"
+        if zone1 == zone2:
+            span = f"{_time(first, loc)}{_EN}{_time(last, loc)} {zone2}"
+        else:
+            span = f"{_time(first, loc)} {zone1}{_EN}{_time(last, loc)} {zone2}"
+        return f"{_day(first, loc)}, {span}"
+    return (
+        f"{_day(first, loc)}, {_time(first, loc)} {zone1}{_DASH}"
+        f"{_day(last, loc)}, {_time(last, loc)} {zone2}"
+    )

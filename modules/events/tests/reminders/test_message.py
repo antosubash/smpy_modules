@@ -192,10 +192,35 @@ def test_links_public_for_a_public_calendar_on_a_single_tenant_host():
 @pytest.mark.parametrize(
     ("visibility", "single"), [("internal", True), ("private", True), ("public", False)]
 )
-def test_links_console_otherwise(visibility, single):
-    got = _build(calendar=_calendar(visibility), links=replace(LINKS, single_tenant=single))
+def test_links_the_editor_only_for_someone_who_can_edit(visibility, single):
+    got = _build(
+        calendar=_calendar(visibility), links=replace(LINKS, single_tenant=single), can_edit=True
+    )
     assert f"https://events.example.org/admin/events/edit/{EVENT_ID}" in got.text
     assert "/events/talk-" not in got.text
+
+
+@pytest.mark.parametrize(
+    ("visibility", "single"), [("internal", True), ("private", True), ("public", False)]
+)
+def test_a_viewer_is_linked_to_the_calendar_with_that_occurrence_open(visibility, single):
+    got = _build(
+        calendar=_calendar(visibility),
+        links=replace(LINKS, single_tenant=single),
+        occurrence_key="e1:2026-07-01T08:00:00Z",
+    )
+    url = (
+        "https://events.example.org/admin/events/?view=day&date=2026-07-01&tz=calendar"
+        f"&calendar={CAL_ID}&event=e1%3A2026-07-01T08%3A00%3A00Z"
+    )
+    assert url in got.text and url in (got.html or "").replace("&amp;", "&")
+    assert "/admin/events/edit/" not in got.text
+
+
+def test_the_day_is_the_events_own_not_utc():
+    late = _event(starts_at=datetime(2026, 7, 1, 22, 30, tzinfo=UTC))  # 00:30 on the 2nd in Vienna
+    got = _build(event=late, calendar=_calendar("internal"), occurrence_key="k")
+    assert "date=2026-07-02&tz=calendar" in got.text
 
 
 def test_a_relative_or_missing_base_url_is_refused_not_guessed():

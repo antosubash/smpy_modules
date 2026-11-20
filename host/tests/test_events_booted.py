@@ -48,6 +48,7 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
     ``HEAD`` only, adds the rate limits, and the 404 a visitor gets is pagebuilder's (it is
     mounted here), not the sign-in screen."""
     from httpx import ASGITransport, AsyncClient
+    from sm_events.core import host_settings
     from simple_module_hosting.public_access import is_public
 
     app = booted_host
@@ -190,7 +191,9 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
             AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as http,
         ):
             for slot, base in zip(out, ("https://events.example.org", ""), strict=True):
-                monkeypatch.setattr(app.state.sm.settings, "public_base_url", base, raising=False)
+                # The address is read from the live host settings, so that is what to set.
+                live = host_settings.host_settings(app)
+                monkeypatch.setattr(live, "public_base_url", base, raising=False)
                 for path in paths:
                     slot[path] = await http.get(path, headers={"Host": "evil.test"} | spoof)
         return out

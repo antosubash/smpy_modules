@@ -5,6 +5,7 @@
  *  `codeFieldPath` says which input they belong to. */
 import { ApiError, CODE } from './api';
 import { keys, translate as t } from './i18n';
+import { REGISTRATION_CAPACITY_MAX } from './limits';
 
 const E = keys.events.errors;
 const MESSAGES: Record<string, string> = {
@@ -16,7 +17,6 @@ const MESSAGES: Record<string, string> = {
   default_timezone: E.default_timezone_invalid,
   rrule: E.rrule_invalid,
   online_url: E.url_invalid,
-  registration_url: E.url_invalid,
   image: E.url_invalid,
   latitude: E.coordinate_invalid,
   longitude: E.coordinate_invalid,
@@ -39,8 +39,25 @@ const TEXT_MESSAGES: Record<string, string> = {
   seo_description: E.seo_invalid,
 };
 
+/** `registration.<leaf>`: the leaf names the message. */
+const REGISTRATION_MESSAGES: Record<string, string> = {
+  url: E.url_invalid,
+  capacity: E.registration_capacity_invalid,
+  opens_at_local: E.registration_window_invalid,
+  closes_at_local: E.registration_closes_invalid,
+};
+
+/** The values a message names (the capacity maximum comes from the one constant). */
+const PARAMS: Record<string, Record<string, unknown>> = {
+  [E.registration_capacity_invalid]: {
+    max: new Intl.NumberFormat().format(REGISTRATION_CAPACITY_MAX),
+  },
+};
+
 const messageFor = (path: string): string => {
   const [head = '', ...rest] = path.split('.');
+  if (head === 'registration')
+    return REGISTRATION_MESSAGES[rest.at(-1) ?? ''] ?? E.invalid_registration;
   if (head === 'texts') return TEXT_MESSAGES[rest.at(-1) ?? ''] ?? E.invalid_input;
   return MESSAGES[head] ?? E.invalid_input;
 };
@@ -56,7 +73,7 @@ export function fieldErrors(error: unknown): Record<string, string> {
     out[path] =
       path.startsWith('extra.') && error.messages[path]
         ? error.messages[path]
-        : t(messageFor(path));
+        : t(messageFor(path), PARAMS[messageFor(path)]);
   }
   return out;
 }

@@ -115,7 +115,6 @@ describe('events API client', () => {
       category_id: null,
       organiser: null,
       image: null,
-      registration_url: null,
     });
     expect(calls[1]?.method).toBe('POST');
   });

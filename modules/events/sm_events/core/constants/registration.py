@@ -13,6 +13,7 @@ __all__ = [
     "EVENT_UNAVAILABLE",
     "INVALID_REGISTRATION_CODE",
     "INVALID_REGISTRATION_DETAIL",
+    "INVALID_REGISTRATION_REASONS",
     "REGISTRATIONS_ORPHANED_CODE",
     "REGISTRATIONS_ORPHANED_DETAIL",
     "REGISTRATION_CAPACITY_MAX",
@@ -81,6 +82,25 @@ EVENT_UNAVAILABLE: Final = "event_unavailable"
 # Refusals of the editor's writes.
 INVALID_REGISTRATION_CODE: Final = "invalid_registration"
 INVALID_REGISTRATION_DETAIL: Final = "These registration settings are not valid"
+INVALID_REGISTRATION_REASONS: Final = {
+    "closes_before_opens": (
+        "registration_closes_before_opens",
+        "Registration must close after it opens",
+    ),
+    "time_invalid": ("registration_time_invalid", "That is not a valid date and time"),
+    "url_required": ("registration_url_required", "A registration link is required"),
+    "target_required": ("registration_target_required", "Choose a registration form"),
+    "provider_required": ("registration_provider_required", "Choose a kind of registration"),
+    "reminder_invalid": (
+        "registration_reminder_invalid",
+        "That reminder time is not one of the allowed lead times",
+    ),
+    "option_not_allowed": (
+        "registration_option_not_allowed",
+        "That setting does not apply to this way of registering",
+    ),
+}
+"""Each reason for an invalid registration: its own code and wording."""
 REGISTRATION_UNAVAILABLE_CODE: Final = "registration_unavailable"
 REGISTRATION_UNAVAILABLE_DETAIL: Final = "Registration through this provider is not available"
 UNKNOWN_REGISTRATION_TARGET_CODE: Final = "unknown_registration_target"

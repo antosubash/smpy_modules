@@ -35,13 +35,28 @@ from sqlalchemy import exists, func, or_, select
 from sm_events.calendar.occurrence import Occurrence, OccurrenceFilters
 from sm_events.calendar.occurrences import occurrences
 from sm_events.core import constants
+from sm_events.core.constants.reminders_limits import (
+    MAX_LEAD_MINUTES,
+    REMINDER_CANDIDATES_MAX,
+    REMINDER_CLAIM_LEASE,
+    REMINDER_LEADS,
+)
 from sm_events.core.tenancy import bound_tenant
-from sm_events.models import Event, EventFollow, OccurrenceOverride
+from sm_events.models import Event, EventFollow, OccurrenceOverride, ReminderSent
 from sm_events.models.enums import EventStatus
 from sm_events.reminders import due
-from sm_events.reminders.limits import MAX_LEAD_MINUTES, REMINDER_CANDIDATES_MAX, REMINDER_LEADS
+from sm_events.reminders.ledger_keys import ledger_keys
 
-__all__ = ["CHUNK", "Candidate", "candidates", "next_starts"]
+__all__ = [
+    "CHUNK",
+    "SYSTEM",
+    "Candidate",
+    "candidates",
+    "expand",
+    "followed_events",
+    "moved_from",
+    "next_starts",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +74,7 @@ SYSTEM = ResourcePrincipal(
 )
 """Sees every published event; used only to expand occurrences, never to decide who is told."""
 
-_F = EventFollow.__table__
+_F, _L = EventFollow.__table__, ReminderSent.__table__
 
 
 @dataclass(frozen=True)
@@ -90,7 +105,7 @@ def _live_events(*extra: Any) -> Any:
     )
 
 
-async def _followed_events(db: Any, lead: int, lo: datetime, hi: datetime) -> dict[uuid.UUID, int]:
+async def followed_events(db: Any, lead: int, lo: datetime, hi: datetime) -> dict[uuid.UUID, int]:
     """``{event: revision}`` of followed events that may have an occurrence starting in
     ``[lo, hi)``: one-offs starting in it, and series that run through it (or have an
     occurrence moved into it). A prefilter: the occurrences read has the last word."""
@@ -136,7 +151,7 @@ async def _followed_events(db: Any, lead: int, lo: datetime, hi: datetime) -> di
     return found
 
 
-async def _expand(
+async def expand(
     db: Any, event_ids: Sequence[uuid.UUID], start: datetime, end: datetime
 ) -> list[Occurrence]:
     """The occurrences read over ``[start, end)`` for these events, chunked; cancelled ones
@@ -184,7 +199,7 @@ async def _followers(
     return rows[:limit], int(total)  # type: ignore[return-value]
 
 
-def _moved_from(occ: Occurrence) -> datetime | None:
+def moved_from(occ: Occurrence) -> datetime | None:
     original = occ.original_start
     return original if original is not None and original != occ.start else None
 
@@ -206,19 +221,24 @@ async def candidates(
     total = 0
     for lead in sorted(in_use):
         lo, hi = due.start_window(now, lead)
-        revisions = await _followed_events(db, lead, lo, hi)
+        revisions = await followed_events(db, lead, lo, hi)
         if not revisions:
             continue
         by_event: dict[uuid.UUID, list[Occurrence]] = defaultdict(list)
-        for occ in await _expand(db, list(revisions), lo, hi):
+        for occ in await expand(db, list(revisions), lo, hi):
             if occ.event_id in revisions and lo <= occ.start < hi:
                 by_event[occ.event_id].append(occ)
         if not by_event:
             continue
         rows, count = await _followers(db, lead, by_event, cap)
         total += count
+        handled = await ledger_keys(
+            db, lead, list(by_event), lo, hi, reclaimable_before=now - REMINDER_CLAIM_LEASE
+        )  # already sent, failed or in flight: nothing left to do, so no render and no claim
         for event_id, user_id, locale in rows:
             for occ in by_event[event_id]:
+                if (event_id, occ.key, occ.start, user_id) in handled:
+                    continue
                 found.append(
                     Candidate(
                         event_id,
@@ -229,7 +249,7 @@ async def candidates(
                         lead,
                         user_id,
                         locale,
-                        _moved_from(occ),
+                        moved_from(occ),
                     )
                 )
     found.sort(key=lambda c: (c.due, c.event_id, c.user_id))
@@ -256,7 +276,7 @@ async def next_starts(
         step = _SERIES_CHUNK if wanted is not None else 1
         for i in range(0, len(pending), step):
             ids = [e.id for e in pending[i : i + step]]
-            for occ in await _expand(db, ids, now, now + horizon):
+            for occ in await expand(db, ids, now, now + horizon):
                 if occ.event_id in out and occ.start > now:
                     out[occ.event_id].append(occ.start)
     for starts in out.values():

@@ -104,8 +104,15 @@ async def test_their_save_leaves_the_form_untouched_and_cannot_change_it(db, cal
             await _patch(db, event, BOB, registration=body)
         await db.refresh(event)
     assert event.registration_target == SECRET_TARGET
-    # the stored target sent back as is, by someone who cannot read it, is not a change of form
-    await _patch(db, event, BOB, registration=reg(SECRET_TARGET, capacity=11))
-    assert event.registration_capacity == 11 and event.registration_target == SECRET_TARGET
+    # The stored target sent back by someone who cannot read it is refused exactly like a wrong
+    # one: accepting it would tell a guesser that the guess is the hidden form's key.
+    guesses = []
+    for key in (SECRET_TARGET, "no-such-form", OPEN_TARGET):
+        with pytest.raises(UnknownRegistrationTarget) as refused:
+            await _patch(db, event, BOB, registration=reg(key, capacity=11))
+        guesses.append((type(refused.value), str(refused.value), refused.value.status_code))
+        await db.refresh(event)
+    assert len(set(guesses)) == 1, guesses  # one answer for right-but-unreadable and wrong
+    assert event.registration_capacity == 9 and event.registration_target == SECRET_TARGET
     await _patch(db, event, ALICE, registration={"mode": "none"})  # alice may
     assert event.registration_mode == "none"

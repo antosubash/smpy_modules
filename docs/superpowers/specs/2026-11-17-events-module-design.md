@@ -511,3 +511,21 @@ optional `pagebuilder` extra, from `pagebuilder-blocks.ts` (17), which amends "e
 extra" to mean no pagebuilder Python for the blocks. The blocks read three anonymous routes at the fixed path
 `/api/events/public/` (18), by calendar slug (19), the pickers read the same anonymous route (20), and a block
 fetches at request time and stores no snapshot, so a calendar that stops being public shows nothing.
+
+## Amendments (PR 8)
+
+The approved PR 8 rulings refine "Reminders" above. A follow is on the **whole event**, never one occurrence
+(1). The ledger key is `(tenant, event, occurrence_key, starts_at, recipient, lead)`, so a moved occurrence is
+reminded once at its new time and moving back sends nothing (2). Calendars carry their own default lead times
+in a nullable column (3). The control is **console only** (the detail popover and the editor); the public pages
+carry none and stay cacheable (10). A reminder is due at start minus lead as an exact duration; an all-day event
+starts at local midnight of its zone; a grace window per lead bounds a late beat and a stale reminder is never
+sent (14). The worker has no user directory, membership store or permission registry (upstream #1005), so it
+builds the host app headless; its principal never grants more than a request principal, and a user it cannot
+establish rights for is told in the request, never silently (18, amended). The ledger has four states
+(`claimed`, `sending`, `sent`, `failed`): only a `claimed` row that never reached the transport may be reclaimed
+(20, amended). A failed send is final (21). No cancel or reschedule notices (#401) (26). Delivery is covered by
+the Python suite and `scripts/bg_tasks_smoke.py`, not a browser spec, because the e2e host runs tasks eagerly on
+the console mail transport and the plan has no dev-only tick hook (32). Found in the browser: the live host
+settings (`app.state.host`), not the boot snapshot, hold a freshly saved `public_base_url`.
+

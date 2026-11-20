@@ -80,7 +80,7 @@ async def update_calendar(db: Any, cal: Calendar, data: CalendarPatch) -> Calend
     fields = data.model_dump(exclude_unset=True)
     if fields.get("default_reminder_minutes") is not None:
         fields["default_reminder_minutes"] = list(
-            leads.validate_distinct(fields["default_reminder_minutes"])
+            leads.validate_leads(fields["default_reminder_minutes"])
         )
     new_slug = fields.get("slug")
     if new_slug is not None:

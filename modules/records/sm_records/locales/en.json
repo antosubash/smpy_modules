@@ -727,7 +727,8 @@
   },
   "menu": {
     "all_types": "All record types",
-    "group_records": "Records"
+    "group_records": "Records",
+    "my_registrations": "My registrations"
   },
   "public_submissions": {
     "card_title": "Website submissions",
@@ -837,7 +838,7 @@
         "page": "The event page:",
         "ics": "Add it to your calendar:",
         "confirm": "Confirm your registration:",
-        "expiry": "This link works until {expires}. If you did not register, ignore this email: the seat is released by itself.",
+        "expiry": "This link works until {expires}. If you did not register, ignore this email: nothing happens and you will not hear from us again.",
         "cancel": "Cannot come? Cancel your registration here:",
         "why": "You get this email because this address was entered in a registration form on {site}.",
         "intro_already": "You are already registered for {title} on {site}. Nothing else is needed.",
@@ -845,7 +846,6 @@
         "notice_subject": "Your registration for {title}",
         "notice_full": "{title} on {site} is fully booked, so your registration could not be saved.",
         "notice_closed": "Registration for {title} on {site} is closed, so your registration could not be saved.",
-        "notice_busy": "Many people are registering for {title} on {site} right now, so your registration could not be saved. Please try again later.",
         "notice_why": "You get this email because this address was entered in a registration form on {site}. Nothing was saved."
       }
     },
@@ -859,6 +859,17 @@
         "done": "Thank you. Your subscription is confirmed.",
         "already": "Your subscription was already confirmed. There is nothing else to do.",
         "expired": "This link has expired or is no longer valid. Sign up again on the website to get a new one."
+      },
+      "confirm_registration": {
+        "title": "Confirm your registration",
+        "intro": "Press the button to confirm your registration and take your seat.",
+        "button": "Confirm registration",
+        "done": "Thank you. Your registration is confirmed.",
+        "already": "Your registration was already confirmed. There is nothing else to do.",
+        "expired": "This link has expired or is no longer valid. Register again on the website to get a new one.",
+        "full": "Sorry, this event is now fully booked, so your registration could not be confirmed. Nothing was saved.",
+        "closed": "Sorry, registration for this event has closed, so your registration could not be confirmed. Nothing was saved.",
+        "busy": "Registrations are busy right now. Please press the button again in a moment."
       },
       "unsubscribe": {
         "title": "Unsubscribe",
@@ -911,23 +922,65 @@
     },
     "errors": {
       "form_expired": "This form has expired. Reload the page and try again.",
-      "rate_limited": "Too many attempts. Please wait {seconds} seconds and try again.",
+      "rate_limited": "Too many attempts. Please wait about {minutes} minutes and try again.",
+      "rate_limited_one": "Too many attempts. Please wait about 1 minute and try again.",
       "captcha_failed": "Please complete the security check and try again.",
       "captcha_unavailable": "The security check isn't available right now. Please try again in a few minutes.",
       "bad_origin": "This form can only be sent from this website.",
       "network": "That didn't work. Check your connection and try again.",
-      "generic": "Something went wrong. Please try again later."
+      "generic": "Something went wrong. Please try again later.",
+      "registration_full": "This event is now fully booked. Nothing was saved.",
+      "registration_closed": "Registration for this event has closed. Nothing was saved.",
+      "event_unavailable": "Registration for this event is no longer available. Nothing was saved.",
+      "seats_busy": "Registrations are busy right now. Please try again in a moment."
     },
     "system_values": {
       "sm_status": {
         "pending": "Pending confirmation",
         "confirmed": "Confirmed",
-        "unsubscribed": "Unsubscribed"
+        "unsubscribed": "Unsubscribed",
+        "registered": "Registered",
+        "cancelled": "Cancelled"
       },
       "sm_spam": {
         "links": "Too many links",
         "manual": "Marked by hand"
       }
+    },
+    "registration": {
+      "panel": {
+        "heading": "Register",
+        "for_event": "Registering for {title}",
+        "loading": "Loading registration...",
+        "submit": "Register",
+        "success_title": "Thank you",
+        "success_pending": "Check your inbox to confirm your registration.",
+        "success_registered": "Thank you, your registration is in. We sent the details to your inbox.",
+        "state_full": "This event is fully booked.",
+        "state_closed": "Registration for this event is closed.",
+        "state_cancelled": "This event has been cancelled.",
+        "state_not_open": "Registration opens {time}.",
+        "state_unavailable": "Registration for this event is no longer available.",
+        "few_left": "Only a few seats left.",
+        "seats_left": "{count} seats left.",
+        "seats_left_one": "1 seat left."
+      }
+    },
+    "form_labels": {
+      "sm_email": "Email",
+      "sm_name": "Name"
+    },
+    "system_labels": {
+      "sm_status": "Sign-up status",
+      "sm_event_title": "Event",
+      "sm_event_id": "Event ID",
+      "sm_occurrence_key": "Date key",
+      "sm_occurrence_start": "Event date",
+      "sm_email": "Email",
+      "sm_name": "Name",
+      "sm_confirmed_at": "Confirmed on",
+      "sm_cancelled_at": "Cancelled on",
+      "sm_consent_at": "Consent given"
     }
   },
   "events": {
@@ -957,6 +1010,38 @@
     },
     "detail": {
       "open_record": "Open record"
+    },
+    "registration": {
+      "label": "Registration form",
+      "choose": "Choose a form...",
+      "loading": "Loading registration forms...",
+      "load_failed": "The registration forms could not be loaded.",
+      "retry": "Try again",
+      "switched_off": "This form is switched off, so nobody can register through it yet.",
+      "no_double_opt_in": "This form has no confirmation step: anyone can take seats without confirming an address, so a limited number of seats can be filled by one person. Switch on double opt-in for this form. A captcha is also recommended for public registration with limited seats.",
+      "attendees": "Open the attendee list",
+      "create": "Create a registration form",
+      "creating": "Creating...",
+      "create_failed": "The form could not be created.",
+      "captcha_hint": "Limited seats on a public form: we recommend turning on a captcha for the registration form's site (Settings), so a script cannot use up the form's submit limit."
+    },
+    "mine": {
+      "title": "My registrations",
+      "intro": "The events you are registered for, or have yet to confirm.",
+      "empty": "You have no upcoming registrations.",
+      "unverified": "Your email address is not verified yet, so your registrations cannot be shown. Verify it first.",
+      "pending": "Waiting for your confirmation",
+      "registered": "Registered",
+      "cancel": "Cancel registration",
+      "cancel_confirm": "Cancel this registration? Your seat goes to someone else.",
+      "cancel_yes": "Yes, cancel",
+      "cancel_no": "Keep it",
+      "cancelled": "Registration cancelled.",
+      "cancel_failed": "The registration could not be cancelled. Please try again.",
+      "load_failed": "Your registrations could not be loaded.",
+      "retry": "Try again",
+      "loading": "Loading...",
+      "gone": "This event is no longer available."
     }
   }
 }

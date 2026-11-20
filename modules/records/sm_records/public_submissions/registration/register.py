@@ -12,12 +12,15 @@ The order, in one transaction (the global lock order is documented in
    cancelled occurrence refuse everyone alike (``event_unavailable``, ``registration_closed``);
 2. the payload is validated, the same way for everyone, before anything is looked up;
 3. the type lock, then a look for a live registration of the same address for the same occurrence:
-   found, the answer is the same 202 (a pending one is mailed again within the address's budget, a
-   registered one is mailed nothing), so the form is no oracle for who is registered, and the
-   capacity decision below is never reached by somebody who already holds a seat;
+   found, the answer is the same 202 (a pending one is mailed its confirmation again, a registered
+   one an "already registered" mail with a cancel link; both within the address's own budget of
+   3 mails a day per form, after which nothing is sent and the answer is still the same 202), so
+   the form is no oracle for who is registered, and the capacity decision below is never reached
+   by somebody who already holds a seat;
 4. otherwise the record is created (a draft, written by nobody, with its ``sm_*`` values through
-   ``system=``), then ``admit`` takes the seat on the same session: a refusal (``registration_full``
-   and the rest) is raised, and the route's rollback leaves no record and no seat.
+   ``system=``), then, on a single opt-in form only, ``admit`` takes the seat on the same session
+   (a double opt-in form takes it at the confirmation): a refusal (``registration_full`` and the
+   rest) is raised, and the route's rollback leaves no record and no seat.
 """
 
 from __future__ import annotations
@@ -42,7 +45,8 @@ from sm_records.public_submissions.definition import (
     page_locale,
 )
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.public_submissions.registration import holds, mail, seats
+from sm_records.public_submissions.registration import codes, mail, notice_mail, seats
+from sm_records.public_submissions.registration.status import LIVE, PENDING, REGISTERED
 from sm_records.public_submissions.registration.tokens import RegistrationToken
 from sm_records.public_submissions.subscribe import normalise
 from sm_records.public_submissions.tokens import host_secret, ip_hash
@@ -54,29 +58,22 @@ from sm_records.records.services._payload import carry_system, field_defs, valid
 from sm_records.records.services.errors import Conflict, ValidationFailed
 from sm_records.schema._text_checks import checked
 
-__all__ = ["PENDING", "REGISTERED", "register"]
+__all__ = ["register"]
 
-PENDING = "pending"
-REGISTERED = "registered"
 NAME_KEY = "sm_name"
-_REFUSED = {
-    "registration_full": "this event is fully booked",
-    "registration_closed": "registration for this event is closed",
-    "event_unavailable": "this event is no longer available",
-}
 
 
 def _refuse(code: str) -> SubmissionRefused:
-    return SubmissionRefused(code, _REFUSED[code])
+    return SubmissionRefused(code, codes.TABLE[code].message)
 
 
 def _availability_refusal(state: str) -> str | None:
     if state == "unavailable":
-        return "event_unavailable"
+        return codes.EVENT_UNAVAILABLE
     if state in ("cancelled", "closed", "not_open_yet"):
-        return "registration_closed"
+        return codes.REGISTRATION_CLOSED
     if state == "full":  # the same for everyone, a registered person included
-        return "registration_full"
+        return codes.REGISTRATION_FULL
     return None
 
 
@@ -154,7 +151,7 @@ async def _live_registration(
         return None
     stmt = select(cls).where(cls.id.in_(ids), cls.tenant_id == tenant, cls.type_id == rtype.id)
     for record in (await db.execute(stmt)).scalars():
-        if (record.data or {}).get("sm_status") in (PENDING, REGISTERED):
+        if (record.data or {}).get("sm_status") in LIVE:
             return record
     return None
 
@@ -165,13 +162,6 @@ class _Declined(Exception):  # noqa: N818 - control flow inside the savepoint
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
-
-
-_NOTICE = {
-    "registration_full": "full",
-    "registration_closed": "closed",
-    "event_unavailable": "closed",
-}
 
 
 async def _discard(db: AsyncSession) -> None:
@@ -223,22 +213,17 @@ async def register(
     with checked(verdicts):
         _check(rtype, data, fresh, settings)
         await lock_type(db, rtype)
-        pending = await holds.expire_pending(db, rtype, token, settings)
+        # A seat is taken at submit only where nothing later can attach it (single opt-in); on a
+        # double opt-in form it is taken at the confirmation, so a submit never moves a count.
+        takes_seat = fresh["sm_status"] == REGISTERED
         existing = await _live_registration(db, rtype, email, token)
         if existing is not None:
-            # Same locks and reads as a new registration: an idempotent admit for its own seat.
-            await integration.admit(
-                db,
-                tenant_id=tenant,
-                event_id=token.event_id,
-                occurrence_key=token.occurrence_key,
-                target=rtype.key,
-                holder=existing.uuid,
-            )
             was_pending = (existing.data or {}).get("sm_status") == PENDING
+            # No ``admit`` here, whatever the mode: a pending record takes its seat only through
+            # its confirmation and a registered one already holds its seat. So nothing on this
+            # branch can raise ``seats_busy`` that a new address would not, and the public answer
+            # for an address that already registered is always the uniform 202.
             outcome = ("registration" if was_pending else "already", existing)
-        elif fresh["sm_status"] == PENDING and len(pending) >= holds.pending_cap(avail.capacity):
-            outcome = ("busy", None)
         else:
             try:
                 record = await record_service.create_record(
@@ -250,30 +235,33 @@ async def register(
                     actor=None,
                     system=fresh,
                 )
-                given = await integration.admit(
-                    db,
-                    tenant_id=tenant,
-                    event_id=token.event_id,
-                    occurrence_key=token.occurrence_key,
-                    target=rtype.key,
-                    holder=record.uuid,
-                    locale=lang,
-                )
-                if not given.admitted:
-                    raise _Declined(given.code or "event_unavailable")
+                if takes_seat:
+                    given = await seats.admit(
+                        db,
+                        tenant_id=tenant,
+                        event_id=token.event_id,
+                        occurrence_key=token.occurrence_key,
+                        target=rtype.key,
+                        holder=record.uuid,
+                        locale=lang,
+                    )
+                    if not given.admitted:
+                        raise _Declined(codes.known(given.code))
                 outcome = ("registration", record)
             except ValidationFailed as exc:
                 raise SubmissionRefused("invalid", exc.detail, errors=exc.errors) from exc
+            except seats.SeatsBusy:
+                raise  # try again: not a conflict of the record
             except Conflict as exc:
                 raise SubmissionRefused("conflict", exc.detail) from exc
             except _Declined as declined:
                 await _discard(db)  # nothing is stored, and nothing announces a record
                 await db.refresh(rtype)  # the rollback expired it; the mail below reads it
-                outcome = (_NOTICE[declined.code], None)
+                outcome = (codes.TABLE[declined.code].notice, None)
     kind, record = outcome
     if await budget_wait(request, rtype, email, settings) != 0:
         return  # over the address's own budget: still the one 202, nothing sent
     if record is not None:
         await mail.queue_registration_mail(db, request, rtype, record, avail.event, kind=kind)
     else:
-        await mail.queue_notice_mail(db, request, rtype, email, avail.event, kind, lang)
+        await notice_mail.queue_notice_mail(db, request, rtype, email, avail.event, kind, lang)

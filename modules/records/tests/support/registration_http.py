@@ -115,7 +115,10 @@ async def register(
 ):
     event = event or client.event  # type: ignore[attr-defined]
     if token is None:
-        loaded = (await load_registration(client, event, key)).json()
+        # The form's digest covers its labels, which follow the language: load it in the language
+        # the submit will name.
+        query = {"locale": body["locale"]} if "locale" in body else {}
+        loaded = (await load_registration(client, event, key, **query)).json()
         token = loaded["definition"]["token"]
     payload = {
         "data": {"sm_email": address, "sm_name": name, **(data or {})},
@@ -134,7 +137,9 @@ async def regs(client: AsyncClient, key: str = TYPE, *, trashed: bool = False) -
     return resp.json()["items"]
 
 
-LINK = __import__("re").compile(r"https://site\.example/records/submissions/(confirm|cancel)\?\S+")
+LINK = __import__("re").compile(
+    r"https://site\.example/records/submissions/(confirm-registration|confirm|cancel)\?\S+"
+)
 
 
 def reg_links(message: Any) -> dict[str, dict[str, str]]:
@@ -144,7 +149,8 @@ def reg_links(message: Any) -> dict[str, dict[str, str]]:
     out: dict[str, dict[str, str]] = {}
     for match in LINK.finditer(message.text):
         query = parse_qs(urlsplit(match.group(0)).query)
-        out[match.group(1)] = {name: values[0] for name, values in query.items()}
+        action = match.group(1).removesuffix("-registration")  # the page, not the action
+        out[action] = {name: values[0] for name, values in query.items()}
     return out
 
 
@@ -184,3 +190,41 @@ async def seat_counts(site: Any) -> tuple[int, int]:
 
 def record_url(uuid: str, tail: str = "", key: str = TYPE) -> str:
     return f"/api/records/types/{key}/records/{uuid}{tail}"
+
+
+SECRET = "submissions-test-secret"
+
+
+async def confirm_link_for(site: Any, record: dict) -> str:
+    """A confirm link for ``record``, minted the way the mail does (the host's secret)."""
+    import time
+
+    from sm_records.public_submissions import links
+
+    return links.sign(
+        SECRET,
+        links.CONFIRM,
+        tenant="default",
+        type_key=TYPE,
+        uuid=record["uuid"],
+        nonce=record["data"]["sm_nonce"],
+        exp=int(time.time()) + 3600,
+    )
+
+
+async def confirm_record(site: Any, record: dict):
+    """POST the record's confirm link, as the confirm page does."""
+    return await follow(site, "confirm", await confirm_link_for(site, record))
+
+
+async def register_confirmed(site: Any, address: Any = ADDRESS, **kw: Any):
+    """Register, and confirm if the form is double opt-in (the seat is taken at the confirmation).
+    Returns the registration's own response."""
+    resp = await register(site, address, **kw)
+    assert resp.status_code == 202, resp.text
+    email = address.strip().lower()
+    record = next(r for r in await regs(site) if r["data"]["sm_email"] == email)
+    if record["data"]["sm_status"] == "pending":
+        got = await confirm_record(site, record)
+        assert got.status_code == 200, got.text
+    return resp

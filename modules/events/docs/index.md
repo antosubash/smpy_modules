@@ -411,7 +411,7 @@ The module is complete: ten parts, delivered in order, each with its own guide.
 | 6 | The extension registry, the plugin guide and the records date-field source | [Writing a plugin](extensions.md) | #421 |
 | 7 | Pagebuilder blocks and the newsletter event card | [Blocks and cards](blocks.md) | #424 |
 | 8 | Reminders | [Reminders](reminders.md) | #425 |
-| 9 | Registration through records | [Registration](registration.md) | this stack |
+| 9 | Registration through records | [Registration](../../records/docs/registration.md) | this stack |
 | 10 | External ICS subscriptions: a calendar shows another calendar read-only | [Subscriptions](subscriptions.md) | this stack |
 
 ## Subscriptions
@@ -428,3 +428,19 @@ a table the tests check, failure codes, and secrets.
 
 [Pagebuilder blocks and the card contract](blocks.md): the `UpcomingEvents` and `EventsCalendar` blocks,
 their anonymous routes and bounds, and `sm_events.contracts.cards` for newsletter.
+
+## Registration
+
+An event can offer registration in three ways: none, a link to another site (`external`), or
+`builtin` through a registration provider (records ships `records:registration`). The seat
+accounting is events': a capacity, a window, and an atomic counter per occurrence that can never
+oversell. The editor's Registration section sets the mode, the provider's form, the seats, the
+window (wall clock in the event's zone), whether the public page shows the remaining seats, and
+a reminder lead for registrants; a saved event shows the seats taken per date (counts, never
+people). The public event page carries a cached, seat-free `registration` prop (where to register
+and which occurrence); the provider's panel asks its own route live. A form cannot change, and a
+date cannot disappear, while somebody holds a seat there (`registration_has_seats`,
+`registrations_orphaned`). The provider contract is `sm_events.contracts.registration` (admit,
+release, describe, summaries, seat holders); see `modules/records/docs/registration.md` for the
+people side.
+

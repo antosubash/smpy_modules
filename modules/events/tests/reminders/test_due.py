@@ -7,7 +7,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from sm_events.calendar.times import localize, to_span
-from sm_events.reminders import due, limits
+from sm_events.core.constants import reminders_limits as limits
+from sm_events.reminders import due
 
 NOW = datetime(2026, 7, 1, 8, tzinfo=UTC)
 

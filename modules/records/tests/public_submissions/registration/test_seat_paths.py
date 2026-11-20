@@ -15,7 +15,7 @@ from tests.support.registration_http import (
     record_url,
     reg_config,
     reg_fields,
-    register,
+    register_confirmed,
     regs,
     seat_counts,
     seed_event,
@@ -35,8 +35,8 @@ def _quiet_mail(monkeypatch):
 
 
 async def two_registered(site):
-    assert (await register(site, "a@example.org")).status_code == 202
-    assert (await register(site, "b@example.org")).status_code == 202
+    assert (await register_confirmed(site, "a@example.org")).status_code == 202
+    assert (await register_confirmed(site, "b@example.org")).status_code == 202
     items = await regs(site)
     assert await seat_counts(site) == (2, 2)
     return sorted(items, key=lambda r: r["data"]["sm_email"])
@@ -136,7 +136,7 @@ async def test_cascade_trash_releases(reg_site):
         "/api/records/types/people/records", json={"data": {"name": "Pat"}}, **A
     )
     assert person.status_code == 201, person.text
-    await register(reg_site, "a@example.org")
+    await register_confirmed(reg_site, "a@example.org")
     (record,) = await regs(reg_site)
     link = await reg_site.put(
         record_url(record["uuid"]),
@@ -160,7 +160,7 @@ def reg_fields_with_person():
 
 
 async def test_mark_as_spam_is_not_a_registration_action(reg_site):
-    await register(reg_site, "a@example.org")
+    await register_confirmed(reg_site, "a@example.org")
     (record,) = await regs(reg_site)
     got = await reg_site.post(record_url(record["uuid"], "/submission/spam"), **A)
     assert (got.status_code, got.json()["code"]) == (409, "wrong_kind")
@@ -168,7 +168,7 @@ async def test_mark_as_spam_is_not_a_registration_action(reg_site):
 
 
 async def test_restore_readmits(reg_site):
-    await register(reg_site, "a@example.org")
+    await register_confirmed(reg_site, "a@example.org")
     (record,) = await regs(reg_site)
     await trash_one(reg_site, record["uuid"])
     assert await seat_counts(reg_site) == (0, 0)
@@ -183,10 +183,10 @@ async def test_restore_readmits(reg_site):
 async def test_restore_refused_when_full(reg_site):
     event = await seed_event(reg_site.db_state, uid="cap@x", registration_capacity=1)
     tokens = [await _token(reg_site, event) for _ in range(2)]
-    await register(reg_site, "a@example.org", event=event, token=tokens[0])
+    await register_confirmed(reg_site, "a@example.org", event=event, token=tokens[0])
     (first,) = await regs(reg_site)
     await trash_one(reg_site, first["uuid"])
-    await register(reg_site, "b@example.org", event=event, token=tokens[1])
+    await register_confirmed(reg_site, "b@example.org", event=event, token=tokens[1])
     assert await seat_counts(reg_site) == (1, 1)
     got = await reg_site.post(record_url(first["uuid"], "/restore"), **A)
     assert (got.status_code, got.json()["code"]) == (409, "registration_full")
@@ -203,7 +203,7 @@ async def _token(site, event):
 async def test_restore_refused_when_the_event_is_gone(reg_site):
     from sm_events.models import Event
 
-    await register(reg_site, "a@example.org")
+    await register_confirmed(reg_site, "a@example.org")
     (record,) = await regs(reg_site)
     await trash_one(reg_site, record["uuid"])
     with tenant_scope("default"):
@@ -216,7 +216,7 @@ async def test_restore_refused_when_the_event_is_gone(reg_site):
 
 
 async def test_a_cancelled_registration_restores_without_a_seat(reg_site):
-    await register(reg_site, "a@example.org")
+    await register_confirmed(reg_site, "a@example.org")
     (record,) = await regs(reg_site)
     await reg_site.post(record_url(record["uuid"], "/submission/cancel"), **A)
     await trash_one(reg_site, record["uuid"])
@@ -255,7 +255,7 @@ async def test_a_busy_release_is_try_again_everywhere(reg_site, monkeypatch):
     from sm_events.contracts import registration as contract
     from sm_events.core.errors_registration import SeatsBusy
 
-    await register(reg_site, "a@example.org")
+    await register_confirmed(reg_site, "a@example.org")
     (record,) = await regs(reg_site)
 
     async def busy(*_a, **_k):
@@ -271,4 +271,4 @@ async def test_a_busy_release_is_try_again_everywhere(reg_site, monkeypatch):
         got = await call
         assert got.status_code == 409, got.text
     (still,) = await regs(reg_site)
-    assert still["data"]["sm_status"] == "pending" and await seat_counts(reg_site) == (1, 1)
+    assert still["data"]["sm_status"] == "registered" and await seat_counts(reg_site) == (1, 1)

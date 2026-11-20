@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { expect, type Page } from '@playwright/test';
 
 import { moduleCsrfHeader } from './helpers';
@@ -44,6 +47,8 @@ export type EventSeed = {
   description?: string;
   /** A sub-event of this event (same calendar, not recurring). */
   parent?: string;
+  /** A path on the site (an image of the media library): off-site images are refused. */
+  image?: string;
   /** More languages: `{ de: { title: 'Konzert' } }`. */
   texts?: Record<string, { title: string; slug?: string }>;
 };
@@ -62,6 +67,7 @@ export async function postEvent(page: Page, seed: EventSeed): Promise<CreatedEve
       },
       rrule: seed.rrule ?? null,
       venue_name: seed.venue ?? null,
+      image: seed.image ?? null,
       parent_id: seed.parent ?? null,
       texts: {
         ...seed.texts,
@@ -94,6 +100,22 @@ export async function publishEvent(
   });
   expect(approve.status(), await approve.text()).toBe(200);
   return ((await approve.json()) as { revision: number }).revision;
+}
+
+/** An image in the media library (the site's own origin, so the pages' policy lets it load): the
+ *  path an event's `image` takes. */
+export async function uploadSiteImage(page: Page): Promise<string> {
+  const png = readFileSync(fileURLToPath(new URL('./fixtures/hero-1024x768.png', import.meta.url)));
+  const headers = await moduleCsrfHeader(page, '/pagebuilder/');
+  const res = await page.request.post('/api/pagebuilder/uploads', {
+    headers,
+    multipart: { file: { name: 'studio.png', mimeType: 'image/png', buffer: png } },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+  const asset = (await res.json()) as { url?: string; public_url?: string };
+  const url = asset.url ?? asset.public_url ?? '';
+  expect(url.startsWith('/'), `a site path, got ${url}`).toBe(true);
+  return url;
 }
 
 export type ApiOccurrence = { original_start: string | null; start: string };

@@ -56,6 +56,32 @@ export type SourceRegistration = {
   SettingsSection?: LazyComponent<SourceSettingsProps>;
   PublicDetail?: LazyComponent<PublicDetailProps>;
 };
+/** A registration provider's section of the event editor: it picks the provider's own target (a
+ *  form's key) and is shown only for an event whose mode is built-in. `capacity` is the event's
+ *  seat limit as typed (`null`: unlimited), so the provider can warn about a form that cannot
+ *  guard it. */
+export type RegistrationEditorProps = Readonly<{
+  target: string | null;
+  onChange: (target: string | null) => void;
+  eventId: string | null;
+  capacity: number | null;
+  readOnly: boolean;
+  /** The server's messages under `registration.` (`target`). */
+  errors: Readonly<Record<string, string>>;
+}>;
+/** What a public event page hands a provider's panel: the target it registered, the event and
+ *  the occurrence (never a request header or a viewer), and the page's language. */
+export type RegistrationPanelProps = Readonly<{
+  typeKey: string;
+  eventId: string;
+  occurrenceKey: string;
+  locale: string;
+}>;
+export type RegistrationRegistration = {
+  id: string;
+  EditorSection?: LazyComponent<RegistrationEditorProps>;
+  PublicPanel?: LazyComponent<RegistrationPanelProps>;
+};
 export type ToolbarSurface = 'console' | 'public';
 export type ToolbarItemRegistration = {
   id: string;

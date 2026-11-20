@@ -157,6 +157,9 @@ MAX_RANGE_DAYS = 366
 # A path number and an occurrence's original start: what a signed 32-bit column holds and
 # the years a calendar means (a bound keeps ``+ 1 microsecond`` and zone maths in range).
 INT32_MAX = 2**31 - 1
+PAGE_MAX = 10_000
+"""The highest page number a list takes: ``(page - 1) * page_size`` stays far inside every
+integer column and OFFSET, on SQLite and Postgres."""
 ORIGINAL_START_MIN_YEAR = 1900
 ORIGINAL_START_MAX_YEAR = 9000
 MAX_OCCURRENCES = 2000
@@ -230,6 +233,8 @@ INVALID_RANGE_DETAIL = "The range must end after it starts"
 RANGE_TOO_LONG_CODE = "range_too_long"
 RANGE_TOO_LONG_DETAIL = "The range is longer than the allowed maximum"
 DEFAULT_LOCALE_REQUIRED_CODE = "default_locale_required"
+IMAGE_OFF_SITE_CODE = "image_off_site"
+IMAGE_OFF_SITE_DETAIL = "Use an image from this site's media library"
 UNKNOWN_CATEGORY_CODE = "unknown_category"
 UNKNOWN_CATEGORY_DETAIL = "That category does not exist"
 UNKNOWN_TYPE_CODE = "unknown_type"

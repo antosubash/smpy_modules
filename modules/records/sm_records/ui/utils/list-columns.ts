@@ -79,7 +79,8 @@ export type ResolvedColumns = {
   truncated: number;
 };
 
-type ColumnType = Pick<TypeRead, 'fields'> & Partial<Pick<TypeRead, 'display_field'>>;
+type ColumnType = Pick<TypeRead, 'fields'> &
+  Partial<Pick<TypeRead, 'display_field'>> & { public_submissions?: { kind?: string } | null };
 
 /** Everything the chooser can offer for a type, envelope first. Language is
  *  offered only where the list shows language UI at all. The display field
@@ -118,6 +119,14 @@ export function defaultColumnKeys(
   showLocale: boolean,
   withMedia = true,
 ): string[] {
+  if (type.public_submissions?.kind === 'registration') {
+    // A registration is read by who and for what: its own status (pending, registered,
+    // cancelled), the event and the date. The generic Draft/Published status says nothing here and
+    // the event's id is not readable.
+    const have = new Set(type.fields.map((field) => field.key));
+    const keys = ['sm_status', 'sm_event_title', 'sm_occurrence_start'].filter((k) => have.has(k));
+    return [...keys, 'updated_at'];
+  }
   const fields = listColumns(type).map((field) => field.key);
   const media = withMedia ? firstMediaField(type) : null;
   if (media) fields.push(media.key);

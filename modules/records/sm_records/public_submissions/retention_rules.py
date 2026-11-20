@@ -6,7 +6,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final
 
-from sm_records.contracts.public_submissions import KIND_FORM, KIND_REGISTRATION
+from sm_records.contracts.public_submissions import (
+    DEFAULT_PENDING_HOLD_HOURS,
+    KIND_FORM,
+    KIND_REGISTRATION,
+)
 from sm_records.models import RecordType
 
 __all__ = ["PENDING", "days_for", "still_due", "window_for"]
@@ -25,7 +29,7 @@ def window_for(config: dict[str, Any]) -> timedelta | None:
     never is: the candidate query's cutoff. A registration is due when its pending hold runs out or,
     with ``retention_days``, that long after its occurrence (which is never before it was made)."""
     if config.get("kind") == KIND_REGISTRATION:
-        hold = timedelta(hours=int(config.get("pending_hold_hours", 24) or 24))
+        hold = timedelta(hours=int(config.get("pending_hold_hours") or DEFAULT_PENDING_HOLD_HOURS))
         days = int(config.get("retention_days", 365) or 0)
         return min(hold, timedelta(days=days)) if days > 0 else hold
     days = days_for(config)
@@ -70,7 +74,7 @@ def _registration_due(config: dict[str, Any], record: Any, now: datetime) -> boo
     created = _moment(record.created_at) if record.created_at else None
     if data.get("sm_status") == PENDING:
         entered = (_moment(data["sm_consent_at"]) if data.get("sm_consent_at") else None) or created
-        hold = timedelta(hours=int(config.get("pending_hold_hours", 24) or 24))
+        hold = timedelta(hours=int(config.get("pending_hold_hours") or DEFAULT_PENDING_HOLD_HOURS))
         return entered is not None and entered + hold < now
     days = int(config.get("retention_days", 365) or 0)
     if days <= 0:

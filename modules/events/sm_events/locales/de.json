@@ -50,7 +50,8 @@
     "event": "Veranstaltung",
     "picker": "Typ",
     "current": "Typ: {name}",
-    "not_installed": "Der Typ dieser Veranstaltung ist auf diesem Server nicht installiert. Die zusätzlichen Angaben bleiben unverändert und können hier nicht geändert werden."
+    "not_installed": "Der Typ dieser Veranstaltung ist auf diesem Server nicht installiert. Die zusätzlichen Angaben bleiben unverändert und können hier nicht geändert werden.",
+    "loading_section": "Felder des Veranstaltungstyps werden geladen ..."
   },
   "calendars": {
     "title": "Kalender",
@@ -133,6 +134,7 @@
     "range_too_long": "Der Zeitraum ist zu lang.",
     "invalid_range": "Das Ende des Zeitraums muss nach seinem Beginn liegen.",
     "unknown_category": "Diese Kategorie gibt es nicht mehr.",
+    "image_off_site": "Dieses Bild liegt auf einer anderen Website und lässt sich auf den öffentlichen Seiten nicht laden. Verwenden Sie ein Bild aus der Medienbibliothek dieser Website.",
     "unknown_type": "Diese Art von Veranstaltung wird nicht unterstützt.",
     "invalid_parent": "Die übergeordnete Veranstaltung muss zum selben Kalender gehören und darf weder selbst eine Unterveranstaltung noch eine Serie sein.",
     "immutable_field": "Kalender und übergeordnete Veranstaltung lassen sich nicht ändern.",
@@ -160,11 +162,27 @@
     "import_too_large": "Die Datei ist größer als das Importlimit.",
     "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus.",
     "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut.",
-    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben. Beende zuerst eine. Entferne zuerst eine unter Erinnerungen; Veranstaltungen, die du nicht mehr sehen kannst, stehen dort ebenfalls.",
+    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben: entferne zuerst eine (Veranstaltungen, die du nicht mehr sehen kannst, stehen dort ebenfalls).",
     "not_published": "Nur veröffentlichte Veranstaltungen können erinnern.",
     "invalid_lead": "Wähle einen der angebotenen Erinnerungszeitpunkte.",
     "reminders_unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
-    "reminders_no_access": "Für diese Veranstaltung können mit deinen aktuellen Zugriffsrechten keine Erinnerungen gesendet werden."
+    "reminders_no_access": "Für diese Veranstaltung können mit deinen aktuellen Zugriffsrechten keine Erinnerungen gesendet werden.",
+    "invalid_registration": "Die Anmeldeeinstellungen sind ungültig.",
+    "registration_unavailable": "Die Anmeldung auf dieser Website ist derzeit nicht verfügbar.",
+    "unknown_registration_target": "Dieses Anmeldeformular existiert nicht, oder Sie dürfen es nicht verwenden.",
+    "registrations_orphaned": "Diese Änderung würde einen Termin entfernen, für den es bereits Anmeldungen gibt. Verschieben oder stornieren Sie diese zuerst.",
+    "registration_has_seats": "Es haben sich bereits Personen angemeldet, daher kann das Anmeldeformular nicht geändert werden. Stornieren Sie zuerst die Anmeldungen.",
+    "seats_busy": "Die Anmeldungen sind gerade ausgelastet. Bitte versuchen Sie es erneut.",
+    "registration_capacity_invalid": "Geben Sie eine ganze Zahl an Plätzen von 1 bis {max} ein.",
+    "registration_window_invalid": "Geben Sie eine gültige Zeit ein, zu der die Anmeldung öffnet.",
+    "registration_closes_invalid": "Die Anmeldung muss nach dem Öffnen schließen. Prüfen Sie die Schließzeit (und die Öffnungszeit).",
+    "registration_closes_before_opens": "Die Anmeldung muss nach dem Öffnen schließen. Prüfen Sie die Schließzeit (und die Öffnungszeit).",
+    "registration_time_invalid": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein.",
+    "registration_url_required": "Geben Sie den Link zur Anmeldung ein.",
+    "registration_target_required": "Wählen Sie ein Anmeldeformular.",
+    "registration_provider_required": "Wählen Sie eine Art der Anmeldung.",
+    "registration_reminder_invalid": "Wählen Sie eine der angebotenen Erinnerungszeiten.",
+    "registration_option_not_allowed": "Diese Einstellung gilt für diese Art der Anmeldung nicht."
   },
   "categories": {
     "title": "Kategorien",
@@ -349,7 +367,7 @@
     "no_category": "Keine Kategorie",
     "organiser": "Veranstalter",
     "image": "Bildadresse",
-    "registration_url": "Link zur Anmeldung",
+    "image_hint": "Verwenden Sie ein Bild aus der Medienbibliothek dieser Website: Die Adresse beginnt mit /. Ein Bild von einer anderen Website wird auf den öffentlichen Seiten nicht geladen.",
     "cancelled": "Diese Veranstaltung ist abgesagt",
     "sub_events": "Unterveranstaltungen",
     "is_sub_event": "Dies ist eine Unterveranstaltung einer anderen Veranstaltung. Sie kann sich nicht wiederholen.",
@@ -623,6 +641,7 @@
       "part_of": "Teil von {title}",
       "sub_events": "Programmpunkte",
       "register": "Anmelden",
+      "register_pick": "Termin zur Anmeldung wählen",
       "add_to_calendar": "Zum Kalender hinzufügen"
     },
     "not_found": {
@@ -852,9 +871,10 @@
     "upcoming": {
       "label": "Kommende Veranstaltungen",
       "heading": "Überschrift",
-      "calendars": "Kalender",
+      "calendars": "Kalender (bis zu 10)",
       "category": "Kategorie",
       "count": "Anzahl der Veranstaltungen",
+      "count_invalid": "Geben Sie eine ganze Zahl von 1 bis {max} ein.",
       "layout": "Darstellung",
       "layout_list": "Liste",
       "layout_cards": "Karten",
@@ -862,7 +882,7 @@
     },
     "calendar": {
       "label": "Veranstaltungskalender",
-      "calendars": "Kalender",
+      "calendars": "Kalender (bis zu 10)",
       "default_view": "Öffnet als",
       "view_month": "Monat",
       "view_week": "Woche",
@@ -882,7 +902,8 @@
       "empty": "Keine kommenden öffentlichen Veranstaltungen. Besucher sehen hier nichts, bis es welche gibt.",
       "unresolved_one": "{count} ausgewählter Kalender ist nicht öffentlich oder existiert nicht mehr.",
       "unresolved_other": "{count} ausgewählte Kalender sind nicht öffentlich oder existieren nicht mehr.",
-      "failed": "Die Veranstaltungen konnten nicht geladen werden."
+      "failed": "Die Veranstaltungen konnten nicht geladen werden.",
+      "selection_unreadable": "Die Kalenderauswahl konnte nicht gelesen werden, deshalb wird nichts angezeigt. Wählen Sie die Kalender erneut aus."
     }
   },
   "reminders": {
@@ -942,10 +963,10 @@
       "none_chosen": "Wähle mindestens einen Zeitpunkt oder beende die Erinnerung.",
       "next_due": "{lead}: nächste Erinnerung {when}",
       "too_late": "{lead}: zu spät für den nächsten Termin",
-      "no_coming": "{lead}: kein kommender Termin",
       "unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
       "time_zone": "Zeiten in der Zeitzone deines Browsers ({zone}); die Zeitzone der Veranstaltung ist {event_zone}.",
-      "reason_note": "Grund: {reason}"
+      "over": "Diese Veranstaltung ist vorbei, es gibt nichts mehr, woran erinnert werden könnte.",
+      "see_list": "Deine Erinnerungen ansehen"
     },
     "leads": {
       "m15": "15 Minuten vorher",
@@ -966,7 +987,6 @@
       "reason_no_public_base_url": "Die öffentliche Adresse der Website ist nicht gesetzt, daher wären Links in der E-Mail falsch.",
       "reason_no_mail_transport": "Es ist kein Mailversand eingerichtet.",
       "reason_console_mail": "Der Mailversand steht auf Konsole und schreibt nur ins Protokoll: Nichts erreicht ein Postfach.",
-      "reason_worker_access_unavailable": "Der Hintergrunddienst kann nicht feststellen, wer noch erinnert werden darf.",
       "defaults": "Vorgeschlagene Erinnerungszeiten: {leads}",
       "settings": "Erinnerungseinstellungen ändern",
       "counts_title": "Letzte {days} Tage, alle zusammen (nur Zahlen, nie wer)",
@@ -974,6 +994,7 @@
       "failed": "Fehlgeschlagen: {count}",
       "failed_code_send_failed": "Mail konnte nicht gesendet werden: {count}",
       "failed_code_send_timeout": "Mailserver antwortete nicht rechtzeitig: {count}",
+      "failed_code_too_late": "Nicht gesendet: zu viele Erinnerungen waren gleichzeitig fällig: {count}",
       "unfinished": "Unvollendet: {count}",
       "unfinished_note": "Unvollendet heißt: reserviert, aber nie als gesendet bestätigt. Diese werden nicht wiederholt."
     },
@@ -1100,5 +1121,40 @@
       "stale": "Jemand anderes hat dieses Abonnement geändert. Lade neu und versuche es erneut.",
       "publish_required": "Externe Termine öffentlich zu zeigen erfordert die Veröffentlichungsberechtigung."
     }
+  },
+  "registration": {
+    "title": "Anmeldung",
+    "mode_label": "Wie man sich anmeldet",
+    "mode_none": "Keine Anmeldung",
+    "mode_external": "Auf einer anderen Seite",
+    "mode_builtin": "Auf dieser Website",
+    "url": "Link zur Anmeldung",
+    "provider": "Art der Anmeldung",
+    "capacity": "Plätze",
+    "capacity_hint": "Leer lassen für keine Begrenzung.",
+    "opens": "Anmeldung öffnet",
+    "closes": "Anmeldung schließt",
+    "window_hint": "Zeiten auf der Uhr der Veranstaltung ({timezone}). Leer lassen für keine Begrenzung.",
+    "show_seats": "Verbleibende Plätze auf der öffentlichen Seite anzeigen",
+    "reminder": "Angemeldete erinnern",
+    "reminder_none": "Keine Erinnerung",
+    "no_provider": "Auf dieser Website ist kein Anmeldeformular verfügbar.",
+    "hidden": "Das Anmeldeformular dieser Veranstaltung ist für Sie ausgeblendet. Die Einstellungen bleiben unverändert.",
+    "not_installed": "Der Anbieter der Anmeldung dieser Veranstaltung ist auf diesem Server nicht installiert. Die Einstellungen bleiben erhalten und können nicht geändert werden.",
+    "counts_title": "Anmeldungen pro Termin",
+    "counts_loading": "Anmeldungen werden geladen ...",
+    "counts_error": "Die Anmeldungen konnten nicht geladen werden.",
+    "counts_empty": "Noch niemand hat sich angemeldet.",
+    "counts_taken": "{taken} von {capacity}",
+    "counts_taken_open": "{taken} angemeldet",
+    "counts_gone": "Dieser Termin existiert im Kalender nicht mehr.",
+    "counts_retry": "Erneut versuchen",
+    "diff": "Anmeldung",
+    "diff_none": "Keine",
+    "diff_external": "Link: {url}",
+    "diff_builtin": "Auf dieser Website, {capacity} Plätze",
+    "diff_builtin_open": "Auf dieser Website, ohne Begrenzung",
+    "loading_providers": "Anmeldeoptionen werden geladen ...",
+    "capacity_warning": "Mindestens ein Termin hat bereits mehr Anmeldungen als diese Platzzahl ({taken} am {date}, Plätze {capacity}). Sie können trotzdem speichern: Niemand wird entfernt, aber dort kann sich niemand Neues anmelden, bis Plätze frei werden."
   }
 }

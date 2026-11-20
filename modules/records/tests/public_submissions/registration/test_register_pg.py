@@ -91,4 +91,4 @@ async def test_the_same_person_many_times_is_one_seat_pg(reg_site):
         120,
     )
     assert {r.status_code for r in got} == {202}
-    assert len(await recomputed(reg_site)) == 1 and len(await regs(reg_site)) == 1
+    assert len(await recomputed(reg_site)) == 0 and len(await regs(reg_site)) == 1  # pending

@@ -1,8 +1,7 @@
-/** The anonymous occurrences fetcher for the read-only grid. Plain `fetch`: there is no
- *  session to send a CSRF token for, and the endpoint only reads. */
+/** The anonymous occurrences fetcher for the read-only grid (`utils/public-get.ts`). */
 
 import type { OccurrenceFetcher, OccurrenceQuery } from '../calendar/types';
-import { ApiError } from '../utils/api';
+import { publicGet } from '../utils/public-get';
 
 export function publicUrl(apiUrl: string, q: OccurrenceQuery): string {
   const params = new URLSearchParams({ start: q.start, end: q.end });
@@ -14,22 +13,5 @@ export function publicUrl(apiUrl: string, q: OccurrenceQuery): string {
 }
 
 export function publicFetcher(apiUrl: string): OccurrenceFetcher {
-  return async (query, signal) => {
-    const response = await fetch(publicUrl(apiUrl, query), {
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' },
-      signal,
-    });
-    if (!response.ok) {
-      let code = String(response.status);
-      try {
-        const body = (await response.json()) as { code?: string };
-        if (typeof body.code === 'string') code = body.code;
-      } catch {
-        /* a body that is not JSON keeps the status as its code */
-      }
-      throw new ApiError(response.status, code);
-    }
-    return response.json();
-  };
+  return (query, signal) => publicGet(publicUrl(apiUrl, query), signal);
 }

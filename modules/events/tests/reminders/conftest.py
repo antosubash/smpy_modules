@@ -39,7 +39,7 @@ def mailbox():
 @pytest.fixture
 async def host():
     """An app whose directory knows ``v`` and ``u0..u39`` (viewers) and ``a`` (no roles)."""
-    from sm_events.reminders.base_url import public_base_url  # noqa: F401
+    from sm_events.core.host_settings import public_base_url  # noqa: F401
 
     from tests.reminders.support import ORIGIN
     from tests.support.app import Directory, build_app

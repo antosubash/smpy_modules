@@ -1,13 +1,12 @@
 /** The hits of a card search: a title and a line of detail per source, one button each. */
 
-import { formatEventWhen } from '../../utils/eventWhen';
 import { keys, useT } from '../../utils/i18n';
 import type { CardHit } from '../../utils/types';
 
 const copy = keys.newsletter.editor.card;
 
 function HitDetail({ hit }: { hit: CardHit }) {
-  const { t, locale } = useT();
+  const { t } = useT();
   if (hit.kind !== 'event') {
     return hit.excerpt ? (
       <span className="line-clamp-2 block text-xs text-muted-foreground">{hit.excerpt}</span>
@@ -20,7 +19,7 @@ function HitDetail({ hit }: { hit: CardHit }) {
           {t(keys.newsletter.email.cancelled)}
         </span>
       )}
-      {formatEventWhen(hit, locale || 'en')}
+      {hit.when}
     </span>
   );
 }
