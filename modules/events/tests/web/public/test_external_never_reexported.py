@@ -121,6 +121,17 @@ async def test_public_grid_does_show_public_items(public_locales_client, ext):
     assert all(i["event_id"] is None for i in external)
 
 
+async def test_a_public_external_item_carries_no_registration(public_locales_client, ext):
+    got = await public_locales_client.get(
+        f"{_urls.api_path()}?start=2026-04-01T00:00:00Z&end=2026-05-15T00:00:00Z"
+    )
+    external = [i for i in got.json()["items"] if i["source"] == constants.SOURCE_SUBSCRIPTIONS]
+    assert external
+    for item in external:  # no registration prop, link or seat information of any kind
+        assert not [k for k in item if "regist" in k or "seat" in k or "capacity" in k], item
+        assert item["event_id"] is None and item["url"] is None
+
+
 async def test_public_grid_hides_non_public_subscription(public_locales_client, fx):
     await add_external(public_locales_client, fx.pub.id, public=False)
     got = await public_locales_client.get(
