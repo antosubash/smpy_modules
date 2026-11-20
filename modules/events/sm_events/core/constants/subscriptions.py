@@ -59,6 +59,8 @@ __all__ = [
     "SUBSCRIPTION_MAX_REDIRECTS",
     "SUBSCRIPTION_MAX_REFRESH_MINUTES",
     "SUBSCRIPTION_MIN_REFRESH_MINUTES",
+    "SUBSCRIPTION_NOT_PAUSED_CODE",
+    "SUBSCRIPTION_NOT_PAUSED_DETAIL",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_CODE",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_DETAIL",
     "SUBSCRIPTION_REFRESH_NOW_SECONDS",
@@ -86,6 +88,8 @@ SUBSCRIPTIONS_SOURCE_ICON: Final = "rss"
 REFRESH_SUBSCRIPTIONS: Final = "events.refresh_subscriptions"
 REFRESH_SUBSCRIPTION: Final = "events.refresh_subscription"
 
+SUBSCRIPTION_NOT_PAUSED_CODE: Final = "subscription_not_paused"
+SUBSCRIPTION_NOT_PAUSED_DETAIL: Final = "Only a paused or stopped subscription can be resumed"
 SUBSCRIPTION_STATE_CONFLICT_CODE: Final = "subscription_paused"
 SUBSCRIPTION_STATE_CONFLICT_DETAIL: Final = "Resume this subscription before refreshing it"
 

@@ -80,10 +80,27 @@ def _same_address(held: list[Subscription], url: str, *, skip: uuid.UUID | None 
     return False
 
 
+def fetch_wait(sub: Subscription, now: datetime) -> timedelta:
+    """How long until a fetch of ``sub`` may start: the one decision every trigger asks (refresh
+    now, resume, a new address). The floor since the last attempt, an unexpired lease (an
+    in-flight fetch finishes; the new work is due after it) and, for a paused subscription, the
+    floor since it was paused (so pause and resume cannot be looped into fetches)."""
+    floor = timedelta(seconds=constants.SUBSCRIPTION_REFRESH_NOW_SECONDS)
+    waits = [timedelta(0)]
+    if sub.last_fetched_at is not None:
+        waits.append(sub.last_fetched_at + floor - now)
+    if sub.lease_until is not None and sub.lease_until > now:
+        waits.append(sub.lease_until - now)
+    if sub.status == "paused":
+        waits.append(sub.updated_at + floor - now)
+    return max(waits)
+
+
 def _make_due(sub: Subscription, now: datetime) -> None:
+    """Back to ``pending`` and due once ``fetch_wait`` allows. Never touches a lease."""
+    wait = fetch_wait(sub, now)
     sub.status, sub.error_code, sub.last_http_status = "pending", None, None
-    sub.consecutive_failures, sub.next_fetch_at = 0, now
-    sub.lease_owner = sub.lease_until = None
+    sub.consecutive_failures, sub.next_fetch_at = 0, now + wait
 
 
 async def create(
@@ -191,7 +208,6 @@ async def pause(
 ) -> Subscription:
     sub, _ = await validate.load_subscription(db, who, sub_id, lock=True)
     sub.status, sub.updated_at = "paused", now
-    sub.lease_owner = sub.lease_until = None
     await db.flush()
     return sub
 
@@ -199,7 +215,15 @@ async def pause(
 async def resume(
     db: Any, who: ResourcePrincipal, sub_id: uuid.UUID, *, now: datetime
 ) -> Subscription:
+    """Only from a pause or a stop; once, and not again inside the floor."""
     sub, _ = await validate.load_subscription(db, who, sub_id, lock=True)
+    if sub.status not in ("paused", "disabled"):
+        raise Conflict(
+            constants.SUBSCRIPTION_NOT_PAUSED_DETAIL, constants.SUBSCRIPTION_NOT_PAUSED_CODE
+        )
+    wait = fetch_wait(sub, now)
+    if wait > timedelta(0):
+        raise RefreshTooSoon(retry_after=int(wait.total_seconds()) + 1)
     _make_due(sub, now)
     sub.updated_at = now
     await db.flush()
@@ -217,13 +241,7 @@ async def refresh_now(
         raise Conflict(
             constants.SUBSCRIPTION_STATE_CONFLICT_DETAIL, constants.SUBSCRIPTION_STATE_CONFLICT_CODE
         )
-    floor = timedelta(seconds=constants.SUBSCRIPTION_REFRESH_NOW_SECONDS)
-    waits = []
-    if sub.last_fetched_at is not None:
-        waits.append(sub.last_fetched_at + floor - now)
-    if sub.lease_until is not None and sub.lease_until > now:
-        waits.append(sub.lease_until - now)
-    wait = max(waits, default=timedelta(0))
+    wait = fetch_wait(sub, now)
     if wait > timedelta(0):
         raise RefreshTooSoon(retry_after=int(wait.total_seconds()) + 1)
     if sub.status in ("disabled", "error"):

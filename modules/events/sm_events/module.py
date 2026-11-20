@@ -124,7 +124,7 @@ class EventsModule(ModuleBase):
         )
         registry.add_regex(
             subscriptions_api.PATH_PATTERN,
-            RateLimitRule(subscriptions_api.RATE, key="user", methods=frozenset({"POST"})),
+            RateLimitRule(subscriptions_api.RATE, key="user", methods=frozenset({"POST", "PATCH"})),
         )
         registry.add_regex(
             reminders_api.PATH_PATTERN,

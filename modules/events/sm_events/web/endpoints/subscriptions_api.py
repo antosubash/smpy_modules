@@ -25,7 +25,11 @@ from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut,
 
 router = APIRouter(tags=["subscriptions"], dependencies=[require_view])
 
-PATH_PATTERN = r"^/api/events/subscriptions/[0-9a-fA-F-]{36}/refresh$"
+_ID = "[0-9a-fA-F-]{36}"
+PATH_PATTERN = (
+    rf"^/api/events/(?:calendars/{_ID}/subscriptions|subscriptions/{_ID}(?:/refresh|/resume)?)$"
+)
+"""Every route that can start a fetch: create, edit (a new address), refresh and resume."""
 RATE = constants.SUBSCRIPTION_REFRESH_RATE
 
 
@@ -49,6 +53,8 @@ def _out(sub, settings: EventsSettings) -> SubscriptionOut:
 
 
 def _start(request: Request, db, sub, settings: EventsSettings) -> None:
+    if sub.next_fetch_at is None or sub.next_fetch_at > utcnow():
+        return  # due later (a floor or a lease): the beat picks it up
     state = getattr(request.app.state, "sm", None)
     launch.refresh_one(
         db,

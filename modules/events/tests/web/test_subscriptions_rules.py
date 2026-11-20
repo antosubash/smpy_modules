@@ -160,7 +160,13 @@ async def test_pause_and_resume(http):
     sid = (await add(http, cid, OWNER)).json()["id"]
     assert (await http.post(f"{SUBS}/{sid}/pause", headers=OWNER)).json()["status"] == "paused"
     async with http.db_state.session_factory() as db:
-        await db.execute(update(Subscription).values(consecutive_failures=7, error_code="timeout"))
+        await db.execute(
+            update(Subscription).values(
+                consecutive_failures=7,
+                error_code="timeout",
+                updated_at=utcnow() - timedelta(hours=1),
+            )
+        )
         await db.commit()
     resumed = (await http.post(f"{SUBS}/{sid}/resume", headers=OWNER)).json()
     assert (

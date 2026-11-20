@@ -153,6 +153,7 @@ async def _store(
                 await db.rollback()
                 return Attempt("lease_lost")
             stamp = utc_now()
+            paused = sub.status == "paused"  # a pause made during the fetch outlives its result
             failure = outcome if isinstance(outcome, FetchFailure) else None
             received = 0
             if isinstance(outcome, FetchResult) and outcome.status == "ok":
@@ -171,6 +172,8 @@ async def _store(
                 _record_failure(sub, failure, job, stamp, rng)
             else:
                 _record_success(sub, outcome, job, stamp, rng)  # type: ignore[arg-type]
+            if paused:
+                sub.status = "paused"
             await lease.release(db, sub)
             await finalize_session(db)
     if failure is not None:
