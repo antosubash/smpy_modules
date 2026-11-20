@@ -193,7 +193,7 @@ function MoveForm({
           <FieldError id={fieldErrorId('move-note')}>{errors.fields.note}</FieldError>
         </div>
         {errors.error && (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {errors.error}
           </p>
         )}

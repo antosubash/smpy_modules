@@ -27,18 +27,20 @@ export default function ExternalDetail({ occurrence: o, gridTimeZone }: DetailPr
   const copy = keys.events.subscriptions;
   const own = localTimeText(o, gridTimeZone, locale, false);
   return (
-    <div className="space-y-2 text-sm" data-testid="external-detail">
-      <h3 className="font-semibold">
+    <div className="space-y-2 text-sm [overflow-wrap:anywhere]" data-testid="external-detail">
+      <h3 className="font-semibold [overflow-wrap:anywhere]">
         <Name>{o.title}</Name>
       </h3>
       <p>{timeText(o, gridTimeZone, locale)}</p>
-      {own ? <p className="text-muted-foreground">{own}</p> : null}
+      {own ? <p className="text-muted-foreground dark:text-zinc-400">{own}</p> : null}
       {o.location ? (
         <p data-testid="external-location">
           <Name>{o.location}</Name>
         </p>
       ) : null}
-      <p className="text-muted-foreground">{t(copy.from_label, { label: o.origin_label ?? '' })}</p>
+      <p className="text-muted-foreground dark:text-zinc-400">
+        {t(copy.from_label, { label: o.origin_label ?? '' })}
+      </p>
       {isWebUrl(o.url) ? (
         <p>
           <a href={o.url} target="_blank" rel="noopener noreferrer nofollow" className="underline">
@@ -46,7 +48,7 @@ export default function ExternalDetail({ occurrence: o, gridTimeZone }: DetailPr
           </a>
         </p>
       ) : null}
-      <p className="text-xs text-muted-foreground">{t(copy.read_only_note)}</p>
+      <p className="text-xs text-muted-foreground dark:text-zinc-400">{t(copy.read_only_note)}</p>
     </div>
   );
 }

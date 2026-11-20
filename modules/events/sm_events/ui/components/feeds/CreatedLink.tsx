@@ -12,7 +12,7 @@ export function CreatedLink({ link, onDone }: { link: CreatedFeedToken; onDone: 
   return (
     <section className="space-y-2 rounded-md border p-3" aria-label={t(copy.created_title)}>
       <h3 className="text-sm font-medium">{t(copy.created_title)}</h3>
-      <p className="text-sm font-medium text-destructive" role="status">
+      <p className="text-sm font-medium text-destructive dark:text-red-400" role="status">
         {t(copy.created_warning)}
       </p>
       <div className="flex items-center gap-2">

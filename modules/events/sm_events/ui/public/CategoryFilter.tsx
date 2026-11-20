@@ -18,7 +18,7 @@ export function CategoryFilter({
   const copy = keys.events.public.index.filter;
   return (
     <nav aria-label={t(copy.label)} className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-muted-foreground">{t(copy.category)}</span>
+      <span className="text-muted-foreground dark:text-zinc-400">{t(copy.category)}</span>
       <a
         href={base}
         aria-current={active === null ? 'true' : undefined}

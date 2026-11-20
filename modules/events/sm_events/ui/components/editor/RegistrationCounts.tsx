@@ -36,18 +36,18 @@ export function Counts({ state, retry }: { state: State; retry: () => void }) {
     <div className="grid gap-2" data-testid="registration-counts">
       <h3 className="text-sm font-medium">{t(copy.counts_title)}</h3>
       {state.kind === 'loading' ? (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground dark:text-zinc-400">
           {t(copy.counts_loading)}
         </p>
       ) : state.kind === 'error' ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive dark:text-red-400">
           {t(copy.counts_error)}{' '}
           <button type="button" className="underline" onClick={retry}>
             {t(copy.counts_retry)}
           </button>
         </p>
       ) : state.items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t(copy.counts_empty)}</p>
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.counts_empty)}</p>
       ) : (
         <table className="text-sm">
           <tbody>

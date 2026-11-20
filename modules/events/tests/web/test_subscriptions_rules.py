@@ -11,7 +11,7 @@ from sm_events.core.tenancy import tenant_scope
 from sm_events.models import ExternalItem, Subscription
 from sqlalchemy import select, update
 
-from tests.support.calendars import BASE, MANAGER, OWNER, OWNER_P
+from tests.support.calendars import BASE, MANAGER, OWNER, OWNER_P, VIEWER
 from tests.support.subscriptions import seed_item
 from tests.support.subscriptions_http import (
     REAL_LAUNCH,
@@ -276,3 +276,31 @@ async def test_refresh_now_says_when_it_is_only_queued(http, monkeypatch, eager)
     assert got["queued_minutes"] == (None if eager else constants.SUBSCRIPTION_QUEUED_MINUTES)
     other = (await http.get(f"{BASE}/{cid}/subscriptions", headers=OWNER)).json()[0]
     assert other["queued"] is False  # only the refresh answer carries it
+
+
+async def test_capacity_says_how_much_room_each_limit_has(http, monkeypatch):
+    monkeypatch.setattr(constants, "SUBSCRIPTIONS_PER_OWNER", 3)
+    monkeypatch.setattr(constants, "SUBSCRIPTIONS_PER_CALENDAR", 2)
+    cid = await calendar(http)
+    other = await calendar(http)
+    for n in range(2):
+        assert (
+            await add(http, cid, OWNER, url=f"https://c{n}.example.test/x.ics")
+        ).status_code == 201
+    got = await http.get(f"{BASE}/{cid}/subscriptions/capacity", headers=OWNER)
+    assert got.status_code == 200
+    assert got.json() == {
+        "calendar": {"used": 2, "limit": 2},
+        "owner": {"used": 2, "limit": 3},
+        "tenant": {"used": 2, "limit": constants.SUBSCRIPTIONS_PER_TENANT},
+    }
+    # another calendar: its own count, the same member's and tenant's totals
+    assert (await http.get(f"{BASE}/{other}/subscriptions/capacity", headers=OWNER)).json()[
+        "calendar"
+    ] == {"used": 0, "limit": 2}
+    # what the capacity says is what create does
+    over = await add(http, cid, OWNER, url="https://c9.example.test/x.ics")
+    assert over.status_code == 409
+    assert (
+        await http.get(f"{BASE}/{cid}/subscriptions/capacity", headers=VIEWER)
+    ).status_code == 404

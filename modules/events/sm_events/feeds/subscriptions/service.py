@@ -32,7 +32,17 @@ from sm_events.feeds.subscriptions import generation, policy, rules, schedule, u
 from sm_events.models import ExternalItem, Subscription
 from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut, SubscriptionPatch
 
-__all__ = ["create", "delete", "list_for", "pause", "refresh_now", "resume", "to_out", "update"]
+__all__ = [
+    "capacity",
+    "create",
+    "delete",
+    "list_for",
+    "pause",
+    "refresh_now",
+    "resume",
+    "to_out",
+    "update",
+]
 
 
 async def create(
@@ -107,6 +117,32 @@ async def create(
     db.add(sub)
     await db.flush()
     return sub
+
+
+async def capacity(
+    db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID
+) -> dict[str, dict[str, int]]:
+    """How much room the calendar, the caller (as a member) and the tenant have left, the same
+    counts ``create`` checks (``used`` and ``limit`` each)."""
+    await validate.require_subscription_right(db, who, calendar_id)
+    table = Subscription.__table__
+    live = (table.c.tenant_id == bound_tenant(), table.c.is_deleted.is_(False))
+
+    async def used(*extra: Any) -> int:
+        stmt = select(func.count()).select_from(table).where(*live, *extra)
+        return int((await db.execute(stmt)).scalar_one())
+
+    return {
+        "calendar": {
+            "used": await used(table.c.calendar_id == calendar_id),
+            "limit": constants.SUBSCRIPTIONS_PER_CALENDAR,
+        },
+        "owner": {
+            "used": await used(table.c.created_by == (who.user_id or "")),
+            "limit": constants.SUBSCRIPTIONS_PER_OWNER,
+        },
+        "tenant": {"used": await used(), "limit": constants.SUBSCRIPTIONS_PER_TENANT},
+    }
 
 
 async def update(

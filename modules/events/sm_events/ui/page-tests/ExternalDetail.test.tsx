@@ -39,6 +39,14 @@ const props = (over: Record<string, unknown> = {}) => ({
   Default: DefaultDetail,
 });
 
+it('wraps an unbroken title inside the popover instead of overflowing it', async () => {
+  const view = await mount(<ExternalDetail {...props({ title: 'W'.repeat(400) })} />);
+  const detail = document.querySelector('[data-testid="external-detail"]') as HTMLElement;
+  expect(detail.className).toContain('[overflow-wrap:anywhere]');
+  expect(detail.querySelector('h3')?.className).toContain('[overflow-wrap:anywhere]');
+  await view.unmount();
+});
+
 it('shows the stored place as literal text', async () => {
   const view = await mount(<ExternalDetail {...props({ location: 'Room <b>4</b>' })} />);
   const place = document.querySelector('[data-testid="external-location"]');

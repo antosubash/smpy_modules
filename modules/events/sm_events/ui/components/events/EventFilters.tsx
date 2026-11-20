@@ -112,7 +112,7 @@ export function EventFilters({
           onChange={(e) => onChange({ q: e.target.value })}
         />
       </Field>
-      <p className="basis-full text-xs text-muted-foreground">
+      <p className="basis-full text-xs text-muted-foreground dark:text-zinc-400">
         {t(copy.dates_hint, { zone: browserZone() })}
       </p>
     </fieldset>

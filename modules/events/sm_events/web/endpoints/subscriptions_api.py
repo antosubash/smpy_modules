@@ -82,6 +82,13 @@ async def list_subscriptions(
     return [_out(s, settings, who) for s in await service.list_for(db, who, calendar_id)]
 
 
+@router.get("/calendars/{calendar_id}/subscriptions/capacity")
+async def subscription_capacity(
+    calendar_id: uuid.UUID, who: Principal, db=Depends(get_db)
+) -> dict[str, dict[str, int]]:
+    return await service.capacity(db, who, calendar_id)
+
+
 @router.post("/calendars/{calendar_id}/subscriptions", status_code=201)
 async def create_subscription(
     calendar_id: uuid.UUID,

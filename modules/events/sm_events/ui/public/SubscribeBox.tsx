@@ -16,7 +16,7 @@ export function SubscribeBox({ feedUrl }: { feedUrl: string }) {
       <h2 id="subscribe-title" className="font-medium">
         {t(copy.title)}
       </h2>
-      <p className="text-muted-foreground">{t(copy.hint)}</p>
+      <p className="text-muted-foreground dark:text-zinc-400">{t(copy.hint)}</p>
       <p>
         <a href={webcal} className="underline">
           {t(keys.events.feeds.webcal)}

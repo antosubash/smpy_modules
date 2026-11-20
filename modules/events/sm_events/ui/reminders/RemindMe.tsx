@@ -31,7 +31,10 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
   if (state.kind === 'loading' || state.kind === 'hidden') return null;
   if (state.kind === 'unavailable') {
     return (
-      <p className="text-xs text-muted-foreground" data-testid="remind-unavailable">
+      <p
+        className="text-xs text-muted-foreground dark:text-zinc-400"
+        data-testid="remind-unavailable"
+      >
         {t(copy.unavailable)}
         {state.reason && AVAILABILITY_REASONS[state.reason]
           ? ` ${t(AVAILABILITY_REASONS[state.reason])}`
@@ -43,7 +46,7 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
   const following = follow.leads.length > 0;
   if (follow.over && !following) {
     return (
-      <p className="text-xs text-muted-foreground" data-testid="remind-over">
+      <p className="text-xs text-muted-foreground dark:text-zinc-400" data-testid="remind-over">
         {t(copy.over)}
       </p>
     );
@@ -79,7 +82,7 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
           : t(copy.remind_me)}
       </Button>
       {!follow.deliverable && following ? (
-        <p role="status" className="text-xs text-destructive">
+        <p role="status" className="text-xs text-destructive dark:text-red-400">
           {t(keys.events.errors.reminders_no_access)}
         </p>
       ) : null}
@@ -97,7 +100,7 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
           }}
         >
           {!follow.deliverable && !following ? (
-            <p role="status" className="text-xs text-destructive">
+            <p role="status" className="text-xs text-destructive dark:text-red-400">
               {t(keys.events.errors.reminders_no_access)}
             </p>
           ) : null}
@@ -120,7 +123,10 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
             })}
           </ul>
           {following ? (
-            <ul className="space-y-0.5 text-xs text-muted-foreground" aria-label={t(copy.already)}>
+            <ul
+              className="space-y-0.5 text-xs text-muted-foreground dark:text-zinc-400"
+              aria-label={t(copy.already)}
+            >
               {[...follow.leads]
                 .sort((a, b) => a - b)
                 .map((lead) => {
@@ -135,11 +141,11 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
                 })}
             </ul>
           ) : null}
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground dark:text-zinc-400">
             {t(copy.time_zone, { zone, event_zone: eventZone })}
           </p>
           {error ? (
-            <p role="alert" className="text-xs text-destructive">
+            <p role="alert" className="text-xs text-destructive dark:text-red-400">
               {error}{' '}
               {atCap ? (
                 <a className="underline" href="/admin/events/reminders">
@@ -174,7 +180,9 @@ export function RemindMe({ eventId, eventZone }: { eventId: string; eventZone: s
             ) : null}
           </div>
           {picked.length === 0 && !following ? (
-            <p className="text-xs text-muted-foreground">{t(copy.none_chosen)}</p>
+            <p className="text-xs text-muted-foreground dark:text-zinc-400">
+              {t(copy.none_chosen)}
+            </p>
           ) : null}
         </div>
       ) : null}

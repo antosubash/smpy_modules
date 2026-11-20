@@ -180,7 +180,7 @@ export function RichTextField({
                 {t(copy.link_cancel)}
               </Button>
               {linkError && (
-                <p role="alert" className="basis-full text-sm text-destructive">
+                <p role="alert" className="basis-full text-sm text-destructive dark:text-red-400">
                   {t(copy.link_invalid)}
                 </p>
               )}

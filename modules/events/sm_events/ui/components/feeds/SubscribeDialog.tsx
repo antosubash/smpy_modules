@@ -80,7 +80,7 @@ export function SubscribeDialog({
 
         <section className="space-y-2" aria-label={t(copy.private_title)}>
           <h3 className="text-sm font-medium">{t(copy.private_title)}</h3>
-          <p className="text-sm text-muted-foreground">{t(copy.private_hint)}</p>
+          <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.private_hint)}</p>
           {created ? (
             <CreatedLink link={created} onDone={() => setCreated(null)} />
           ) : (
@@ -113,7 +113,7 @@ export function SubscribeDialog({
           )}
           {!canManage && <h3 className="text-sm font-medium">{t(copy.mine)}</h3>}
           {state.error && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-sm text-destructive dark:text-red-400" role="alert">
               {state.error}
             </p>
           )}

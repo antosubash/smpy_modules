@@ -8,7 +8,10 @@ export default function ExternalChip(props: EventChipProps) {
   const { t } = useT();
   const { Default, occurrence } = props;
   return (
-    <span className="flex min-w-0 items-center gap-1" data-testid="external-chip">
+    <span
+      className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden"
+      data-testid="external-chip"
+    >
       <ExternalLink aria-hidden="true" className="size-3 shrink-0" />
       <Default {...props} />
       <span className="sr-only">

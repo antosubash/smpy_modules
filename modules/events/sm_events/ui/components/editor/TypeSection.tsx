@@ -72,7 +72,10 @@ export function TypeSection({
           </NativeSelect>
         </div>
       ) : showType && !isNew ? (
-        <p className="text-sm text-muted-foreground" data-testid="event-type-readonly">
+        <p
+          className="text-sm text-muted-foreground dark:text-zinc-400"
+          data-testid="event-type-readonly"
+        >
           {t(copy.current, { name: label(type) })}
         </p>
       ) : null}
@@ -86,7 +89,7 @@ export function TypeSection({
         </p>
       ) : null}
       {waiting ? (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground dark:text-zinc-400">
           {t(copy.loading_section)}
         </p>
       ) : null}

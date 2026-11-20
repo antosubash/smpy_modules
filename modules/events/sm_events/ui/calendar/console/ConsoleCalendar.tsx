@@ -179,7 +179,7 @@ export function ConsoleCalendar({
       {ready && extensionFailures().length > 0 ? (
         <p
           role="status"
-          className="mt-2 text-xs text-muted-foreground"
+          className="mt-2 text-xs text-muted-foreground dark:text-zinc-400"
           data-testid="extension-failed"
         >
           {t(keys.events.extensions.load_failed)}

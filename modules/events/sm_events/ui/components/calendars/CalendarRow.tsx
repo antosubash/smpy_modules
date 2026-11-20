@@ -226,7 +226,7 @@ export function CalendarRow({
           )}
         </div>
         {error && (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {error}
           </p>
         )}

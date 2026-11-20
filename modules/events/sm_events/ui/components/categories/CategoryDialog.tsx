@@ -170,7 +170,7 @@ function CategoryForm({
             }}
           />
           {category && (
-            <p id="category-slug-hint" className="text-xs text-muted-foreground">
+            <p id="category-slug-hint" className="text-xs text-muted-foreground dark:text-zinc-400">
               {t(copy.slug_fixed_hint)}
             </p>
           )}
@@ -206,7 +206,7 @@ function CategoryForm({
           <FieldError id={fieldErrorId('category-color')}>{errors.fields.color}</FieldError>
         </div>
         {errors.error && (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {errors.error}
           </p>
         )}

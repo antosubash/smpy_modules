@@ -148,7 +148,9 @@ export function EventForm({
         </div>
         {text('organiser', t(copy.organiser), { max: 200 })}
         {text('image', t(copy.image), { max: 2048 })}
-        <p className="-mt-4 text-xs text-muted-foreground">{t(copy.image_hint)}</p>
+        <p className="-mt-4 text-xs text-muted-foreground dark:text-zinc-400">
+          {t(copy.image_hint)}
+        </p>
         <div className="flex items-center gap-2">
           <Checkbox
             id="event-cancelled"

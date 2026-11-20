@@ -93,7 +93,7 @@ export function ShareDialog({
               className="flex items-center justify-between gap-2"
               data-testid="events-share-list-error"
             >
-              <p className="text-sm text-destructive" role="alert">
+              <p className="text-sm text-destructive dark:text-red-400" role="alert">
                 {state.listError}
               </p>
               <Button type="button" variant="outline" size="sm" onClick={state.retry}>
@@ -103,7 +103,7 @@ export function ShareDialog({
           )}
           {state.shares.length === 0 ? (
             !state.loading && state.listError ? null : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground dark:text-zinc-400">
                 {t(state.loading ? keys.events.common.loading : keys.events.share.none)}
               </p>
             )
@@ -162,12 +162,17 @@ export function ShareDialog({
             </NativeSelect>
           </div>
           {state.tooShort ? (
-            <p className="text-sm text-muted-foreground" data-testid="events-share-hint">
+            <p
+              className="text-sm text-muted-foreground dark:text-zinc-400"
+              data-testid="events-share-hint"
+            >
               {t(keys.events.share.search_min, { min: MIN_QUERY })}
             </p>
           ) : state.searchError ? null : !state.searchSettled ? null : state.candidates.length ===
             0 ? (
-            <p className="text-sm text-muted-foreground">{t(keys.events.share.no_candidates)}</p>
+            <p className="text-sm text-muted-foreground dark:text-zinc-400">
+              {t(keys.events.share.no_candidates)}
+            </p>
           ) : (
             <ul className="max-h-48 divide-y overflow-auto rounded-md border">
               {state.candidates.map((candidate) => (
@@ -178,7 +183,9 @@ export function ShareDialog({
                 >
                   <span className="min-w-0 break-words">
                     <Name>{candidate.display_name}</Name>
-                    <span className="block text-xs text-muted-foreground">{candidate.email}</span>
+                    <span className="block text-xs text-muted-foreground dark:text-zinc-400">
+                      {candidate.email}
+                    </span>
                   </span>
                   <Button
                     type="button"
@@ -193,7 +200,7 @@ export function ShareDialog({
             </ul>
           )}
           {state.searchError && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-sm text-destructive dark:text-red-400" role="alert">
               {state.searchError}
             </p>
           )}

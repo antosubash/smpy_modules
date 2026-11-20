@@ -41,7 +41,7 @@ export function SubEvents({
     <section className="grid gap-2" aria-label={t(copy.sub_events)}>
       <h3 className="text-sm font-medium">{t(copy.sub_events)}</h3>
       {subEvents.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t(copy.no_sub_events)}</p>
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.no_sub_events)}</p>
       )}
       <ul className="grid gap-1">
         {subEvents.map((sub) => (
@@ -49,7 +49,9 @@ export function SubEvents({
             <Link href={`${EDIT}/${sub.id}`} className="underline-offset-4 hover:underline">
               <Name>{sub.title}</Name>
             </Link>{' '}
-            <span className="text-muted-foreground">{formatWall(sub.start_local, locale)}</span>
+            <span className="text-muted-foreground dark:text-zinc-400">
+              {formatWall(sub.start_local, locale)}
+            </span>
           </li>
         ))}
       </ul>

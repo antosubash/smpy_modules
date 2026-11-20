@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { calendar, flush, stubFetch } from './support';
-import { click, mount, setValue } from './test-dom';
+import { click, mount, press, setValue } from './test-dom';
 
 const toast = vi.hoisted(() => Object.assign(vi.fn(), { error: vi.fn() }));
 vi.mock('@inertiajs/react', async () => (await import('./support')).inertiaMock());
@@ -206,6 +206,84 @@ describe('SubscriptionsDialog', () => {
     expect(text()).toContain(
       'Showing a subscription on public pages needs the publish permission.',
     );
+    await view.unmount();
+  });
+
+  const room = (calendar: number, owner = 1, tenant = 1) => ({
+    calendar: { used: calendar, limit: 10 },
+    owner: { used: owner, limit: 30 },
+    tenant: { used: tenant, limit: 100 },
+  });
+
+  it('keeps Add off, with the reason, when an allowance is used up', async () => {
+    const cases: [ReturnType<typeof room>, string][] = [
+      [room(10), 'This calendar has the maximum of 10 subscriptions.'],
+      [room(2, 30), 'You have added the maximum of 30 subscriptions.'],
+      [room(2, 3, 100), 'This organisation has the maximum of 100 subscriptions.'],
+    ];
+    for (const [capacity, reason] of cases) {
+      const { view } = await open({
+        [`GET ${LIST}`]: [sub()],
+        [`GET ${LIST}/capacity`]: capacity,
+      });
+      const add = button('Add a subscription') as HTMLButtonElement;
+      expect(add.disabled).toBe(true);
+      expect(text()).toContain(reason);
+      expect(add.getAttribute('aria-describedby')).toBe('events-sub-full');
+      await view.unmount();
+      document.body.innerHTML = '';
+    }
+    const { view } = await open({ [`GET ${LIST}`]: [], [`GET ${LIST}/capacity`]: room(2) });
+    expect((button('Add a subscription') as HTMLButtonElement).disabled).toBe(false);
+    await view.unmount();
+  });
+
+  it('has no count sentence for a subscription that cached nothing', async () => {
+    const { view } = await open({ [`GET ${LIST}`]: [sub({ item_count: 0, last_counts: {} })] });
+    await click(button('Remove') as HTMLElement);
+    await flush(20);
+    expect(document.body.textContent).not.toContain('0 cached');
+    expect(document.body.textContent).toContain('Nothing is cached yet.');
+    await view.unmount();
+  });
+
+  it('drops a stale refusal as soon as the person types again', async () => {
+    const { view } = await open({
+      [`GET ${LIST}`]: [],
+      [`POST ${LIST}`]: () =>
+        Response.json({ detail: 'x', code: 'subscription_exists' }, { status: 409 }),
+    });
+    await click(button('Add a subscription') as HTMLElement);
+    const url = document.getElementById('events-sub-url') as HTMLInputElement;
+    await setValue(url, 'https://a.example/x.ics');
+    await setValue(document.getElementById('events-sub-label') as HTMLInputElement, 'A');
+    await click(button('Save') as HTMLElement);
+    await flush(50);
+    const refusal = () =>
+      document.querySelector('[data-testid="subscription-form"] [role="alert"]');
+    expect(refusal()).not.toBeNull();
+    await setValue(document.getElementById('events-sub-label') as HTMLInputElement, 'AB');
+    expect(refusal()).toBeNull(); // typing clears it
+    await click(button('Save') as HTMLElement);
+    await flush(50);
+    expect(refusal()).not.toBeNull();
+    await view.unmount();
+  });
+
+  it('puts focus in the address field, closes the form on the first Escape and the dialog on the next, and returns focus to the trigger', async () => {
+    const { view } = await open({ [`GET ${LIST}`]: [] });
+    const trigger = document.querySelector('[data-testid="events-subscriptions"]') as HTMLElement;
+    await click(button('Add a subscription') as HTMLElement);
+    await flush(20);
+    expect(document.activeElement?.id).toBe('events-sub-url');
+    await press(dialog(), { key: 'Escape' });
+    await flush(20);
+    expect(document.querySelector('[data-testid="subscription-form"]')).toBeNull();
+    expect(dialog()).not.toBeNull(); // the dialog is still open
+    await press(dialog(), { key: 'Escape' });
+    await flush(50);
+    expect(dialog()).toBeNull();
+    expect(document.activeElement).toBe(trigger);
     await view.unmount();
   });
 

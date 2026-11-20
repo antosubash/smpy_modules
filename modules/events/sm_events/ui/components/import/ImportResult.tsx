@@ -27,7 +27,7 @@ export function ImportResult({
   return (
     <section className="space-y-4" aria-label={t(copy.title)}>
       <h2 className="text-lg font-medium">{t(copy.title)}</h2>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">
         <Name>{row.filename}</Name> · <Name>{row.calendar.name}</Name>
       </p>
       <fieldset className="flex flex-wrap gap-2" aria-label={t(keys.events.import.preview.filter)}>

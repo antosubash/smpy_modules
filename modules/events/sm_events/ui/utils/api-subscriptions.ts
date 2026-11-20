@@ -43,6 +43,9 @@ const one = (id: string) => `/api/events/subscriptions/${id}`;
 
 export const listSubscriptions = (calendarId: string, signal?: AbortSignal) =>
   send<Subscription[]>(base(calendarId), { signal });
+export type Capacity = Record<'calendar' | 'owner' | 'tenant', { used: number; limit: number }>;
+export const subscriptionCapacity = (calendarId: string, signal?: AbortSignal) =>
+  send<Capacity>(`${base(calendarId)}/capacity`, { signal });
 export const createSubscription = (calendarId: string, body: SubscriptionInput) =>
   send<Subscription>(base(calendarId), { method: 'POST', json: body });
 export const updateSubscription = (id: string, patch: SubscriptionPatch) =>

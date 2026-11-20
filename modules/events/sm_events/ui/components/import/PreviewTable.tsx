@@ -39,7 +39,7 @@ export function PreviewTable({
   return (
     <section className="space-y-4" aria-label={t(copy.preview.title)}>
       <h2 className="text-lg font-medium">{t(copy.preview.title)}</h2>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">
         <Name>{row.filename}</Name> · <Name>{row.calendar.name}</Name>
       </p>
       <fieldset className="flex flex-wrap gap-2" aria-label={t(copy.preview.filter)}>
@@ -63,7 +63,7 @@ export function PreviewTable({
           {dropped.map(([name, n]) => `${droppedText(name)} ${n}`).join(', ')}
         </p>
       )}
-      <p className="text-sm text-muted-foreground">{t(copy.locked_hint)}</p>
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.locked_hint)}</p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" disabled={busy || row.total === 0} onClick={() => onApply(false)}>
           {t(copy.apply_drafts)}

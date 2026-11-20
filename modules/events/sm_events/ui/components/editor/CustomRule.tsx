@@ -31,7 +31,7 @@ export function CustomRule({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">
         {t(editing ? copy.custom_hint : copy.custom_readonly)}
       </p>
       {!editing && (

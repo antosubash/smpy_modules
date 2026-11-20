@@ -74,7 +74,7 @@ export function Filters({ state, calendars, categories, types, sources = [], onC
             onChange={() => onChange({ calendars: toggle(state.calendars, calendar.id) })}
           >
             <Name>{calendar.name}</Name>{' '}
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground dark:text-zinc-400">
               ({t(keys.events.visibility[calendar.visibility])})
             </span>
           </Check>

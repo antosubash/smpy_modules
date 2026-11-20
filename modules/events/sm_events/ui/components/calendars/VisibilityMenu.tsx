@@ -75,7 +75,7 @@ export function VisibilityMenu({ calendar, onSaved }: { calendar: Calendar; onSa
             ))}
           </NativeSelect>
           {error && (
-            <p role="alert" className="text-destructive">
+            <p role="alert" className="text-destructive dark:text-red-400">
               {error}
             </p>
           )}

@@ -184,7 +184,7 @@ function MoveForm({
         </fieldset>
       )}
       {notice && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive dark:text-red-400">
           {notice.message}{' '}
           {notice.link && (
             <Link className="underline" href={notice.link}>

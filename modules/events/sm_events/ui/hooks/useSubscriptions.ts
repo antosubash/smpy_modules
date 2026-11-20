@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isGone } from '../utils/api';
 import {
+  type Capacity,
   deleteSubscription,
   listSubscriptions,
   pauseSubscription,
   refreshSubscription,
   resumeSubscription,
   type Subscription,
+  subscriptionCapacity,
   subscriptionErrorText,
 } from '../utils/api-subscriptions';
 import { keys, translate } from '../utils/i18n';
@@ -30,6 +32,7 @@ export function useSubscriptions(calendarId: string, open: boolean, onGone?: () 
   const [error, setError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [capacity, setCapacity] = useState<Capacity | null>(null);
 
   const load = useCallback(async () => {
     const request = begin();
@@ -39,6 +42,11 @@ export function useSubscriptions(calendarId: string, open: boolean, onGone?: () 
       if (!request.alive()) return;
       setItems(rows);
       setError(null);
+      // How much room is left is only a hint for the Add button (the server decides): a failure
+      // to read it leaves the button as it was.
+      subscriptionCapacity(calendarId, request.signal)
+        .then((room) => request.alive() && setCapacity(room))
+        .catch(() => undefined);
     } catch (e) {
       if (!request.alive()) return;
       if (isGone(e)) gone();
@@ -72,5 +80,5 @@ export function useSubscriptions(calendarId: string, open: boolean, onGone?: () 
     },
     [load],
   );
-  return { items, loading, error, rowError, notes, reload: load, act };
+  return { items, loading, error, rowError, notes, capacity, reload: load, act };
 }

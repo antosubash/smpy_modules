@@ -29,7 +29,9 @@ export function EventWhen({
         <time dateTime={when.start_local}>{own}</time>
       </p>
       {mine ? (
-        <p className="text-sm text-muted-foreground">{t(copy.your_time, { time: mine })}</p>
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">
+          {t(copy.your_time, { time: mine })}
+        </p>
       ) : null}
       {previous ? (
         <p className="text-sm font-medium">{t(copy.rescheduled_from, { time: previous })}</p>

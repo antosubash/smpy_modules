@@ -9,8 +9,11 @@ export default function ExternalPublicDetail({ occurrence }: PublicDetailProps) 
   const copy = keys.events.subscriptions;
   if (!occurrence) return null;
   return (
-    <div className="space-y-1 text-sm" data-testid="external-public-detail">
-      <p className="text-muted-foreground">
+    <div
+      className="space-y-1 text-sm [overflow-wrap:anywhere]"
+      data-testid="external-public-detail"
+    >
+      <p className="text-muted-foreground dark:text-zinc-400">
         {t(copy.from_label, { label: occurrence.origin_label ?? '' })}
       </p>
       {occurrence.location ? (

@@ -35,7 +35,7 @@ export function TimezoneToggle({ mode, calendarZone, myZone, calendarTime = true
       {calendarTime ? option('calendar', t(copy.calendar), calendarZone) : null}
       {option('mine', t(copy.mine), myZone)}
       {calendarTime && calendarZone === myZone ? (
-        <span className="text-xs text-muted-foreground">{t(copy.same)}</span>
+        <span className="text-xs text-muted-foreground dark:text-zinc-400">{t(copy.same)}</span>
       ) : null}
     </fieldset>
   );

@@ -61,10 +61,10 @@ export function OccurrencesPreview(props: Props) {
     <section className="grid gap-2" aria-label={t(copy.title)}>
       <h3 className="text-sm font-medium">{t(copy.title)}</h3>
       {props.saved && !props.canOverride && (
-        <p className="text-sm text-muted-foreground">{t(copy.save_first)}</p>
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.save_first)}</p>
       )}
       {props.error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive dark:text-red-400">
           {props.error}
         </p>
       )}
@@ -74,13 +74,13 @@ export function OccurrencesPreview(props: Props) {
         </p>
       )}
       {!props.loading && !props.error && rows.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t(copy.none)}</p>
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.none)}</p>
       )}
       <ul className="grid gap-2">
         {rows.map(({ occ, found, when, offset }) => (
           <li key={occ.start} className="flex flex-wrap items-center gap-2 text-sm">
             <span className={found?.kind === 'skipped' ? 'line-through' : undefined}>{when}</span>
-            {offset && <span className="text-muted-foreground">({offset})</span>}
+            {offset && <span className="text-muted-foreground dark:text-zinc-400">({offset})</span>}
             {found && <Badge variant="secondary">{t(copy[`kind_${found.kind}`])}</Badge>}
             {found && described(found) && <span>{described(found)}</span>}
             {props.saved && (

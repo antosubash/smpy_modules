@@ -99,7 +99,7 @@ export function RecurrenceEditor({
   return (
     <fieldset className="grid gap-3" disabled={disabled}>
       <legend className="mb-2 text-sm font-medium">{t(copy.title)}</legend>
-      {reason && <p className="text-sm text-muted-foreground">{reason}</p>}
+      {reason && <p className="text-sm text-muted-foreground dark:text-zinc-400">{reason}</p>}
       <div className="grid gap-2">
         <Label htmlFor={MODE}>{t(copy.frequency)}</Label>
         <NativeSelect

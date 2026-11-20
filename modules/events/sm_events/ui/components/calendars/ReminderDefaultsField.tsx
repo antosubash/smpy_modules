@@ -51,7 +51,7 @@ export function ReminderDefaultsField({
           ))}
         </ul>
       ) : null}
-      <p className="text-xs text-muted-foreground">{t(copy.help)}</p>
+      <p className="text-xs text-muted-foreground dark:text-zinc-400">{t(copy.help)}</p>
     </div>
   );
 }

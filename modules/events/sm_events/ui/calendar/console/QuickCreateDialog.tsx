@@ -200,9 +200,11 @@ function QuickCreateForm({
           {t(copy.skipped_hour, { ...jump, zone })}
         </p>
       )}
-      <p className="text-sm text-muted-foreground">{t(copy.zone_note, { zone })}</p>
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">
+        {t(copy.zone_note, { zone })}
+      </p>
       {errors.error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive dark:text-red-400">
           {errors.error}
         </p>
       )}

@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@simple-module-py/ui/components/ui/dialog';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import type { Subscription } from '../../utils/api-subscriptions';
 import { keys, useT } from '../../utils/i18n';
@@ -35,8 +35,20 @@ export function SubscriptionsDialog({
   const { t } = useT();
   const copy = keys.events.subscriptions;
   const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   const [form, setForm] = useState<Form>(null);
   const state = useSubscriptions(calendar.id, open, onGone);
+  const room = state.capacity;
+  // Why Add is off: the calendar's, the member's or the tenant's allowance is used up.
+  const full: string | null = !room
+    ? null
+    : room.calendar.used >= room.calendar.limit
+      ? t(copy.limit_calendar, { limit: room.calendar.limit })
+      : room.owner.used >= room.owner.limit
+        ? t(copy.limit_owner, { limit: room.owner.limit })
+        : room.tenant.used >= room.tenant.limit
+          ? t(copy.limit_tenant, { limit: room.tenant.limit })
+          : null;
   const change = (next: boolean) => {
     setOpen(next);
     if (!next) setForm(null); // an address typed and not saved is dropped with the dialog
@@ -45,6 +57,7 @@ export function SubscriptionsDialog({
     <Dialog open={open} onOpenChange={change}>
       <DialogTrigger asChild>
         <Button
+          ref={trigger}
           type="button"
           variant="outline"
           data-testid="events-subscriptions"
@@ -56,6 +69,16 @@ export function SubscriptionsDialog({
       <DialogContent
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto"
         data-testid="events-subscriptions-dialog"
+        onEscapeKeyDown={(event) => {
+          if (form) {
+            event.preventDefault(); // the first Escape closes the form, the next the dialog
+            setForm(null);
+          }
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          trigger.current?.focus(); // back to where the person was
+        }}
       >
         <DialogHeader>
           <DialogTitle>{withName(t, copy.title, calendar.name)}</DialogTitle>
@@ -63,7 +86,7 @@ export function SubscriptionsDialog({
         </DialogHeader>
         {state.loading && state.items.length === 0 ? <p role="status">{t(copy.loading)}</p> : null}
         {state.error ? (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {state.error}
           </p>
         ) : null}
@@ -98,9 +121,21 @@ export function SubscriptionsDialog({
             onCancel={() => setForm(null)}
           />
         ) : (
-          <Button type="button" onClick={() => setForm({ editing: null })}>
-            {t(copy.add)}
-          </Button>
+          <>
+            <Button
+              type="button"
+              disabled={full !== null}
+              aria-describedby={full ? 'events-sub-full' : undefined}
+              onClick={() => setForm({ editing: null })}
+            >
+              {t(copy.add)}
+            </Button>
+            {full ? (
+              <p id="events-sub-full" className="text-sm text-muted-foreground dark:text-zinc-400">
+                {full}
+              </p>
+            ) : null}
+          </>
         )}
       </DialogContent>
     </Dialog>

@@ -42,7 +42,7 @@ export function ItemRows({
   const outcome = keys.events.import.outcome;
   const lookup = (table: object, code: string) => (table as Record<string, string>)[code];
   if (!page || page.items.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t(copy.empty)}</p>;
+    return <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.empty)}</p>;
   }
   const current = filter.page ?? 1;
   const last = Math.max(1, Math.ceil(page.total / page.page_size));
@@ -110,7 +110,7 @@ export function ItemRows({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-zinc-400">
         <span>{t(copy.more, { shown: page.items.length, total: page.total })}</span>
         {last > 1 && (
           <>

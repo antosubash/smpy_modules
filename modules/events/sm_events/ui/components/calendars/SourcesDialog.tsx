@@ -178,7 +178,7 @@ export function SourcesDialog({ calendar, onSaved }: { calendar: Calendar; onSav
             ))}
           </ul>
           {error ? (
-            <p role="alert" className="text-destructive">
+            <p role="alert" className="text-destructive dark:text-red-400">
               {error}
             </p>
           ) : null}

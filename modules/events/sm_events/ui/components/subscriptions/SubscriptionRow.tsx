@@ -57,7 +57,7 @@ export function SubscriptionRow({ sub, calendarColor, error, note, onAction, onE
       <p className="font-mono text-xs break-all" data-testid="subscription-url">
         {sub.url_display}
       </p>
-      <p className="text-muted-foreground">
+      <p className="text-muted-foreground dark:text-zinc-400">
         {sub.last_ok_at
           ? t(copy.row.updated, { when: when(sub.last_ok_at) })
           : t(copy.row.never_updated)}
@@ -68,21 +68,29 @@ export function SubscriptionRow({ sub, calendarColor, error, note, onAction, onE
           : ''}
       </p>
       {sub.error_code ? (
-        <p role="status" className="text-destructive" data-testid="subscription-code">
+        <p
+          role="status"
+          className="text-destructive dark:text-red-400"
+          data-testid="subscription-code"
+        >
           {failureText(sub.error_code, sub.last_http_status)}
         </p>
       ) : null}
-      {left ? <p className="text-muted-foreground">{left}</p> : null}
+      {left ? <p className="text-muted-foreground dark:text-zinc-400">{left}</p> : null}
       {sub.may_use_internal_addresses ? (
-        <p className="text-muted-foreground">{t(copy.row.internal)}</p>
+        <p className="text-muted-foreground dark:text-zinc-400">{t(copy.row.internal)}</p>
       ) : null}
       {note ? (
-        <p role="status" className="text-muted-foreground" data-testid="subscription-queued">
+        <p
+          role="status"
+          className="text-muted-foreground dark:text-zinc-400"
+          data-testid="subscription-queued"
+        >
           {note}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-destructive">
+        <p role="alert" className="text-destructive dark:text-red-400">
           {error}
         </p>
       ) : null}
@@ -127,7 +135,11 @@ export function SubscriptionRow({ sub, calendarColor, error, note, onAction, onE
             </Button>
           }
           title={t(copy.remove_title, { name: sub.label })}
-          description={t(copy.remove_description, { count: sub.item_count })}
+          description={
+            sub.item_count === 0
+              ? t(copy.remove_description_empty)
+              : t(copy.remove_description, { count: sub.item_count })
+          }
           confirmLabel={t(copy.remove)}
           onConfirm={() => onAction('delete')}
         />

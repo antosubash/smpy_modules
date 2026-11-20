@@ -94,10 +94,14 @@ export function SubscriptionForm({
           required={!editing}
           value={url}
           placeholder={editing ? t(copy.form.url_keep) : 'https://'}
-          onChange={(e) => setUrl(e.target.value)}
+          autoFocus
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setError(null);
+          }}
           aria-describedby="events-sub-url-hint"
         />
-        <p id="events-sub-url-hint" className="text-xs text-muted-foreground">
+        <p id="events-sub-url-hint" className="text-xs text-muted-foreground dark:text-zinc-400">
           {t(copy.form.url_hint)}
         </p>
       </div>
@@ -108,7 +112,10 @@ export function SubscriptionForm({
           required
           maxLength={100}
           value={label}
-          onChange={(e) => setLabel(e.target.value)}
+          onChange={(e) => {
+            setLabel(e.target.value);
+            setError(null);
+          }}
         />
       </div>
       <div className="flex flex-wrap gap-3">
@@ -119,7 +126,10 @@ export function SubscriptionForm({
             value={color}
             pattern="#[0-9a-fA-F]{6}"
             placeholder="#2563eb"
-            onChange={(e) => setColor(e.target.value)}
+            onChange={(e) => {
+              setColor(e.target.value);
+              setError(null);
+            }}
           />
         </div>
         <div className="space-y-1">
@@ -131,7 +141,10 @@ export function SubscriptionForm({
             max={1440}
             value={minutes}
             placeholder={t(copy.form.refresh_default, { minutes: defaultMinutes })}
-            onChange={(e) => setMinutes(e.target.value)}
+            onChange={(e) => {
+              setMinutes(e.target.value);
+              setError(null);
+            }}
           />
         </div>
       </div>
@@ -146,7 +159,7 @@ export function SubscriptionForm({
           />
           {t(copy.form.public)}
         </label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground dark:text-zinc-400">
           {!canPublish
             ? t(copy.form.public_needs_publish)
             : !isPublicCalendar
@@ -155,12 +168,14 @@ export function SubscriptionForm({
         </p>
       </div>
       {error ? (
-        <p role="alert" className="text-destructive">
+        <p role="alert" className="text-destructive dark:text-red-400">
           {error}
         </p>
       ) : null}
       <div className="flex gap-2">
-        <Button type="submit" disabled={pending}>
+        {/* A stale refusal goes at the next attempt, even one the browser's own validation stops
+            before `submit` runs. */}
+        <Button type="submit" disabled={pending} onClick={() => setError(null)}>
           {t(pending ? keys.events.common.saving : keys.events.common.save)}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
