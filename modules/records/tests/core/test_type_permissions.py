@@ -223,7 +223,9 @@ async def test_the_sidebar_follows_the_grant(granted):
     async def labels(*names: str) -> list[str]:
         resp = await granted.get("/admin/records/", headers={**roles(*names), **_INERTIA})
         assert resp.status_code == 200, resp.text
-        return [item["label"] for item in resp.json()["props"]["menus"]["adminSidebar"]]
+        items = resp.json()["props"]["menus"]["adminSidebar"]
+        # "My registrations" is the events-gated entry, tested with the registration suite.
+        return [i["label"] for i in items if i["label"] != "My registrations"]
 
     assert await labels(ROLE_VIEWER) == ["All record types", "Companies"]
     assert await labels(ROLE_EDITOR_TWO) == ["All record types"]
