@@ -17,7 +17,7 @@ from typing import Any
 
 from simple_module_db import all_tenants as framework_all_tenants
 from simple_module_db import mark_written
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.sql.elements import ColumnElement
 
 from sm_events.core import constants
@@ -27,6 +27,8 @@ from sm_events.models import Subscription
 __all__ = ["claim", "due", "fenced", "release"]
 
 _LIVE = ("pending", "ok", "error")
+_SLOTS_LOCK = 7_310_017
+"""The advisory-lock key of the claim (Postgres)."""
 
 
 def due(now: datetime) -> ColumnElement[bool]:
@@ -45,8 +47,16 @@ async def claim(db: Any, sub_id: uuid.UUID, *, owner: str, now: datetime) -> boo
     """Take the lease on ``sub_id`` if it is due. ``True`` for the one caller that won."""
     table = Subscription.__table__
     tenant = bound_tenant()
-    active = (
-        select(func.count()).select_from(table).where(table.c.lease_until > now).scalar_subquery()
+    # Two counts of live leases, nothing else read: this tenant's, and the whole install's (the
+    # one legitimate cross-tenant read here: a count, no row). ``lease_until > now`` frees an
+    # expired lease's slot at once.
+    live = table.c.lease_until > now
+    active = select(func.count()).select_from(table).where(live).scalar_subquery()
+    mine = (
+        select(func.count())
+        .select_from(table)
+        .where(live, table.c.tenant_id == tenant)
+        .scalar_subquery()
     )
     stmt = (
         update(table)
@@ -54,10 +64,15 @@ async def claim(db: Any, sub_id: uuid.UUID, *, owner: str, now: datetime) -> boo
             table.c.tenant_id == tenant,
             table.c.id == sub_id,
             due(now),
+            mine < constants.SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT,
             active < constants.SUBSCRIPTION_MAX_CONCURRENT_FETCHES,
         )
         .values(lease_owner=owner, lease_until=now + constants.SUBSCRIPTION_LEASE)
     )
+    if db.sync_session.get_bind().dialect.name == "postgresql":
+        # Counting and updating must not interleave across sessions, or two claims could each see
+        # a free slot: one transaction-scoped lock makes the caps exact (SQLite serialises writes).
+        await db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _SLOTS_LOCK})
     with framework_all_tenants():  # the count is install-wide; the target names its tenant itself
         result = await db.execute(stmt)
     mark_written(db)

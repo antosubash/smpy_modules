@@ -43,6 +43,7 @@ from sm_events.feeds.subscriptions import lease
 from sm_events.feeds.subscriptions.attempt import attempt
 from sm_events.feeds.subscriptions.fetch import fetch_feed
 from sm_events.models import Calendar, Subscription
+from sm_events.reminders.tick import order_tenants
 
 __all__ = ["COUNTS", "refresh_async", "refresh_one_async"]
 
@@ -63,11 +64,15 @@ def _stored_settings() -> EventsSettings:
     return settings_for(EventsSettings, constants.PACKAGE, ttl=30)
 
 
-def _interleave(rows: list[tuple[str, uuid.UUID]]) -> list[tuple[str, uuid.UUID]]:
-    """Round-robin across tenants, each tenant's own order (oldest due first) kept."""
-    by_tenant: dict[str, list[tuple[str, uuid.UUID]]] = {}
+def rotate(rows: list[Any], now: datetime) -> list[Any]:
+    """Round-robin across tenants, each tenant's own order (oldest due first) kept, starting at a
+    different tenant every minute (the reminders tick's rotation), so the shared slots are
+    spread fairly across ticks."""
+    by_tenant: dict[str, list[Any]] = {}
+    for tenant in order_tenants(sorted({row[0] for row in rows}), now):
+        by_tenant[tenant] = []
     for row in rows:
-        by_tenant.setdefault(row[0], []).append(row)
+        by_tenant[row[0]].append(row)
     return [row for group in zip_longest(*by_tenant.values()) for row in group if row is not None]
 
 
@@ -83,7 +88,7 @@ async def _due(factory: Any, now: datetime) -> list[tuple[str, uuid.UUID]]:
         async with factory() as session:
             rows = [(str(t), i) for t, i in (await session.execute(stmt)).all()]
             await finalize_session(session)
-    return _interleave([row for row in rows if valid_tenant(row[0])])
+    return rotate([row for row in rows if valid_tenant(row[0])], now)
 
 
 async def refresh_async(

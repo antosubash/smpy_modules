@@ -55,6 +55,7 @@ __all__ = [
     "SUBSCRIPTION_LIMIT_DETAIL",
     "SUBSCRIPTION_MAX_BACKOFF",
     "SUBSCRIPTION_MAX_CONCURRENT_FETCHES",
+    "SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT",
     "SUBSCRIPTION_MAX_FAILURES",
     "SUBSCRIPTION_MAX_REDIRECTS",
     "SUBSCRIPTION_MAX_REFRESH_MINUTES",
@@ -145,6 +146,8 @@ SUBSCRIPTION_TICK_FETCHES: Final = 20
 SUBSCRIPTION_TICK_BYTES: Final = 50 * 1024 * 1024
 SUBSCRIPTION_TICK_SECONDS: Final = 45
 SUBSCRIPTION_LEASE: Final = timedelta(minutes=2)
+SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT: Final = 2
+"""One tenant's share of those slots (a quarter): hung feeds of one tenant cannot hold the pool."""
 SUBSCRIPTION_MAX_CONCURRENT_FETCHES: Final = 8
 """Install-wide ceiling on subscriptions leased (so being fetched) at once, whatever the number of
 beats and workers; the excess waits for the next tick. Counted in the claim's own statement, so

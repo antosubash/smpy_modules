@@ -87,6 +87,7 @@ async def test_release_clears_the_lease(db, sub):
 @pytest.mark.skipif(not USING_POSTGRES, reason="needs two real connections")
 async def test_two_workers_one_fetch(db_state, db, monkeypatch):
     monkeypatch.setattr(constants, "SUBSCRIPTION_MAX_CONCURRENT_FETCHES", 1000)
+    monkeypatch.setattr(constants, "SUBSCRIPTION_MAX_CONCURRENT_FETCHES_PER_TENANT", 1000)
     cal = await seed_calendar(db)
     ids = [
         (await seed_subscription(db, cal, label=f"s{n}", next_fetch_at=NOW)).id for n in range(20)
