@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@simple-module-py/ui/components/ui/dialog';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSubscriptions } from '../../hooks/useSubscriptions';
 import type { Subscription } from '../../utils/api-subscriptions';
 import { keys, useT } from '../../utils/i18n';
@@ -37,6 +37,7 @@ export function SubscriptionsDialog({
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const [form, setForm] = useState<Form>(null);
+  const [restore, setRestore] = useState(0);
   const opener = useRef<HTMLElement | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   /** Open the form from `from` (the Add button or a row's Edit) and remember it. */
@@ -48,11 +49,15 @@ export function SubscriptionsDialog({
    *  form closed, so a detached opener falls back to it). */
   const closeForm = () => {
     setForm(null);
-    setTimeout(() => {
-      const back = opener.current?.isConnected ? opener.current : addButton.current;
-      back?.focus();
-    }, 0);
+    setRestore((n) => n + 1);
   };
+  // After the commit that removed the form (not a timer: React may render it later than any
+  // timeout, and the dialog would take focus for itself first).
+  useEffect(() => {
+    if (restore === 0) return;
+    const back = opener.current?.isConnected ? opener.current : addButton.current;
+    back?.focus();
+  }, [restore]);
   const state = useSubscriptions(calendar.id, open, onGone);
   const room = state.capacity;
   // Why Add is off: the calendar's, the member's or the tenant's allowance is used up.

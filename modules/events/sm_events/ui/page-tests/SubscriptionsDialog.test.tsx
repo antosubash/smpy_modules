@@ -150,6 +150,28 @@ describe('SubscriptionsDialog', () => {
     await view.unmount();
   });
 
+  it('returns focus to Add after saving a new subscription', async () => {
+    let made = false;
+    const { view } = await open({
+      [`GET ${LIST}`]: () => (made ? [sub()] : []),
+      [`POST ${LIST}`]: () => {
+        made = true;
+        return Response.json(sub(), { status: 201 });
+      },
+    });
+    await click(button('Add a subscription') as HTMLElement);
+    await setValue(
+      document.getElementById('events-sub-url') as HTMLInputElement,
+      'https://a.example/x.ics',
+    );
+    await setValue(document.getElementById('events-sub-label') as HTMLInputElement, 'Holidays');
+    await click(button('Save') as HTMLElement);
+    await flush(80);
+    expect(document.querySelector('[data-testid="subscription-form"]')).toBeNull();
+    expect(document.activeElement).toBe(button('Add a subscription'));
+    await view.unmount();
+  });
+
   it('puts focus in the address field, closes the form on the first Escape and the dialog on the next, and returns focus to the trigger', async () => {
     const { view } = await open({ [`GET ${LIST}`]: [] });
     const trigger = document.querySelector('[data-testid="events-subscriptions"]') as HTMLElement;
