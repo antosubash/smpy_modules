@@ -27,7 +27,9 @@ from sm_events.web.schemas.subscriptions import SubscriptionIn, SubscriptionOut,
 router = APIRouter(tags=["subscriptions"], dependencies=[require_view])
 
 _ID = "[^/]+"  # whatever spelling of a UUID the route accepts (hex, braces, urn:uuid:)
-PATH_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/(?:calendars/{_ID}/subscriptions|subscriptions/{_ID}(?:/refresh|/resume)?)$"
+_CALENDAR_SUBS = rf"calendars/{_ID}/subscriptions"
+_ONE = rf"subscriptions/{_ID}(?:/refresh|/resume)?"
+PATH_PATTERN = rf"^{constants.ROUTE_PREFIX_API}/(?:{_CALENDAR_SUBS}|{_ONE})$"
 """Every route that can start a fetch: create, edit (a new address), refresh and resume."""
 RATE = constants.SUBSCRIPTION_WRITE_RATE
 
