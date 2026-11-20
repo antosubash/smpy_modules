@@ -181,3 +181,35 @@ async def test_a_trashed_event_is_listed_as_no_longer_available(reg_site):
     assert [(i["available"], i["status"]) for i in gone] == [(False, "pending")]
     assert gone[0]["page_path"] is None and gone[0]["when_text"] is None
     assert len(await regs(reg_site)) == 1  # the registration itself is kept
+
+
+async def test_an_unavailable_row_sorts_last_whatever_its_old_date(reg_site):
+    from datetime import UTC, datetime, timedelta
+
+    from sm_events.core.tenancy import tenant_scope
+    from sm_events.models import Event
+    from sqlalchemy import update
+
+    from tests.support.registration_http import seed_event
+
+    soon = datetime.now(UTC) + timedelta(days=10)
+    first = await seed_event(
+        reg_site.db_state, uid="s1@x", starts_at=soon, ends_at=soon + timedelta(hours=1)
+    )
+    later = soon + timedelta(days=5)
+    second = await seed_event(
+        reg_site.db_state, uid="s2@x", starts_at=later, ends_at=later + timedelta(hours=1)
+    )
+    a = await sign_up(reg_site, address="test@example.com", event=first)
+    b = await sign_up(reg_site, address="test@example.com", event=second)
+    with tenant_scope("default"):
+        async with reg_site.db_state.session_factory() as db:
+            await db.execute(
+                update(Event)
+                .where(Event.id == uuid.UUID(first["event_id"]))
+                .values(is_deleted=True)
+            )
+            await db.commit()
+    me(reg_site)
+    got = (await reg_site.get(URL, headers=roles(ROLE_VIEWER))).json()["items"]
+    assert [(i["uuid"], i["available"]) for i in got] == [(b["uuid"], True), (a["uuid"], False)]

@@ -78,9 +78,11 @@ function MyRegistrations() {
               )}
             </p>
             {item.available && item.when_text ? <p className="text-sm">{item.when_text}</p> : null}
-            <p className="text-sm text-muted-foreground">
-              {t(item.status === 'pending' ? copy.pending : copy.registered)}
-            </p>
+            {item.available ? (
+              <p className="text-sm text-muted-foreground">
+                {t(item.status === 'pending' ? copy.pending : copy.registered)}
+              </p>
+            ) : null}
             {!item.available ? null : asking === item.uuid ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-sm">{t(copy.cancel_confirm)}</span>

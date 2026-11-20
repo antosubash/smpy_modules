@@ -109,5 +109,6 @@ it('a row whose event is gone says so and offers no cancel', async () => {
   expect(text()).toContain('This event is no longer available');
   expect(v.button('Cancel registration')).toBeUndefined();
   expect(text()).not.toContain('Event g');
+  expect(text()).not.toContain('Registered'); // the status badge gives way to the unavailable state
   await v.unmount();
 });

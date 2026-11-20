@@ -148,29 +148,29 @@ async def _items(
         facts = await seats.integration().summaries(
             db, tenant_id=bound_tenant(), refs=refs, locale=locale
         )
-    items = []
+    rows: list[tuple[tuple[Any, ...], MineItem]] = []
     for (rtype, record), begun in kept:
         data = record.data or {}
         ref = (uuid.UUID(str(data["sm_event_id"])), str(data.get("sm_occurrence_key")))
         title, when_text, page_path = _title(record, facts.get(ref))
         start = data.get("sm_occurrence_start")
-        items.append(
-            MineItem(
-                uuid=record.uuid,
-                type_key=rtype.key,
-                status=str(data.get("sm_status")),
-                event_id=str(data.get("sm_event_id")),
-                occurrence_key=str(data.get("sm_occurrence_key")),
-                title=title,
-                when_text=when_text,
-                page_path=page_path,
-                starts_at=begun.isoformat()
-                if begun
-                else (start if isinstance(start, str) else None),
-                available=facts.get(ref) is not None or not seats.available(),
-            )
+        available = facts.get(ref) is not None or not seats.available()
+        item = MineItem(
+            uuid=record.uuid,
+            type_key=rtype.key,
+            status=str(data.get("sm_status")),
+            event_id=str(data.get("sm_event_id")),
+            occurrence_key=str(data.get("sm_occurrence_key")),
+            title=title,
+            when_text=when_text,
+            page_path=page_path,
+            starts_at=begun.isoformat() if begun else (start if isinstance(start, str) else None),
+            available=available,
         )
-    return items
+        # Ones events still answers for first, by their current start; the unavailable last.
+        rows.append(((not available, begun is None, begun or now, record.uuid), item))
+    rows.sort(key=lambda row: row[0])
+    return [item for _, item in rows]
 
 
 @router.get("/registrations/mine", response_model=MineOut)
