@@ -50,7 +50,8 @@
     "event": "Veranstaltung",
     "picker": "Typ",
     "current": "Typ: {name}",
-    "not_installed": "Der Typ dieser Veranstaltung ist auf diesem Server nicht installiert. Die zusätzlichen Angaben bleiben unverändert und können hier nicht geändert werden."
+    "not_installed": "Der Typ dieser Veranstaltung ist auf diesem Server nicht installiert. Die zusätzlichen Angaben bleiben unverändert und können hier nicht geändert werden.",
+    "loading_section": "Felder des Veranstaltungstyps werden geladen ..."
   },
   "calendars": {
     "title": "Kalender",
@@ -1026,6 +1027,7 @@
     "diff_none": "Keine",
     "diff_external": "Link: {url}",
     "diff_builtin": "Auf dieser Website, {capacity} Plätze",
-    "diff_builtin_open": "Auf dieser Website, ohne Begrenzung"
+    "diff_builtin_open": "Auf dieser Website, ohne Begrenzung",
+    "loading_providers": "Anmeldeoptionen werden geladen ..."
   }
 }

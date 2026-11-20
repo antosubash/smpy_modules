@@ -7,6 +7,7 @@ import { FieldError } from '@simple-module-py/ui/components/ui/field';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
+import { useEventExtensions } from '../../extensions/load';
 import { PluginBoundary } from '../../extensions/PluginBoundary';
 import { registrationFor, registrations } from '../../extensions/registry';
 import { useRegistrationCounts } from '../../hooks/useRegistrationCounts';
@@ -48,7 +49,9 @@ export function RegistrationSection({
 }: Props) {
   const { t } = useT();
   const copy = keys.events.registration;
+  const loaded = useEventExtensions(); // starts the lazy plugin load: a direct visit has none yet
   const providers = registrations();
+  const loading = !loaded && providers.length === 0;
   const frozen = disabled || value.hidden || !value.installed;
   const canBuiltin = providers.length > 0 || value.mode === 'builtin';
   const provider = registrationFor(value.provider);
@@ -117,7 +120,11 @@ export function RegistrationSection({
                 {t(copy[`mode_${mode}`])}
               </label>
             ))}
-            {!canBuiltin ? (
+            {loading && !canBuiltin ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                {t(copy.loading_providers)}
+              </p>
+            ) : !canBuiltin ? (
               <p className="text-xs text-muted-foreground">{t(copy.no_provider)}</p>
             ) : null}
           </div>

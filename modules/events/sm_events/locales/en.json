@@ -50,7 +50,8 @@
     "event": "Event",
     "picker": "Type",
     "current": "Type: {name}",
-    "not_installed": "This event's type is not installed on this server. Its extra details are kept as they are and cannot be changed here."
+    "not_installed": "This event's type is not installed on this server. Its extra details are kept as they are and cannot be changed here.",
+    "loading_section": "Loading the event type's fields..."
   },
   "calendars": {
     "title": "Calendars",
@@ -1026,6 +1027,7 @@
     "diff_none": "None",
     "diff_external": "Link: {url}",
     "diff_builtin": "On this site, {capacity} seats",
-    "diff_builtin_open": "On this site, no seat limit"
+    "diff_builtin_open": "On this site, no seat limit",
+    "loading_providers": "Loading registration options..."
   }
 }

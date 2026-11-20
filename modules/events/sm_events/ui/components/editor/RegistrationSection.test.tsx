@@ -190,3 +190,30 @@ it('the external mode asks for the link only', async () => {
   expect(document.getElementById('event-registration-capacity')).toBeNull();
   await view.unmount();
 });
+
+it('loads the plugins itself on a cold visit: a loading line, then the provider', async () => {
+  const { loadEventExtensions, resetLoader } = await import('../../extensions/load');
+  resetLoader();
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // A direct load of the editor: nothing registered, the glob's loaders still pending.
+  void loadEventExtensions({
+    'records/events-extensions.ts': async () => {
+      await gate;
+      registerRegistration({ id: ID, EditorSection: section });
+    },
+  });
+  stubFetch({ [`GET ${COUNTS}`]: { items: [], total: 0 } });
+  const view = await mount(<Harness eventId={null} />);
+  expect(document.body.textContent).toContain('Loading registration options');
+  expect(document.body.textContent).not.toContain('no registration form available');
+  expect(radio('builtin')).toBeNull();
+  release();
+  await flush();
+  expect(radio('builtin')).not.toBeNull();
+  expect(document.body.textContent).not.toContain('Loading registration options');
+  await view.unmount();
+  resetLoader();
+});
