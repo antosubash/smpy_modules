@@ -35,7 +35,7 @@ from sm_events.feeds.subscriptions import items
 from sm_events.feeds.subscriptions.errors import FetchFailure
 from sm_events.models import ExternalItem, Subscription
 
-__all__ = ["StoreCounts", "store_feed"]
+__all__ = ["Prepared", "StoreCounts", "prepare", "store_feed"]
 
 
 @dataclass(frozen=True)
@@ -45,12 +45,21 @@ class StoreCounts:
     reasons: dict[str, int]
 
 
+@dataclass(frozen=True)
+class Prepared:
+    """A feed scanned and mapped in memory: what ``store_feed`` writes."""
+
+    values: list[items.ItemValues]
+    reasons: Counter[str]
+
+
 def _chunks[T](seq: Sequence[T]) -> Iterator[Sequence[T]]:
     for start in range(0, len(seq), constants.SUBSCRIPTION_STORE_CHUNK):
         yield seq[start : start + constants.SUBSCRIPTION_STORE_CHUNK]
 
 
-def _map(body: bytes, calendar_tz: str) -> tuple[list[items.ItemValues], Counter[str]]:
+def prepare(body: bytes, calendar_tz: str) -> Prepared:
+    """Scan and map ``body`` (CPU only: no database, no lock). Raises ``FetchFailure``."""
     try:
         deadline = time.monotonic() + constants.IMPORT_PARSE_SECONDS
         mapped = map_calendar(
@@ -69,7 +78,7 @@ def _map(body: bytes, calendar_tz: str) -> tuple[list[items.ItemValues], Counter
             values.append(items.to_values(item.event))
         except ItemSkip as skip:
             reasons[skip.code] += 1
-    return values, reasons
+    return Prepared(values, reasons)
 
 
 async def _check_caps(db: Any, sub: Subscription, count: int) -> None:
@@ -131,10 +140,19 @@ async def _swap(
 
 
 async def store_feed(
-    db: Any, sub: Subscription, *, calendar_tz: str, body: bytes, now: datetime | None = None
+    db: Any,
+    sub: Subscription,
+    *,
+    calendar_tz: str | None = None,
+    body: bytes | None = None,
+    prepared: Prepared | None = None,
+    now: datetime | None = None,
 ) -> StoreCounts:
-    """Replace ``sub``'s items with the feed in ``body``. No commit."""
-    values, reasons = _map(body, calendar_tz)
+    """Replace ``sub``'s items with the feed: ``prepared`` (parsed earlier, outside any lock) or
+    ``body`` parsed here. No commit."""
+    if prepared is None:
+        prepared = prepare(body or b"", calendar_tz or "UTC")
+    values, reasons = prepared.values, prepared.reasons
     await _check_caps(db, sub, len(values))
     generation = sub.generation + 1
     async with db.begin_nested():

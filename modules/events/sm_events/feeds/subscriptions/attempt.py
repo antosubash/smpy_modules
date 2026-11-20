@@ -10,6 +10,7 @@ subscription's id reach the log, never the address.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 import uuid
@@ -25,11 +26,10 @@ from sm_events.core import constants
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import tenant_scope
 from sm_events.feeds.importing.staging import effective_max_bytes
-from sm_events.feeds.subscriptions import lease, schedule, urls
+from sm_events.feeds.subscriptions import lease, schedule, store, urls
 from sm_events.feeds.subscriptions.errors import FetchFailure
 from sm_events.feeds.subscriptions.fetch import FetchResult
 from sm_events.feeds.subscriptions.policy import effective
-from sm_events.feeds.subscriptions.store import store_feed
 from sm_events.models import Calendar, Subscription
 
 __all__ = ["Attempt", "attempt"]
@@ -166,7 +166,18 @@ async def _store(
     rng: random.Random,
     utc_now: Callable[[], datetime],
 ) -> Attempt:
-    """Store the result (or record the failure) in one transaction fenced on the lease."""
+    """Store the result (or record the failure) in one transaction fenced on the lease. A body
+    is scanned and mapped first, in a thread, before any lock: an edit never waits for a parse."""
+    prepared: store.Prepared | None = None
+    failure: FetchFailure | None = outcome if isinstance(outcome, FetchFailure) else None
+    if isinstance(outcome, FetchResult) and outcome.status == "ok":
+        try:
+            prepared = await asyncio.to_thread(store.prepare, outcome.body, job.calendar_tz)
+        except FetchFailure as refused:
+            failure = refused
+        except Exception as exc:  # the class only
+            logger.warning("events subscription parse failed (%s)", type(exc).__name__)
+            failure = FetchFailure("internal")
     with tenant_scope(tenant):
         async with factory() as db:
             sub = await lease.fenced(db, sid, owner=owner, now=utc_now())
@@ -181,15 +192,12 @@ async def _store(
                 return Attempt("lease_lost")
             stamp = utc_now()
             paused = sub.status == "paused"  # a pause made during the fetch outlives its result
-            failure = outcome if isinstance(outcome, FetchFailure) else None
             received = 0
-            if isinstance(outcome, FetchResult) and outcome.status == "ok":
+            if prepared is not None:
                 try:
                     async with db.begin_nested():
-                        await store_feed(
-                            db, sub, calendar_tz=job.calendar_tz, body=outcome.body, now=stamp
-                        )
-                    received = len(outcome.body)
+                        await store.store_feed(db, sub, prepared=prepared, now=stamp)
+                    received = len(outcome.body)  # type: ignore[union-attr]
                 except FetchFailure as refused:
                     failure = refused
                 except Exception as exc:  # the class only; the savepoint left the items alone
