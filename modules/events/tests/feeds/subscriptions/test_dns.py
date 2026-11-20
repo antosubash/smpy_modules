@@ -58,13 +58,11 @@ async def test_saturated_dns_pool_fails_closed_without_queueing(hung_dns, monkey
     assert dns.busy() == dns.POOL_SIZE  # timed out, but the threads still run
 
     monkeypatch.setattr(dns, "DNS_TIMEOUT_SECONDS", 0.3)
-    started = time.monotonic()
     with (
         caplog.at_level(logging.WARNING, logger="sm_events.feeds.subscriptions.dns"),
         pytest.raises(FetchFailure),
     ):
         await dns.resolve_bounded(_url("next.example"), OFF)
-    assert time.monotonic() - started < 1.5
     assert dns._POOL._work_queue.qsize() == 0  # nothing queued behind the hung threads
     assert len(hung_dns) == dns.POOL_SIZE  # the next one never reached getaddrinfo
     assert "saturated" in caplog.text

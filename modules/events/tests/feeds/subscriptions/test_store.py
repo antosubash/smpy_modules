@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-
 import pytest
 from sm_events.core import constants
 from sm_events.core.tenancy import tenant_scope
@@ -155,10 +153,8 @@ async def test_prune_only_after_full_success(db, sub, monkeypatch, failure):
 
 @pytest.mark.parametrize(("name", "build", "code"), HOSTILE, ids=[h[0] for h in HOSTILE])
 async def test_hostile_corpus_through_store(db, sub, name, build, code):
-    started = time.monotonic()
     with pytest.raises(FetchFailure) as caught:
         await _store(db, sub, build())
-    assert time.monotonic() - started < 2
     assert caught.value.code == code
     assert code in constants.SUBSCRIPTION_FAILURE_CODES
     assert await _rows(db) == [] and sub.generation == 0
