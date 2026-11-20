@@ -59,3 +59,12 @@ Mail links come from configuration only: the confirm and cancel links from `publ
 event page and `.ics` from the tenant's configured public origin; never from a request header. With no
 trusted origin the mail has no event link. The `.ics` is linked, not attached (the framework mailer
 has no attachments).
+
+## What a repeated submit does
+
+A submit for an address that already holds a live registration for that occurrence answers the same
+neutral 202 as a new address. Behind it, a pending registration is mailed its confirmation again and
+a registered one an "already registered" mail that carries a cancel link, both within the address's
+own budget (3 mails a day per form; past it nothing is sent and the answer is unchanged). The mail
+goes only to that address, so the form is no oracle for who is registered.
+

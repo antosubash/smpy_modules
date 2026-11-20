@@ -12,12 +12,15 @@ The order, in one transaction (the global lock order is documented in
    cancelled occurrence refuse everyone alike (``event_unavailable``, ``registration_closed``);
 2. the payload is validated, the same way for everyone, before anything is looked up;
 3. the type lock, then a look for a live registration of the same address for the same occurrence:
-   found, the answer is the same 202 (a pending one is mailed again within the address's budget, a
-   registered one is mailed nothing), so the form is no oracle for who is registered, and the
-   capacity decision below is never reached by somebody who already holds a seat;
+   found, the answer is the same 202 (a pending one is mailed its confirmation again, a registered
+   one an "already registered" mail with a cancel link; both within the address's own budget of
+   3 mails a day per form, after which nothing is sent and the answer is still the same 202), so
+   the form is no oracle for who is registered, and the capacity decision below is never reached
+   by somebody who already holds a seat;
 4. otherwise the record is created (a draft, written by nobody, with its ``sm_*`` values through
-   ``system=``), then ``admit`` takes the seat on the same session: a refusal (``registration_full``
-   and the rest) is raised, and the route's rollback leaves no record and no seat.
+   ``system=``), then, on a single opt-in form only, ``admit`` takes the seat on the same session
+   (a double opt-in form takes it at the confirmation): a refusal (``registration_full`` and the
+   rest) is raised, and the route's rollback leaves no record and no seat.
 """
 
 from __future__ import annotations
