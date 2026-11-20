@@ -20,11 +20,12 @@ from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 
 from sm_events.core import constants
-from sm_events.core.errors import Conflict, PublishRequired, Stale
+from sm_events.core.errors import Conflict, Stale
 from sm_events.core.errors_subscriptions import (
     RefreshTooSoon,
     SubscriptionExists,
     SubscriptionLimit,
+    SubscriptionPublishRequired,
 )
 from sm_events.core.tenancy import bound_tenant
 from sm_events.feeds.subscriptions import generation, policy, rules, schedule, urls, validate
@@ -127,8 +128,10 @@ async def update(
         or body.url is not None
         or (body.label is not None and body.label != sub.label)
     )
-    if public and changes_shown and not ctx.can_publish:
-        raise PublishRequired  # what the public sees is chosen with the publish right, every time
+    if (sub.public or public) and changes_shown and not ctx.can_publish:
+        # What the public sees is chosen with the publish right, every time, in both directions
+        # (like the workflow's approve and unpublish).
+        raise SubscriptionPublishRequired
     moved = body.public is not None and body.public != sub.public
     flag_before = sub.may_use_private
     if public and body.public is not None and not sub.public:

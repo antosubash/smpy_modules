@@ -38,7 +38,7 @@ async def test_an_editor_without_publish_cannot_change_a_public_address(http):
     got = await http.patch(
         f"{SUBS}/{made['id']}", json={"url": "https://x.example.test/a.ics"}, headers=OWNER
     )
-    assert (got.status_code, got.json()["code"]) == (403, "publish_required")
+    assert (got.status_code, got.json()["code"]) == (403, "subscription_publish_required")
     after = await row(http, made["id"])
     assert (after.url_enc, after.url_display, after.updated_at) == (
         before.url_enc,
@@ -70,7 +70,7 @@ async def test_the_body_cannot_publish_without_the_right(http):
     assert (await add(http, cid, OWNER, public=True)).status_code == 403
     private = (await add(http, cid, OWNER, url="https://q.example.test/a.ics")).json()
     got = await http.patch(f"{SUBS}/{private['id']}", json={"public": True}, headers=OWNER)
-    assert (got.status_code, got.json()["code"]) == (403, "publish_required")
+    assert (got.status_code, got.json()["code"]) == (403, "subscription_publish_required")
     assert (await row(http, private["id"])).public is False
 
 
@@ -108,3 +108,17 @@ def test_a_public_subscription_is_fetched_public_only_whatever_its_flag():
         attempt.fetch_policy(EventsSettings(allow_private_subscription_urls=True), Row).intranet
         is True
     )
+
+
+async def test_an_editor_without_publish_cannot_take_a_subscription_off_the_public_site(http):
+    """Unpublishing an event needs the publish right (workflow: ``unpublish``), so does this."""
+    _, made = await _public(http)
+    got = await http.patch(f"{SUBS}/{made['id']}", json={"public": False}, headers=OWNER)
+    assert (got.status_code, got.json()["code"]) == (403, "subscription_publish_required")
+    assert (
+        got.json()["detail"]
+        == "Showing a subscription on public pages needs the publish permission"
+    )
+    assert (await row(http, made["id"])).public is True
+    done = await http.patch(f"{SUBS}/{made['id']}", json={"public": False}, headers=OWNER_P)
+    assert done.status_code == 200 and done.json()["public"] is False  # with the right it works

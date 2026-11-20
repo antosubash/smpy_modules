@@ -1120,7 +1120,7 @@
       "refresh_too_soon": "Dieses Abonnement wurde gerade erst aktualisiert. Versuche es in ein paar Minuten erneut.",
       "subscription_paused": "Setze dieses Abonnement fort, bevor du es aktualisierst.",
       "stale": "Jemand anderes hat dieses Abonnement geändert. Lade neu und versuche es erneut.",
-      "publish_required": "Externe Termine öffentlich zu zeigen erfordert die Veröffentlichungsberechtigung."
+      "subscription_publish_required": "Ein Abonnement auf öffentlichen Seiten zu zeigen erfordert die Veröffentlichungsberechtigung."
     }
   },
   "registration": {

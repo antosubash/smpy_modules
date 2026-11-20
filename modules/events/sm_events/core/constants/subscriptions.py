@@ -66,6 +66,8 @@ __all__ = [
     "SUBSCRIPTION_NOT_PAUSED_DETAIL",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_CODE",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_DETAIL",
+    "SUBSCRIPTION_PUBLISH_REQUIRED_CODE",
+    "SUBSCRIPTION_PUBLISH_REQUIRED_DETAIL",
     "SUBSCRIPTION_QUEUED_MINUTES",
     "SUBSCRIPTION_REFRESH_NOW_SECONDS",
     "SUBSCRIPTION_SLOW_MAX",
@@ -283,6 +285,10 @@ status number). A manager therefore cannot map the intranet beyond "answered wit
 not". The precise cause is only in the server log."""
 INTERNAL_KEPT_CODES: Final = frozenset({"internal", "url_unreadable", "url_own_feed"})
 
+SUBSCRIPTION_PUBLISH_REQUIRED_CODE: Final = "subscription_publish_required"
+SUBSCRIPTION_PUBLISH_REQUIRED_DETAIL: Final = (
+    "Showing a subscription on public pages needs the publish permission"
+)
 SUBSCRIPTION_EXISTS_CODE: Final = "subscription_exists"
 SUBSCRIPTION_EXISTS_DETAIL: Final = "This calendar already has a subscription to that address"
 SUBSCRIPTION_LIMIT_CODE: Final = "subscription_limit"

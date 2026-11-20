@@ -11,8 +11,10 @@ from typing import Any
 from sqlalchemy import select
 
 from sm_events.core import constants
-from sm_events.core.errors import PublishRequired
-from sm_events.core.errors_subscriptions import SubscriptionNotPublicCalendar
+from sm_events.core.errors_subscriptions import (
+    SubscriptionNotPublicCalendar,
+    SubscriptionPublishRequired,
+)
 from sm_events.core.settings import EventsSettings
 from sm_events.feeds.subscriptions import urls, validate
 from sm_events.models import Calendar, Subscription, Visibility
@@ -49,7 +51,7 @@ def check_public(public: bool, calendar: Calendar, ctx: Context) -> None:
     if not public:
         return
     if not ctx.can_publish:
-        raise PublishRequired
+        raise SubscriptionPublishRequired
     if calendar.visibility != Visibility.PUBLIC.value:
         raise SubscriptionNotPublicCalendar
 

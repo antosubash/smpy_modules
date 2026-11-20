@@ -1120,7 +1120,7 @@
       "refresh_too_soon": "This subscription was refreshed a moment ago. Try again in a few minutes.",
       "subscription_paused": "Resume this subscription before refreshing it.",
       "stale": "Someone else changed this subscription. Reload and try again.",
-      "publish_required": "Showing external events publicly needs the publish permission."
+      "subscription_publish_required": "Showing a subscription on public pages needs the publish permission."
     }
   },
   "registration": {

@@ -79,7 +79,7 @@ async def test_public_flag_needs_publish_and_a_public_calendar(http):
     pub = await calendar(http, OWNER_P, visibility="public")
     private = await calendar(http)
     denied = await add(http, pub, OWNER, public=True)
-    assert (denied.status_code, denied.json()["code"]) == (403, "publish_required")
+    assert (denied.status_code, denied.json()["code"]) == (403, "subscription_publish_required")
     assert (await add(http, pub, OWNER_P, public=True)).status_code == 201
     wrong = await add(http, private, OWNER_P, url="https://b.example.test/x.ics", public=True)
     assert (wrong.status_code, wrong.json()["code"]) == (422, "subscription_not_public_calendar")

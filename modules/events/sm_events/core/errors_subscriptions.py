@@ -8,7 +8,7 @@ carries the address: a ``detail`` is a fixed sentence.
 from __future__ import annotations
 
 from sm_events.core import constants
-from sm_events.core.errors import Conflict, EventsError, Invalid
+from sm_events.core.errors import Conflict, EventsError, Forbidden, Invalid
 
 __all__ = [
     "RefreshTooSoon",
@@ -16,6 +16,7 @@ __all__ = [
     "SubscriptionExists",
     "SubscriptionLimit",
     "SubscriptionNotPublicCalendar",
+    "SubscriptionPublishRequired",
     "UrlRefused",
 ]
 
@@ -58,3 +59,11 @@ class RefreshTooSoon(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
 
 class SecretUnreadable(Exception):  # noqa: N818 - names the condition
     """A stored secret that no key opens. Carries nothing: not the value, not its field."""
+
+
+class SubscriptionPublishRequired(Forbidden):
+    """Showing a subscription publicly, or taking it off the public site, is a publishing act:
+    the same right the events workflow asks for ``approve`` and ``unpublish``."""
+
+    code = constants.SUBSCRIPTION_PUBLISH_REQUIRED_CODE
+    detail = constants.SUBSCRIPTION_PUBLISH_REQUIRED_DETAIL

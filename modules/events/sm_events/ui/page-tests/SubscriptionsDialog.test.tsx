@@ -195,6 +195,20 @@ describe('SubscriptionsDialog', () => {
     await view.unmount();
   });
 
+  it('words a missing publish right as a subscription, not an event', async () => {
+    const { view } = await open({
+      [`GET ${LIST}`]: [sub()],
+      'POST /api/events/subscriptions/s1/pause': () =>
+        Response.json({ detail: 'x', code: 'subscription_publish_required' }, { status: 403 }),
+    });
+    await click(button('Pause') as HTMLElement);
+    await flush(50);
+    expect(text()).toContain(
+      'Showing a subscription on public pages needs the publish permission.',
+    );
+    await view.unmount();
+  });
+
   it('shows the refresh_too_soon message for a 429', async () => {
     const { view } = await open({
       [`GET ${LIST}`]: [sub()],
