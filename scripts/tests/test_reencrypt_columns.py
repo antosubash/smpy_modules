@@ -91,7 +91,8 @@ def _insert(db: Path, value: str, tenant="t1", deleted=False) -> str:
             " url_enc, url_display, label, public, may_use_private, policy_generation, status,"
             " consecutive_failures, generation,"
             " item_count, last_counts, created_at, updated_at)"
-            " VALUES (?, ?, ?, ?, 'o', ?, 'https://calendar.example/…', 'L', 0, 0, 0, 'ok', 0, 0, 0,"
+            " VALUES (?, ?, ?, ?, 'o', ?, 'https://calendar.example/…', 'L', 0, 0, 0, 'ok',"
+            " 0, 0, 0,"
             " '{}', '2026-01-01 00:00:00', '2026-01-01 00:00:00')",
             (tenant, int(deleted), row_id, uuid.uuid4().hex, value),
         )
