@@ -21,6 +21,8 @@ async def test_route_open(reg_site):
         "state": "open",
         "seats_left": None,
         "few_left": False,
+        "opens_text": None,
+        "closes_text": None,
         "opens_at": None,
         "closes_at": None,
     }

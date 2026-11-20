@@ -127,7 +127,11 @@ export default function RegistrationPanel({
         </p>
       );
     } else if (state?.state === 'not_open_yet') {
-      body = <p role="status">{t(copy.state_not_open, { time: when(state.opens_at, locale) })}</p>;
+      body = (
+        <p role="status">
+          {t(copy.state_not_open, { time: state.opens_text || when(state.opens_at, locale) })}
+        </p>
+      );
     } else if (state && state.state !== 'open') {
       body = <p role="status">{t(STATE_TEXT[state.state as keyof typeof STATE_TEXT])}</p>;
     } else {

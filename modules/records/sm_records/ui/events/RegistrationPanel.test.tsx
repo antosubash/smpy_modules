@@ -184,6 +184,20 @@ it.each([
   await v.unmount();
 });
 
+it("words the opening time as the server did, in the event zone, not the visitor's", async () => {
+  server({
+    status: 200,
+    body: view('not_open_yet', {
+      opens_at: '2026-06-01T04:30:00Z',
+      opens_text: 'Monday, 1 June 2026, 6:30 AM CEST',
+    }),
+  });
+  const v = await mount(<RegistrationPanel {...props} />);
+  await settle();
+  expect(text()).toContain('Registration opens Monday, 1 June 2026, 6:30 AM CEST');
+  await v.unmount();
+});
+
 it('not-yet-open shows when registration opens', async () => {
   server({ status: 200, body: view('not_open_yet', { opens_at: '2026-06-01T07:00:00Z' }) });
   const v = await mount(<RegistrationPanel {...props} />);

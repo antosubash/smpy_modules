@@ -14,6 +14,9 @@ export type RegistrationView = {
     few_left: boolean;
     opens_at: string | null;
     closes_at: string | null;
+    /** The window's ends in the event's zone with its label, like the event's own time. */
+    opens_text?: string | null;
+    closes_text?: string | null;
   };
   event: {
     title: string;

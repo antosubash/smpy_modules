@@ -86,6 +86,10 @@ class Availability:
     opens_at: datetime | None
     closes_at: datetime | None
     event: RegistrationEvent | None
+    opens_text: str | None = None
+    closes_text: str | None = None
+    """The window's ends as text in the event's zone with its label, like ``event.when_text``: a
+    page must not word them in the visitor's own zone beside an event time in another."""
     few_left: bool = False
     """A fifth of the seats or fewer remain (at least one seat counts). Computed only for an event
     that shows seats; never raw counts: the contract returns what a caller may publish."""
@@ -95,6 +99,12 @@ class Availability:
 class Found:
     event: Event
     occurrence: ResolvedOccurrence
+
+
+def _window_text(event: Event, value: datetime | None, locale: str) -> str | None:
+    if value is None:
+        return None
+    return formatting.format_instant(value=value, timezone=event.timezone, locale=locale)
 
 
 def _absent() -> Availability:
@@ -238,4 +248,6 @@ async def describe(
             closes_at=event.registration_closes_at,
             event=await registration_event(db, event, found.occurrence, lang),
             few_left=few,
+            opens_text=_window_text(event, event.registration_opens_at, lang),
+            closes_text=_window_text(event, event.registration_closes_at, lang),
         )

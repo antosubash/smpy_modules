@@ -97,6 +97,8 @@ async def registration_view(
             few_left=found.few_left and not double,
             opens_at=_iso(found.opens_at),
             closes_at=_iso(found.closes_at),
+            opens_text=found.opens_text,
+            closes_text=found.closes_text,
         ),
         event=RegistrationEventInfo(
             title=found.event.title,

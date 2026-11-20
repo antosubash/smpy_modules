@@ -290,3 +290,24 @@ async def test_few_left_only_when_the_event_shows_seats(db, cal, show, capacity,
     assert not hasattr(got, "taken") and not hasattr(got, "capacity")  # no raw numbers returned
     if not show:
         assert got.seats_left is None
+
+
+async def test_the_window_comes_with_text_in_the_events_zone_like_the_time_beside_it(db, cal):
+    """The panel must not format the opening time in the visitor's own zone: it would disagree with
+    the event time next to it. The text is built like the event's own time (zone label too)."""
+    opens = datetime(2026, 6, 1, 4, 30, tzinfo=UTC)  # 06:30 in Vienna (summer time)
+    event = await one_off(
+        db,
+        cal,
+        registration_capacity=5,
+        registration_opens_at=opens,
+        registration_closes_at=opens + timedelta(days=2),
+    )
+    got = await ask(db, event, locale="en")
+    assert got.opens_text and "6:30" in got.opens_text and "CEST" in got.opens_text
+    assert got.closes_text and "CEST" in got.closes_text
+    de = await ask(db, event, locale="de")
+    assert "06:30" in de.opens_text and "Montag" in de.opens_text  # the reader's language
+    plain = await one_off(db, cal)
+    got = await ask(db, plain)
+    assert (got.opens_text, got.closes_text) == (None, None)

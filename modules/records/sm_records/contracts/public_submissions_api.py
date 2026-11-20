@@ -135,6 +135,9 @@ class RegistrationAvailability(SQLModel):
     public number would tell whether an address was new): few seats remain."""
     opens_at: str | None = None
     closes_at: str | None = None
+    opens_text: str | None = None
+    closes_text: str | None = None
+    """The window's ends worded in the event's zone with its label, like the event's own time."""
 
 
 class RegistrationEventInfo(SQLModel):

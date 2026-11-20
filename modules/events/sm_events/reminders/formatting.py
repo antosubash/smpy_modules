@@ -44,6 +44,14 @@ def _time(value: datetime, locale: str) -> str:
     return format_time(value, format="short", locale=locale).translate(_SPACES)
 
 
+def format_instant(*, value: datetime, timezone: str, locale: str) -> str:
+    """One instant the way :func:`format_when` words a time: the day, the time and the zone label,
+    in the event's zone and the reader's language (a window's opening, say)."""
+    zone, loc = zone_of(timezone), strings.catalogue_locale(locale)
+    local = value.astimezone(zone)
+    return f"{_day(local, loc)}, {_time(local, loc)} {local.tzname() or timezone}"
+
+
 def format_when(
     *, start: datetime, end: datetime, all_day: bool, timezone: str, locale: str
 ) -> str:
