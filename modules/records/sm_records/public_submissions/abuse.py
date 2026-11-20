@@ -174,6 +174,17 @@ async def wait(request: Request, key: str, rate: str) -> int:
     return 0 if result.allowed else max(1, int(result.retry_after))
 
 
+ATTEMPTS_MULTIPLE = 10
+"""A registration's attempts bucket is this many times the form's strict total: charged before the
+captcha provider is called, so a flood of wrong answers stops there without touching the total."""
+
+
+def scaled(rate: str, factor: int) -> str:
+    """``<count>/<period>`` with the count multiplied (``off``, or anything unparsed, as given)."""
+    count, sep, period = rate.partition("/")
+    return f"{int(count) * factor}{sep}{period}" if sep and count.strip().isdigit() else rate
+
+
 async def hit(request: Request, key: str, rate: str) -> None:
     """Count one against ``key`` at ``rate``; ``429`` once it is over."""
     spec = parse_rate(rate)

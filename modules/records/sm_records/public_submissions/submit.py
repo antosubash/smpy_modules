@@ -190,14 +190,27 @@ async def submit(
         rtype = await _check_token(request, db, type_key, body, settings)
     # After the token: only a form this host signed counts against the type's
     # budget, so a flood of forged posts cannot use it up (or mint a counter
-    # per invented type key) and lock real visitors out. A registration is charged later, once
-    # the captcha and the form's own checks have passed (below): burning the form's total then
-    # costs an attacker one solved captcha per request instead of nothing.
-    if reg_token is None:
+    # per invented type key) and lock real visitors out.
+    #
+    # A registration with a captcha configured is bounded in two steps so the strict total costs
+    # an attacker one solved captcha per request, yet nobody can call the provider or run the
+    # pattern worker without bound: a higher attempts bucket first (before the provider call),
+    # the strict total right after the captcha passes. With no captcha there is nothing that
+    # proves a human, so it is charged first, exactly as for any other form.
+    guarded = reg_token is not None and settings.public_submissions_captcha_provider != "none"
+    if guarded:
+        await abuse.hit(
+            request,
+            abuse.rate_key(tenant, f"type-attempts={rtype.key}"),
+            abuse.scaled(settings.public_submissions_type_rate, abuse.ATTEMPTS_MULTIPLE),
+        )
+    else:
         await _charge_type(request, tenant, rtype, settings)
     # After the token, so only a form this host signed costs a call to the
     # provider; before anything is read into a record or written.
     await captcha.verify(settings, body.captcha_response, ip)
+    if guarded:
+        await _charge_type(request, tenant, rtype, settings)
     sent = dict(body.data)
     newsletter = rtype.public_submissions.get("kind") == KIND_SUBSCRIPTION
     address = sent.pop(EMAIL_KEY, None) if newsletter or reg_token is not None else None
@@ -213,7 +226,6 @@ async def submit(
     # write below validates with these verdicts instead of matching again.
     verdicts = await check_patterns(rtype, data)
     if reg_token is not None:
-        await _charge_type(request, tenant, rtype, settings)
         await register(request, db, rtype, data, address, name, reg_token, body, settings, verdicts)
         return
     if newsletter:

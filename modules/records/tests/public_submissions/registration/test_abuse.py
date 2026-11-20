@@ -114,3 +114,88 @@ async def test_the_form_total_is_charged_only_after_the_captcha_passes(reg_site)
     ]
     assert [g.status_code for g in got] == [202, 202, 429]
     assert got[2].headers.get("Retry-After")
+
+
+class Counting:
+    """Counts the captcha provider calls and the pattern worker runs, and accepts one answer."""
+
+    def __init__(self, monkeypatch):
+        from sm_records.public_submissions import submit as module
+        from sm_records.public_submissions.errors import SubmissionRefused
+
+        self.provider = 0
+        self.patterns = 0
+        real = module.check_patterns
+
+        async def verify(settings, response, ip):
+            self.provider += 1
+            if settings.public_submissions_captcha_provider != "none" and response != "good":
+                raise SubmissionRefused("captcha_failed", "captcha failed")
+
+        async def patterns(*args, **kwargs):
+            self.patterns += 1
+            return await real(*args, **kwargs)
+
+        monkeypatch.setattr(module.captcha, "verify", verify)
+        monkeypatch.setattr(module, "check_patterns", patterns)
+
+
+def limits(**extra):
+    return {
+        "public_submissions_rate_per_ip": "10000/minute",
+        "public_submissions_type_rate": "2/hour",
+        **extra,
+    }
+
+
+CAPTCHA = {
+    "public_submissions_captcha_provider": "turnstile",
+    "public_submissions_captcha_site_key": "k",
+    "public_submissions_captcha_secret": "s",
+}
+
+
+async def send(site, event, n, answer):
+    return await register(
+        site,
+        f"f{n}@example.org",
+        event=event,
+        token=await token(site, event),
+        captcha_response=answer,
+    )
+
+
+async def test_a_wrong_captcha_flood_stops_at_the_attempts_bucket(reg_site, monkeypatch):
+    """Before the provider is called, a separate higher bucket bounds the attempts; the strict form
+    total is not touched, so a real registrant with a right answer still gets in."""
+    from sm_records.public_submissions.abuse import ATTEMPTS_MULTIPLE
+
+    counts = Counting(monkeypatch)
+    configure(reg_site, **limits(**CAPTCHA))
+    event = await seed_event(reg_site.db_state, uid="fl@x", registration_capacity=50)
+    cap = 2 * ATTEMPTS_MULTIPLE
+    codes = [(await send(reg_site, event, n, "bad")).status_code for n in range(cap + 5)]
+    assert codes == [400] * cap + [429] * 5
+    assert counts.provider == cap  # the provider was called no more than the bucket allows
+    assert counts.patterns == 0
+
+
+async def test_a_right_answer_still_gets_in_after_wrong_ones(reg_site, monkeypatch):
+    counts = Counting(monkeypatch)
+    configure(reg_site, **limits(**CAPTCHA))
+    event = await seed_event(reg_site.db_state, uid="ok@x", registration_capacity=50)
+    for n in range(8):
+        assert (await send(reg_site, event, n, "bad")).status_code == 400
+    got = [(await send(reg_site, event, 100 + n, "good")).status_code for n in range(3)]
+    assert got == [202, 202, 429]  # the strict total (2) counted only the right answers
+    assert counts.patterns == 2
+
+
+async def test_without_a_captcha_the_strict_budget_is_charged_first(reg_site, monkeypatch):
+    counts = Counting(monkeypatch)
+    configure(reg_site, **limits(public_submissions_type_rate="1/hour"))
+    event = await seed_event(reg_site.db_state, uid="nc@x", registration_capacity=50)
+    assert (await send(reg_site, event, 1, None)).status_code == 202
+    before = (counts.provider, counts.patterns)
+    assert (await send(reg_site, event, 2, None)).status_code == 429
+    assert (counts.provider, counts.patterns) == before  # refused before any costly step
