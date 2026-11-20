@@ -238,8 +238,9 @@ class RecordsModule(SubmissionHooks, ModuleBase):
         the tenancy guard, the anonymous read API, the media picker, the
         orphaned-locale count and the first sidebar read. The body is
         :func:`sm_records.core.boot.startup`, which says why each runs here."""
-        from sm_records.core import boot
+        from sm_records.core import boot, log_redact
 
+        log_redact.install()  # first: no request may log a token before the filter is on
         await boot.startup(self, app)
 
     async def on_shutdown(self, app: FastAPI) -> None:

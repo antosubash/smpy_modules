@@ -108,3 +108,11 @@ event's seats and counters with it (a cascade); the registration records stay un
 runs (retention asks events first, and falls back to the stored date when it cannot say), and the
 reconcile job finds no seat to repair. The organiser still sees those records in the registrants list.
 
+## Logs
+
+The confirm, cancel and unsubscribe pages carry their token in the query (`?t=`). Records installs a
+log filter (`sm_records/core/log_redact.py`, on the request, rate-limit and uvicorn loggers and every
+handler) that rewrites the value to `<redacted>`; a proxy or load balancer in front of the process
+logs paths itself and must redact the `t` query of `/records/submissions/` too. Before this change
+records' own confirm and unsubscribe links were logged in full the same way (pre-existing).
+
