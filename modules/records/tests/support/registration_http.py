@@ -115,7 +115,10 @@ async def register(
 ):
     event = event or client.event  # type: ignore[attr-defined]
     if token is None:
-        loaded = (await load_registration(client, event, key)).json()
+        # The form's digest covers its labels, which follow the language: load it in the language
+        # the submit will name.
+        query = {"locale": body["locale"]} if "locale" in body else {}
+        loaded = (await load_registration(client, event, key, **query)).json()
         token = loaded["definition"]["token"]
     payload = {
         "data": {"sm_email": address, "sm_name": name, **(data or {})},

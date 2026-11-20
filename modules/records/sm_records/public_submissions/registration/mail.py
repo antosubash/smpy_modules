@@ -43,6 +43,7 @@ from sm_records.public_submissions.confirmation import recipient_key
 from sm_records.public_submissions.delivery import SessionFactory, load
 from sm_records.public_submissions.mail import template
 from sm_records.public_submissions.mail_runner import queue, ui_locale
+from sm_records.public_submissions.registration import seats
 from sm_records.public_submissions.registration.origin import event_base
 from sm_records.public_submissions.registration.status import LIVE, PENDING
 from sm_records.public_submissions.sending import send_all
@@ -125,7 +126,10 @@ def message(
     blocks = []
     if pending:
         confirm = links.sign(secret, links.CONFIRM, exp=exp, **claims)
-        expires = datetime.fromtimestamp(exp, UTC).strftime("%Y-%m-%d %H:%M UTC")
+        # In the mail's language and the event's zone (labelled), never ISO.
+        expires = seats.integration().format_instant(
+            value=datetime.fromtimestamp(exp, UTC), timezone=event.timezone, locale=locale
+        )
         blocks.append(
             f"{_text('confirm', locale)}\n"
             f"{links.url(base_url, links.CONFIRM, confirm, locale, page=_CONFIRM_PAGE)}\n\n"

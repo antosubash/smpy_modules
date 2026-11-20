@@ -46,6 +46,7 @@ from sm_events.registration import summaries as _summaries
 from sm_events.registration.availability import Availability, RegistrationEvent
 from sm_events.registration.seat_reads import SeatRef
 from sm_events.registration.seats import Admission
+from sm_events.reminders import formatting as _formatting
 
 __all__ = [
     "EVENT_UNAVAILABLE",
@@ -59,12 +60,15 @@ __all__ = [
     "SeatsBusy",
     "admit",
     "describe",
+    "format_instant",
     "release",
     "release_target",
     "seat_holders",
     "summaries",
 ]
 
+format_instant = _formatting.format_instant
+"""One instant as day, time and zone label, in an event's zone and a reader's language."""
 SEAT_RELEASE_MAX = constants.SEAT_RELEASE_MAX
 """How many holders one ``release`` call takes: a caller with more splits its calls."""
 _RETRYABLE = frozenset({"40P01", "40001"})  # deadlock detected, serialization failure

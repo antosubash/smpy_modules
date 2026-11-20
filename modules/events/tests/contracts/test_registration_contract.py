@@ -34,6 +34,7 @@ EXPECTED = [
     "release_target",
     "seat_holders",
     "summaries",
+    "format_instant",
 ]
 
 

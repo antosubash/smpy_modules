@@ -838,7 +838,7 @@
         "page": "The event page:",
         "ics": "Add it to your calendar:",
         "confirm": "Confirm your registration:",
-        "expiry": "This link works until {expires}. If you did not register, ignore this email: the seat is released by itself.",
+        "expiry": "This link works until {expires}. If you did not register, ignore this email: nothing happens and you will not hear from us again.",
         "cancel": "Cannot come? Cancel your registration here:",
         "why": "You get this email because this address was entered in a registration form on {site}.",
         "intro_already": "You are already registered for {title} on {site}. Nothing else is needed.",
@@ -965,6 +965,10 @@
         "seats_left": "{count} seats left.",
         "seats_left_one": "1 seat left."
       }
+    },
+    "form_labels": {
+      "sm_email": "Email",
+      "sm_name": "Name"
     }
   },
   "events": {
