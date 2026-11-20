@@ -27,12 +27,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
-import ssl
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from email.utils import parsedate_to_datetime
 from importlib import metadata
 from typing import Final, Literal
 
@@ -43,6 +39,7 @@ from sm_events.feeds.importing.scan import sniff
 from sm_events.feeds.subscriptions import policy as url_policy
 from sm_events.feeds.subscriptions.client import PinnedTransport
 from sm_events.feeds.subscriptions.errors import FetchFailure
+from sm_events.feeds.subscriptions.fetch_signals import failure_of, max_age, retry_after
 from sm_events.feeds.subscriptions.url_safety import UnsafeURLError
 
 __all__ = ["USER_AGENT", "FetchFailure", "FetchResult", "fetch_feed"]
@@ -106,47 +103,6 @@ def _request(
     return httpx.Request("GET", url, headers=headers, extensions={"timeout": dict(_TIMEOUTS)})
 
 
-_MAX_AGE: Final = re.compile(r"(?i)(?:^|[\s,])max-age=(\d{1,9})(?:$|[\s,;])")
-_ONE_YEAR: Final = 365 * 24 * 3600
-
-
-def _max_age(response: httpx.Response) -> int | None:
-    found = _MAX_AGE.search(response.headers.get("cache-control", ""))
-    return int(found.group(1)) or None if found else None
-
-
-def _retry_after(response: httpx.Response) -> int | None:
-    """Seconds from ``Retry-After`` (a number, or an HTTP date), or ``None`` for anything else."""
-    raw = response.headers.get("retry-after", "").strip()
-    if not raw:
-        return None
-    try:
-        seconds = (
-            int(raw)
-            if raw.isdigit()
-            else int((parsedate_to_datetime(raw) - datetime.now(UTC)).total_seconds())
-        )
-    except (TypeError, ValueError, OverflowError):
-        return None
-    return seconds if 0 < seconds <= _ONE_YEAR else None
-
-
-def _failure(error: BaseException) -> FetchFailure:
-    """The code for a failure of the network layer. Never keeps the exception's text."""
-    if isinstance(error, TimeoutError | httpx.TimeoutException):
-        return FetchFailure("timeout")
-    if isinstance(error, UnsafeURLError):
-        return FetchFailure(url_policy.user_code(error))
-    if isinstance(error, FetchFailure):
-        return error
-    cause: BaseException | None = error
-    for _ in range(8):  # an SSL error sits a few links down httpx's and httpcore's chain
-        if isinstance(cause, ssl.SSLError):
-            return FetchFailure("tls_failed")
-        cause = None if cause is None else (cause.__cause__ or cause.__context__)
-    return FetchFailure("connect_failed")
-
-
 async def _send(
     transport: httpx.AsyncBaseTransport, request: httpx.Request, deadline: float
 ) -> httpx.Response:
@@ -155,7 +111,7 @@ async def _send(
         async with asyncio.timeout_at(deadline):
             return await transport.handle_async_request(request)
     except (TimeoutError, UnsafeURLError, FetchFailure, httpx.TransportError) as error:
-        raise _failure(error) from None
+        raise failure_of(error) from None
     except (httpx.InvalidURL, ValueError, UnicodeError):
         raise FetchFailure("url_invalid") from None
     except Exception:  # whatever the layer below raised can quote the address: only a code leaves
@@ -174,7 +130,7 @@ async def _read(response: httpx.Response, max_bytes: int, deadline: float) -> by
             except StopAsyncIteration:
                 return bytes(body)
             except (TimeoutError, httpx.TransportError) as error:
-                raise _failure(error) from None
+                raise failure_of(error) from None
             except Exception:
                 raise FetchFailure("connect_failed") from None
             body += chunk
@@ -214,11 +170,11 @@ async def _final(
 ) -> FetchResult:
     status = response.status_code
     if status == 304 and hop == 0 and conditional:
-        return FetchResult("not_modified", b"", None, None, status, _max_age(response))
+        return FetchResult("not_modified", b"", None, None, status, max_age(response))
     if status == 410:
         raise FetchFailure("gone", http_status=status)
     if not 200 <= status < 300:
-        raise FetchFailure("http_status", http_status=status, retry_after=_retry_after(response))
+        raise FetchFailure("http_status", http_status=status, retry_after=retry_after(response))
     if response.headers.get("content-encoding", "").strip().lower() not in _IDENTITY:
         raise FetchFailure("unsupported_encoding")
     if (kind := _media_type(response)) and kind not in constants.FETCH_MEDIA_TYPES:
@@ -238,7 +194,7 @@ async def _final(
         _printable(response.headers.get("etag"), constants.SUBSCRIPTION_ETAG_MAX),
         _printable(response.headers.get("last-modified"), constants.SUBSCRIPTION_LAST_MODIFIED_MAX),
         status,
-        _max_age(response),
+        max_age(response),
     )
 
 
