@@ -999,7 +999,7 @@
       "load_failed": "The registration forms could not be loaded.",
       "retry": "Try again",
       "switched_off": "This form is switched off, so nobody can register through it yet.",
-      "no_double_opt_in": "This form has no confirmation step: anyone can take seats without confirming an address, so a limited number of seats can be filled by one person. Switch on double opt-in for this form.",
+      "no_double_opt_in": "This form has no confirmation step: anyone can take seats without confirming an address, so a limited number of seats can be filled by one person. Switch on double opt-in for this form. A captcha is also recommended for public registration with limited seats.",
       "attendees": "Open the attendee list",
       "create": "Create a registration form",
       "creating": "Creating...",

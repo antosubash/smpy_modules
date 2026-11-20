@@ -999,7 +999,7 @@
       "load_failed": "Die Anmeldeformulare konnten nicht geladen werden.",
       "retry": "Erneut versuchen",
       "switched_off": "Dieses Formular ist ausgeschaltet, daher kann sich noch niemand darüber anmelden.",
-      "no_double_opt_in": "Dieses Formular hat keinen Bestätigungsschritt: Jede Person kann Plätze belegen, ohne eine Adresse zu bestätigen, sodass eine begrenzte Zahl von Plätzen von einer einzigen Person gefüllt werden kann. Schalten Sie für dieses Formular die doppelte Bestätigung ein.",
+      "no_double_opt_in": "Dieses Formular hat keinen Bestätigungsschritt: Jede Person kann Plätze belegen, ohne eine Adresse zu bestätigen, sodass eine begrenzte Zahl von Plätzen von einer einzigen Person gefüllt werden kann. Schalten Sie für dieses Formular die doppelte Bestätigung ein. Für öffentliche Anmeldungen mit begrenzten Plätzen empfehlen wir außerdem ein Captcha.",
       "attendees": "Teilnehmerliste öffnen",
       "create": "Anmeldeformular erstellen",
       "creating": "Wird erstellt ...",

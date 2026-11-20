@@ -203,6 +203,27 @@ tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
 publish in the worker emits no bus event. Its `core/worker.py` is a parity-checked
 copy of newsletter's (family "worker runtime").
 
+**Event registration (events seats, records people).** Events owns the seats
+(`events_registration_count` is the lock target, `events_registration_seat` is unique per
+tenant, provider and holder) and records owns the person (the record IS the registration, kind
+`registration`); they meet only in `sm_events.contracts.registration`, which runs in the caller's
+transaction and never commits. **Lock order, everywhere:** records' type and row locks, then the
+event row (`FOR SHARE`), then counter rows in ascending id (`FOR UPDATE`), then seats; `release`
+restarts under the union of what it needs, bounded, and ends in `SeatsBusy` (409 `seats_busy`).
+A database deadlock inside the contract is also `SeatsBusy`. **A seat is taken at the
+confirmation** for a double opt-in form (a submit takes none and answers one neutral 202 for
+every address), and at submit for a single opt-in form (whose public availability shows states,
+never a number). The routes under `/api/records/submissions/` that carry a **registration token**
+(`{digest}.{issued}.{nonce}.{event_id}.{occurrence_key}.{mac}`, HMAC purpose `registration`; the
+event comes only from it) are the FOURTH documented token-bound anonymous surface, with the
+confirm and cancel links (`/records/submissions/confirm-registration`, `/cancel`; GET pages are
+inert, only the POST acts). The submit route is bounded by per-IP, a per-form total
+(`public_submissions_type_rate`, charged only after the captcha passes), a per-address mail bound
+and the optional captcha; raise the total before a large event opens. Mail links come from the
+configured origin only, never a request header. "My registrations" (`/api/records/registrations/mine`)
+matches the caller's address as the account directory reports it verified. Docs:
+`modules/records/docs/registration.md`.
+
 **Events private feeds and the .ics import.** `/events/feed/{token}.ics` is the THIRD documented
 token-bound public route (after newsletter's `/u/` and records' form token): it binds the token
 row's tenant and answers one padded 404 for every token state. Tokens are never logged (the
