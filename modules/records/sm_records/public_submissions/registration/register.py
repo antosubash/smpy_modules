@@ -45,7 +45,7 @@ from sm_records.public_submissions.definition import (
     page_locale,
 )
 from sm_records.public_submissions.errors import SubmissionRefused
-from sm_records.public_submissions.registration import codes, mail, seats
+from sm_records.public_submissions.registration import codes, mail, notice_mail, seats
 from sm_records.public_submissions.registration.status import LIVE, PENDING, REGISTERED
 from sm_records.public_submissions.registration.tokens import RegistrationToken
 from sm_records.public_submissions.subscribe import normalise
@@ -272,4 +272,4 @@ async def register(
     if record is not None:
         await mail.queue_registration_mail(db, request, rtype, record, avail.event, kind=kind)
     else:
-        await mail.queue_notice_mail(db, request, rtype, email, avail.event, kind, lang)
+        await notice_mail.queue_notice_mail(db, request, rtype, email, avail.event, kind, lang)

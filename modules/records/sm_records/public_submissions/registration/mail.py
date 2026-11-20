@@ -50,10 +50,8 @@ from sm_records.public_submissions.tokens import host_secret, public_base_url
 from sm_records.records.services._common import utcnow
 
 __all__ = [
-    "NoticeDue",
     "RegistrationDue",
     "message",
-    "queue_notice_mail",
     "queue_registration_mail",
 ]
 
@@ -235,60 +233,3 @@ async def queue_registration_mail(
         kind=kind,
     )
     await queue(db, app, due, partial(_send, host_secret(app), app), durable=False)
-
-
-@dataclass
-class NoticeDue:
-    """In-process only: a mail to an address that registered **nothing** (a full, closed or busy
-    occurrence), so there is no record. It carries the address for the one send and is never logged
-    or published."""
-
-    tenant_id: str
-    to: str
-    locale: str
-    base_url: str
-    event: Any
-    reason: str
-    type_key: str = "-"
-    uuid: str = "-"
-    attempt: str = ""
-
-
-def notice_message(due: NoticeDue, locale: str) -> MailMessage:
-    site = urlsplit(due.base_url).netloc or due.base_url
-    title = _line(due.event.title)
-    body = (
-        f"{_text(f'notice_{due.reason}', locale, title=title, site=site)}\n\n"
-        f"{_text('notice_why', locale, site=site)}\n"
-    )
-    subject = _line(_text("notice_subject", locale, title=title, site=site))[:SUBJECT_MAX]
-    return MailMessage(to=due.to, subject=subject, text=body)
-
-
-async def _send_notice(
-    db: AsyncSession, sender: MailSender, due: NoticeDue, settings: RecordsSettings, factory: Any
-) -> None:
-    await sender.send(notice_message(due, strings.catalogue_locale(due.locale)))
-
-
-async def queue_notice_mail(
-    db: AsyncSession,
-    request: Any,
-    rtype: RecordType,
-    address: str,
-    event: Any,
-    reason: str,
-    locale: str,
-) -> None:
-    """Tell ``address`` (stored nowhere) why its registration was not saved, once ``db`` commits.
-    ``reason`` is ``full``, ``closed`` or ``busy``."""
-    app = request.app
-    due = NoticeDue(
-        tenant_id=rtype.tenant_id,
-        to=address,
-        locale=locale,
-        base_url=public_base_url(app),
-        event=event,
-        reason=reason,
-    )
-    await queue(db, app, due, _send_notice, durable=False)
