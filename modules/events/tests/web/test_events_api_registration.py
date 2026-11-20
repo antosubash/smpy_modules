@@ -81,9 +81,26 @@ async def test_legacy_url_still_works(client):
     [
         ({**BUILTIN, "target": "nope"}, 422, "unknown_registration_target"),
         ({**BUILTIN, "provider": "other:registration"}, 422, "registration_unavailable"),
-        ({**BUILTIN, "closes_at_local": "2026-05-01T09:00"}, 422, "invalid_registration"),
-        ({**BUILTIN, "reminder_minutes": 7}, 422, "invalid_registration"),
-        ({"mode": "external"}, 422, "invalid_registration"),
+        (
+            {**BUILTIN, "closes_at_local": "2026-05-01T09:00"},
+            422,
+            "registration_closes_before_opens",
+        ),
+        ({**BUILTIN, "opens_at_local": "not a time"}, 422, "invalid_local_time"),
+        ({**BUILTIN, "reminder_minutes": 7}, 422, "registration_reminder_invalid"),
+        ({"mode": "external"}, 422, "registration_url_required"),
+        (
+            {"mode": "builtin", "provider": "records:registration"},
+            422,
+            "registration_target_required",
+        ),
+        ({"mode": "builtin", "target": KNOWN_TARGET}, 422, "registration_provider_required"),
+        ({"mode": "none", "capacity": 5}, 422, "registration_option_not_allowed"),
+        (
+            {"mode": "external", "url": "https://x.example/r", "show_seats": True},
+            422,
+            "registration_option_not_allowed",
+        ),
         ({**BUILTIN, "capacity": 0}, 422, None),  # schema bound: FastAPI's own 422
         ({**BUILTIN, "capacity": 100_001}, 422, None),
         ({**BUILTIN, "surprise": 1}, 422, None),

@@ -50,6 +50,13 @@ it.each([
   ['registrations_orphaned', 409, 'already has registrations'],
   ['registration_has_seats', 409, 'already registered'],
   ['seats_busy', 409, 'try again'],
+  ['registration_closes_before_opens', 422, 'close after it opens'],
+  ['registration_time_invalid', 422, 'valid date and time'],
+  ['registration_url_required', 422, 'registration link'],
+  ['registration_target_required', 422, 'registration form'],
+  ['registration_provider_required', 422, 'kind of registration'],
+  ['registration_reminder_invalid', 422, 'reminder times'],
+  ['registration_option_not_allowed', 422, 'does not apply'],
 ])("words the registration code %s in the reader's language", async (code, status, words) => {
   const { errorText } = await import('./api');
   expect(errorText(new ApiError(status, code))).toContain(words);

@@ -54,28 +54,28 @@ class Applied(NamedTuple):
     """What the provider said about the target, when it was asked."""
 
 
-def _bad(field: str) -> InvalidRegistration:
-    return InvalidRegistration(field=f"{_FIELD}.{field}")
+def _bad(field: str, reason: str | None = None) -> InvalidRegistration:
+    return InvalidRegistration(field=f"{_FIELD}.{field}", reason=reason)
 
 
 def _check_shape(reg: RegistrationIn) -> None:
     """Only ``builtin`` takes a provider, a target, a capacity, a window or a reminder; only
     ``external`` takes a URL."""
     if reg.mode == _EXTERNAL and reg.url is None:
-        raise _bad("url")
+        raise _bad("url", "url_required")
     if reg.mode != _EXTERNAL and reg.url is not None:
-        raise _bad("url")
+        raise _bad("url", "option_not_allowed")
     if reg.mode == _BUILTIN:
         if reg.target is None:
-            raise _bad("target")
+            raise _bad("target", "target_required")
         return
     for name in ("provider", "target", "capacity", "opens_at_local", "closes_at_local"):
         if getattr(reg, name) is not None:
-            raise _bad(name)
+            raise _bad(name, "option_not_allowed")
     if reg.show_seats:
-        raise _bad("show_seats")
+        raise _bad("show_seats", "option_not_allowed")
     if reg.reminder_minutes is not None:
-        raise _bad("reminder_minutes")
+        raise _bad("reminder_minutes", "option_not_allowed")
 
 
 def _instant(text: str | None, zone: ZoneInfo, field: str) -> datetime | None:
@@ -84,7 +84,7 @@ def _instant(text: str | None, zone: ZoneInfo, field: str) -> datetime | None:
     try:
         return supported_instant(localize(parse_local(text, zone, f"{_FIELD}.{field}"), zone))
     except ValueError:
-        raise _bad(field) from None
+        raise _bad(field, "time_invalid") from None
 
 
 def _window(reg: RegistrationIn, timezone: str) -> tuple[datetime | None, datetime | None]:
@@ -92,7 +92,7 @@ def _window(reg: RegistrationIn, timezone: str) -> tuple[datetime | None, dateti
     opens = _instant(reg.opens_at_local, zone, "opens_at_local")
     closes = _instant(reg.closes_at_local, zone, "closes_at_local")
     if opens is not None and closes is not None and opens >= closes:
-        raise _bad("closes_at_local")
+        raise _bad("closes_at_local", "closes_before_opens")
     return opens, closes
 
 
@@ -102,11 +102,11 @@ def _check_builtin(reg: RegistrationIn) -> None:
     if not registry.registration_providers():
         raise RegistrationUnavailable
     if reg.provider is None:
-        raise _bad("provider")
+        raise _bad("provider", "provider_required")
     if registry.registration_provider(reg.provider) is None:
         raise RegistrationUnavailable
     if reg.reminder_minutes is not None and reg.reminder_minutes not in REMINDER_LEADS:
-        raise _bad("reminder_minutes")
+        raise _bad("reminder_minutes", "reminder_invalid")
 
 
 def _values(reg: RegistrationIn, window: tuple[datetime | None, datetime | None]) -> dict[str, Any]:

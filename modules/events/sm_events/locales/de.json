@@ -175,7 +175,14 @@
     "seats_busy": "Die Anmeldungen sind gerade ausgelastet. Bitte versuchen Sie es erneut.",
     "registration_capacity_invalid": "Geben Sie eine ganze Zahl an Plätzen von 1 bis {max} ein.",
     "registration_window_invalid": "Geben Sie eine gültige Zeit ein, zu der die Anmeldung öffnet.",
-    "registration_closes_invalid": "Die Anmeldung muss nach dem Öffnen schließen. Prüfen Sie die Schließzeit (und die Öffnungszeit)."
+    "registration_closes_invalid": "Die Anmeldung muss nach dem Öffnen schließen. Prüfen Sie die Schließzeit (und die Öffnungszeit).",
+    "registration_closes_before_opens": "Die Anmeldung muss nach dem Öffnen schließen. Prüfen Sie die Schließzeit (und die Öffnungszeit).",
+    "registration_time_invalid": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein.",
+    "registration_url_required": "Geben Sie den Link zur Anmeldung ein.",
+    "registration_target_required": "Wählen Sie ein Anmeldeformular.",
+    "registration_provider_required": "Wählen Sie eine Art der Anmeldung.",
+    "registration_reminder_invalid": "Wählen Sie eine der angebotenen Erinnerungszeiten.",
+    "registration_option_not_allowed": "Diese Einstellung gilt für diese Art der Anmeldung nicht."
   },
   "categories": {
     "title": "Kategorien",

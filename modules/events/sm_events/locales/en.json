@@ -175,7 +175,14 @@
     "seats_busy": "The registrations are busy right now. Please try again.",
     "registration_capacity_invalid": "Enter a whole number of seats from 1 to {max}.",
     "registration_window_invalid": "Enter a valid date and time for when registration opens.",
-    "registration_closes_invalid": "Registration must close after it opens. Check the closing time (and the opening time)."
+    "registration_closes_invalid": "Registration must close after it opens. Check the closing time (and the opening time).",
+    "registration_closes_before_opens": "Registration must close after it opens. Check the closing time (and the opening time).",
+    "registration_time_invalid": "Enter a valid date and time.",
+    "registration_url_required": "Enter the registration link.",
+    "registration_target_required": "Choose a registration form.",
+    "registration_provider_required": "Choose a kind of registration.",
+    "registration_reminder_invalid": "Choose one of the offered reminder times.",
+    "registration_option_not_allowed": "That setting does not apply to this way of registering."
   },
   "categories": {
     "title": "Categories",
