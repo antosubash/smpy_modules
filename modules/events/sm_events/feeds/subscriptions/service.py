@@ -221,6 +221,8 @@ async def list_for(db: Any, who: ResourcePrincipal, calendar_id: uuid.UUID) -> l
 def to_out(sub: Subscription, *, setting_minutes: int, is_manager: bool = False) -> SubscriptionOut:
     """The API shape. That an address may be internal says an intranet service exists, so only
     ``events.manage`` holders are told (everyone else gets ``False``)."""
+    hidden = sub.may_use_private and not is_manager  # a non-manager may not learn what failed
+    shown_code = "url_unreachable" if hidden and sub.error_code else sub.error_code
     return SubscriptionOut(
         id=sub.id,
         calendar_id=sub.calendar_id,
@@ -231,8 +233,8 @@ def to_out(sub: Subscription, *, setting_minutes: int, is_manager: bool = False)
         effective_refresh_minutes=schedule.effective_minutes(sub.refresh_minutes, setting_minutes),
         public=sub.public,
         status=sub.status,
-        error_code=sub.error_code,
-        last_http_status=sub.last_http_status,
+        error_code=shown_code,
+        last_http_status=None if hidden else sub.last_http_status,
         last_fetched_at=sub.last_fetched_at,
         last_ok_at=sub.last_ok_at,
         next_fetch_at=sub.next_fetch_at,

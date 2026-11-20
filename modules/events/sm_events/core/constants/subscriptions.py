@@ -23,6 +23,8 @@ __all__ = [
     "FETCH_READ_SECONDS",
     "FETCH_USER_AGENT_PREFIX",
     "FETCH_WRITE_SECONDS",
+    "INTERNAL_KEPT_CODES",
+    "INTERNAL_NOTHING_ANSWERED",
     "MAX_ADDRESSES_PER_HOP",
     "REFRESH_SUBSCRIPTION",
     "REFRESH_SUBSCRIPTIONS",
@@ -222,8 +224,25 @@ SUBSCRIPTION_FAILURE_CODES: Final = (
     "unsupported_encoding",
     "unexpected_content_type",
     *SCAN_FAILURE_CODES,
+    "not_a_calendar",
     "internal",
 )
+
+INTERNAL_NOTHING_ANSWERED: Final = frozenset(
+    {
+        "timeout",
+        "connect_failed",
+        "tls_failed",
+        "url_unreachable",
+        "too_many_redirects",
+        "insecure_redirect",
+    }
+)
+"""For a subscription that may use internal addresses, every failure before a response is stored
+and shown as ``url_unreachable``; any other network or content failure as ``not_a_calendar`` (no
+status number). A manager therefore cannot map the intranet beyond "answered with a calendar or
+not". The precise cause is only in the server log."""
+INTERNAL_KEPT_CODES: Final = frozenset({"internal", "url_unreadable", "url_own_feed"})
 
 SUBSCRIPTION_EXISTS_CODE: Final = "subscription_exists"
 SUBSCRIPTION_EXISTS_DETAIL: Final = "This calendar already has a subscription to that address"

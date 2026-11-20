@@ -89,7 +89,7 @@ async def test_fetch_replace_break_and_remove(tls_server, db_state):
 
     seen["body"], seen["type"] = b"<html>sign in</html>", b"text/html"  # a broken answer
     assert await _refresh(db_state, sid) == "failed"
-    assert await _state(db_state, sid) == ("error", "unexpected_content_type", ["Beta", "Gamma"])
+    assert await _state(db_state, sid) == ("error", "not_a_calendar", ["Beta", "Gamma"])
     seen["body"], seen["type"] = b"BEGIN:VCALENDAR\r\nBEGIN:VEVENT\x00\r\n", b"text/calendar"
     assert await _refresh(db_state, sid) == "failed"
     status, code, titles = await _state(db_state, sid)

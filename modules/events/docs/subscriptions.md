@@ -80,8 +80,8 @@ request, and stays when the saver later loses the permission until the address i
 applied at every fetch and redirect hop together with the setting (the setting off always wins).
 A public subscription is never an internal one: changing a subscription's address, its public setting or its internal access (any of them) deletes what it stored, so stored items always belong to its current address and policy, and it is fetched again; a fetch that started under another one stores nothing, and every read ignores items of an older one. With the switch on, anyone who may add a
 subscription and holds `events.manage` can make the server send GET requests to internal http(s)
-addresses, including services on its own private address, and see whether the answer parses as a
-calendar: turn it on only for trusted networks. The server's own addresses are not listed.
+addresses, including services on its own private address, and learn whether something reachable
+there answers with a calendar (failures are only "unreachable" or "not a calendar"): turn it on only for trusted networks. The server's own addresses are not listed.
 
 ## Refresh, backoff and the worker
 
@@ -131,9 +131,18 @@ install-wide and per-tenant caps keep one tenant's hung feeds from holding every
 
 ## Failure codes
 
+For a subscription that may use internal addresses (`may_use_internal_addresses`, shown only to
+managers) the stored and shown failure is one of two codes: `url_unreachable` when nothing answered
+(refused, filtered, timed out, TLS) and `not_a_calendar` when something did (any status, any
+content that is not a calendar), never a status number. The precise cause is in the server log at
+WARNING, with the subscription id and no address. What remains learnable is whether an internal
+address answers with a calendar; the setting's description says so. Anyone without
+`events.manage` sees only `url_unreachable` for such a subscription.
+
 Shown translated, never as a message from the server: `url_invalid`, `url_scheme`,
 `url_userinfo`, `url_port`, `url_unreachable` (a refused or missing host, one answer), `url_own_feed`,
 `url_unreadable` (the stored address no longer opens: the key was rotated away; enter it again),
+`not_a_calendar` (only for an internal address, see below),
 `too_many_redirects`, `insecure_redirect`, `timeout`, `connect_failed`, `tls_failed`,
 `http_status` (with the server's number), `gone` (stops at once), `too_large`,
 `unsupported_encoding`, `unexpected_content_type`, the scanner's own (`ics_invalid`,

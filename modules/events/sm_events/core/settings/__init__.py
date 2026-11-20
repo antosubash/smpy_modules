@@ -76,6 +76,8 @@ class EventsSettings(DbBackedSettings):
     10.x or 192.168.x, plain ``http://`` and any port). Never lets one reach this server's
     loopback, link-local or cloud-metadata addresses. WARNING: with this on, anyone who may
     subscribe a calendar and holds ``events.manage`` can make the server send GET requests to
-    internal http(s) addresses (including services on this server's own private address) and see
-    whether the answer parses as a calendar. A system setting: only someone with
+    internal http(s) addresses (including services on this server's own private address). What
+    they can learn is whether something reachable there answers with a calendar: a failure is
+    shown only as "unreachable" or "not a calendar", never as a port, TLS or status detail. A
+    system setting: only someone with
     ``settings.edit`` changes it, never a calendar owner."""

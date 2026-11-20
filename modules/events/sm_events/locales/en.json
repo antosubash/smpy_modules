@@ -1047,6 +1047,7 @@
       "url_userinfo": "The address must not contain a user name or password.",
       "url_port": "That port is not allowed.",
       "url_unreachable": "The address cannot be used or reached.",
+      "not_a_calendar": "The address answered, but not with a calendar.",
       "url_own_feed": "That is this site's own calendar feed, which cannot be subscribed to.",
       "url_unreadable": "The stored address can no longer be read. Enter it again.",
       "too_many_redirects": "The address redirects too often.",

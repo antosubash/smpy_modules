@@ -21,6 +21,7 @@ from typing import Any
 from simple_module_db import finalize_session
 from sqlalchemy import select
 
+from sm_events.core import constants
 from sm_events.core.settings import EventsSettings
 from sm_events.core.tenancy import tenant_scope
 from sm_events.feeds.importing.staging import effective_max_bytes
@@ -126,6 +127,12 @@ async def _fetch(
         del url
 
 
+def _internal_code(code: str) -> str:
+    if code in constants.INTERNAL_NOTHING_ANSWERED:
+        return "url_unreachable"
+    return code if code in constants.INTERNAL_KEPT_CODES else "not_a_calendar"
+
+
 def _record_failure(
     sub: Subscription, failure: FetchFailure, job: _Job, stamp: datetime, rng: random.Random
 ) -> None:
@@ -134,6 +141,8 @@ def _record_failure(
         stamp, job.minutes, failures, failure.code, rng, retry_after=failure.retry_after
     )
     sub.status, sub.error_code, sub.last_http_status = status, failure.code, failure.http_status
+    if job.may_use_private and not job.public:  # an internal address: show almost nothing
+        sub.error_code, sub.last_http_status = _internal_code(failure.code), None
     sub.consecutive_failures, sub.last_fetched_at, sub.next_fetch_at = failures, stamp, at
 
 
@@ -195,7 +204,9 @@ async def _store(
             await lease.release(db, sub)
             await finalize_session(db)
     if failure is not None:
-        logger.info("events subscription %s failed: %s", sid, failure.code)
+        # The precise cause is for the operator; the address and its host never are.
+        log = logger.warning if job.may_use_private and not job.public else logger.info
+        log("events subscription %s failed: %s", sid, failure.code)
         return Attempt("failed", received)
     return Attempt("not_modified" if outcome.status == "not_modified" else "stored", received)  # type: ignore[union-attr]
 

@@ -201,3 +201,24 @@ async def test_only_a_manager_is_told_that_an_address_may_be_internal(http):
         assert flag is (headers is MANAGER), headers  # the owner without manage gets false
     edited = await http.patch(f"{SUBS}/{theirs['id']}", json={"label": "X"}, headers=OWNER)
     assert edited.json()["may_use_internal_addresses"] is False
+
+
+async def test_a_non_manager_sees_one_generic_failure_for_an_internal_subscription(http):
+    from datetime import UTC, datetime
+
+    from sm_events.models import Subscription
+    from sqlalchemy import update
+
+    cid = await calendar(http, OWNER_P)
+    theirs = (await add(http, cid, MANAGER, url="https://other.example.test/a.ics")).json()
+    async with http.db_state.session_factory() as db:
+        await db.execute(
+            update(Subscription).values(
+                status="error", error_code="not_a_calendar", last_http_status=None,
+                last_fetched_at=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        )  # fmt: skip
+        await db.commit()
+    for headers, code in ((MANAGER, "not_a_calendar"), (OWNER, "url_unreachable")):
+        got = (await http.get(f"{BASE}/{cid}/subscriptions", headers=headers)).json()[0]
+        assert (got["id"], got["error_code"], got["last_http_status"]) == (theirs["id"], code, None)

@@ -1047,6 +1047,7 @@
       "url_userinfo": "Die Adresse darf keinen Benutzernamen und kein Passwort enthalten.",
       "url_port": "Dieser Port ist nicht erlaubt.",
       "url_unreachable": "Die Adresse kann nicht verwendet oder erreicht werden.",
+      "not_a_calendar": "Die Adresse hat geantwortet, aber nicht mit einem Kalender.",
       "url_own_feed": "Das ist der eigene Kalender-Feed dieser Website; er kann nicht abonniert werden.",
       "url_unreadable": "Die gespeicherte Adresse kann nicht mehr gelesen werden. Gib sie erneut ein.",
       "too_many_redirects": "Die Adresse leitet zu oft weiter.",
