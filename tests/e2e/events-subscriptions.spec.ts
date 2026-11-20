@@ -167,7 +167,7 @@ test('external entries on the calendar are marked and read-only, and never in it
   const sub = await subscribe(
     page,
     calendar.id,
-    'https://localhost/holidays.ics',
+    'https://holidays.localhost/holidays.ics',
     'Public holidays',
   );
   seedItems(sub.id, day, ['National holiday']);
@@ -204,6 +204,9 @@ test('external entries on the calendar are marked and read-only, and never in it
     data: { public: true },
   });
   expect(patched.status(), await patched.text()).toBe(200);
+  // a change of the public setting starts a new generation: what was stored is gone until the
+  // next fetch, so the entries are stored again as that fetch would
+  seedItems(sub.id, day, ['National holiday']);
   const shown = await (await request.get(grid)).text();
   expect(shown).toContain('National holiday');
   expect(shown).toContain('Public holidays');
@@ -219,18 +222,18 @@ test('external entries on the calendar are marked and read-only, and never in it
 test('a refresh that fails keeps the cached entries and shows the code', async ({ page }) => {
   const day = wednesday(3);
   const calendar = await seedCalendar(page, { label: 'Kept entries' });
-  const sub = await subscribe(page, calendar.id, 'https://localhost/a.ics', 'Feed');
+  const sub = await subscribe(page, calendar.id, 'https://kept.localhost/a.ics', 'Feed');
   seedItems(sub.id, day, ['Cached holiday']);
   await page.goto('/admin/events/calendars');
   await page.getByRole('button', { name: `Subscriptions of ${calendar.name}` }).click();
   const dialog = dialogOf(page);
   const row = dialog.getByTestId('subscription-row');
-  await expect(row).toContainText('1 events');
+  await expect(row).toContainText('1 event');
   await row.getByRole('button', { name: 'Refresh Feed now' }).click();
   await expect(row.getByTestId('subscription-code')).toHaveText(
     'The address cannot be used or reached.',
   );
-  await expect(row).toContainText('1 events');
+  await expect(row).toContainText('1 event');
   await page.goto(calendarUrl(calendar.id, 'month', day));
   await expect(
     page.getByTestId('external-chip').filter({ hasText: 'Cached holiday' }),
@@ -239,7 +242,7 @@ test('a refresh that fails keeps the cached entries and shows the code', async (
 
 test('German and the phone layout', async ({ page, context }) => {
   const calendar = await seedCalendar(page, { label: 'Kalender Rathaus', plain: true });
-  await subscribe(page, calendar.id, 'https://localhost/a.ics', 'Feiertage');
+  await subscribe(page, calendar.id, 'https://german.localhost/a.ics', 'Feiertage');
   await context.addCookies([
     { name: 'locale', value: 'de', url: new URL('/', page.url()).toString() },
   ]);
