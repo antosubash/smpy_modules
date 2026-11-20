@@ -114,11 +114,9 @@ async def test_a_schema_change_checks_stored_values_in_the_worker(client):
     assert made.status_code == 201, made.text
     rtype = (await client.get(f"{API}/note", headers=roles(ADMIN))).json()
     fields = [{**rtype["fields"][0], "constraints": {"pattern": EVIL}}]
-    started = time.monotonic()
     resp = await client.post(
         f"{API}/note/schema/preview", json={"fields": fields}, headers=roles(ADMIN)
     )
-    assert time.monotonic() - started < NOT_MATCHED_WITHIN
     _too_slow(resp)
 
 
@@ -150,11 +148,50 @@ async def test_a_verdict_covers_exactly_its_pair():
 
 
 SLOW_DEFAULT = "^(a+)+$|!$"
-NOT_MATCHED_WITHIN = 30
-"""Seconds. Matching 40 ``a`` plus ``!`` against ``SLOW_DEFAULT`` takes about 2**40 steps, so
-any bound far below that proves it was not matched. It was 4 and failed at 6.1 s in a full run on a
-machine at load 17 to 20 (it passes alone in well under a second): a wall-clock bound must not be a
-load bound."""
+
+
+class _Spy:
+    """Stands in for a compiled pattern and counts how often anything asks it to match."""
+
+    def __init__(self, real):
+        self.real = real
+        self.asked: list[str] = []
+
+    def _ask(self, how, value):
+        self.asked.append(value)
+        return getattr(self.real, how)(value)
+
+    def match(self, value):
+        return self._ask("match", value)
+
+    def fullmatch(self, value):
+        return self._ask("fullmatch", value)
+
+    def search(self, value):
+        return self._ask("search", value)
+
+
+@pytest.fixture
+def matched(monkeypatch):
+    """Every value any ``text_check`` asked ``SLOW_DEFAULT`` to match, in this process."""
+    import re
+    import types
+
+    from sm_records.schema import _text_checks
+
+    spies: list[_Spy] = []
+
+    def compile_(source, *args, **kwargs):
+        real = re.compile(source, *args, **kwargs)
+        if source != SLOW_DEFAULT:
+            return real
+        spies.append(_Spy(real))
+        return spies[-1]
+
+    monkeypatch.setattr(
+        _text_checks, "re", types.SimpleNamespace(**{**vars(re), "compile": compile_})
+    )
+    return spies
 
 
 async def test_a_backtracking_default_is_checked_in_the_worker_on_save(client):
@@ -162,10 +199,8 @@ async def test_a_backtracking_default_is_checked_in_the_worker_on_save(client):
     entry["constraints"] = {"pattern": SLOW_DEFAULT}
     entry["default"] = "a" * 40 + "!"
     body = {"key": "slowdefault", "label": "S", "fields": [entry]}
-    started = time.monotonic()
     resp = await client.post(API, json=body, headers=roles(ADMIN))
-    assert time.monotonic() - started < NOT_MATCHED_WITHIN
-    _too_slow(resp)
+    _too_slow(resp)  # the worker's deadline, not a stopwatch, is what ended it
     entry["constraints"] = {"pattern": "^x+$"}
     entry["default"] = "y"
     refused = await client.post(API, json=body, headers=roles(ADMIN))
@@ -177,14 +212,16 @@ async def test_a_backtracking_default_is_checked_in_the_worker_on_save(client):
     assert (await client.post(API, json=body, headers=roles(ADMIN))).status_code == 201
 
 
-async def test_a_stored_default_is_never_matched_again_on_load(client):
-    """A type whose stored default would backtrack: loading the schema (every
-    record read and write does) does not match it."""
+async def test_a_stored_default_is_never_matched_again_on_load(client, matched):
+    """A type whose stored default would backtrack: loading the schema (every record read and
+    write does) never asks its pattern to match that default."""
+    from sm_records.schema._text_checks import text_check
+
+    stored_default = "a" * 40 + "!"
     entry = field("name", indexed=False)
     entry["constraints"] = {"pattern": SLOW_DEFAULT}
-    entry["default"] = "a" * 40 + "!"
+    entry["default"] = stored_default
     await seed_type(client.db_state, "stored", [entry])
-    started = time.monotonic()
     assert (await client.get(f"{API}/stored", headers=roles(ADMIN))).status_code == 200
     listed = await client.get(f"{API}/stored/records", headers=roles(ADMIN))
     assert listed.status_code == 200
@@ -192,7 +229,11 @@ async def test_a_stored_default_is_never_matched_again_on_load(client):
         f"{API}/stored/records", json={"data": {"name": "!"}}, headers=roles(ADMIN)
     )
     assert made.status_code == 201, made.text
-    assert time.monotonic() - started < NOT_MATCHED_WITHIN
+    asked = [value for spy in matched for value in spy.asked]
+    assert stored_default not in asked
+    # Control: the spy does see a match when one happens, so the assertion above can fail.
+    text_check({"pattern": SLOW_DEFAULT})("a")
+    assert "a" in [value for spy in matched for value in spy.asked]
 
 
 async def test_a_batch_whose_answer_exceeds_64_kib_is_framed():
