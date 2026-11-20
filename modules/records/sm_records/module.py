@@ -139,7 +139,7 @@ class RecordsModule(SubmissionHooks, ModuleBase):
                     label=constants.MENU_MINE_LABEL,
                     label_key=constants.MENU_MINE_LABEL_KEY,
                     url=constants.MENU_MINE_URL,
-                    icon="calendar-check",
+                    icon="calendar",
                     order=constants.MENU_ORDER_TYPE + 1,
                     section=MenuSection.ADMIN_SIDEBAR,
                     group=constants.MENU_GROUP_TYPES,
