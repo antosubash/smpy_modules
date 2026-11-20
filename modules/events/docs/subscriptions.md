@@ -98,16 +98,21 @@ nothing and records nothing against the feeds.
 | One name lookup | 5 s | `DNS_TIMEOUT_SECONDS` |
 | Connect | 5 s | `FETCH_CONNECT_SECONDS` |
 | One read | 15 s | `FETCH_READ_SECONDS` |
+| One write, wait for a free connection | 5 s / 5 s | `FETCH_WRITE_SECONDS` / `FETCH_POOL_SECONDS` |
+| Name lookups at once | 4 | `DNS_POOL_SIZE` |
+| Response size (the `import_max_bytes` setting), smallest / largest allowed | 64 KiB / 20 MiB | `IMPORT_MIN_BYTES` / `IMPORT_BODY_CEILING` |
 | Redirects followed | 3 | `SUBSCRIPTION_MAX_REDIRECTS` |
 | Addresses tried per hop | 4 | `MAX_ADDRESSES_PER_HOP` |
 | Address length | 2,000 | `SUBSCRIPTION_URL_MAX` |
 | Name length | 100 | `SUBSCRIPTION_LABEL_MAX` |
+| A stored event's title / place / link, longest | 300 / 200 / 2,000 | `SUBSCRIPTION_ITEM_TITLE_MAX` / `SUBSCRIPTION_ITEM_LOCATION_MAX` / `SUBSCRIPTION_ITEM_URL_MAX` |
 | Events kept per subscription | 5,000 | `SUBSCRIPTION_ITEMS_MAX` |
 | Events kept per tenant | 50,000 | `SUBSCRIPTION_TENANT_ITEMS_MAX` |
 | Subscriptions per calendar | 10 | `SUBSCRIPTIONS_PER_CALENDAR` |
 | Subscriptions per tenant | 100 | `SUBSCRIPTIONS_PER_TENANT` |
 | Refresh interval, shortest / longest | 15 / 1,440 minutes | `SUBSCRIPTION_MIN_REFRESH_MINUTES` / `SUBSCRIPTION_MAX_REFRESH_MINUTES` |
 | Refresh now, per subscription | 300 s | `SUBSCRIPTION_REFRESH_NOW_SECONDS` |
+| Writes per signed-in user (add, edit, refresh, resume) | 20 per minute | `SUBSCRIPTION_WRITE_RATE` |
 | Failures in a row before it stops | 10 | `SUBSCRIPTION_MAX_FAILURES` |
 | Longest backoff and longest honoured Retry-After or max-age | 24 hours | `SUBSCRIPTION_MAX_BACKOFF` |
 | Fetches per tick | 20 | `SUBSCRIPTION_TICK_FETCHES` |

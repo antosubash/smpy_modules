@@ -30,7 +30,7 @@ PATH_PATTERN = (
     rf"^/api/events/(?:calendars/{_ID}/subscriptions|subscriptions/{_ID}(?:/refresh|/resume)?)$"
 )
 """Every route that can start a fetch: create, edit (a new address), refresh and resume."""
-RATE = constants.SUBSCRIPTION_REFRESH_RATE
+RATE = constants.SUBSCRIPTION_WRITE_RATE
 
 
 def _context(request: Request, who, settings: EventsSettings) -> rules.Context:

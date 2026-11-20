@@ -120,4 +120,17 @@ def test_the_rate_limit_covers_every_route_that_can_start_a_fetch():
         rule = registry.match(method, path)
         assert rule is not None, (method, path)
         assert rule.key == "user"
-    assert constants.SUBSCRIPTION_REFRESH_RATE
+    assert rule.rate == constants.SUBSCRIPTION_WRITE_RATE == "20/minute"
+
+
+async def test_the_twenty_first_write_in_a_minute_is_refused():
+    from simple_module_core.rate_limit import InProcessWindowStore, parse_rate
+
+    registry = RateLimitRegistry()
+    EventsModule().register_rate_limits(registry)
+    rule = registry.match("POST", f"/api/events/subscriptions/{uuid.uuid4()}/resume")
+    spec = parse_rate(rule.rate)
+    store = InProcessWindowStore(clock=lambda: 1000.0)
+    answers = [(await store.hit("user:u", spec)).allowed for _ in range(21)]
+    assert answers == [True] * 20 + [False]  # at the limit passes, past it is refused
+    assert (await InProcessWindowStore(clock=lambda: 1000.0).hit("user:other", spec)).allowed

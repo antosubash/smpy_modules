@@ -53,7 +53,7 @@ class SubscriptionPatch(BaseModel):
     color: Color | None = None
     refresh_minutes: Minutes | None = None
     public: bool | None = None
-    expected: Annotated[str, Field(max_length=64)] | None = None
+    expected: Annotated[str, Field(max_length=constants.SUBSCRIPTION_VERSION_MAX)] | None = None
     """The ``version`` the caller read: another edit since is 409 ``stale``."""
 
     _lower_color = field_validator("color", mode="before")(lower_color)

@@ -35,14 +35,12 @@ __all__ = [
     "SUBSCRIPTIONS_SOURCE_ICON",
     "SUBSCRIPTIONS_SOURCE_LABEL_KEY",
     "SUBSCRIPTION_CODE_MAX",
-    "SUBSCRIPTION_COLOR_PATTERN",
     "SUBSCRIPTION_DELETED_KEPT_DAYS",
     "SUBSCRIPTION_ETAG_MAX",
     "SUBSCRIPTION_EXISTS_CODE",
     "SUBSCRIPTION_EXISTS_DETAIL",
     "SUBSCRIPTION_FAILURE_CODES",
     "SUBSCRIPTION_FETCH_SECONDS",
-    "SUBSCRIPTION_ID_MAX",
     "SUBSCRIPTION_ITEMS_MAX",
     "SUBSCRIPTION_ITEM_LOCATION_MAX",
     "SUBSCRIPTION_ITEM_TITLE_MAX",
@@ -65,7 +63,6 @@ __all__ = [
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_CODE",
     "SUBSCRIPTION_NOT_PUBLIC_CALENDAR_DETAIL",
     "SUBSCRIPTION_REFRESH_NOW_SECONDS",
-    "SUBSCRIPTION_REFRESH_RATE",
     "SUBSCRIPTION_STATE_CONFLICT_CODE",
     "SUBSCRIPTION_STATE_CONFLICT_DETAIL",
     "SUBSCRIPTION_STATUSES",
@@ -76,6 +73,8 @@ __all__ = [
     "SUBSCRIPTION_TICK_FETCHES",
     "SUBSCRIPTION_TICK_SECONDS",
     "SUBSCRIPTION_URL_MAX",
+    "SUBSCRIPTION_VERSION_MAX",
+    "SUBSCRIPTION_WRITE_RATE",
     "URL_DISPLAY_MAX",
     "URL_REFUSAL_CODES",
     "URL_REFUSAL_DETAIL",
@@ -136,9 +135,10 @@ SUBSCRIPTION_MAX_REFRESH_MINUTES: Final = 1440
 SUBSCRIPTION_MAX_BACKOFF: Final = timedelta(hours=24)
 SUBSCRIPTION_MAX_FAILURES: Final = 10
 SUBSCRIPTION_REFRESH_NOW_SECONDS: Final = 300
-SUBSCRIPTION_REFRESH_RATE: Final = "20/minute"
-"""Per signed-in user, on every subscription's refresh route (the per-subscription floor is
-``SUBSCRIPTION_REFRESH_NOW_SECONDS``)."""
+SUBSCRIPTION_WRITE_RATE: Final = "20/minute"
+"""Per signed-in user, shared by create, edit, refresh and resume. It only caps write churn: how
+often a subscription is fetched is bounded by ``SUBSCRIPTION_REFRESH_NOW_SECONDS``, the lease and
+the tick budgets, whatever this says. A person clicking through the dialog stays far below it."""
 SUBSCRIPTION_DELETED_KEPT_DAYS: Final = 30
 
 # The beat (Ruling 15).
@@ -157,13 +157,13 @@ it can overshoot by at most the number of claims racing at that instant."""
 SUBSCRIPTIONS_PER_CALENDAR: Final = 10
 SUBSCRIPTIONS_PER_TENANT: Final = 100
 SUBSCRIPTION_LABEL_MAX: Final = 100
-SUBSCRIPTION_COLOR_PATTERN: Final = r"^#[0-9a-fA-F]{6}$"
 SUBSCRIPTION_ITEM_TITLE_MAX: Final = 300
 SUBSCRIPTION_ITEM_LOCATION_MAX: Final = 200
 SUBSCRIPTION_ITEM_URL_MAX: Final = 2000
 
 # Column widths.
-SUBSCRIPTION_ID_MAX: Final = 64
+SUBSCRIPTION_VERSION_MAX: Final = 64
+"""The edit token (``version``, an ISO timestamp) a client sends back as ``expected``."""
 SUBSCRIPTION_STATUS_MAX: Final = 16
 SUBSCRIPTION_CODE_MAX: Final = 40
 SUBSCRIPTION_LEASE_OWNER_MAX: Final = 32
