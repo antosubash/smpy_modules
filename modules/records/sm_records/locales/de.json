@@ -969,6 +969,18 @@
     "form_labels": {
       "sm_email": "E-Mail",
       "sm_name": "Name"
+    },
+    "system_labels": {
+      "sm_status": "Anmeldestatus",
+      "sm_event_title": "Veranstaltung",
+      "sm_event_id": "Veranstaltungs-ID",
+      "sm_occurrence_key": "Terminschlüssel",
+      "sm_occurrence_start": "Termin",
+      "sm_email": "E-Mail",
+      "sm_name": "Name",
+      "sm_confirmed_at": "Bestätigt am",
+      "sm_cancelled_at": "Storniert am",
+      "sm_consent_at": "Einwilligung am"
     }
   },
   "events": {

@@ -159,7 +159,11 @@ export function RecordCell({
       // lives, shared with the envelope's own `published_at`/`updated_at`
       // timestamps in `RecordTable`/`RecordCardList`.
       return (
-        <span>{typeof value === 'string' ? formatDateTime(value, locale) : String(value)}</span>
+        <span>
+          {typeof value === 'string'
+            ? formatDateTime(value, locale, Boolean(field.system))
+            : String(value)}
+        </span>
       );
 
     case 'select': {

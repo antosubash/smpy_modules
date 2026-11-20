@@ -969,6 +969,18 @@
     "form_labels": {
       "sm_email": "Email",
       "sm_name": "Name"
+    },
+    "system_labels": {
+      "sm_status": "Sign-up status",
+      "sm_event_title": "Event",
+      "sm_event_id": "Event ID",
+      "sm_occurrence_key": "Date key",
+      "sm_occurrence_start": "Event date",
+      "sm_email": "Email",
+      "sm_name": "Name",
+      "sm_confirmed_at": "Confirmed on",
+      "sm_cancelled_at": "Cancelled on",
+      "sm_consent_at": "Consent given"
     }
   },
   "events": {

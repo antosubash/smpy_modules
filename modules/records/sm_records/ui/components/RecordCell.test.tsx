@@ -240,4 +240,14 @@ describe('RecordCell', () => {
       html(field({ type: 'select', options: { choices: [{ value: 'a', label: 'Alpha' }] } }), 'a'),
     ).toContain('Alpha');
   });
+
+  it('words a system datetime with its zone label, an ordinary one without', () => {
+    const when = '2026-09-21T12:00:00+00:00';
+    const system = html(
+      field({ key: 'sm_occurrence_start', type: 'datetime', system: 'readonly' }),
+      when,
+    );
+    const plain = html(field({ type: 'datetime' }), when);
+    expect(system.length).toBeGreaterThan(plain.length);
+  });
 });
