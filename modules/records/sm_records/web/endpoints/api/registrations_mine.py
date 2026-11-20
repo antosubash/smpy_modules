@@ -28,6 +28,7 @@ from sm_records.core.tenancy import bound_tenant
 from sm_records.models import Record, RecordType, tables_for
 from sm_records.public_submissions.registration import cancel as cancelling
 from sm_records.public_submissions.registration import seats
+from sm_records.public_submissions.registration import start as start_module
 from sm_records.public_submissions.registration.status import LIVE
 from sm_records.public_submissions.subscribe import normalise
 from sm_records.records.index.query import Filter, FilterOp, filtered
@@ -90,8 +91,9 @@ async def verified_address(request: Request, db: AsyncSession) -> str | None:
         return None
 
 
-async def _own(db: AsyncSession, email: str, now: datetime) -> list[tuple[RecordType, Record]]:
-    """The caller's live, untrashed, upcoming registrations in the bound tenant."""
+async def _own(db: AsyncSession, email: str) -> list[tuple[RecordType, Record]]:
+    """The caller's live, untrashed registrations in the bound tenant (the upcoming ones are picked
+    in :func:`_items`, from events' resolved start)."""
     tenant = bound_tenant()
     out: list[tuple[RecordType, Record]] = []
     for rtype in await type_service.list_types(db):
@@ -106,11 +108,7 @@ async def _own(db: AsyncSession, email: str, now: datetime) -> list[tuple[Record
         ).limit(MAX_ITEMS)
         for record in (await db.execute(stmt)).scalars():
             data = record.data or {}
-            if (
-                not record.is_deleted
-                and data.get("sm_status") in LIVE
-                and not cancelling.occurrence_started(data, now)
-            ):
+            if not record.is_deleted and data.get("sm_status") in LIVE:
                 out.append((rtype, record))
     return out
 
@@ -123,8 +121,10 @@ def _title(record: Record, facts: Any) -> tuple[str, str | None, str | None]:
 
 
 async def _items(
-    db: AsyncSession, own: list[tuple[RecordType, Record]], locale: str
+    db: AsyncSession, own: list[tuple[RecordType, Record]], locale: str, now: datetime
 ) -> list[MineItem]:
+    starts = await start_module.resolve_many(db, bound_tenant(), [r.data or {} for _, r in own])
+    own = [pair for pair, begun in zip(own, starts, strict=True) if begun is None or begun > now]
     own = own[:MAX_ITEMS]
     facts: dict[tuple[uuid.UUID, str], Any] = {}
     if own and seats.available():
@@ -167,7 +167,7 @@ async def mine(request: Request, db: AsyncSession = Depends(request_db)) -> Mine
     if email is None:
         return MineOut(verified=False, items=[])
     locale = (request.headers.get("accept-language") or "en")[:2].lower()
-    return MineOut(verified=True, items=await _items(db, await _own(db, email, utcnow()), locale))
+    return MineOut(verified=True, items=await _items(db, await _own(db, email), locale, utcnow()))
 
 
 @router.post("/registrations/mine/{record_uuid}/cancel", response_model=MineOut)
@@ -180,7 +180,7 @@ async def cancel_mine(
     email = await verified_address(request, db)
     if email is None:
         raise NotFound(NOT_FOUND)
-    own = await _own(db, email, utcnow())
+    own = await _own(db, email)
     found = next(((t, r) for t, r in own if r.uuid == record_uuid.replace("-", "").lower()), None)
     if found is None:
         raise NotFound(NOT_FOUND)
@@ -188,4 +188,4 @@ async def cancel_mine(
         raise NotFound(NOT_FOUND)
     remaining = [pair for pair in own if pair[1].uuid != found[1].uuid]
     locale = (request.headers.get("accept-language") or "en")[:2].lower()
-    return MineOut(verified=True, items=await _items(db, remaining, locale))
+    return MineOut(verified=True, items=await _items(db, remaining, locale, utcnow()))

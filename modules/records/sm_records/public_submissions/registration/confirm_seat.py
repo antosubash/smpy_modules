@@ -33,9 +33,10 @@ _EXPIRED = "this link has expired or is no longer valid; sign up again"
 
 async def take_seat(
     db: AsyncSession, rtype: RecordType, record: Record, holds: Callable[[Record], bool]
-) -> None:
+) -> Any:
     """Admit ``record``'s seat if it is still pending and the link still holds for it; else nothing
-    (the caller's transition decides ``already_confirmed`` and expiry)."""
+    (the caller's transition decides ``already_confirmed`` and expiry). Returns the occurrence's
+    start as events resolves it now (to refresh the record's snapshot), or ``None``."""
     try:
         row: Any = await lock_record(db, rtype, record)
     except NoResultFound:
@@ -44,7 +45,7 @@ async def take_seat(
     if row.is_deleted or not holds(row):
         raise SubmissionRefused("link_expired", _EXPIRED)
     if data.get("sm_status") != PENDING:
-        return
+        return None
     if not seats.available():
         raise SubmissionRefused(
             codes.REGISTRATION_CLOSED, codes.TABLE[codes.REGISTRATION_CLOSED].message
@@ -56,7 +57,10 @@ async def take_seat(
         occurrence_key=str(data.get("sm_occurrence_key") or ""),
         target=rtype.key,
         holder=row.uuid,
+        locale=str(data.get("sm_locale") or "en"),
     )
     if not given.admitted:
         code = codes.known(given.code)
         raise SubmissionRefused(code, codes.TABLE[code].message)
+    # The occurrence's start as events resolves it now: the snapshot taken at submit may be stale.
+    return given.event.starts_at if given.event is not None else None

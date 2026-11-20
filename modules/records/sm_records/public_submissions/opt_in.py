@@ -93,6 +93,8 @@ async def confirm(
     registration = (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION
     done = REGISTERED if registration else CONFIRMED
 
+    resolved_start: Any = None
+
     def derive(row: Record) -> Change | None:
         data = row.data or {}
         if row.is_deleted or not links.matches(secret, link, data.get("sm_nonce")):
@@ -101,11 +103,14 @@ async def confirm(
             return None
         if data.get("sm_status") != PENDING:
             raise _expired()
-        return {"sm_status": done, "sm_confirmed_at": utcnow()}, None
+        change: dict[str, Any] = {"sm_status": done, "sm_confirmed_at": utcnow()}
+        if resolved_start is not None:
+            change["sm_occurrence_start"] = resolved_start  # refreshed: the event may have moved
+        return change, None
 
     try:
         if registration:  # the seat, then ``registered``: one transaction, the global lock order
-            await take_seat(
+            resolved_start = await take_seat(
                 db,
                 rtype,
                 record,

@@ -19,6 +19,7 @@ from sm_records.contracts.public_submissions import (
 )
 from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, tables_for
+from sm_records.public_submissions.registration import start
 from sm_records.public_submissions.retention_rules import PENDING, still_due, window_for
 from sm_records.records.index.query import Filter, FilterOp, filtered
 from sm_records.records.services._lock import lock_type
@@ -66,6 +67,10 @@ async def _purge_one(session: Any, rtype: RecordType, uuid: str, run: Any) -> bo
     record = (await session.execute(stmt)).scalars().first()
     if record is None or not still_due(rtype, record, run.now):
         return False
+    if (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION and await start.keeps(
+        session, rtype, record, run.now
+    ):
+        return False  # the event moved later: its registrations live on
     if not record.is_deleted:
         await soft_delete_record(session, rtype, record, settings=run.settings)
     await hard_delete_record(session, rtype, record)
