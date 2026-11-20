@@ -213,6 +213,19 @@ stored URL never carries credentials (`http_url`). A worker cannot re-check the 
 captured at apply expire after one hour (`rights_expired`); eager hosts re-check every slice. Log
 redaction covers the app only: redact `/feed/` in proxies and CDNs yourself.
 
+**Events subscriptions.** Fetch a subscription URL only through
+`sm_events.feeds.subscriptions.fetch` (the pinned transport, every hop re-checked, never an
+`httpx.AsyncClient`: its request log would print the URL). The URL is stored only as `enc:v2:`
+(`url_enc`, a column target of `scripts/reencrypt_secrets.py`) and shown only as `url_display`;
+nothing that leaves `fetch_feed` carries it (a failure is a code with no cause). Build a fetch
+`Policy` only through `policy.effective(setting, may_use_private=sub.may_use_private)`: the flag
+is set only from the saver's `events.manage` (`flag_after_save`), never from a body, and a public
+subscription is never fetched with it. One function (`rules.fetch_wait`) decides when a fetch may
+start; never clear an unexpired lease. External items are plain text with no description: never
+render them as HTML, never re-export them (feeds build plugin calls only), never remind or card
+them. The browser suite does not fetch (loopback is always refused): seed through
+`tests/e2e/support/seed_external.py`. Docs: `modules/events/docs/subscriptions.md`.
+
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
 which fields are public, the consent text and the recipients live on

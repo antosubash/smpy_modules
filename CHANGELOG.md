@@ -7,6 +7,16 @@ name the module they affect.
 
 ### Added
 
+- **events: external calendar subscriptions** (PR 10 of the events module, the last). A calendar
+  shows an external `.ics` feed read-only (marked External, plain text, never re-published or
+  reminded), added in a Subscriptions dialog. The address is stored encrypted (`enc:v2:`, a fifth
+  copy of the stored-secret crypto, rewritten by `scripts/reencrypt_secrets.py`) and shown only as
+  `https://host/…`; a worker fetches it through a pinned, bounded client that resolves and checks
+  every address and every redirect and never lets an exception or log carry the address. New
+  settings `subscription_refresh_minutes` and `allow_private_subscription_urls`, new migration
+  `d1847b1d68bb`, and the `events.refresh_subscriptions` beat task (worker needs a secret key).
+  events joins images and ai in keeping a parity-checked SSRF guard.
+
 - **events and newsletter: the pagebuilder blocks and the event card** (PR 7 of the events module).
   Events contributes `UpcomingEvents` and `EventsCalendar` to pagebuilder's palette (the optional
   `pagebuilder` extra), reading three anonymous routes under `/api/events/public/`; they show only

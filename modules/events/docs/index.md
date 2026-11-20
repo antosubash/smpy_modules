@@ -399,25 +399,26 @@ last-write-wins; event writes use `expected_revision`.
 
 ## Status
 
-PR 4 adds the public surface: pages, ICS feeds, JSON-LD and a sitemap, with calendar slug
-redirects (see [Public pages](public.md) and [Operating](operations.md)); private feed links are in [Private feed links](feeds.md). PR 3 adds the calendar: the `Calendar` component and the console grid at
-`/admin/events/`. PR 2 adds events: texts, recurrence and overrides, the
-occurrences read, the workflow, scheduled publishing, the API, and the Events list and editor. PR 1
-provided calendars, categories, settings, the tenancy and access policy and all
-seven tables. Browser QA and the shipping pipeline follow branch verification.
-Later delivery remains:
+The module is complete: ten parts, delivered in order, each with its own guide.
 
-| PR | Delivers |
-| --- | --- |
-| 2 | Events and texts, recurrence and overrides, occurrences read, workflow, API, list and editor |
-| 3 | Calendar component and console grid: views, create, drag, resize, timezone |
-| 4 (this release) | Public pages, calendar slug redirects, public ICS, JSON-LD and sitemap |
-| 5 | Private feed tokens and `.ics` upload |
-| 6 | Extension registry, plugin guide and records date-field source |
-| 7 (this release) | Pagebuilder blocks and newsletter card |
-| 8 | Reminders |
-| 9 | Registration through records |
-| 10 | External ICS subscriptions |
+| Part | Delivers | Guide |
+| --- | --- | --- |
+| 1 | Calendars with private, internal and public visibility, sharing, categories, settings, tenancy and the access policy | this page |
+| 2 | Events with texts, recurrence and overrides, the occurrences read, the workflow, scheduled publishing, the API, the Events list and editor | this page |
+| 3 | The `Calendar` component and the console grid: views, create, drag, resize, timezone | this page |
+| 4 | The public site: pages, calendar slug redirects, `.ics` feeds, JSON-LD, sitemap | [Public pages](public.md), [Operating](operations.md) |
+| 5 | Private feed links and `.ics` import | [Feeds](feeds.md), [Import](import.md) |
+| 6 | The extension registry, the plugin guide and the records date-field source | [Writing a plugin](extensions.md) |
+| 7 | Pagebuilder blocks and the newsletter event card | [Blocks and cards](blocks.md) |
+| 8 | Reminders | [Reminders](reminders.md) |
+| 9 | Registration through records | [Registration](registration.md) |
+| 10 | External ICS subscriptions: a calendar shows another calendar read-only | [Subscriptions](subscriptions.md) |
+
+## Subscriptions
+
+[External calendar subscriptions](subscriptions.md): what an external event can never do, the
+address policy and the intranet switch, how a fetch is made, refresh and backoff with every bound in
+a table the tests check, failure codes, and secrets.
 
 ## Feeds and import
 
