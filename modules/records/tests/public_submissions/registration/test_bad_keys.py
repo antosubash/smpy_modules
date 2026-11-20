@@ -3,15 +3,15 @@ event, never a server error: the panel API, the submit route and a forged token.
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 
 from tests.support.registration_http import ADDRESS, TYPE, load_registration
 from tests.support.submissions_http import JSON, SUBMISSIONS
 
 pytestmark = pytest.mark.usefixtures("reg_site")
-SUBSCRIPTION = str(uuid.uuid4())  # what an external subscription's id looks like
+SUBSCRIPTION = (
+    "5c0a3d52-0b5e-4b8e-9c1f-7d2e6a1b3c44"  # fixed: parametrize ids must match across xdist workers
+)
 BAD_KEYS = [
     "",
     "x",
