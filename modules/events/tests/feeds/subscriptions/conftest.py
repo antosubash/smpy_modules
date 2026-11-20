@@ -130,9 +130,11 @@ async def tls_server(tls_pki, resolver, monkeypatch):  # noqa: F811
                 for line in lines:
                     if line.lower().startswith("host:"):
                         seen["host"] = line.split(":", 1)[1].strip()
+                payload = seen.get("body", ICS)  # a test may serve another feed
+                kind = seen.get("type", b"text/calendar")
                 writer.write(
-                    b"HTTP/1.1 200 OK\r\nContent-Type: text/calendar\r\n"
-                    b"Content-Length: %d\r\n\r\n%s" % (len(ICS), ICS)
+                    b"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n%s"
+                    % (kind, len(payload), payload)
                 )
                 await writer.drain()
         except (asyncio.IncompleteReadError, ConnectionError, ssl.SSLError):
