@@ -162,6 +162,15 @@ an event that is published or scheduled. See the guide's [access table](docs/ind
 No anonymous page or API ships yet. A public calendar's visibility prepares it
 for later public, published-event reads; it exposes no anonymous screen today.
 
+## Extensions
+
+A second package can add dates to a calendar (a source such as records' `records:dates`), add an event type
+with its own validated `extra`, and contribute chips, details, editor and settings sections and toolbar
+items. An admin turns a source on per calendar (Calendars, **Sources**). A plugin call runs on its own
+database connection with a time budget and validated, bounded output, and a failing source is reported in the
+calendar instead of failing it. See [the plugin guide](docs/extensions.md). Events publishes nine bus
+events, also durably through the `background_tasks` outbox. Status: PR 6 of 10 (extensions).
+
 ## Public pages
 
 Anonymous visitors get a public calendar's published events under `public_prefix` (default

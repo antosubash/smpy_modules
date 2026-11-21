@@ -14,6 +14,11 @@ export class ApiError extends Error {
     public readonly retryAfter: number | null = null,
     /** The input the server says the refusal belongs to (`times.end`, `texts.de.slug`). */
     public readonly field: string | null = null,
+    /** The 422's `msg` per dotted `loc` (`extra.speaker`): a plugin's section shows its own. */
+    public readonly messages: Record<string, string> = {},
+    /** A plugin's short code per dotted `loc` (`mappings.0.field` -> `field_missing`), when it
+     *  gave one: the 422's `type` is `value_error.<code>`. */
+    public readonly codes: Record<string, string> = {},
   ) {
     super(code);
   }
@@ -80,6 +85,8 @@ export function errorText(error: unknown, gone?: string): string {
     import_too_large: keys.events.errors.import_too_large,
     ics_invalid: keys.events.errors.ics_invalid,
     private_feeds_unavailable: keys.events.errors.private_feeds_unavailable,
+    extra_too_large: keys.events.errors.extra_too_large,
+    type_not_installed: keys.events.errors.type_not_installed,
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);
@@ -128,6 +135,27 @@ function fieldsOf(body: ErrorBody): string[] {
   );
 }
 
+function messagesOf(body: ErrorBody): Record<string, string> {
+  if (!Array.isArray(body?.detail)) return {};
+  const out: Record<string, string> = {};
+  for (const item of body.detail as { loc?: unknown; msg?: unknown }[]) {
+    if (!Array.isArray(item?.loc) || typeof item.msg !== 'string') continue;
+    out[item.loc.filter((part) => part !== 'body' && part !== 'query').join('.')] = item.msg;
+  }
+  return out;
+}
+
+function codesOf(body: ErrorBody): Record<string, string> {
+  if (!Array.isArray(body?.detail)) return {};
+  const out: Record<string, string> = {};
+  for (const item of body.detail as { loc?: unknown; type?: unknown }[]) {
+    if (!Array.isArray(item?.loc) || typeof item.type !== 'string') continue;
+    const code = item.type.startsWith('value_error.') ? item.type.slice('value_error.'.length) : '';
+    if (code) out[item.loc.filter((part) => part !== 'body' && part !== 'query').join('.')] = code;
+  }
+  return out;
+}
+
 export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> {
   const result = await apiFetch<T>(url, init);
   if (result.ok) return result.data;
@@ -139,6 +167,8 @@ export async function send<T>(url: string, init: ApiFetchInit = {}): Promise<T> 
     result.status === 422 ? fieldsOf(body) : [],
     result.status === 429 && Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : null,
     typeof body?.field === 'string' ? body.field : null,
+    result.status === 422 ? messagesOf(body) : {},
+    result.status === 422 ? codesOf(body) : {},
   );
 }
 

@@ -64,6 +64,7 @@ class EventsModule(ModuleBase):
         the framework's session class (as images does), and, once the settings are hydrated,
         the public routes: where they mount and in which languages depend on the database. The log
         filter that keeps a private feed token out of every request log goes on first."""
+        from sm_events.calendar.plugins.extensions import load_extensions
         from sm_events.core import boot, tenancy
         from sm_events.feeds.tokens import log_redact
 
@@ -73,6 +74,7 @@ class EventsModule(ModuleBase):
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)
         boot.wire_public(app)
+        load_extensions()  # the registry: built-ins, then every plugin's, then frozen
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from simple_module_hosting.csrf import RequiresCsrf

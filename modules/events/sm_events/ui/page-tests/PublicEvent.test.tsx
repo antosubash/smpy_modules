@@ -13,6 +13,8 @@ import type { PublicEventProps } from '../public/types';
 
 function props(overrides: Partial<PublicEventProps> = {}): PublicEventProps {
   return {
+    type: 'event',
+    public_extra: {},
     locale: 'en',
     title: 'Concert',
     summary: 'An evening of music',

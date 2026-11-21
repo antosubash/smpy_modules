@@ -24,12 +24,15 @@ def machine_response(
     media_type: str,
     kind: _cache.Kind,
     headers: dict[str, str] | None = None,
+    degraded: bool = False,
 ) -> Response:
     head = request.method == "HEAD"
     response = Response(b"" if head else body, media_type=media_type, headers=headers)
     if head:
         response.headers["content-length"] = str(len(body))
-    _cache.apply(response, request, settings, kind=kind, etag=_cache.body_etag(body))
+    _cache.apply(
+        response, request, settings, kind=kind, etag=_cache.body_etag(body), degraded=degraded
+    )
     return _cache.not_modified(request, response.headers) or response
 
 

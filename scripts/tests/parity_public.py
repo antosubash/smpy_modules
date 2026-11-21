@@ -48,4 +48,19 @@ PUBLIC_FAMILIES: tuple[Family, ...] = (
         ),
         shared=("_CLOSE_HEAD", "_EXISTING_TITLE", "_tag", "_alternate_links", "inject"),
     ),
+    Family(
+        "plugin loader: find the extensions module (images, events)",
+        (
+            Copy(
+                "modules/images/sm_images/pipeline/extensions.py",
+                messages=("images: entry-point package %r is not importable; skipped",),
+            ),
+            Copy(
+                "modules/events/sm_events/calendar/plugins/extensions.py",
+                {"constants.EXTENSIONS_MODULE": "EXTENSIONS_MODULE"},
+                messages=("events: entry-point package %r is not importable; skipped",),
+            ),
+        ),
+        shared=("_find",),
+    ),
 )

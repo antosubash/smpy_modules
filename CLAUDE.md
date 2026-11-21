@@ -183,6 +183,8 @@ with write and `events.publish`. Every event write starts with `claim_revision`
 `calendar/occurrences.py`, and never without an `until`. The editor's HTML is
 cleaned by both sanitisers and never inserted as markup otherwise. The API takes
 a local wall clock plus an IANA timezone, never UTC (an instant is stored UTC).
+Events' bus events are also published durably (the `background_tasks` outbox, at least once, no
+ordering), and an in-process subscriber misses changes made in a worker.
 **`/admin/events/` is the calendar (FullCalendar 7).** Import FullCalendar only under
 `sm_events/ui/calendar/adapter/` and add only the MIT packages on the allow-list
 (`boundaries.test.ts`, which checks the lockfile's licences too); the adapter must load the interaction plugin or nothing
@@ -232,6 +234,10 @@ trash (`empty_trash`; both reach `_purge_ids`) and deleting the type
 `records_submission_delivery` claims first, through `forget_deliveries`; a
 new way of deleting records must go through one of them. The retention sweep
 trashes with `soft_delete_record` and then calls `hard_delete_record`.
+`sm_records.contracts.dated` serves events' `records:dates` source: published, untrashed records only,
+under the caller's own access (`records.view`, `allowed_roles`, a type grant; never wider than the list
+API), `is_public` types only for the public, tenant pinned; `integrations/events/` is the only code
+that imports `sm_events`.
 
 **Newsletter content and test sends.** Email HTML is produced only by
 `sm_newsletter.content.render`. Rich text is re-serialised from an allow-list at
@@ -416,6 +422,22 @@ registry, so a later `register_step` raises `RegistryFrozenError`. The plugin mu
 be installed identically in the web image and in **every** worker image: a worker
 without it settles the plugin's steps as `not_installed`. Docs:
 `modules/images/docs/`.
+
+**A plugin registers events sources and types from `events_extensions.py`, never from
+`on_startup`.** Same loader shape as images: `sm_events.calendar.plugins.extensions.load_extensions()`
+imports the file in the web process and on a worker's first registry read, then freezes the registry
+(`RegistryFrozenError`); ids are `<entry-point name>:<name>`; install the plugin identically in the
+web image and every worker image. UI registers lazily from `events-extensions.ts` (loaders only; it
+imports only `@simple-module-py/events`). A plugin call never uses the host's session: it gets a
+read-only session of its own (own connection, cancellation-shielded cleanup, Postgres
+`statement_timeout`), a time and item budget and validated output. Visibility is decided by the
+calendar **and** the source (`public = True` only for data that is public in its own module, called
+with `viewer=None`). **Plugin settings are never secret**: they are stored in the clear and shown to
+whoever manages the calendar, so a settings model with a secret field is refused at registration.
+The `extra` of an event whose type is not installed is never validated, rewritten or dropped. A
+sibling reaches events only through `contracts.extensions`; records' optional `events` extra
+registers `records:dates` from `sm_records/events_extensions.py` and imports `sm_events` nowhere
+else. Docs: `modules/events/docs/extensions.md`.
 
 **Host settings come from the environment first, then the database.**
 `host/main.py` builds its settings with the framework's

@@ -20,6 +20,8 @@ export function readState(search: string): Partial<CalendarState> {
   if (categories.length) state.categories = categories;
   const types = query.getAll('type');
   if (types.length) state.types = types;
+  const sources = query.getAll('source');
+  if (sources.length) state.sources = sources;
   return state;
 }
 
@@ -33,5 +35,6 @@ export function writeState(state: CalendarState, allCalendars: string[]): string
   }
   for (const id of state.categories) query.append('category', id);
   for (const id of state.types) query.append('type', id);
+  for (const id of state.sources) query.append('source', id);
   return `?${query}`;
 }

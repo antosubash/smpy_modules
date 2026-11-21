@@ -67,12 +67,14 @@ class EventCreate(_Fields):
     calendar_id: uuid.UUID
     parent_id: uuid.UUID | None = None
     type: TypeName = DEFAULT_EVENT_TYPE
+    extra: dict[str, Any] = Field(default_factory=dict)
+    """The type's own data; validated against its model on write (size and unknown keys too)."""
     times: TimesIn
     texts: Annotated[dict[LocaleKey, TextIn], Field(min_length=1, max_length=constants.TEXTS_MAX)]
 
 
 _IMMUTABLE = ("calendar_id", "parent_id", "type")
-_NOT_NULL = ("times", "cancelled", "attendance_mode", "texts")
+_NOT_NULL = ("times", "cancelled", "attendance_mode", "texts", "extra")
 
 
 class EventPatch(_Fields):
@@ -89,6 +91,9 @@ class EventPatch(_Fields):
         | None
     ) = None
     drop_orphaned_overrides: bool = False
+    extra: dict[str, Any] | None = None
+    """Replaces the whole ``extra``, validated against the event's type. Left out, the stored
+    value is untouched, byte for byte."""
 
     @model_validator(mode="before")
     @classmethod

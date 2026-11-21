@@ -14,7 +14,13 @@ const r = (start: string, end: string) => ({ start, end });
 const first = r('2026-03-01T00:00:00Z', '2026-04-12T00:00:00Z');
 const insideFirst = r('2026-03-08T00:00:00Z', '2026-04-19T00:00:00Z');
 const far = r('2026-08-01T00:00:00Z', '2026-09-12T00:00:00Z');
-const filters: FilterQuery = { calendars: [], categories: [], types: [], locale: 'en' };
+const filters: FilterQuery = {
+  calendars: [],
+  categories: [],
+  types: [],
+  sources: [],
+  locale: 'en',
+};
 
 const item = (key: string) => ({ key, title: key }) as Occurrence;
 const pageOf = (...keys: string[]): OccurrencePage => ({ items: keys.map(item), truncated: false });

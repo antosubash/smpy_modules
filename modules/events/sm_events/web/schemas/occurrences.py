@@ -33,6 +33,7 @@ def occurrence_query(
     calendar: Annotated[list[uuid.UUID] | None, Query(max_length=constants.CALENDARS_MAX)] = None,
     category: Annotated[list[uuid.UUID] | None, Query(max_length=constants.CATEGORIES_MAX)] = None,
     types: Annotated[list[str] | None, Query(alias="type", max_length=20)] = None,
+    sources: Annotated[list[str] | None, Query(alias="source", max_length=20)] = None,
     locale: Annotated[str | None, Query(max_length=constants.LOCALE_MAX)] = None,
     include_unpublished: Annotated[bool, Query()] = True,
 ) -> OccurrenceQuery:
@@ -44,6 +45,7 @@ def occurrence_query(
             calendar_ids=frozenset(calendar) if calendar else None,
             category_ids=frozenset(category) if category else None,
             types=frozenset(types) if types else None,
+            sources=frozenset(sources) if sources else None,
             locale=locale,
             include_unpublished=include_unpublished,
         ),

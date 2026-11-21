@@ -21,6 +21,7 @@ def build_api_router() -> APIRouter:
         categories_api,
         events_actions_api,
         events_api,
+        extensions_api,
         feed_tokens_api,
         imports_api,
         occurrences_api,
@@ -30,6 +31,7 @@ def build_api_router() -> APIRouter:
     router = APIRouter(dependencies=[Depends(bind_admin)])
     for sub in (
         calendars_api.router,
+        extensions_api.router,
         feed_tokens_api.router,
         imports_api.router,
         categories_api.router,

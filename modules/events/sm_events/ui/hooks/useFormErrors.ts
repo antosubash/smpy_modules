@@ -47,7 +47,7 @@ export function useFormErrors(
       const paths = Object.keys(mapped);
       if (paths.length > 0) {
         const visible = Object.fromEntries(
-          Object.entries(mapped).filter(([p]) => shown.includes(p)),
+          Object.entries(mapped).filter(([p]) => shown.includes(p) || p.startsWith('extra.')),
         );
         setFields(visible);
         setError(

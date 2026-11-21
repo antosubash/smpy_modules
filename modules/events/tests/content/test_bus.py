@@ -144,3 +144,150 @@ def test_dataclass_shapes():
     assert contract.EventPublished(
         tenant_id="t", event_id=uuid.uuid4(), calendar_id=uuid.uuid4(), uid="u", published_at=WHEN
     )
+
+
+NEW = (
+    contract.EventUnpublished,
+    contract.EventReinstated,
+    contract.OccurrenceSkipped,
+    contract.EventRestored,
+    contract.EventUpdated,
+)
+
+
+def test_all_events_serialisable():
+    from simple_module_core.durable_events import check_serializable
+
+    for cls in (
+        contract.EventPublished,
+        contract.EventRescheduled,
+        contract.EventCancelled,
+        contract.EventDeleted,
+        *NEW,
+    ):
+        check_serializable(cls)
+
+
+def test_new_dataclass_shapes():
+    head = ["tenant_id", "event_id", "calendar_id", "uid"]
+    assert names(contract.EventUnpublished) == [*head, "was_scheduled"]
+    assert names(contract.EventReinstated) == [*head, "original_start"]
+    assert names(contract.OccurrenceSkipped) == [*head, "original_start"]
+    assert names(contract.EventRestored) == head
+    assert names(contract.EventUpdated) == [*head, "changed"]
+    assert all(issubclass(cls, Event) for cls in NEW)
+
+
+def test_no_payload_carries_content():
+    """Identifiers, instants, flags and field names only: never a title, text or ``extra``."""
+    for cls in (*NEW, contract.EventPublished, contract.EventDeleted):
+        for field in dataclasses.fields(cls):
+            assert field.name not in {"title", "description", "texts", "extra", "summary", "email"}
+
+
+class Transport:
+    """A durable transport that writes into the session's transaction, as the outbox does."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.calls: list[tuple[object, list[str], str | None, bool]] = []
+        self.fail = fail
+
+    async def enqueue(self, event, handler_names, db):
+        if self.fail:
+            raise RuntimeError("outbox down")
+        in_txn = db.sync_session.get_transaction() is not None
+        self.calls.append((event, list(handler_names), current_tenant_id.get(), in_txn))
+
+
+def durable_bus(transport, *, handlers=True):
+    ev_bus = EventBus()
+    ev_bus.durable_transport = transport  # type: ignore[assignment]
+    if handlers:
+
+        async def handle(event, ctx):
+            return None
+
+        ev_bus.subscribe_durable(contract.EventDeleted, handle, name="test.handler")
+    return ev_bus
+
+
+async def test_durable_published_in_transaction(db):
+    transport = Transport()
+    bus.attach(db, durable_bus(transport))
+    await dirty_write(db)
+    bus.emit(db, deleted())
+    assert transport.calls == []  # not before the request ends
+    await bus.commit(db)
+    ((event, handlers, tenant, in_txn),) = transport.calls
+    assert isinstance(event, contract.EventDeleted) and handlers == ["test.handler"]
+    assert tenant == "default" and in_txn  # inside the writer's transaction, under its tenant
+
+
+async def test_durable_nothing_after_rollback(db):
+    transport = Transport()
+    bus.attach(db, durable_bus(transport))
+    await dirty_write(db)
+    bus.emit(db, deleted())
+    await bus.rollback(db)
+    await dirty_write(db)
+    await bus.commit(db)
+    assert transport.calls == []
+
+
+async def test_no_durable_without_handlers_or_transport(db):
+    transport = Transport()
+    bus.attach(db, durable_bus(transport, handlers=False))
+    await dirty_write(db)
+    bus.emit(db, deleted())
+    await bus.commit(db)
+    assert transport.calls == []
+    rec = Recorder()
+    bus.attach(db, rec.bus)  # in-process only: no transport at all
+    bus.emit(db, deleted())
+    await bus.commit(db)
+    assert len(rec.seen) == 1
+
+
+async def test_a_failing_outbox_fails_the_commit_so_the_change_is_not_kept(db):
+    """No change without its event: the writer sees the failure and rolls back."""
+    bus.attach(db, durable_bus(Transport(fail=True)))
+    await dirty_write(db)
+    bus.emit(db, deleted())
+    with pytest.raises(RuntimeError, match="outbox down"):
+        await bus.commit(db)
+    await bus.rollback(db)
+    from sm_events.models import Event as Row
+    from sqlalchemy import select
+
+    assert (await db.execute(select(Row))).scalars().all() == []
+
+
+async def test_in_process_and_durable_both_deliver(db):
+    transport = Transport()
+    ev_bus = durable_bus(transport)
+    seen = []
+
+    async def local(event):
+        seen.append(event)
+
+    ev_bus.subscribe(contract.EventDeleted, local)
+    bus.attach(db, ev_bus)
+    await dirty_write(db)
+    bus.emit(db, deleted())
+    await bus.commit(db)
+    assert len(seen) == 1 and len(transport.calls) == 1
+
+
+@pytest.mark.unbound_tenant
+async def test_the_durable_publish_runs_under_the_events_tenant(db):
+    """The outbox row is written for the tenant the event describes, not whichever is bound at
+    the end of the request."""
+    transport = Transport()
+    bus.attach(db, durable_bus(transport))
+    with tenant_scope("b"):
+        await dirty_write(db)
+        await db.flush()
+        bus.emit(db, deleted("b"))
+    await bus.commit(db)  # no tenant is bound here
+    ((_event, _names, tenant, _txn),) = transport.calls
+    assert tenant == "b"

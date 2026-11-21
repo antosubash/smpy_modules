@@ -20,6 +20,12 @@ workers (or a redelivered message) that read the same row cannot both publish it
 the second loses the compare-and-set, skips the row and writes nothing. On Postgres
 ``FOR UPDATE SKIP LOCKED`` makes the second worker pass over rows the first holds.
 At most ``PUBLISH_DUE_BATCH`` rows per tenant per pass; the rest wait for the next.
+
+**Announcing.** Each tenant's session gets the worker's bus (``background_tasks``'
+``worker_bus()``), so a scheduled publish is announced like an approval: in process after the
+commit, and, for durable subscribers, written to the outbox in the same transaction as the
+publish (:mod:`sm_events.content.bus`). When that bus cannot be built (no ``background_tasks``
+configuration in this process) the publish still happens and nothing is announced; this is logged.
 """
 
 from __future__ import annotations
@@ -33,6 +39,7 @@ from simple_module_db import finalize_session
 from sqlalchemy import distinct, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_events.content import bus
 from sm_events.content.workflow import publish_scheduled
 from sm_events.core import constants
 from sm_events.core.errors import NotFound, Stale
@@ -46,6 +53,20 @@ logger = logging.getLogger(__name__)
 
 SessionFactory = Callable[[], AsyncSession]
 _UNPUBLISHED = (EventStatus.DRAFT.value, EventStatus.IN_REVIEW.value)
+
+
+def _worker_bus() -> object | None:
+    """The bus a worker announces on, or ``None`` when this process cannot build one."""
+    try:
+        from background_tasks.outbox import worker
+
+        return worker.worker_bus()
+    except Exception:
+        logger.warning(
+            "events: no worker bus here, so scheduled publishes are not announced",
+            exc_info=True,
+        )
+        return None
 
 
 def _due(now: datetime) -> tuple:
@@ -69,6 +90,7 @@ async def _publish_tenant(session_factory: SessionFactory, now: datetime) -> tup
     """One tenant's due events, in a session of its own; ``(published, failed)``."""
     published = failed = 0
     async with session_factory() as session:
+        bus.attach(session, _worker_bus())
         stmt = (
             select(Event)
             .where(*_due(now))
@@ -92,7 +114,7 @@ async def _publish_tenant(session_factory: SessionFactory, now: datetime) -> tup
                 failed += 1
                 continue
             published += 1
-        await finalize_session(session)
+        await bus.commit(session)
     return published, failed
 
 

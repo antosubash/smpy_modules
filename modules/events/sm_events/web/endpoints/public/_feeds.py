@@ -19,20 +19,27 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
+import icalendar
 from fastapi import APIRouter, Depends, Request, Response
+from simple_module_core.resources import ResourcePrincipal
 from simple_module_db.deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.content import calendar_redirects
 from sm_events.content.public_read import calendar_by_slug, event_by_slug, resolve_event_redirect
 from sm_events.core import constants, locales, timezones
+from sm_events.core.access.public import ANONYMOUS
 from sm_events.core.errors import NotFound
 from sm_events.core.settings import EventsSettings
 from sm_events.feeds import ics_calendar
 from sm_events.feeds.ics_event import FeedEvent
-from sm_events.feeds.select import feed_events, single_event
+from sm_events.feeds.plugin_items import PluginFeed, plugin_feed
+from sm_events.feeds.select import FeedRead, component_cost, feed_events, single_event
 from sm_events.web.endpoints.deps import get_settings
 from sm_events.web.endpoints.public import _cache, _clock, _urls
 from sm_events.web.endpoints.public._errors import PublicErrorRoute
@@ -67,6 +74,7 @@ def _respond(
     *,
     truncated: bool = False,
     filename: str | None = None,
+    degraded: bool = False,
 ) -> Response:
     headers: dict[str, str] = {}
     if filename is not None:
@@ -75,13 +83,55 @@ def _respond(
         headers[TRUNCATED_HEADER] = "1"
         _log.info("events: a public feed was cut at its caps (%s)", request.url.path)
     return machine_response(
-        request, settings, body, media_type=constants.ICS_MEDIA_TYPE, kind="feed", headers=headers
+        request,
+        settings,
+        body,
+        media_type=constants.ICS_MEDIA_TYPE,
+        kind="feed",
+        headers=headers,
+        degraded=degraded,
     )
 
 
-def ics_file(items: list[FeedEvent], *, name: str, timezone: str, now: datetime) -> bytes:
+def ics_file(
+    items: list[FeedEvent],
+    *,
+    name: str,
+    timezone: str,
+    now: datetime,
+    extra: Sequence[icalendar.Event] = (),
+) -> bytes:
     first, last = _zone_range(now)
-    return ics_calendar.build(items, name=name, timezone=timezone, first=first, last=last)
+    return ics_calendar.build(
+        items, name=name, timezone=timezone, first=first, last=last, extra=extra
+    )
+
+
+async def plugin_events(
+    db: AsyncSession,
+    request: Request,
+    read: FeedRead,
+    *,
+    who: ResourcePrincipal,
+    viewer: SourceViewer | None,
+    calendar_id: uuid.UUID | None,
+    now: datetime,
+    locale: str,
+) -> PluginFeed:
+    """The plugin sources' ``VEVENT``s for this feed, in what the events' own components leave
+    of the cap. A public feed passes the anonymous principal and no viewer."""
+    own = sum(component_cost(item) for item in read.items)
+    return await plugin_feed(
+        db,
+        who=who,
+        viewer=viewer,
+        calendar_id=calendar_id,
+        now=now,
+        locale=locale,
+        default_locale=locales.default(),
+        room=constants.FEED_MAX_COMPONENTS - own,
+        absolute=lambda path: _urls.absolute(request, path),
+    )
 
 
 def calendar_feed_router(locale: str) -> APIRouter:
@@ -102,13 +152,23 @@ def calendar_feed_router(locale: str) -> APIRouter:
             now=now,
             url_for=lambda slug, loc: _urls.absolute(request, _urls.event_path(slug, loc)),
         )
+        plug = await plugin_events(
+            db, request, read, who=ANONYMOUS, viewer=None, calendar_id=None, now=now, locale=locale
+        )
         body = ics_file(
             read.items,
             name=_urls.site_title(settings),
             timezone=timezones.effective(settings.default_timezone),
             now=now,
+            extra=plug.events,
         )
-        return _respond(request, settings, body, truncated=read.truncated)
+        return _respond(
+            request,
+            settings,
+            body,
+            truncated=read.truncated or plug.truncated,
+            degraded=plug.degraded,
+        )
 
     @router.api_route(f"/{constants.SEGMENT_CALENDAR}/{{calendar}}.ics", methods=_METHODS)
     async def calendar_feed(
@@ -134,13 +194,30 @@ def calendar_feed_router(locale: str) -> APIRouter:
             now=now,
             url_for=lambda slug, loc: _urls.absolute(request, _urls.event_path(slug, loc)),
         )
+        plug = await plugin_events(
+            db,
+            request,
+            read,
+            who=ANONYMOUS,
+            viewer=None,
+            calendar_id=found.id,
+            now=now,
+            locale=locale,
+        )
         body = ics_file(
             read.items,
             name=found.name,
             timezone=timezones.effective(found.default_timezone),
             now=now,
+            extra=plug.events,
         )
-        return _respond(request, settings, body, truncated=read.truncated)
+        return _respond(
+            request,
+            settings,
+            body,
+            truncated=read.truncated or plug.truncated,
+            degraded=plug.degraded,
+        )
 
     return router
 

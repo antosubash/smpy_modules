@@ -10,14 +10,16 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any
-from urllib.parse import urlsplit
 
+from sm_events.calendar.plugins import registry
 from sm_events.calendar.times import Span, to_local
 from sm_events.content.public_read import (
     pick_text,
 )
 from sm_events.content.richtext_tree import to_tree
-from sm_events.core import locales
+from sm_events.content.types import public_extra
+from sm_events.core import constants, locales
+from sm_events.core.web_urls import is_web_url
 from sm_events.feeds.plaintext import to_text
 from sm_events.models import Event
 from sm_events.web.endpoints.public import _urls
@@ -39,16 +41,12 @@ from sm_events.web.schemas.public_event import (
 __all__ = ["build_props", "description_for_head", "web_url"]
 
 _META_DESCRIPTION_MAX = 160
-_WEB = frozenset({"http", "https"})
 
 
 def web_url(value: str | None) -> str | None:
     """``value`` when it is an absolute ``http(s)`` URL, else ``None``: a stored address is shown
     only as a link a browser may follow."""
-    if not value:
-        return None
-    parts = urlsplit(value)
-    return value if parts.scheme in _WEB and parts.netloc else None
+    return value if value and is_web_url(value) else None
 
 
 def _local(event: Event, start: datetime, end: datetime) -> tuple[str, str]:
@@ -150,6 +148,8 @@ def build_props(
         for o in upcoming
     ]
     return PublicEventProps(
+        type=event.type if registry.get_type(event.type) is not None else constants.BUILTIN_TYPE,
+        public_extra=public_extra(event.type, event.extra),
         locale=locale,
         title=text.title,
         summary=text.summary,

@@ -12,6 +12,7 @@ import { RecurrenceEditor } from '../ui/components/editor/RecurrenceEditor';
 import { RevisionHistory } from '../ui/components/editor/RevisionHistory';
 import { SubEvents } from '../ui/components/editor/SubEvents';
 import { TextsTabs } from '../ui/components/editor/TextsTabs';
+import { type TypeOption, TypeSection } from '../ui/components/editor/TypeSection';
 import { WorkflowBar } from '../ui/components/editor/WorkflowBar';
 import { categoryName } from '../ui/components/events/EventFilters';
 import { useEvent } from '../ui/hooks/useEvent';
@@ -30,6 +31,8 @@ type Props = {
   content_locales: string[];
   categories: Category[];
   default_timezone: string;
+  /** The installed event types, for the picker on create. */
+  types?: TypeOption[];
   /** `?start=&end=&all_day=&title=` of a new event, as the calendar's quick create sends it. */
   prefill?: Prefill | null;
 };
@@ -154,6 +157,21 @@ export default function EventEditor(props: Props) {
             onEdit={errors.clearField}
           />
           <EventForm
+            typeSection={
+              <TypeSection
+                types={props.types ?? []}
+                type={form.type}
+                extra={form.extra}
+                isNew={!props.event_id}
+                installed={event?.type_installed !== false}
+                eventId={props.event_id}
+                locale={locales[0] ?? 'en'}
+                readOnly={readOnly}
+                errors={errors.fields}
+                onType={(type) => ev.setFields({ type, extra: {} })}
+                onExtra={(extra) => ev.setFields({ extra })}
+              />
+            }
             form={form}
             errors={errors.fields}
             disabled={readOnly}

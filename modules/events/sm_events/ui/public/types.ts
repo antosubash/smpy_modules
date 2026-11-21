@@ -91,6 +91,10 @@ export type Place = {
 };
 
 export type PublicEventProps = {
+  /** The event's type when a plugin here provides it, else the default type. */
+  type: string;
+  /** Only the fields the type declared public, never the whole `extra`. */
+  public_extra: Record<string, unknown>;
   locale: string;
   title: string;
   summary: string | null;

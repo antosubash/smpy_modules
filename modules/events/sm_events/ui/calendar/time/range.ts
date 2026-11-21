@@ -35,7 +35,13 @@ const sorted = (ids: readonly string[]): string[] => [...ids].sort();
 
 /** Stable for the same filters in any order. */
 export function filtersKey(q: FilterQuery): string {
-  return JSON.stringify([sorted(q.calendars), sorted(q.categories), sorted(q.types), q.locale]);
+  return JSON.stringify([
+    sorted(q.calendars),
+    sorted(q.categories),
+    sorted(q.types),
+    sorted(q.sources ?? []),
+    q.locale,
+  ]);
 }
 
 export const rangeKey = (q: OccurrenceQuery): string => `${q.start}|${q.end}|${filtersKey(q)}`;

@@ -15,6 +15,7 @@ from pydantic import (
     model_validator,
 )
 
+from sm_events.calendar.plugins import source_entries
 from sm_events.core import constants
 from sm_events.models import Visibility
 from sm_events.web.schemas._fields import (
@@ -25,6 +26,7 @@ from sm_events.web.schemas._fields import (
     known_timezone,
     lower_color,
 )
+from sm_events.web.schemas.extensions import CalendarSourceOut
 
 Name = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200), SingleLine
@@ -84,7 +86,9 @@ class CalendarOut(BaseModel):
     owner_id: str
     owner_name: str | None = None
     default_timezone: str
-    sources: list[Any]
+    sources: list[CalendarSourceOut] = []
+    sources_version: str = ""
+    """What a write to the sources must send back; empty for one who cannot manage them."""
     created_at: datetime
     updated_at: datetime | None
     deleted_at: datetime | None
@@ -92,3 +96,10 @@ class CalendarOut(BaseModel):
     can_own: bool = False
     can_write_events: bool = False
     can_publish: bool = False
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def _stored_entries(cls, raw: Any) -> list[dict[str, Any]]:
+        """The column holds ids and settings; what a caller sees is added by ``shown``, and
+        settings stay out until the caller is known to manage the calendar."""
+        return source_entries.shown(raw, with_settings=False)

@@ -94,3 +94,32 @@ def test_import_failure_carries_a_code_only():
     assert failure.code == "too_many_events"
     assert not isinstance(failure, errors.EventsError)
     assert str(failure) == "too_many_events"
+
+
+def _extension_cases():
+    from sm_events.core import errors_extensions as ext
+
+    return [
+        (ext.UnknownSource, 422, "unknown_source"),
+        (ext.BuiltinSource, 422, "builtin_source"),
+        (ext.DuplicateSource, 422, "duplicate_source"),
+        (ext.TooManySources, 422, "too_many_sources"),
+        (ext.ExtraTooLarge, 422, "extra_too_large"),
+        (ext.TypeNotInstalled, 422, "type_not_installed"),
+        (ext.SourceUnavailable, 503, "source_unavailable"),
+    ]
+
+
+@pytest.mark.parametrize(("cls", "status", "code"), _extension_cases())
+async def test_extension_codes(cls, status, code):
+    app = FastAPI()
+    install_exception_handlers(app)
+
+    @app.get("/x")
+    async def raiser():
+        raise cls()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+        response = await client.get("/x")
+    assert response.status_code == status
+    assert response.json() == {"detail": cls.detail, "code": code}

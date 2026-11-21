@@ -3,6 +3,7 @@ import { CancelledBanner } from '../ui/public/CancelledBanner';
 import { EventPlace } from '../ui/public/EventPlace';
 import { EventWhen } from '../ui/public/EventWhen';
 import { LanguageSwitch } from '../ui/public/LanguageSwitch';
+import { PluginDetail } from '../ui/public/PluginDetail';
 import { PublicHead } from '../ui/public/PublicHead';
 import { RichText } from '../ui/public/RichText';
 import { SubEvents } from '../ui/public/SubEvents';
@@ -93,6 +94,12 @@ function PublicEventPage(p: PublicEventProps) {
           </a>
         </p>
         <RichText nodes={p.description_tree} />
+        <PluginDetail
+          type={p.type}
+          title={p.title}
+          publicExtra={p.public_extra}
+          locale={p.locale}
+        />
         <SubEvents items={p.sub_events} locale={p.locale} />
         <p className="flex flex-wrap gap-4">
           {p.registration_url ? (

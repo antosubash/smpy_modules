@@ -28,6 +28,7 @@ function initialState(props: CalendarProps): CalendarState {
     calendars: all,
     categories: [],
     types: [],
+    sources: [],
     ...props.initialState,
   };
   const shown = props.calendars.filter((c) => seed.calendars.includes(c.id));
@@ -36,7 +37,15 @@ function initialState(props: CalendarProps): CalendarState {
 }
 
 export function Calendar(props: CalendarProps) {
-  const { fetchOccurrences, calendars, categories = [], types = [], editing, slots } = props;
+  const {
+    fetchOccurrences,
+    calendars,
+    categories = [],
+    types = [],
+    sources = [],
+    editing,
+    slots,
+  } = props;
   const { t, locale } = useT();
   const copy = keys.events.calendar;
   const [state, setState] = useState(() => initialState(props));
@@ -61,9 +70,18 @@ export function Calendar(props: CalendarProps) {
       calendars: shown.length === calendars.length ? [] : state.calendars,
       categories: state.categories,
       types: state.types,
+      sources: state.sources,
       locale: locale ?? '',
     }),
-    [shown.length, calendars.length, state.calendars, state.categories, state.types, locale],
+    [
+      shown.length,
+      calendars.length,
+      state.calendars,
+      state.categories,
+      state.types,
+      state.sources,
+      locale,
+    ],
   );
   const data = useOccurrences({
     fetcher: fetchOccurrences,
@@ -155,6 +173,7 @@ export function Calendar(props: CalendarProps) {
             calendars={calendars}
             categories={categories}
             types={types}
+            sources={sources}
             onChange={patch}
           />
         </aside>
@@ -164,6 +183,9 @@ export function Calendar(props: CalendarProps) {
             error={data.error}
             empty={items.length === 0}
             truncated={!nothingShown && data.truncated}
+            shown={data.items.length}
+            sources={nothingShown ? [] : data.sources}
+            sourceLabels={sources}
             noCalendars={nothingShown}
             noneExist={calendars.length === 0}
             action={props.noCalendarsAction}

@@ -1,3 +1,5 @@
+import type { SourceStatus } from '../extensions/types';
+
 /** The events API's shapes, as `sm_events/web/schemas/events_*.py` returns them. */
 
 export const EVENT_STATUSES = ['draft', 'in_review', 'published'] as const;
@@ -13,6 +15,9 @@ export type EventBase = {
   calendar_id: string;
   parent_id: string | null;
   type: string;
+  /** False when no plugin on this server provides the type: its `extra` is kept, read-only. */
+  type_installed?: boolean;
+  type_label_key?: string | null;
   status: EventStatus;
   scheduled: boolean;
   cancelled: boolean;
@@ -104,6 +109,9 @@ export type EventFields = {
 };
 export type EventCreate = EventFields & {
   calendar_id: string;
+  /** A registered type's id; the default type when left out. */
+  type?: string;
+  extra?: Record<string, unknown>;
   parent_id?: string | null;
   times: TimesInput;
   texts: Record<string, TextInput>;
@@ -112,6 +120,8 @@ export type EventPatch = Partial<EventFields> & {
   expected_revision: number;
   times?: TimesInput;
   texts?: Record<string, TextInput | null>;
+  /** Replaces the whole `extra`; sent only when a section changed it. */
+  extra?: Record<string, unknown>;
   drop_orphaned_overrides?: boolean;
 };
 
@@ -202,13 +212,19 @@ export type Occurrence = {
   original_start: string | null;
   event_status: string | null;
 };
-export type OccurrencePage = { items: Occurrence[]; truncated: boolean };
+export type OccurrencePage = {
+  items: Occurrence[];
+  truncated: boolean;
+  /** How each plugin source answered (a console read only; the public API omits it). */
+  sources?: SourceStatus[];
+};
 export type OccurrenceQuery = {
   start: string;
   end: string;
   calendar?: string[];
   category?: string[];
   type?: string[];
+  source?: string[];
   locale?: string;
   include_unpublished?: boolean;
 };

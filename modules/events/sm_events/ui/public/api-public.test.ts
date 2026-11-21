@@ -8,6 +8,7 @@ const query = {
   calendars: ['c1', 'c2'],
   categories: ['k1'],
   types: [],
+  sources: [],
   locale: 'de',
 };
 

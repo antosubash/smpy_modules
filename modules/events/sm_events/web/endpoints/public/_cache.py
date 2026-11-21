@@ -190,10 +190,13 @@ def apply(
     *,
     kind: Kind,
     etag: str | None,
+    degraded: bool = False,
 ) -> Response:
-    """Set the cache headers (and the validator, where one is allowed) on ``response``."""
+    """Set the cache headers (and the validator, where one is allowed) on ``response``.
+    ``degraded``: a plugin source did not answer, so the body is a failure's, not the
+    calendar's: ``no-store`` and no validator, whatever the lifetime would be."""
     page = kind in _PAGE_KINDS
-    seconds = settings.public_cache_seconds
+    seconds = 0 if degraded else settings.public_cache_seconds
     keep_etag = False
     if page and signed_in(request):
         response.headers["Cache-Control"] = SIGNED_IN_CACHE_CONTROL

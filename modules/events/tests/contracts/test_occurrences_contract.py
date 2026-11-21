@@ -99,3 +99,43 @@ def test_contract_surface():
 async def test_an_instant_outside_a_sane_range_is_a_value_error_before_any_query(db, start, end):
     with pytest.raises(ValueError, match="supported years"):
         await contract.occurrences(db, tenant_id="default", viewer=OWNER, start=start, end=end)
+
+
+async def test_contract_without_viewer_skips_plugins(db, monkeypatch):
+    from sm_events.calendar.plugins import registry
+    from sm_events.calendar.plugins.extension_types import SourceViewer
+
+    from tests.support.sources import FakeSource, install, item, ok
+
+    fake = FakeSource("acme:fake", ok(item("a")), public=True)
+    install(monkeypatch, fake)
+    try:
+        cals = await seed_calendars(db)
+        cals["U"].sources = [{"id": "acme:fake", "settings": {}}]
+        await db.flush()
+        # Anonymous: a public source is called, with no viewer.
+        page = await contract.occurrences(
+            db, tenant_id="default", viewer=None, start=START, end=END
+        )
+        assert [o.source for o in page.items] == ["acme:fake"]
+        assert fake.calls[0][0].viewer is None
+        fake.calls.clear()
+        # Signed in without a source_viewer: every plugin pair is skipped, fail safe.
+        page = await contract.occurrences(
+            db, tenant_id="default", viewer=OWNER, start=START, end=END
+        )
+        assert page.items == [] and fake.calls == []
+        assert [(s.status, s.code) for s in page.sources] == [("skipped", "no_viewer")]
+        # With one, the source runs for them.
+        who = SourceViewer(user_id="o", roles=(), permissions=frozenset({"events.view"}))
+        page = await contract.occurrences(
+            db, tenant_id="default", viewer=OWNER, start=START, end=END, source_viewer=who
+        )
+        assert [o.source for o in page.items] == ["acme:fake"]
+        assert fake.calls[0][0].viewer == who
+        only = await contract.occurrences(
+            db, tenant_id="default", viewer=None, start=START, end=END, sources=["events"]
+        )
+        assert only.items == [] and len(fake.calls) == 1  # the built-in only: no plugin call
+    finally:
+        registry.reset_registry()

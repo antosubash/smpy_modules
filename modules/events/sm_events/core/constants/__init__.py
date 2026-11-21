@@ -3,6 +3,7 @@
 # ruff: noqa: F401 - the re-exports below are the point
 from __future__ import annotations
 
+from sm_events.core.constants.extensions import *  # noqa: F403 - plugins (PR 6)
 from sm_events.core.constants.feed_tokens import *  # noqa: F403 - private feed links (PR 5)
 from sm_events.core.constants.imports import *  # noqa: F403 - the .ics import (PR 5)
 

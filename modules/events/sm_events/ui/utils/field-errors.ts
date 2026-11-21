@@ -50,7 +50,14 @@ const messageFor = (path: string): string => {
 export function fieldErrors(error: unknown): Record<string, string> {
   if (!(error instanceof ApiError) || error.status !== 422) return {};
   const out: Record<string, string> = {};
-  for (const path of error.fields) if (path) out[path] = t(messageFor(path));
+  for (const path of error.fields) {
+    if (!path) continue;
+    // A plugin's own words (its model's message) for a path under `extra`; ours for the rest.
+    out[path] =
+      path.startsWith('extra.') && error.messages[path]
+        ? error.messages[path]
+        : t(messageFor(path));
+  }
   return out;
 }
 

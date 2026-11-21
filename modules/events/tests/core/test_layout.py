@@ -1,0 +1,39 @@
+"""Events knows no sibling module: they depend on events (through its contracts), never back."""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+PACKAGE = Path(__file__).resolve().parents[2] / "sm_events"
+SIBLINGS = "sm_records|sm_images|sm_newsletter|sm_billing|sm_ai|news|pagebuilder"
+IMPORT = re.compile(rf"^\s*(from|import)\s+({SIBLINGS})\b", re.MULTILINE)
+DYNAMIC = re.compile(rf"""(import_module|find_spec)\(\s*f?["']({SIBLINGS})\b""")
+TS = re.compile(
+    r"""['"]@simple-module-py/(records|images|news|newsletter|billing|ai|pagebuilder)\b"""
+)
+ALLOWED = {"integrations/pagebuilder.py"}  # PR 4's guarded optional integration
+
+
+def _files(*suffixes: str):
+    for path in sorted(PACKAGE.rglob("*")):
+        if path.suffix in suffixes and "node_modules" not in path.parts:
+            yield path, path.relative_to(PACKAGE).as_posix()
+
+
+def test_no_sibling_imports():
+    offenders = []
+    for path, rel in _files(".py"):
+        if rel in ALLOWED:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if IMPORT.search(text) or DYNAMIC.search(text):
+            offenders.append(rel)
+    assert offenders == []
+
+
+def test_no_sibling_frontend_imports():
+    offenders = [
+        rel for path, rel in _files(".ts", ".tsx") if TS.search(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == []

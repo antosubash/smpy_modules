@@ -56,4 +56,5 @@ async def restore_event(
         event.deleted_by = None
         await db.flush()
         await revisions.record(db, event, action="restored", actor=who.user_id)
+        bus.emit(db, notices.restored(event))
     return event

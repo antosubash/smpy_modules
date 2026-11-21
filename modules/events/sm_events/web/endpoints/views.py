@@ -12,6 +12,7 @@ from sqlmodel import select
 
 from sm_events.calendar import calendars as calendar_service
 from sm_events.calendar import categories as category_service
+from sm_events.calendar.plugins import registry, source_entries
 from sm_events.core import constants, tenancy, timezones
 from sm_events.core.access.events import load_event
 from sm_events.core.access.rights import calendar_rights, calendar_rights_many
@@ -115,9 +116,34 @@ def _calendar_props(cal: Calendar, request: Request, *, can_write_events: bool) 
     }
 
 
-async def _viewer_calendars(db, who, request: Request) -> list[dict]:
+def _type_props() -> list[dict]:
+    """The installed types as the console's pickers and filters need them."""
+    found = registry.all_types()
+    ordered = sorted(found.values(), key=lambda t: (t.id != constants.BUILTIN_TYPE, t.id))
+    return [{"id": t.id, "label_key": t.label_key, "icon": t.icon} for t in ordered]
+
+
+def _enabled_sources(rows: list[Calendar]) -> list[dict]:
+    """The installed plugin sources enabled on any of ``rows``: what the console's source
+    filter offers. Only ids, labels and colours, never a calendar's settings."""
+    found: dict[str, dict] = {}
+    for row in rows:
+        for entry in source_entries.read(row.sources):
+            source = registry.get_source(entry.id)
+            if source is not None:
+                found[entry.id] = {
+                    "id": entry.id,
+                    "label_key": source.label_key,
+                    "color": source.color,
+                }
+    return [found[key] for key in sorted(found)]
+
+
+async def _viewer_calendars(
+    db, who, request: Request, rows: list[Calendar] | None = None
+) -> list[dict]:
     """The calendars the viewer can see, with what the screens need of each."""
-    rows = await calendar_service.list_calendars(db, who)
+    rows = await calendar_service.list_calendars(db, who) if rows is None else rows
     rights = await calendar_rights_many(db, who, rows)
     return [
         _calendar_props(row, request, can_write_events=rights[row.id].write_events) for row in rows
@@ -129,11 +155,14 @@ async def calendar_page(
     request: Request, inertia: InertiaDep, who: Principal, db=Depends(get_db)
 ) -> InertiaResponse:
     settings = get_settings(request)
+    rows = await calendar_service.list_calendars(db, who)
     return await inertia.render(
         constants._PAGE_CALENDAR,
         {
             **tenancy.view_props(request),
-            "calendars": await _viewer_calendars(db, who, request),
+            "calendars": await _viewer_calendars(db, who, request, rows),
+            "sources": _enabled_sources(rows),
+            "types": _type_props(),
             "categories": await _categories(db),
             "default_timezone": timezones.effective(settings.default_timezone),
             "content_locales": list(settings.content_locales),
@@ -149,6 +178,7 @@ def _editor_props(request: Request, cal: Calendar, can_write: bool, categories: 
         "calendar": {k: calendar[k] for k in ("id", "name", "default_timezone")},
         "content_locales": list(get_settings(request).content_locales),
         "categories": categories,
+        "types": _type_props(),
         "default_timezone": calendar["default_timezone"],
     }
 

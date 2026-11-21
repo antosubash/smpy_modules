@@ -36,7 +36,7 @@ describe('contains', () => {
 });
 
 describe('rangeKey', () => {
-  const base = { start: 'a', end: 'b', categories: [], types: [], locale: 'en' };
+  const base = { start: 'a', end: 'b', categories: [], types: [], sources: [], locale: 'en' };
   it('ignores filter order', () => {
     expect(rangeKey({ ...base, calendars: ['b', 'a'] })).toBe(
       rangeKey({ ...base, calendars: ['a', 'b'] }),

@@ -32,6 +32,7 @@ export function EventForm({
   locales,
   onChange,
   onEdit,
+  typeSection,
 }: {
   form: FormState;
   errors: Record<string, string>;
@@ -41,6 +42,8 @@ export function EventForm({
   locales: readonly string[];
   onChange: (patch: Partial<FormState>) => void;
   onEdit: (path: string) => void;
+  /** The type picker and the plugin's section, when the page has types to offer. */
+  typeSection?: ReactNode;
 }) {
   const { t } = useT();
   const copy = keys.events.editor;
@@ -73,6 +76,7 @@ export function EventForm({
   };
   return (
     <div className="grid gap-6">
+      {typeSection}
       <TimesFields
         form={form}
         errors={errors}

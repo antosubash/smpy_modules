@@ -1,6 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { Calendar } from '../calendar/Calendar';
 import type { CalendarInfo, CalendarState, DetailProps, FilterOption } from '../calendar/types';
+import { useEventExtensions } from '../extensions/load';
+import { buildSlots } from '../extensions/slots';
 import { keys, useT } from '../utils/i18n';
 import { publicFetcher } from './api-public';
 import { publicGridZone } from './gridZone';
@@ -57,7 +59,9 @@ export function PublicCalendarGrid({
     () => categories.map((c) => ({ id: c.id, label: c.name, color: c.color })),
     [categories],
   );
-  const slots = useMemo(() => ({ Detail: PublicDetail }), []);
+  const ready = useEventExtensions();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `ready` is the registry's version
+  const slots = useMemo(() => buildSlots('public', PublicDetail), [ready]);
   const report = useCallback((state: CalendarState) => onState?.(state), [onState]);
   return (
     <Calendar

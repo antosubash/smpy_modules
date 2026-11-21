@@ -38,14 +38,16 @@ import time
 from fastapi import APIRouter, Request, Response
 from simple_module_db import no_tenant
 
+from sm_events.calendar.plugins.extension_types import SourceViewer
 from sm_events.core import constants, locales, timezones
+from sm_events.core.access.offline import feed_viewer
 from sm_events.core.tenancy import tenant_scope, valid_tenant
 from sm_events.feeds.select import feed_events
 from sm_events.feeds.tokens.codec import well_formed
 from sm_events.feeds.tokens.resolve import FeedAccess, TokenRow, lookup, resolve, touch_last_used
 from sm_events.feeds.tokens.throttle import TokenThrottle
 from sm_events.web.endpoints.public import _clock, _urls
-from sm_events.web.endpoints.public._feeds import TRUNCATED_HEADER, ics_file
+from sm_events.web.endpoints.public._feeds import TRUNCATED_HEADER, ics_file, plugin_events
 from sm_events.web.endpoints.public._host_tenant import host_tenant
 
 __all__ = ["THROTTLE", "deny", "private_feed", "router"]
@@ -141,6 +143,23 @@ def _item_urls(request: Request, access: FeedAccess, items: list) -> list:
     ]
 
 
+async def _viewer(request: Request, access: FeedAccess, db) -> SourceViewer | None:
+    """The link's owner as a plugin source sees them, or ``None`` (then no plugin source is
+    called and the feed is served as before): a failing directory is no reason to refuse a
+    link that already passed every check."""
+    try:
+        return await feed_viewer(
+            request.app,
+            db,
+            user_id=access.row.user_id,
+            tenant_id=access.row.tenant_id,
+            request=request,
+        )
+    except Exception as exc:
+        _log.error("events: a private feed's viewer could not be built (%s)", type(exc).__name__)
+        return None
+
+
 async def _body(request: Request, access: FeedAccess, db) -> tuple[bytes, bool]:
     now = _clock.now()
     read = await feed_events(
@@ -152,13 +171,24 @@ async def _body(request: Request, access: FeedAccess, db) -> tuple[bytes, bool]:
         url_for=lambda slug, loc: _urls.absolute(request, _urls.event_path(slug, loc)),
         events=access.events(),
     )
+    plug = await plugin_events(
+        db,
+        request,
+        read,
+        who=access.who,
+        viewer=await _viewer(request, access, db),
+        calendar_id=access.row.calendar_id,
+        now=now,
+        locale=access.row.locale,
+    )
     body = ics_file(
         _item_urls(request, access, read.items),
         name=access.calendar.name,
         timezone=timezones.effective(access.calendar.default_timezone),
         now=now,
+        extra=plug.events,
     )
-    return body, read.truncated
+    return body, read.truncated or plug.truncated
 
 
 async def _serve(request: Request, token: str) -> tuple[Response, TokenRow] | None:

@@ -901,5 +901,34 @@
         "manual": "Marked by hand"
       }
     }
+  },
+  "events": {
+    "source": {
+      "label": "Records with a date"
+    },
+    "settings": {
+      "mapping": "Mapping {n}",
+      "type": "Record type",
+      "field": "Date field",
+      "end": "End field (optional)",
+      "choose": "Choose…",
+      "none": "None",
+      "duration": "Length when a record has no end (minutes)",
+      "color": "Colour (optional)",
+      "add": "Add a mapping",
+      "remove": "Remove",
+      "load_failed": "The record types could not be loaded.",
+      "hint": "Shows published records with a date. Who sees which record follows the record type's own access rules.",
+      "hidden": "A mapping you cannot view. Its record type does not exist, or you may not read it.",
+      "field_gone": "{field} (no longer available)",
+      "error_field_missing": "This field no longer exists on the record type. Choose another field or remove the mapping.",
+      "error_field_not_date": "This field is no longer an indexed date or date-time field. Choose another field or remove the mapping.",
+      "error_type_unavailable": "That record type does not exist, or you may not read it.",
+      "error_end_same": "The end must be another field.",
+      "error_end_kind": "The end must be an indexed field of the same kind as the start."
+    },
+    "detail": {
+      "open_record": "Open record"
+    }
   }
 }

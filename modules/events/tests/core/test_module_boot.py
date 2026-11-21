@@ -68,6 +68,20 @@ async def test_on_startup_installs_the_token_log_filter():
         assert any(isinstance(f, log_redact.Filter) for f in logging.getLogger(name).filters), name
 
 
+async def test_startup_freezes_registry():
+    from types import SimpleNamespace
+
+    from sm_events.calendar.plugins import registry
+
+    registry.reset_registry()
+    try:
+        await EventsModule().on_startup(SimpleNamespace(state=SimpleNamespace()))
+        assert registry.is_frozen()
+        assert registry.builtin_source() is not None
+    finally:
+        registry.reset_registry()
+
+
 def test_import_upload_body_limit_is_registered():
     from simple_module_core.body_limits import BodyLimitRegistry
 

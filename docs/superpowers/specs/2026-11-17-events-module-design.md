@@ -469,3 +469,22 @@ importer; a real worker cannot (no app, upstream gap) and relies on the rights c
 valid one hour (`rights_expired` after), plus per-item share, owner, trash and lock checks. A
 repeating series written in UTC keeps zone UTC (`kept_utc`). Stored URLs never carry credentials.
 
+## Amendments (PR 6)
+
+The approved PR 6 rulings refine the design above. A plugin id is `<entry-point name>:<name>`, and plugins
+register from `events_extensions.py` (loaded in the web process and on a worker's first read, then frozen)
+(2). A source returns `SourceOccurrence`s that carry no source, calendar or editability: the read fills
+those in (5). A plugin call runs on a session of its own, read-only, under a time and item budget, and
+its output is validated whole (7, 8, 9). The occurrences answer reports a status per plugin source in the
+console and never in a public answer, and a failed public answer is not cached (11). Sources are enabled
+per calendar with settings validated against the plugin's model, written with the `sources_version` a read
+returned, and settings are never secret (12). Only `public` sources run for the public, with no viewer, and
+only in the grid and the feeds, never the server-rendered list, the sitemap or JSON-LD (13, 15). A category
+filter or a type filter without the default type excludes plugin items (14). A plugin item's key and ICS
+UID carry the calendar id (16). The type is immutable; an event of an uninstalled type keeps its `extra`
+byte for byte and refuses a change to it; public pages receive only the type's `public_fields` (19, 21,
+22). Bus events number nine and are also published durably, at least once and unordered, and the scheduled
+publish now announces `EventPublished` (23, 24). The frontend registry is a lazy, guarded glob of
+`events-extensions.ts` with an error boundary per component; the calendar's own events are a choice in the
+source filter (25-30). Records contributes `records:dates` through `sm_records.contracts.dated`, public only
+for types marked Public (31-33).

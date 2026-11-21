@@ -45,6 +45,12 @@
     "internal": "Intern",
     "public": "Öffentlich"
   },
+  "types": {
+    "event": "Veranstaltung",
+    "picker": "Typ",
+    "current": "Typ: {name}",
+    "not_installed": "Der Typ dieser Veranstaltung ist auf diesem Server nicht installiert. Die zusätzlichen Angaben bleiben unverändert und können hier nicht geändert werden."
+  },
   "calendars": {
     "title": "Kalender",
     "subtitle": "Kalender, Sichtbarkeit und geteilten Zugriff verwalten.",
@@ -146,6 +152,8 @@
     "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt.",
     "token_limit": "Du hast bereits die meisten privaten Links, die dieser Kalender erlaubt. Widerrufe zuerst einen.",
     "private_feeds_unavailable": "Private Links sind für dein Konto nicht verfügbar.",
+    "extra_too_large": "Die zusätzlichen Angaben dieser Veranstaltung sind zu groß.",
+    "type_not_installed": "Der Typ dieser Veranstaltung ist nicht installiert, daher können die zusätzlichen Angaben nicht geändert werden.",
     "import_busy": "Du hast zu viele wartende Importe. Wende einen an oder verwirf einen.",
     "import_state": "Dieser Import lässt sich in seinem jetzigen Zustand nicht ändern.",
     "import_too_large": "Die Datei ist größer als das Importlimit.",
@@ -473,7 +481,9 @@
       "label": "Kalender filtern",
       "calendars": "Kalender",
       "categories": "Kategorien",
-      "types": "Arten"
+      "types": "Arten",
+      "sources": "Quellen",
+      "own_events": "Veranstaltungen"
     },
     "type_event": "Veranstaltungen",
     "status": {
@@ -581,8 +591,7 @@
     "subscribe": {
       "title": "Abonnieren",
       "hint": "Fügen Sie diese Veranstaltungen Ihrem eigenen Kalender hinzu. Er aktualisiert sich selbst.",
-      "feed": "Kalenderlink (https)",
-      "webcal": "In der Kalender-App öffnen"
+      "feed": "Kalenderlink (https)"
     },
     "grid": {
       "loading": "Kalender wird geladen…"
@@ -648,6 +657,56 @@
     "revoke_title": "{name} widerrufen?",
     "revoke_description": "Kalender-Apps, die diesen Link verwenden, erhalten keine Termine mehr.",
     "revoked": "Link widerrufen"
+  },
+  "extensions": {
+    "load_failed": "Einige Erweiterungen konnten nicht geladen werden. Der Kalender funktioniert auch ohne sie.",
+    "status": {
+      "heading": "Einige Quellen haben nicht geantwortet",
+      "failed": "{name} konnte nicht geladen werden.",
+      "timeout": "{name} hat zu lange für die Antwort gebraucht.",
+      "skipped": "{name} wurde übersprungen.",
+      "truncated": "{name} zeigt nur einen Teil seiner Einträge.",
+      "not_installed": "{name} ist auf diesem Server nicht installiert.",
+      "truncated_source": "Es werden die ersten {count} Einträge von {name} angezeigt.",
+      "reason": {
+        "wrote": "Sie wollte Daten ändern, was eine Quelle nicht darf.",
+        "invalid_item": "Sie hat einen ungültigen Eintrag geliefert.",
+        "duplicate_key": "Sie hat denselben Eintrag zweimal geliefert.",
+        "invalid_answer": "Ihre Antwort hatte die falsche Form.",
+        "too_many_items": "Sie hat viel zu viele Einträge geliefert.",
+        "invalid_settings": "Ihre Einstellungen passen nicht mehr: Öffnen Sie Quellen, um sie zu korrigieren.",
+        "field_missing": "Ein Feld, das sie liest, wurde gelöscht: Öffnen Sie Quellen, um die Zuordnung zu korrigieren.",
+        "field_changed": "Ein Feld, das sie liest, ist kein Datum mehr: Öffnen Sie Quellen, um die Zuordnung zu korrigieren.",
+        "reindexing": "Ein Feld, das sie liest, wird neu indiziert. Versuchen Sie es gleich noch einmal.",
+        "session": "Eine frühere Quelle hat die Verbindung unbrauchbar gemacht.",
+        "budget": "Dem Kalender ging die Zeit aus, bevor er sie erreichte.",
+        "too_many_calls": "Es sind mehr Quellen aktiviert, als auf einmal gefragt werden können."
+      }
+    }
+  },
+  "sources": {
+    "trigger": "Quellen",
+    "trigger_for": "Quellen von {name}",
+    "title": "Quellen von {name}",
+    "description": "Fügen Sie diesem Kalender Termine aus anderen Modulen hinzu. Was eine Quelle zeigt, bestimmen die Zugriffsregeln des jeweiligen Moduls.",
+    "loading": "Quellen werden geladen…",
+    "none": "Auf diesem Server sind keine Quellen installiert.",
+    "public": "Öffentlich",
+    "public_hint": "Kann auch auf der öffentlichen Website erscheinen",
+    "not_installed": "Nicht installiert",
+    "not_installed_hint": "Kein Modul auf diesem Server stellt diese Quelle bereit. Sie bleibt unverändert, bis Sie sie entfernen.",
+    "remove": "Entfernen",
+    "remove_title": "{name} entfernen?",
+    "remove_description": "Die Quelle erscheint nicht mehr in diesem Kalender, und ihre Einstellungen werden beim Speichern gelöscht.",
+    "settings_json": "Einstellungen (JSON)",
+    "invalid_json": "Diese Einstellungen sind kein gültiges JSON.",
+    "save": "Quellen speichern",
+    "saving": "Wird gespeichert…",
+    "stale": "Die Quellen dieses Kalenders wurden seit dem Öffnen von jemand anderem geändert. Schließen Sie dieses Fenster und versuchen Sie es erneut.",
+    "settings_for": "Einstellungen von {name}",
+    "turn_off": "Ausschalten",
+    "turn_off_title": "{name} ausschalten?",
+    "turn_off_description": "Die Einstellungen gehen verloren, sobald Sie speichern."
   },
   "import": {
     "title": "Termine importieren",

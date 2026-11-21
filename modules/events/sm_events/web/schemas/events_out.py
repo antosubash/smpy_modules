@@ -23,6 +23,10 @@ class EventBase(BaseModel):
     calendar_id: uuid.UUID
     parent_id: uuid.UUID | None
     type: str
+    type_installed: bool = True
+    """False when no installed plugin provides the type: the event is shown as a plain event and
+    its ``extra`` is kept, read-only."""
+    type_label_key: str | None = None
     status: str
     scheduled: bool
     cancelled: bool

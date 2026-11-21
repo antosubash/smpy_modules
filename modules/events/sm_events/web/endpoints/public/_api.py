@@ -12,6 +12,7 @@ may see. A calendar or category id the public may not see matches nothing, as an
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import date, datetime
 from typing import Any
@@ -36,6 +37,9 @@ from sm_events.web.schemas.public import PublicOccurrenceParams
 
 __all__ = ["api_router", "occurrence_day", "public_page", "public_read"]
 
+_log = logging.getLogger("sm_events.public")
+_EVENTS_ONLY = frozenset({constants.SOURCE_EVENTS})
+
 
 def occurrence_day(item: Occurrence) -> date | None:
     """The local date a series instance is addressed by (``?date=``): that of its original start in
@@ -45,7 +49,23 @@ def occurrence_day(item: Occurrence) -> date | None:
     return item.original_start.astimezone(ZoneInfo(item.timezone)).date()
 
 
+def _plugin_public(item: Occurrence) -> Occurrence:
+    """A plugin source's item on the public grid: as the source gave it (it was asked for the
+    public, with no viewer, and may return only what is public in its own module), with its
+    key namespaced by the source so it can never collide with an event's."""
+    return item.model_copy(
+        update={
+            "key": f"{item.source}:{item.key}",
+            "editable": False,
+            "event_id": None,
+            "original_start": None,
+        }
+    )
+
+
 def _public(item: Occurrence, texts: dict[str, Any], locale: str) -> Occurrence | None:
+    if item.source != constants.SOURCE_EVENTS:
+        return _plugin_public(item)
     chosen = texts.get(item.event_id) if item.event_id else None
     if not chosen:  # no text to link to: not a page a visitor can open
         return None
@@ -73,9 +93,14 @@ async def public_read(
     calendar_ids: frozenset[uuid.UUID] | None,
     category_ids: frozenset[uuid.UUID] | None,
     locale: str,
+    sources: frozenset[str] | None = _EVENTS_ONLY,
 ) -> OccurrencePage:
     """The occurrences read for the anonymous principal, as it comes back (event ids included:
-    for the server's own use, never sent out; see :func:`public_page`)."""
+    for the server's own use, never sent out; see :func:`public_page`).
+
+    ``sources`` defaults to this module's own events: the server-rendered pages are about its
+    event pages and never show, or call, a plugin source. Only the grid's API passes ``None``
+    (every *public* source, on public calendars, with no viewer)."""
     return await occurrences(
         db,
         tenant_id=tenant,
@@ -87,6 +112,7 @@ async def public_read(
             category_ids=category_ids,
             locale=locale,
             include_unpublished=False,
+            sources=sources,
         ),
         default_locale=locales.default(),
     )
@@ -96,10 +122,13 @@ async def public_page(db: Any, **query: Any) -> OccurrencePage:
     """What an anonymous visitor may see in ``[start, end)``: the read plus one texts query,
     with public addresses and no internal ids."""
     page = await public_read(db, **query)
+    for status in page.sources:  # never in the answer (it may be cached), but not lost
+        if status.status != "ok":
+            _log.info("events: public source %s is %s (%s)", status.id, status.status, status.code)
     locale = query["locale"]
     texts = await public_texts(db, {i.event_id for i in page.items if i.event_id})
     shown = [p for item in page.items if (p := _public(item, texts, locale)) is not None]
-    return OccurrencePage(items=shown, truncated=page.truncated)
+    return OccurrencePage(items=shown, truncated=page.truncated, sources=page.sources)
 
 
 def api_router() -> APIRouter:
@@ -122,13 +151,16 @@ def api_router() -> APIRouter:
             calendar_ids=query.calendar_ids,
             category_ids=query.category_ids,
             locale=query.locale,
+            sources=None,
         )
         return machine_response(
             request,
             settings,
-            page.model_dump_json().encode(),
+            # A public answer may be cached: it never carries a plugin's health.
+            page.model_dump_json(exclude={"sources"}).encode(),
             media_type=constants.JSON_MEDIA_TYPE,
             kind="api",
+            degraded=any(st.status not in ("ok", "truncated") for st in page.sources),
         )
 
     return router

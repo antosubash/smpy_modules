@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -231,3 +232,52 @@ async def test_eager_task_runs(db_state, tmp_path, monkeypatch):
         sync_db.set_database_url(None)
         sync_db.dispose_sync_engine()
         await state.engine.dispose()
+
+
+@pytest.mark.unbound_tenant
+async def test_publish_due_keeps_unknown_extra(db_state):
+    """A worker image without the plugin: the event of its type is published and its ``extra``
+    is exactly what was stored."""
+    from sm_events.calendar.plugins import registry
+
+    registry.reset_registry()  # the registry holds the built-ins only: no ``gone:thing``
+    raw = {"b": 1, "a": [1, 2], "n": {"z": None}}
+    (due,) = await seed(db_state, type="gone:thing", extra=raw)
+    assert await run(db_state) == {"tenants": 1, "published": 1, "failed": 0}
+    (event,) = await events_of(db_state)
+    assert event.id == due and event.status == "published"
+    assert (event.type, json.dumps(event.extra)) == ("gone:thing", json.dumps(raw))
+    registry.reset_registry()
+
+
+@pytest.mark.unbound_tenant
+async def test_publish_due_publishes_durably(db_state, monkeypatch):
+    """The beat's session gets the worker's bus: one durable ``EventPublished`` per publish,
+    written in the transaction that publishes."""
+    from simple_module_core.events import EventBus
+    from sm_events.contracts import events as contract
+
+    calls = []
+
+    class Transport:
+        async def enqueue(self, event, names, db):
+            calls.append((event, list(names)))
+
+    worker_bus = EventBus()
+    worker_bus.durable_transport = Transport()  # type: ignore[assignment]
+
+    async def handler(event, ctx):
+        return None
+
+    worker_bus.subscribe_durable(contract.EventPublished, handler, name="test.published")
+    from background_tasks.outbox import worker
+
+    monkeypatch.setattr(worker, "worker_bus", lambda: worker_bus)
+    (due,) = await seed(db_state)
+    assert await run(db_state) == {"tenants": 1, "published": 1, "failed": 0}
+    ((event, names),) = calls
+    assert isinstance(event, contract.EventPublished) and event.event_id == due
+    assert event.published_at == NOW and event.tenant_id == "default"
+    assert names == ["test.published"]
+    assert await run(db_state) == {"tenants": 0, "published": 0, "failed": 0}
+    assert len(calls) == 1  # nothing more to announce
