@@ -27,15 +27,15 @@ export function addDays(date: string, days: number): string {
 export async function seedCalendar(
   page: Page,
   { visibility = 'internal', color = '#2563eb', zone = ZONE, label = 'Cal', plain = false } = {},
-): Promise<{ id: string; name: string }> {
-  const { id, name } = await postCalendar(page, {
+): Promise<{ id: string; name: string; slug: string }> {
+  const { id, name, slug } = await postCalendar(page, {
     // `plain`: the label is the name (screenshots); otherwise a suffix keeps names apart.
     name: plain ? label : `${label} ${uniqueSlug('c')}`,
     visibility,
     color,
     zone,
   });
-  return { id, name };
+  return { id, name, slug };
 }
 
 type SeedInput = Omit<EventSeed, 'calendar'> & { calendar: string };

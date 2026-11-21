@@ -81,8 +81,8 @@ async def test_an_anonymous_reader_still_gets_public_pages(anon_client) -> None:
 
 async def test_a_304_carries_no_content_security_policy(anon_client) -> None:
     """A browser merges a 304's headers into the stored response (#322): a
-    ``public_csp`` here would replace the policy the cached body's nonce'd
-    scripts were served with."""
+    ``public_csp`` here would sit beside the policy the cached body's nonce'd
+    scripts were served with, and block them."""
     news_settings.use(NewsSettings(public_csp="default-src 'self'"))
     try:
         await _seed(anon_client)
@@ -93,5 +93,16 @@ async def test_a_304_carries_no_content_security_policy(anon_client) -> None:
         )
         assert again.status_code == 304
         assert "content-security-policy" not in again.headers
+    finally:
+        news_settings.reset()
+
+
+async def test_a_whitespace_public_csp_sends_no_header(anon_client) -> None:
+    news_settings.use(NewsSettings(public_csp="  \n"))
+    try:
+        await _seed(anon_client)
+        first = await anon_client.get(f"{NEWS}/hello")
+        assert first.status_code == 200
+        assert "content-security-policy" not in first.headers
     finally:
         news_settings.reset()
