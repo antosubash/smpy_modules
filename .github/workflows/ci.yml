@@ -618,7 +618,7 @@ jobs:
           uv-version: ${{ env.UV_VERSION }}
 
       # With E2E_NEWSLETTER=1, playwright.config.ts matches newsletter.spec.ts
-      # only; every other run, the `e2e-shard` jobs included, ignores it.
+      # and newsletter-events.spec.ts only; every other run, the `e2e-shard` jobs included, ignores it.
       - name: Run newsletter Playwright tests
         run: npm run test:e2e
 

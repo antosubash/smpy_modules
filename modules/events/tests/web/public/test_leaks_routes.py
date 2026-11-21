@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from fastapi.routing import iter_route_contexts
+from sm_events.core import constants
 
 from tests.support.calendars import PublicFixture
-from tests.web.public.leaks import REDIRECT_ONLY, ROUTE_SURFACES, surfaces
+from tests.web.public.leaks import BLOCK_ROUTE_SURFACES, REDIRECT_ONLY, ROUTE_SURFACES, surfaces
 
 
 def public_get_routes(app, prefix: str) -> set[str]:
@@ -30,7 +31,12 @@ async def test_every_get_route_under_the_prefix_has_a_surface(public_locales_cli
             if not default and surface in ("sitemap", "occurrences api", "private feed"):
                 continue
             expected[path] = surface
-    found = public_get_routes(app, "/events") | public_get_routes(app, "/de/events")
+    expected.update(BLOCK_ROUTE_SURFACES)
+    found = (
+        public_get_routes(app, "/events")
+        | public_get_routes(app, "/de/events")
+        | public_get_routes(app, constants.PUBLIC_BLOCKS_API)
+    )
     aliases = public_get_routes(app, "/en/events")
     assert found == set(expected), found ^ set(expected)
     assert aliases == {"/en/events/{rest:path}"}  # the default language's redundant prefix
@@ -40,6 +46,6 @@ async def test_every_get_route_under_the_prefix_has_a_surface(public_locales_cli
 
 async def test_the_table_has_no_stale_surface(public_locales_client):
     names = {s.name for s in surfaces(PublicFixture.__new__(PublicFixture), "en")}
-    used = set(ROUTE_SURFACES.values())
+    used = set(ROUTE_SURFACES.values()) | set(BLOCK_ROUTE_SURFACES.values())
     # the 404's suggestions are served by every route's 404 and have no route of their own
     assert names - used == {"404 suggestions"}

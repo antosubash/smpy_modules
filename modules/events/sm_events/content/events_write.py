@@ -25,16 +25,34 @@ from sm_events.content._core import apply_patch, create_core
 from sm_events.content.guard import Unchanged
 from sm_events.core.access.events import load_event, require
 from sm_events.core.access.rights import writable_calendar
+from sm_events.core.errors import ImageOffSite
+from sm_events.core.web_urls import is_site_image
 from sm_events.models import Event
 from sm_events.web.schemas.events_in import EventCreate, EventPatch
 
 __all__ = ["create_event", "update_event"]
 
 
+def _check_image(image: str | None, stored: str | None, origin: str | None) -> None:
+    """A NEW image must be one the site's pages may load. A value equal to the stored one is
+    accepted (stored data stays as it is), and ``origin=None`` (the importer, a worker) skips the
+    check: it has no site to compare with."""
+    if origin is None or not image or image == stored:
+        return
+    if not is_site_image(image, origin):
+        raise ImageOffSite
+
+
 async def create_event(
-    db: Any, who: ResourcePrincipal, data: EventCreate, *, locales: tuple[str, ...]
+    db: Any,
+    who: ResourcePrincipal,
+    data: EventCreate,
+    *,
+    locales: tuple[str, ...],
+    site_origin: str | None = None,
 ) -> Event:
     """A new draft at revision 1, with its texts and a ``created`` history row."""
+    _check_image(data.image, None, site_origin)
     calendar = await writable_calendar(db, who, data.calendar_id)
     return await create_core(db, calendar, data, actor=who.user_id, locales=locales)
 
@@ -46,12 +64,15 @@ async def update_event(
     data: EventPatch,
     *,
     locales: tuple[str, ...],
+    site_origin: str | None = None,
 ) -> Event:
     """Apply a PATCH: only the fields the body set. One that changes nothing (only
     ``expected_revision``, or values equal to the stored ones) writes nothing: same
     revision, no history row, no bus event, and the unchanged event comes back."""
     event, rights = await load_event(db, who, event_id)
     require(rights)
+    if "image" in data.model_fields_set:
+        _check_image(data.image, event.image, site_origin)
     try:
         await apply_patch(db, who.user_id, event, data, locales)
     except Unchanged:

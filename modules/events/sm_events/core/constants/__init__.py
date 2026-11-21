@@ -13,6 +13,7 @@ from sm_events.core.constants.public import (
     _PAGE_PUBLIC_EVENT,
     _PAGE_PUBLIC_INDEX,
     _PAGE_PUBLIC_NOT_FOUND,
+    BLOCK_CALENDARS_MAX,
     DEFAULT_PUBLIC_PREFIX,
     FEED_DAYS_AHEAD,
     FEED_DAYS_BACK,
@@ -49,6 +50,8 @@ from sm_events.core.constants.public import (
     SLUG_RESERVED_CODE,
     SLUG_RESERVED_DETAIL,
     SUB_EVENTS_MAX,
+    UPCOMING_BLOCK_DEFAULT,
+    UPCOMING_BLOCK_MAX,
     XML_MEDIA_TYPE,
 )  # isort: skip
 
@@ -60,6 +63,9 @@ LOCALE_NAMESPACE = "events"
 BASE_NAME = "events"
 
 ROUTE_PREFIX_API = "/api/events"
+PUBLIC_BLOCKS_API = f"{ROUTE_PREFIX_API}/public"
+"""Where the pagebuilder blocks read: three anonymous, fixed-path routes (a block cannot learn
+the configurable public prefix)."""
 VIEW_PREFIX = "/admin/events"
 
 PERM_GROUP = MODULE_NAME
@@ -151,6 +157,12 @@ INT32_MAX = 2**31 - 1
 ORIGINAL_START_MIN_YEAR = 1900
 ORIGINAL_START_MAX_YEAR = 9000
 MAX_OCCURRENCES = 2000
+# Cards for another module (``contracts.cards``): the most one search returns, how many
+# matching events it looks at before cutting, and how many times it re-reads series the
+# occurrences read's own cap starved (a bound on statements, never on correctness of a card).
+MAX_EVENT_SEARCH_LIMIT = 50
+CARD_SEARCH_SCAN = 50
+CARD_READ_ROUNDS = 3
 SERIES_FETCH_MAX = 2000
 RRULE_MAX_LEN = 500
 RRULE_MAX_INTERVAL = 99
@@ -215,6 +227,8 @@ INVALID_RANGE_DETAIL = "The range must end after it starts"
 RANGE_TOO_LONG_CODE = "range_too_long"
 RANGE_TOO_LONG_DETAIL = "The range is longer than the allowed maximum"
 DEFAULT_LOCALE_REQUIRED_CODE = "default_locale_required"
+IMAGE_OFF_SITE_CODE = "image_off_site"
+IMAGE_OFF_SITE_DETAIL = "Use an image from this site's media library"
 UNKNOWN_CATEGORY_CODE = "unknown_category"
 UNKNOWN_CATEGORY_DETAIL = "That category does not exist"
 UNKNOWN_TYPE_CODE = "unknown_type"

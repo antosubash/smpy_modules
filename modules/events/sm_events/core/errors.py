@@ -150,6 +150,14 @@ class DefaultLocaleRequired(Invalid):
     detail = constants.DEFAULT_LOCALE_REQUIRED_DETAIL
 
 
+class ImageOffSite(Invalid):
+    """A new image the site's pages could not load (they allow their own origin only)."""
+
+    code = constants.IMAGE_OFF_SITE_CODE
+    detail = constants.IMAGE_OFF_SITE_DETAIL
+    field = "image"
+
+
 class UnknownCategory(Invalid):
     code = constants.UNKNOWN_CATEGORY_CODE
     detail = constants.UNKNOWN_CATEGORY_DETAIL

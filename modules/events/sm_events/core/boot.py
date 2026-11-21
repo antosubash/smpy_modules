@@ -114,7 +114,9 @@ def mount_public_routers(app: FastAPI, prefix: str) -> None:
     """One mount per language: the default at the bare prefix, every other at ``/{locale}``.
     With several languages, the default's redundant ``/{default}{prefix}`` 301s to the bare one."""
     from sm_events.web.endpoints.public import alias_router, public_router
+    from sm_events.web.endpoints.public._blocks_api import blocks_router
 
+    app.include_router(blocks_router(), prefix=constants.PUBLIC_BLOCKS_API)  # fixed path
     languages = locales.supported()
     for locale in languages:
         app.include_router(public_router(locale), prefix=f"{locales.path_prefix(locale)}{prefix}")
@@ -140,6 +142,8 @@ def exempt_public_routes(app: FastAPI, prefix: str, languages: tuple[str, ...]) 
     for base in bases:
         registry.add_prefix(dir_prefix(base), methods=constants.PUBLIC_METHODS)
         registry.add_exact(base.rstrip("/"), methods=constants.PUBLIC_METHODS)
+    # The pagebuilder blocks' routes, at a fixed path outside any language's prefix.
+    registry.add_prefix(dir_prefix(constants.PUBLIC_BLOCKS_API), methods=constants.PUBLIC_METHODS)
 
 
 def _feed_pattern(base: str, *, default: bool) -> str:
@@ -165,6 +169,10 @@ def register_public_rate_limits(app: FastAPI, prefix: str, languages: tuple[str,
         registry.add_regex(pattern, RateLimitRule(constants.FEED_RATE, key="ip", methods=methods))
     registry.add_exact(
         _urls.api_path(), RateLimitRule(constants.PUBLIC_API_RATE, key="ip", methods=methods)
+    )
+    registry.add_regex(
+        rf"^{re.escape(constants.PUBLIC_BLOCKS_API)}/(?:calendars|upcoming|occurrences)$",
+        RateLimitRule(constants.PUBLIC_API_RATE, key="ip", methods=methods),
     )
     # Private feed links, on the default language's prefix only. Its own, lower budget: a link is
     # polled a few times a day, and a flood of guesses is what this limits. The pattern is one

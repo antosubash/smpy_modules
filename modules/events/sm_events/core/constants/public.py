@@ -74,3 +74,8 @@ SLUG_RESERVED_DETAIL = "That slug is reserved for a public address"
 
 INVALID_QUERY_CODE = "invalid_query"
 INVALID_QUERY_DETAIL = "The query is missing a parameter or one is malformed"
+
+# The pagebuilder blocks (PR 7): bounds on what a block may ask the anonymous routes for.
+UPCOMING_BLOCK_MAX = 20
+UPCOMING_BLOCK_DEFAULT = 5
+BLOCK_CALENDARS_MAX = 10

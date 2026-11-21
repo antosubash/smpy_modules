@@ -1,6 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import { Calendar } from '../calendar/Calendar';
-import type { CalendarInfo, CalendarState, DetailProps, FilterOption } from '../calendar/types';
+import type {
+  CalendarInfo,
+  CalendarState,
+  DetailProps,
+  FilterOption,
+  OccurrenceQuery,
+} from '../calendar/types';
 import { useEventExtensions } from '../extensions/load';
 import { buildSlots } from '../extensions/slots';
 import { keys, useT } from '../utils/i18n';
@@ -27,6 +33,10 @@ type Props = {
   categories: PublicCategory[];
   defaultTimezone: string;
   initial: Partial<CalendarState>;
+  /** Restrict every read to these calendar ids. The grid sends no calendar filter while all the
+   *  calendars it was given are shown, which would be every public calendar: a block that names
+   *  some calendars asks for exactly those. */
+  limitTo?: readonly string[];
   /** Written to the address as the grid moves, so a copied link opens the same month. */
   onState?: (state: CalendarState) => void;
 };
@@ -39,9 +49,15 @@ export function PublicCalendarGrid({
   categories,
   defaultTimezone,
   initial,
+  limitTo,
   onState,
 }: Props) {
-  const fetcher = useMemo(() => publicFetcher(apiUrl), [apiUrl]);
+  const fetcher = useMemo(() => {
+    const read = publicFetcher(apiUrl);
+    if (!limitTo?.length) return read;
+    return (q: OccurrenceQuery, signal: AbortSignal) =>
+      read({ ...q, calendars: q.calendars.length > 0 ? q.calendars : [...limitTo] }, signal);
+  }, [apiUrl, limitTo]);
   const infos = useMemo<CalendarInfo[]>(
     () =>
       calendars.map((c) => ({

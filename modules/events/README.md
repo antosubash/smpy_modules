@@ -4,8 +4,8 @@ Owned calendars with private, internal or public visibility, calendar sharing,
 multilingual categories, and events for SimpleModule hosts. Events have texts in
 each content language, one-off, all-day and recurring schedules, overrides for
 single occurrences, a review and publishing workflow, and a bounded occurrences
-read, a console calendar, and (from PR 4) a public site: pages, ICS feeds, JSON-LD and a
-sitemap. This is **PR 4 of 10**. See the [guide](docs/index.md), [public pages](docs/public.md), [operating](docs/operations.md) and the
+read, a console calendar, a public site (pages, ICS feeds, JSON-LD, a sitemap), private feed links,
+an `.ics` import, a plugin registry, pagebuilder blocks and a newsletter event card. See the [guide](docs/index.md), [public pages](docs/public.md), [blocks and cards](docs/blocks.md), [operating](docs/operations.md) and the
 [approved design](../../docs/superpowers/specs/2026-11-17-events-module-design.md).
 
 ## Install
@@ -37,6 +37,13 @@ it creates the seven `events_*` tables without dropping existing data, then
 run `make migrate`. Migrations belong to the host, never to this wheel. The
 label is a named target in the host's shared history; downgrading
 `events@base` does not remove only events' tables.
+
+## Pagebuilder blocks
+
+With the `pagebuilder` extra, events adds an "Upcoming events" list and a read-only "Events
+calendar" to pagebuilder's palette. They show only published events of public calendars,
+fetched when the page is viewed. `sm_events.contracts.cards` gives newsletter the same public
+projection for its Event card. See [blocks and cards](docs/blocks.md).
 
 ## Usage
 
@@ -169,7 +176,7 @@ with its own validated `extra`, and contribute chips, details, editor and settin
 items. An admin turns a source on per calendar (Calendars, **Sources**). A plugin call runs on its own
 database connection with a time budget and validated, bounded output, and a failing source is reported in the
 calendar instead of failing it. See [the plugin guide](docs/extensions.md). Events publishes nine bus
-events, also durably through the `background_tasks` outbox. Status: PR 6 of 10 (extensions).
+events, also durably through the `background_tasks` outbox. The delivery list is in the [guide](docs/index.md#status).
 
 ## Public pages
 

@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
+from sm_events.core import constants
 from sm_events.web.endpoints.public import _urls
 
 from tests.support.calendars import PublicFixture
@@ -58,8 +59,19 @@ def private_feed_path() -> str:
     return f"{_urls.prefix()}/feed/evf_{'0' * 43}.ics"
 
 
+BLOCKS = constants.PUBLIC_BLOCKS_API
+
+
+_RANGE = "start=2026-01-01T00:00:00Z&end=2026-12-31T00:00:00Z"
+
+
+def _block(route: str, locale: str) -> str:
+    joiner = "&" if "?" in route else "?"
+    return f"{BLOCKS}/{route}{joiner}locale={locale}"
+
+
 def _api_url(locale: str) -> str:
-    return f"{_urls.api_path()}?start=2026-01-01T00:00:00Z&end=2026-12-31T00:00:00Z&locale={locale}"
+    return f"{_urls.api_path()}?{_RANGE}&locale={locale}"
 
 
 def surfaces(fx: PublicFixture, locale: str) -> list[Surface]:
@@ -78,6 +90,12 @@ def surfaces(fx: PublicFixture, locale: str) -> list[Surface]:
         ),
         Surface("sitemap", "listing", lambda f, loc, _: _urls.sitemap_path()),
         Surface("occurrences api", "listing", lambda f, loc, _: _api_url(loc)),
+        # The pagebuilder blocks' routes (fixed path, no language prefix: ``loc`` is a query).
+        Surface("block calendars", "listing", lambda f, loc, _: _block("calendars", loc)),
+        Surface("block upcoming", "listing", lambda f, loc, _: _block("upcoming?count=20", loc)),
+        Surface(
+            "block occurrences", "listing", lambda f, loc, _: _block(f"occurrences?{_RANGE}", loc)
+        ),
         Surface(
             "all calendars feed", "listing", lambda f, loc, _: _urls.calendar_ics_path(None, loc)
         ),
@@ -124,6 +142,13 @@ meta-test in ``test_leaks_routes.py`` fails on a route that is not here, and on 
 not a surface). ``{prefix}`` is the mounted prefix of a language; the sitemap, the API and the
 private feed exist on the default language's only. A redirect-only route is named ``"redirect"``."""
 
+BLOCK_ROUTE_SURFACES: dict[str, str] = {
+    f"{BLOCKS}/calendars": "block calendars",
+    f"{BLOCKS}/upcoming": "block upcoming",
+    f"{BLOCKS}/occurrences": "block occurrences",
+}
+"""The pagebuilder blocks' ``GET`` routes (one set, outside every language's prefix), by surface."""
+
 REDIRECT_ONLY = "redirect"
 
 
@@ -136,3 +161,12 @@ def fingerprint(response, *echoed: str) -> tuple[int, bytes, dict[str, str]]:
         body = body.replace(text.encode(), b"<echo>")
     headers = {k: v for k, v in response.headers.items() if k not in IGNORED_HEADERS}
     return response.status_code, body, headers
+
+
+def assert_no_event_ids(body: str, fx: PublicFixture) -> None:
+    """No event's internal id (dashed or bare hex) appears in a public body: the public surface
+    is keyed by slug. A *calendar's* or category's id is allowed (they are the grid's filter)."""
+    low = body.lower()
+    for event in [*fx.public_events, *fx.hidden.values()]:
+        assert str(event.id) not in low, "event id in a public body"
+        assert event.id.hex not in low, "event id (hex) in a public body"

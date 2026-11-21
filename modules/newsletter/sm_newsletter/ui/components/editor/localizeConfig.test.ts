@@ -9,7 +9,7 @@ type Labelled = { label?: string; options?: { label?: string }[] | Record<string
 
 describe('localizeConfig', () => {
   it('resolves labels to strings', () => {
-    const out = localizeConfig(buildConfig({ news: true, pagebuilder: true }), shout);
+    const out = localizeConfig(buildConfig({ news: true, pagebuilder: true, events: true }), shout);
     const cats = out.categories as Record<string, { title?: string }>;
     expect(cats.content.title).toBe('T(newsletter.blocks.categories.content)');
     expect(cats.cards.title).toBe('T(newsletter.blocks.categories.cards)');
@@ -37,7 +37,10 @@ describe('localizeConfig', () => {
   });
 
   it("leaves a richtext field's extension options alone", () => {
-    const out = localizeConfig(buildConfig({ news: false, pagebuilder: false }), shout);
+    const out = localizeConfig(
+      buildConfig({ news: false, pagebuilder: false, events: false }),
+      shout,
+    );
     const html = (out.components.RichText as { fields: Record<string, Labelled> }).fields.html;
     expect(html.label).toBe('T(newsletter.blocks.rich_text.html)');
     expect(html.options).toMatchObject({ heading: false, codeBlock: false });

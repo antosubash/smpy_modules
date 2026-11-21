@@ -488,3 +488,16 @@ publish now announces `EventPublished` (23, 24). The frontend registry is a lazy
 `events-extensions.ts` with an error boundary per component; the calendar's own events are a choice in the
 source filter (25-30). Records contributes `records:dates` through `sm_records.contracts.dated`, public only
 for types marked Public (31-33).
+
+## Amendments (PR 7)
+
+The approved PR 7 rulings refine the design above. `sm_events.contracts.cards` is the public projection of
+an event for a sibling: it starts from the public gate, pins the named tenant twice, and a card is a one-off's
+own times or a series' next occurrence (4). Its `id` exists for a consumer's own lookup and is never rendered
+publicly. Newsletter's Event card is its own block with its own props, snapshotted when inserted and
+refreshed on request, a series card rolling forward to its next date (12, 14); its date is formatted in the
+event's zone with the tzdata abbreviation, untranslated (15). Events contributes its blocks through the
+optional `pagebuilder` extra, from `pagebuilder-blocks.ts` (17), which amends "events gains no pagebuilder
+extra" to mean no pagebuilder Python for the blocks. The blocks read three anonymous routes at the fixed path
+`/api/events/public/` (18), by calendar slug (19), the pickers read the same anonymous route (20), and a block
+fetches at request time and stores no snapshot, so a calendar that stops being public shows nothing.

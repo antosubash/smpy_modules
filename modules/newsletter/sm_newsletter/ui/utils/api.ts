@@ -10,6 +10,7 @@ import type {
   CardKind,
   CardSnapshot,
   Estimate,
+  EventCardSnapshot,
   Lift,
   LiftPage,
   ListField,
@@ -57,8 +58,8 @@ export const api = {
   lists: () => read<string[]>('/lists'),
   searchCards: (kind: CardKind, q: string, signal?: AbortSignal) =>
     read<CardHit[]>(`/cards/${kind}s${query({ q })}`, signal),
-  snapshot: (kind: CardKind, source_id: number) =>
-    send<CardSnapshot>('/cards/snapshot', 'POST', { kind, source_id }),
+  snapshot: (kind: CardKind, source_id: number | string) =>
+    send<CardSnapshot | EventCardSnapshot>('/cards/snapshot', 'POST', { kind, source_id }),
   refreshCard: (id: number, block_id: string, expected_revision: number) =>
     send<CampaignDetail>(`/campaigns/${id}/cards/refresh`, 'POST', { block_id, expected_revision }),
   searchMedia: (q: string, signal?: AbortSignal) =>

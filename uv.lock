@@ -3218,6 +3218,9 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
 ]
+pagebuilder = [
+    { name = "simple-module-pagebuilder" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -3231,11 +3234,12 @@ requires-dist = [
     { name = "simple-module-db", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-hosting", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-inertia", specifier = ">=0.0.44,<0.1" },
+    { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
     { name = "simple-module-settings", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-sharing", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.44,<0.1" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["pagebuilder", "dev"]
 
 [[package]]
 name = "simple-module-file-storage"
@@ -3424,6 +3428,7 @@ version = "0.0.15"
 source = { editable = "modules/newsletter" }
 dependencies = [
     { name = "aiosmtplib" },
+    { name = "babel" },
     { name = "cryptography" },
     { name = "email-validator" },
     { name = "pydantic-settings" },
@@ -3442,6 +3447,9 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "simple-module-test" },
 ]
+events = [
+    { name = "simple-module-events" },
+]
 news = [
     { name = "simple-module-news" },
 ]
@@ -3453,6 +3461,7 @@ pagebuilder = [
 requires-dist = [
     { name = "aiosmtpd", marker = "extra == 'dev'", specifier = ">=1.4.6" },
     { name = "aiosmtplib", specifier = ">=3.0,<6" },
+    { name = "babel", specifier = ">=2.12,<3" },
     { name = "cryptography", specifier = ">=42" },
     { name = "email-validator", specifier = ">=2.1" },
     { name = "pydantic-settings", specifier = ">=2.0" },
@@ -3461,6 +3470,7 @@ requires-dist = [
     { name = "simple-module-background-tasks", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-core", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-db", specifier = ">=0.0.42,<0.1" },
+    { name = "simple-module-events", marker = "extra == 'events'", editable = "modules/events" },
     { name = "simple-module-hosting", specifier = ">=0.0.42,<0.1" },
     { name = "simple-module-news", marker = "extra == 'news'", editable = "modules/news" },
     { name = "simple-module-pagebuilder", marker = "extra == 'pagebuilder'", editable = "modules/pagebuilder" },
@@ -3468,7 +3478,7 @@ requires-dist = [
     { name = "simple-module-settings", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-test", marker = "extra == 'dev'", specifier = ">=0.0.42,<0.1" },
 ]
-provides-extras = ["news", "pagebuilder", "dev"]
+provides-extras = ["news", "pagebuilder", "events", "dev"]
 
 [[package]]
 name = "simple-module-pagebuilder"

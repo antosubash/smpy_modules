@@ -14,6 +14,18 @@ describe('bodyDraft', () => {
     expect(isComplete({ type: 'Divider', props: { id: 'd' } })).toBe(true);
   });
 
+  it('an EventCard needs a chosen event and its address', () => {
+    expect(isComplete({ type: 'EventCard', props: { id: 'e', source_id: '', url: '' } })).toBe(
+      false,
+    );
+    expect(isComplete({ type: 'EventCard', props: { id: 'e', source_id: 'x', url: '' } })).toBe(
+      false,
+    );
+    expect(isComplete({ type: 'EventCard', props: { id: 'e', source_id: 'x', url: '/e' } })).toBe(
+      true,
+    );
+  });
+
   it('omits an empty image link and a cleared width', () => {
     const [image] = normalizeBody([
       { type: 'Image', props: { id: 'a', src: '/x.png', alt: '', href: '', width: Number.NaN } },

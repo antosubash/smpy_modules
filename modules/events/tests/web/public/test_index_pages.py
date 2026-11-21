@@ -74,7 +74,7 @@ async def test_item_shape(public_locales_client, fx):
     assert set(one) == {
         "key", "url", "title", "lang", "all_day", "start_local", "end_local", "start_date",
         "end_date", "timezone", "show_timezone", "status", "rescheduled", "calendar", "category",
-        "venue_name", "attendance_mode", "summary",
+        "venue_name", "attendance_mode", "summary", "image",
     }  # fmt: skip
     assert one["url"] == f"/events/{fx.slug(fx.one_off)}" and one["timezone"] == "UTC"
     assert one["calendar"] == {"slug": fx.pub.slug, "name": fx.pub.name, "color": fx.pub.color}

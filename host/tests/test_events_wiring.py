@@ -140,7 +140,13 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
                 feed = await http.get("/events/calendar.ics")
                 missing = await http.get("/events/no-such-event.ics")
                 write = await http.post("/events/no-such-event")
+                blocks = await http.get("/api/events/public/calendars")
+                blocks_post = await http.post("/api/events/public/calendars")
+                admin = await http.get("/api/events/calendars")
             return {
+                "blocks": blocks,
+                "blocks_post": blocks_post,
+                "admin": admin,
                 "paths": paths,
                 "page": page,
                 "feed": feed,
@@ -172,6 +178,12 @@ def test_public_routes_wired_by_startup(booted_host, monkeypatch):
     assert got["missing"].status_code == 404
     assert got["missing"].json() == {"detail": "Not found", "code": "not_found"}
     assert got["write"].status_code not in (200, 404)  # still behind the sign-in
+    # The pagebuilder blocks' anonymous routes: readable without a session, read-only, and the
+    # console API next to them is still behind the sign-in.
+    assert got["blocks"].status_code == 200, got["blocks"].text[:300]
+    assert got["blocks"].json()["calendars"] == []
+    assert got["blocks_post"].status_code in (401, 403, 405)
+    assert got["admin"].status_code in (401, 403)
 
 
 def test_not_modified_carries_what_we_pin(booted_host, monkeypatch):

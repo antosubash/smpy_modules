@@ -39,6 +39,10 @@ export type OccurrenceFetcher = (
   signal: AbortSignal,
 ) => Promise<OccurrencePage>;
 
+/** In `CalendarState.sources`: every source is unchecked. (An empty list is no filter: every
+ *  source is shown, and every box checked.) A plugin source id has a colon, so none can be this. */
+export const NO_SOURCES = 'none';
+
 /** `date` is YYYY-MM-DD in the grid's time zone. */
 export type CalendarState = {
   view: CalendarView;

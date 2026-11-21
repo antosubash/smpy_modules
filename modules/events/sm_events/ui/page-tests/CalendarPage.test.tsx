@@ -175,6 +175,9 @@ it("offers the calendar's own events in the source filter beside the plugin sour
   await flush();
   await act(async () => fakeGrid.emitRange(MARCH, 'March 2026'));
   await flush();
-  expect(calls.at(-1)?.url).toContain('source=events');
+  // Every box starts checked: unchecking the calendar's own events leaves the plugin source.
+  expect(own.checked).toBe(false);
+  expect(calls.at(-1)?.url).toContain('source=records%3Adates');
+  expect(calls.at(-1)?.url).not.toContain('source=events');
   await view.unmount();
 });

@@ -14,7 +14,13 @@ import { StatusBar } from './StatusBar';
 import { Toolbar } from './Toolbar';
 import type { Range } from './time/range';
 import { browserTimeZone, gridTimeZone, todayIn } from './time/zones';
-import type { CalendarProps, CalendarState, GridHandle, Occurrence } from './types';
+import {
+  type CalendarProps,
+  type CalendarState,
+  type GridHandle,
+  NO_SOURCES,
+  type Occurrence,
+} from './types';
 
 // The grid, FullCalendar and its CSS are one chunk of their own.
 const Grid = lazy(() => import('./adapter/FullCalendarGrid'));
@@ -64,7 +70,8 @@ export function Calendar(props: CalendarProps) {
   const myZone = browserTimeZone();
   const zone = gridTimeZone(state.tzMode, shown, props.defaultTimezone, myZone);
   const calendarZone = gridTimeZone('calendar', shown, props.defaultTimezone, myZone);
-  const nothingShown = shown.length === 0;
+  // Nothing is shown when no calendar is checked, or the last source box was unchecked.
+  const nothingShown = shown.length === 0 || state.sources.includes(NO_SOURCES);
   const filters = useMemo(
     () => ({
       calendars: shown.length === calendars.length ? [] : state.calendars,

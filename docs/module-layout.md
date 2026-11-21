@@ -38,7 +38,7 @@ file has).
 | `pages/` | the host's page glob; real Inertia pages only (`scripts/check_rules.py`) |
 | `locales/` | the framework's i18n registry |
 | `index.ts` | `package.json` `exports` (pagebuilder's `main` until 0.0.17, so its moved-path stubs stay reachable); the module's public TS surface. A sibling imports `@simple-module-py/<module>`, never a file inside the package; `scripts/check_ts_imports.py` refuses a deep or cross-module relative import (#337) |
-| `pagebuilder-blocks.ts` | pagebuilder's `puck-blocks.ts` glob (`*/*/pagebuilder-blocks.ts`) |
+| `pagebuilder-blocks.ts` | pagebuilder's `puck-blocks.ts` glob (`*/*/pagebuilder-blocks.ts`); news, images, records and events each ship one |
 | `images_extensions.py`, `images-steps.ts` | a plugin's file that another module imports or globs by name |
 | `events_extensions.py`, `events-extensions.ts` | events' loader (`calendar/plugins/extensions.py`) and its `ui/extensions/load.ts` glob (`*/*/events-extensions.ts`); records' lives beside an `integrations/events/` package that is the only code importing `sm_events` |
 | `contracts/` | other modules: the only import path they may use |

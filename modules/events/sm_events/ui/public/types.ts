@@ -26,6 +26,8 @@ export type PublicListItem = {
   venue_name: string | null;
   attendance_mode: string;
   summary: string | null;
+  /** An absolute http(s) address as stored, else null. */
+  image: string | null;
 };
 
 export type MonthGroup = { month: string; items: PublicListItem[] };

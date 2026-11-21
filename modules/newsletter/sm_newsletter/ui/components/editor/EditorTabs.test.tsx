@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import en from '../../../locales/en.json';
-import { EditorTabs } from './EditorTabs';
+import { EditorTabs, editPaneClass } from './EditorTabs';
 
 vi.mock('../../utils/api', async (original) => ({
   ...(await original<typeof import('../../utils/api')>()),
@@ -43,5 +43,14 @@ describe('EditorTabs', () => {
     act(() => root.unmount());
     document.body.innerHTML = '';
     expect(await mount(false)).not.toContain(en.test_send.trigger);
+  });
+});
+
+describe('editPaneClass', () => {
+  it('keeps the Puck pane measurable off the Edit tab: out of sight, never display: none', () => {
+    expect(editPaneClass(true)).toBe('min-h-0 flex-1');
+    const off = editPaneClass(false).split(' ');
+    expect(off).not.toContain('hidden'); // `display: none` makes Puck's frame NaN wide
+    expect(off).toEqual(expect.arrayContaining(['invisible', 'fixed', 'pointer-events-none']));
   });
 });

@@ -7,6 +7,15 @@ name the module they affect.
 
 ### Added
 
+- **events and newsletter: the pagebuilder blocks and the event card** (PR 7 of the events module).
+  Events contributes `UpcomingEvents` and `EventsCalendar` to pagebuilder's palette (the optional
+  `pagebuilder` extra), reading three anonymous routes under `/api/events/public/`; they show only
+  published events of public calendars, fetched at request time. `sm_events.contracts.cards` gives a
+  sibling the public projection of an event, and newsletter gains an Event card (the `events` extra,
+  snapshotted when inserted and refreshed on request, dates in the event's own timezone and a link
+  to its `.ics`). Newsletter now depends on `babel`. Pagebuilder is unchanged: a page holding an
+  events block still renders where events is not installed.
+
 - **events: private feed links and `.ics` import** (PR 5 of the events module). A signed-in user
   gets a private subscription link for any calendar they may view (`/events/feed/<token>.ics`,
   token stored only as a SHA-256, shown once, revocable, one `404` for every refusal), and the

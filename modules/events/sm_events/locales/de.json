@@ -132,6 +132,7 @@
     "range_too_long": "Der Zeitraum ist zu lang.",
     "invalid_range": "Das Ende des Zeitraums muss nach seinem Beginn liegen.",
     "unknown_category": "Diese Kategorie gibt es nicht mehr.",
+    "image_off_site": "Dieses Bild liegt auf einer anderen Website und lässt sich auf den öffentlichen Seiten nicht laden. Verwenden Sie ein Bild aus der Medienbibliothek dieser Website.",
     "unknown_type": "Diese Art von Veranstaltung wird nicht unterstützt.",
     "invalid_parent": "Die übergeordnete Veranstaltung muss zum selben Kalender gehören und darf weder selbst eine Unterveranstaltung noch eine Serie sein.",
     "immutable_field": "Kalender und übergeordnete Veranstaltung lassen sich nicht ändern.",
@@ -343,6 +344,7 @@
     "no_category": "Keine Kategorie",
     "organiser": "Veranstalter",
     "image": "Bildadresse",
+    "image_hint": "Verwenden Sie ein Bild aus der Medienbibliothek dieser Website: Die Adresse beginnt mit /. Ein Bild von einer anderen Website wird auf den öffentlichen Seiten nicht geladen.",
     "registration_url": "Link zur Anmeldung",
     "cancelled": "Diese Veranstaltung ist abgesagt",
     "sub_events": "Unterveranstaltungen",
@@ -839,6 +841,46 @@
       "done": "Import abgeschlossen: {created} angelegt, {updated} aktualisiert, {unchanged} unverändert, {skipped} übersprungen, {failed} fehlgeschlagen.",
       "failed": "Der Import ist fehlgeschlagen: {reason}",
       "working": "Der Import läuft."
+    }
+  },
+  "blocks": {
+    "palette_group": "Veranstaltungen",
+    "upcoming": {
+      "label": "Kommende Veranstaltungen",
+      "heading": "Überschrift",
+      "calendars": "Kalender (bis zu 10)",
+      "category": "Kategorie",
+      "count": "Anzahl der Veranstaltungen",
+      "count_invalid": "Geben Sie eine ganze Zahl von 1 bis {max} ein.",
+      "layout": "Darstellung",
+      "layout_list": "Liste",
+      "layout_cards": "Karten",
+      "show_images": "Bilder anzeigen"
+    },
+    "calendar": {
+      "label": "Veranstaltungskalender",
+      "calendars": "Kalender (bis zu 10)",
+      "default_view": "Öffnet als",
+      "view_month": "Monat",
+      "view_week": "Woche",
+      "view_day": "Tag",
+      "view_list": "Liste",
+      "height": "Höhe",
+      "height_compact": "Kompakt",
+      "height_medium": "Mittel",
+      "height_tall": "Hoch"
+    },
+    "fields": {
+      "calendar": "Kalender",
+      "calendar_all": "Alle öffentlichen Kalender",
+      "category_any": "Jede Kategorie"
+    },
+    "editor_hint": {
+      "empty": "Keine kommenden öffentlichen Veranstaltungen. Besucher sehen hier nichts, bis es welche gibt.",
+      "unresolved_one": "{count} ausgewählter Kalender ist nicht öffentlich oder existiert nicht mehr.",
+      "unresolved_other": "{count} ausgewählte Kalender sind nicht öffentlich oder existieren nicht mehr.",
+      "failed": "Die Veranstaltungen konnten nicht geladen werden.",
+      "selection_unreadable": "Die Kalenderauswahl konnte nicht gelesen werden, deshalb wird nichts angezeigt. Wählen Sie die Kalender erneut aus."
     }
   }
 }
