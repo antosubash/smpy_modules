@@ -96,6 +96,14 @@ def public_config(settings: RecordsSettings) -> dict[str, str] | None:
     return {"provider": provider, "site_key": site_key}
 
 
+def enforced(settings: RecordsSettings) -> bool:
+    """Whether a visitor can be asked to solve a CAPTCHA at all: a known provider *and* a site key.
+    The same test the form's widget uses (:func:`public_config`), so the submit path's order of
+    charges and the form agree. A provider named without its key is not enforced here; ``verify``
+    still fails closed (503) for it."""
+    return public_config(settings) is not None
+
+
 async def verify(settings: RecordsSettings, response: str | None, remote_ip: str) -> None:
     """Refuse the submission unless the provider vouches for ``response``.
     A no-op while no provider is configured."""

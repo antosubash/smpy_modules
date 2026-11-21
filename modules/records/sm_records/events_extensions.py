@@ -11,6 +11,8 @@ from typing import Any
 
 
 def register(registry: Any) -> None:
+    from sm_records.integrations.events.registration_provider import provider
     from sm_records.integrations.events.source import RecordDatesSource
 
     registry.add_source(RecordDatesSource())
+    registry.add_registration_provider(provider())

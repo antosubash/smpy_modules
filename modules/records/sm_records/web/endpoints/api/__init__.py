@@ -29,6 +29,8 @@ from sm_records.web.endpoints.api import (
     public_submissions_admin,
     records,
     referrers,
+    registration_forms,
+    registrations_mine,
     revisions,
     translations,
     types,
@@ -52,6 +54,8 @@ router = APIRouter(dependencies=[Depends(bind_admin), Depends(RequiresCsrf())])
 # split between them visible at the mount point.
 router.include_router(preview.router)
 router.include_router(types.router)
+router.include_router(registration_forms.router)
+router.include_router(registrations_mine.router)
 # Before ``records``: Starlette matches in registration order, and
 # ``/types/{key}/records/{uuid}`` would otherwise swallow
 # ``/types/{key}/records/export`` as a record whose uuid is "export".

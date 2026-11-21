@@ -35,6 +35,10 @@ def test_snapshot_columns_are_the_listed_ones():
         "venue_name", "address", "online_url", "latitude", "longitude", "category_id",
         "organiser", "image", "registration_url", "extra", "revision", "publish_at",
         "published_at",
+        # PR 9: registration settings are part of an event's history.
+        "registration_mode", "registration_provider", "registration_target",
+        "registration_capacity", "registration_opens_at", "registration_closes_at",
+        "registration_show_seats", "registration_reminder_minutes",
     }  # fmt: skip
 
 

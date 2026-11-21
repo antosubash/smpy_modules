@@ -8,6 +8,7 @@ from simple_module_core.events import Event, EventBus
 from sm_events.content import bus
 from sm_events.content.events_write import create_event
 from sm_events.contracts import events as contract
+from sm_events.contracts.extensions import SourceViewer
 from sm_events.models import Calendar, Revision
 from sm_events.models import Event as EventRow
 from sm_events.web.schemas.events_in import EventCreate
@@ -41,8 +42,14 @@ def create_body(cal: Calendar, **kw: Any) -> EventCreate:
     return EventCreate(**body)
 
 
+EDITOR = SourceViewer(
+    user_id="o", roles=(), permissions=frozenset({V, E, P, M}), role_map=None
+)  # the writer's caller, for registration settings
+
+
 async def make(db, who, cal, **kw) -> EventRow:
-    return await create_event(db, who, create_body(cal, **kw), locales=LOCALES)
+    viewer = kw.pop("viewer", EDITOR)
+    return await create_event(db, who, create_body(cal, **kw), locales=LOCALES, viewer=viewer)
 
 
 class Recorder:

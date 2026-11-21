@@ -92,6 +92,17 @@ export type Place = {
   longitude: number | null;
 };
 
+/** Where to register and for which occurrence; never anything about seats (the page is cached). */
+export type PublicRegistration = {
+  mode: 'none' | 'external' | 'builtin';
+  url: string | null;
+  provider: string | null;
+  target: string | null;
+  /** `null` on a series' page with no date chosen. */
+  occurrence_key: string | null;
+  upcoming: NextOccurrence[];
+};
+
 export type PublicEventProps = {
   /** The event's type when a plugin here provides it, else the default type. */
   type: string;
@@ -114,6 +125,7 @@ export type PublicEventProps = {
   parent: { title: string; url: string } | null;
   sub_events: PublicListItem[];
   registration_url: string | null;
+  registration: PublicRegistration;
   ics_url: string;
   canonical_url: string;
   alternates: Alternate[];

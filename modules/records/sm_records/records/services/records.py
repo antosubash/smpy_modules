@@ -50,12 +50,8 @@ from sm_records.records.services.claims import _claims
 
 # Re-exported so the delete lifecycle is importable from the one module
 # endpoints already use; it lives in ``_lifecycle`` only for the file cap.
-from sm_records.records.services.delete._lifecycle import (
-    hard_delete_record,
-    purge_type_records,
-    restore_record,
-    soft_delete_record,
-)
+from sm_records.records.services.delete._lifecycle import restore_record, soft_delete_record
+from sm_records.records.services.delete._purge import hard_delete_record, purge_type_records
 from sm_records.records.services.revisions import write_revision
 from sm_records.records.services.schema_changes import _invalid
 

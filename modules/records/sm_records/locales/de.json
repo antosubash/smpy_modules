@@ -727,7 +727,8 @@
   },
   "menu": {
     "all_types": "Alle Datensatztypen",
-    "group_records": "Datensätze"
+    "group_records": "Datensätze",
+    "my_registrations": "Meine Anmeldungen"
   },
   "public_submissions": {
     "card_title": "Einsendungen über die Website",
@@ -825,6 +826,27 @@
         "expiry": "Dieser Link gilt bis {expires}. Wenn Sie sich nicht angemeldet haben, ignorieren Sie diese E-Mail: Es passiert nichts, und Sie hören nicht wieder von uns.",
         "why": "Sie erhalten diese E-Mail, weil diese Adresse in einem Anmeldeformular auf {site} eingegeben wurde.",
         "unsubscribe": "Später umentschieden? Hier abmelden:"
+      },
+      "registration": {
+        "subject_pending": "Bestätigen Sie Ihre Anmeldung zu {title}",
+        "subject_registered": "Ihre Anmeldung zu {title}",
+        "intro_pending": "Jemand, hoffentlich Sie, hat diese Adresse auf {site} für {title} angemeldet. Bitte bestätigen Sie, dass Sie das waren.",
+        "intro_registered": "Sie sind auf {site} für {title} angemeldet.",
+        "when": "Wann:",
+        "place": "Wo:",
+        "online": "Online:",
+        "page": "Die Veranstaltungsseite:",
+        "ics": "In den Kalender eintragen:",
+        "confirm": "Anmeldung bestätigen:",
+        "expiry": "Dieser Link gilt bis {expires}. Wenn Sie sich nicht angemeldet haben, ignorieren Sie diese E-Mail: Es passiert nichts, und Sie hören nicht wieder von uns.",
+        "cancel": "Sie können nicht kommen? Melden Sie sich hier ab:",
+        "why": "Sie erhalten diese E-Mail, weil diese Adresse auf {site} in ein Anmeldeformular eingetragen wurde.",
+        "intro_already": "Sie sind bereits für {title} auf {site} angemeldet. Weiter ist nichts nötig.",
+        "subject_already": "Sie sind bereits für {title} angemeldet",
+        "notice_subject": "Ihre Anmeldung zu {title}",
+        "notice_full": "{title} auf {site} ist ausgebucht, daher konnte Ihre Anmeldung nicht gespeichert werden.",
+        "notice_closed": "Die Anmeldung zu {title} auf {site} ist geschlossen, daher konnte Ihre Anmeldung nicht gespeichert werden.",
+        "notice_why": "Sie erhalten diese E-Mail, weil diese Adresse auf {site} in ein Anmeldeformular eingetragen wurde. Es wurde nichts gespeichert."
       }
     },
     "landing": {
@@ -838,11 +860,28 @@
         "already": "Ihr Abonnement war bereits bestätigt. Sie müssen nichts weiter tun.",
         "expired": "Dieser Link ist abgelaufen oder nicht mehr gültig. Melden Sie sich auf der Website erneut an, um einen neuen zu erhalten."
       },
+      "confirm_registration": {
+        "title": "Anmeldung bestätigen",
+        "intro": "Drücken Sie die Schaltfläche, um Ihre Anmeldung zu bestätigen und Ihren Platz zu belegen.",
+        "button": "Anmeldung bestätigen",
+        "done": "Vielen Dank. Ihre Anmeldung ist bestätigt.",
+        "already": "Ihre Anmeldung wurde bereits bestätigt. Es ist nichts weiter zu tun.",
+        "expired": "Dieser Link ist abgelaufen oder nicht mehr gültig. Melden Sie sich auf der Website erneut an, um einen neuen zu erhalten.",
+        "full": "Leider ist diese Veranstaltung jetzt ausgebucht, daher konnte Ihre Anmeldung nicht bestätigt werden. Es wurde nichts gespeichert.",
+        "closed": "Leider ist die Anmeldung für diese Veranstaltung geschlossen, daher konnte Ihre Anmeldung nicht bestätigt werden. Es wurde nichts gespeichert.",
+        "busy": "Die Anmeldungen sind gerade ausgelastet. Bitte drücken Sie die Schaltfläche gleich noch einmal."
+      },
       "unsubscribe": {
         "title": "Abmelden",
         "intro": "Klicken Sie auf die Schaltfläche, um diesen Newsletter nicht mehr zu erhalten.",
         "button": "Abmelden",
         "done": "Sie sind abgemeldet. Sie erhalten diesen Newsletter nicht mehr."
+      },
+      "cancel": {
+        "title": "Anmeldung stornieren",
+        "intro": "Drücken Sie die Schaltfläche, um Ihre Anmeldung zu stornieren und Ihren Platz freizugeben.",
+        "button": "Anmeldung stornieren",
+        "done": "Ihre Anmeldung ist storniert."
       }
     },
     "block": {
@@ -883,23 +922,65 @@
     },
     "errors": {
       "form_expired": "Dieses Formular ist abgelaufen. Laden Sie die Seite neu und versuchen Sie es noch einmal.",
-      "rate_limited": "Zu viele Versuche. Bitte warten Sie {seconds} Sekunden und versuchen Sie es dann erneut.",
+      "rate_limited": "Zu viele Versuche. Bitte warten Sie etwa {minutes} Minuten und versuchen Sie es dann erneut.",
+      "rate_limited_one": "Zu viele Versuche. Bitte warten Sie etwa 1 Minute und versuchen Sie es dann erneut.",
       "captcha_failed": "Bitte schließen Sie die Sicherheitsprüfung ab und versuchen Sie es erneut.",
       "captcha_unavailable": "Die Sicherheitsprüfung ist gerade nicht verfügbar. Bitte versuchen Sie es in ein paar Minuten erneut.",
       "bad_origin": "Dieses Formular kann nur von dieser Website gesendet werden.",
       "network": "Das hat nicht geklappt. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
-      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es später noch einmal."
+      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es später noch einmal.",
+      "registration_full": "Diese Veranstaltung ist jetzt ausgebucht. Es wurde nichts gespeichert.",
+      "registration_closed": "Die Anmeldung für diese Veranstaltung ist geschlossen. Es wurde nichts gespeichert.",
+      "event_unavailable": "Die Anmeldung für diese Veranstaltung ist nicht mehr möglich. Es wurde nichts gespeichert.",
+      "seats_busy": "Die Anmeldungen sind gerade ausgelastet. Bitte versuchen Sie es gleich noch einmal."
     },
     "system_values": {
       "sm_status": {
         "pending": "Bestätigung ausstehend",
         "confirmed": "Bestätigt",
-        "unsubscribed": "Abgemeldet"
+        "unsubscribed": "Abgemeldet",
+        "registered": "Angemeldet",
+        "cancelled": "Storniert"
       },
       "sm_spam": {
         "links": "Zu viele Links",
         "manual": "Von Hand markiert"
       }
+    },
+    "registration": {
+      "panel": {
+        "heading": "Anmeldung",
+        "for_event": "Anmeldung für {title}",
+        "loading": "Anmeldung wird geladen ...",
+        "submit": "Anmelden",
+        "success_title": "Vielen Dank",
+        "success_pending": "Prüfen Sie Ihren Posteingang, um Ihre Anmeldung zu bestätigen.",
+        "success_registered": "Vielen Dank, Ihre Anmeldung ist eingegangen. Wir haben die Details an Ihren Posteingang geschickt.",
+        "state_full": "Diese Veranstaltung ist ausgebucht.",
+        "state_closed": "Die Anmeldung für diese Veranstaltung ist geschlossen.",
+        "state_cancelled": "Diese Veranstaltung wurde abgesagt.",
+        "state_not_open": "Die Anmeldung öffnet {time}.",
+        "state_unavailable": "Die Anmeldung für diese Veranstaltung ist nicht mehr möglich.",
+        "few_left": "Nur noch wenige Plätze frei.",
+        "seats_left": "Noch {count} Plätze frei.",
+        "seats_left_one": "Noch 1 Platz frei."
+      }
+    },
+    "form_labels": {
+      "sm_email": "E-Mail",
+      "sm_name": "Name"
+    },
+    "system_labels": {
+      "sm_status": "Anmeldestatus",
+      "sm_event_title": "Veranstaltung",
+      "sm_event_id": "Veranstaltungs-ID",
+      "sm_occurrence_key": "Terminschlüssel",
+      "sm_occurrence_start": "Termin",
+      "sm_email": "E-Mail",
+      "sm_name": "Name",
+      "sm_confirmed_at": "Bestätigt am",
+      "sm_cancelled_at": "Storniert am",
+      "sm_consent_at": "Einwilligung am"
     }
   },
   "events": {
@@ -929,6 +1010,38 @@
     },
     "detail": {
       "open_record": "Datensatz öffnen"
+    },
+    "registration": {
+      "label": "Anmeldeformular",
+      "choose": "Formular wählen ...",
+      "loading": "Anmeldeformulare werden geladen ...",
+      "load_failed": "Die Anmeldeformulare konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "switched_off": "Dieses Formular ist ausgeschaltet, daher kann sich noch niemand darüber anmelden.",
+      "no_double_opt_in": "Dieses Formular hat keinen Bestätigungsschritt: Jede Person kann Plätze belegen, ohne eine Adresse zu bestätigen, sodass eine begrenzte Zahl von Plätzen von einer einzigen Person gefüllt werden kann. Schalten Sie für dieses Formular die doppelte Bestätigung ein. Für öffentliche Anmeldungen mit begrenzten Plätzen empfehlen wir außerdem ein Captcha.",
+      "attendees": "Teilnehmerliste öffnen",
+      "create": "Anmeldeformular erstellen",
+      "creating": "Wird erstellt ...",
+      "create_failed": "Das Formular konnte nicht erstellt werden.",
+      "captcha_hint": "Begrenzte Plätze auf einem öffentlichen Formular: Wir empfehlen, in den Einstellungen ein Captcha einzuschalten, damit ein Skript das Sendelimit des Formulars nicht aufbrauchen kann."
+    },
+    "mine": {
+      "title": "Meine Anmeldungen",
+      "intro": "Die Veranstaltungen, für die Sie angemeldet sind oder die Sie noch bestätigen müssen.",
+      "empty": "Sie haben keine bevorstehenden Anmeldungen.",
+      "unverified": "Ihre E-Mail-Adresse ist noch nicht bestätigt, daher können Ihre Anmeldungen nicht angezeigt werden. Bestätigen Sie sie zuerst.",
+      "pending": "Wartet auf Ihre Bestätigung",
+      "registered": "Angemeldet",
+      "cancel": "Anmeldung stornieren",
+      "cancel_confirm": "Diese Anmeldung stornieren? Ihr Platz geht an jemand anderen.",
+      "cancel_yes": "Ja, stornieren",
+      "cancel_no": "Behalten",
+      "cancelled": "Anmeldung storniert.",
+      "cancel_failed": "Die Anmeldung konnte nicht storniert werden. Bitte versuchen Sie es erneut.",
+      "load_failed": "Ihre Anmeldungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "loading": "Wird geladen ...",
+      "gone": "Diese Veranstaltung ist nicht mehr verfügbar."
     }
   }
 }

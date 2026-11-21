@@ -25,7 +25,11 @@ from __future__ import annotations
 import copy
 from typing import Any, Final
 
-from sm_records.contracts.public_submissions import KIND_FORM, KIND_SUBSCRIPTION
+from sm_records.contracts.public_submissions import (
+    KIND_FORM,
+    KIND_REGISTRATION,
+    KIND_SUBSCRIPTION,
+)
 from sm_records.schema.types import FieldType
 
 __all__ = [
@@ -117,7 +121,37 @@ _SUBSCRIPTION: Final = (
     _field("sm_nonce", "Nonce", _T, system=INTERNAL, max_length=32),
 )
 
-_BY_KIND: Final = {KIND_FORM: _FORM, KIND_SUBSCRIPTION: _SUBSCRIPTION}
+_REGISTRATION: Final = (
+    # Not unique: one address registers for many events (and for one event's many dates).
+    _field("sm_email", "Email", FieldType.EMAIL, required=True, indexed=True),
+    _field("sm_name", "Name", _T, required=True, max_length=200),
+    _field("sm_event_id", "Event", _T, indexed=True, max_length=36),
+    _field("sm_occurrence_key", "Occurrence", _T, indexed=True, max_length=80),
+    _field("sm_occurrence_start", "Occurrence start", _DT, indexed=True),
+    _field("sm_event_title", "Event title", _T, max_length=300),
+    _field(
+        "sm_status",
+        "Status",
+        FieldType.SELECT,
+        choices=("pending", "registered", "cancelled"),
+        indexed=True,
+    ),
+    _field("sm_locale", "Language", _T, max_length=16),
+    _field("sm_source_page", "Source page", _T, max_length=300),
+    _field("sm_consent_text", "Consent text", _LONG),
+    _field("sm_consent_at", "Consent given at", _DT),
+    _field("sm_confirmed_at", "Confirmed at", _DT),
+    _field("sm_cancelled_at", "Cancelled at", _DT),
+    _field("sm_confirm_sent_at", "Confirmation sent at", _DT),
+    _field("sm_ip_hash", "IP hash", _T, max_length=64),
+    _field("sm_nonce", "Nonce", _T, system=INTERNAL, max_length=32),
+)
+
+_BY_KIND: Final = {
+    KIND_FORM: _FORM,
+    KIND_SUBSCRIPTION: _SUBSCRIPTION,
+    KIND_REGISTRATION: _REGISTRATION,
+}
 
 
 def system_fields(kind: str | None) -> list[dict[str, Any]]:

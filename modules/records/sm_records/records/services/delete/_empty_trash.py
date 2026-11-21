@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sm_records.core import events
 from sm_records.core.tenancy import bound_tenant
 from sm_records.models import RecordType, tables_for
+from sm_records.public_submissions.registration import seats
 from sm_records.records.index.query import Filter, filtered, only_trashed
 from sm_records.records.services._common import mark_written
 from sm_records.records.services._lock import lock_type
@@ -92,6 +93,12 @@ async def _purge_ids(db: AsyncSession, rtype: RecordType, ids: list[int]) -> Non
     tenant = bound_tenant()
     for start in range(0, len(ids), _CHUNK):
         batch = ids[start : start + _CHUNK]
+        if seats.is_registration(rtype):  # free what these records still hold, before they go
+            held = select(document.uuid).where(
+                document.id.in_(batch), document.tenant_id == tenant
+            )  # trashed rows: the soft-delete filter would hide exactly the ones being purged
+            held = held.execution_options(include_deleted=True)
+            await seats.on_purged(db, rtype, list((await db.execute(held)).scalars()))
         for table in tables.index_tables:
             await db.execute(sa_delete(table).where(table.record_id.in_(batch)))
         await db.execute(

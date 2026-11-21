@@ -6,6 +6,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sm_events.core import errors
+from sm_events.core import errors_registration as reg_errors
 from sm_events.core.errors import install_exception_handlers
 
 CASES = [
@@ -34,6 +35,12 @@ CASES = [
     (errors.ImportTooLarge, 413, "import_too_large"),
     (errors.IcsInvalid, 422, "ics_invalid"),
     (errors.PrivateFeedsUnavailable, 503, "private_feeds_unavailable"),
+    # PR 9: registration.
+    (reg_errors.InvalidRegistration, 422, "invalid_registration"),
+    (reg_errors.RegistrationUnavailable, 422, "registration_unavailable"),
+    (reg_errors.UnknownRegistrationTarget, 422, "unknown_registration_target"),
+    (reg_errors.RegistrationsOrphaned, 409, "registrations_orphaned"),
+    (reg_errors.RegistrationHasSeats, 409, "registration_has_seats"),
 ]
 
 EXTRA_CODES = [
@@ -149,3 +156,9 @@ async def test_reminder_codes(cls, status, code):
         response = await client.get("/x")
     assert response.status_code == status
     assert response.json() == {"detail": cls.detail, "code": code}
+
+
+def test_registration_unavailable_is_503_on_a_timeout():
+    assert reg_errors.RegistrationUnavailable().status_code == 422
+    exc = reg_errors.RegistrationUnavailable(timed_out=True)
+    assert (exc.status_code, exc.code) == (503, "registration_unavailable")

@@ -49,12 +49,13 @@ async def create_event(
     data: EventCreate,
     *,
     locales: tuple[str, ...],
+    viewer: Any = None,
     site_origin: str | None = None,
 ) -> Event:
     """A new draft at revision 1, with its texts and a ``created`` history row."""
     _check_image(data.image, None, site_origin)
     calendar = await writable_calendar(db, who, data.calendar_id)
-    return await create_core(db, calendar, data, actor=who.user_id, locales=locales)
+    return await create_core(db, calendar, data, actor=who.user_id, locales=locales, viewer=viewer)
 
 
 async def update_event(
@@ -64,6 +65,7 @@ async def update_event(
     data: EventPatch,
     *,
     locales: tuple[str, ...],
+    viewer: Any = None,
     site_origin: str | None = None,
 ) -> Event:
     """Apply a PATCH: only the fields the body set. One that changes nothing (only
@@ -74,7 +76,7 @@ async def update_event(
     if "image" in data.model_fields_set:
         _check_image(data.image, event.image, site_origin)
     try:
-        await apply_patch(db, who.user_id, event, data, locales)
+        await apply_patch(db, who.user_id, event, data, locales, viewer=viewer)
     except Unchanged:
         await db.refresh(event)  # the savepoint rolled back: the stored revision
     return event

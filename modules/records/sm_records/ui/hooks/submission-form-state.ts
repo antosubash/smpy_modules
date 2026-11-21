@@ -1,6 +1,6 @@
 import { keys } from '../utils/i18n';
 import type { FormValue, FormValues } from '../utils/submission-values';
-import type { SubmissionDefinition } from '../utils/submissions-form-api';
+import type { DefinitionResult, SubmissionDefinition } from '../utils/submissions-form-api';
 
 export type Phase = 'loading' | 'ready' | 'submitting' | 'success' | 'unavailable';
 export type Problem = { key: string; params?: Record<string, unknown> };
@@ -19,7 +19,11 @@ export const BY_CODE: Record<string, string> = {
   captcha_failed: errors.captcha_failed,
   captcha_unavailable: errors.captcha_unavailable,
   bad_origin: errors.bad_origin,
+  seats_busy: errors.seats_busy,
 };
+
+/** A registration the event no longer takes: the panel swaps to the matching state. */
+export const GONE = new Set(['registration_full', 'registration_closed', 'event_unavailable']);
 
 export type SubmissionForm = {
   phase: Phase;
@@ -46,6 +50,11 @@ export type Options = {
   /** Off in the editor with no type chosen: nothing is fetched. */
   enabled?: boolean;
   onFocus?: (target: FocusTarget) => void;
+  /** Where the definition comes from, when it is not the plain form route (a registration
+   *  asks its event and occurrence). Used for the first load and for a refetch. */
+  load?: (signal?: AbortSignal) => Promise<DefinitionResult>;
+  /** The server said the event no longer takes this registration (`registration_full`, ...). */
+  onGone?: (code: string) => void;
 };
 
 /** The extra wait past the token's minimum age, for the clock and the trip. */

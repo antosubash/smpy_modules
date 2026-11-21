@@ -27,6 +27,7 @@ from sm_events.web.endpoints.public._event_context import EventContext
 from sm_events.web.endpoints.public._jsonld import event_json_ld
 from sm_events.web.endpoints.public._listing import category_name, make_item
 from sm_events.web.endpoints.public._occurrence import ShownOccurrence, own_occurrence
+from sm_events.web.endpoints.public._registration_prop import registration_prop
 from sm_events.web.schemas.public import AlternateOut, CategoryRef, PublicListItem
 from sm_events.web.schemas.public_event import (
     CalendarLink,
@@ -201,6 +202,9 @@ def build_props(
         ),
         sub_events=_sub_items(ctx, base),
         registration_url=None if cancelled else web_url(event.registration_url),
+        registration=registration_prop(
+            event, shown=shown, series=series, cancelled=cancelled, upcoming=next_items
+        ),
         ics_url=_urls.event_ics_path(text.slug, locale),
         canonical_url=canonical,
         alternates=_alternates(origin, ctx),

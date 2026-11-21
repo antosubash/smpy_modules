@@ -175,6 +175,8 @@ export default function EventEditor(props: Props) {
               />
             }
             form={form}
+            eventId={props.event_id}
+            revision={event?.revision}
             errors={errors.fields}
             disabled={readOnly}
             categories={props.categories}

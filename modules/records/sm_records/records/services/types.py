@@ -162,6 +162,7 @@ async def create_type(
         }
     )
     config = submissions.parse(public_submissions)
+    submissions.check_available(config)
     defs, fields = await normalise_checked(
         fields_raw or [], settings, kind=(config or {}).get("kind")
     )

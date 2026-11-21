@@ -150,6 +150,16 @@ export function eventItem(overrides = {}) {
   };
 }
 
+/** The public page's `registration` prop for an event nobody can register for. */
+export const NO_REGISTRATION = {
+  mode: 'none' as const,
+  url: null,
+  provider: null,
+  target: null,
+  occurrence_key: null,
+  upcoming: [],
+};
+
 export const category = { id: 'k1', slug: 'talks', names: { en: 'Talks' }, color: null };
 
 /** An event as `GET /api/events/events/{id}` returns it. */
@@ -169,6 +179,19 @@ export function eventDetail(overrides = {}) {
     organiser: null,
     image: null,
     registration_url: null,
+    registration: {
+      mode: 'none' as const,
+      url: null,
+      provider: null,
+      target: null,
+      capacity: null,
+      opens_at_local: null,
+      closes_at_local: null,
+      show_seats: false,
+      reminder_minutes: null,
+      target_hidden: false,
+      provider_installed: null,
+    },
     extra: {},
     created_at: '2026-06-01T10:00:00Z',
     updated_at: null,

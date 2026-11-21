@@ -34,7 +34,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sm_records.contracts.public_submissions import KIND_SUBSCRIPTION
+from sm_records.contracts.public_submissions import KIND_REGISTRATION, KIND_SUBSCRIPTION
 from sm_records.core import events
 from sm_records.core.settings import RecordsSettings
 from sm_records.models import Record, RecordType
@@ -42,6 +42,8 @@ from sm_records.public_submissions import links
 from sm_records.public_submissions.address_lock import lock_addresses
 from sm_records.public_submissions.definition import EMAIL_KEY
 from sm_records.public_submissions.errors import SubmissionRefused
+from sm_records.public_submissions.registration.confirm_seat import take_seat
+from sm_records.public_submissions.registration.status import REGISTERED
 from sm_records.public_submissions.subscribe import CONFIRMED, PENDING, UNSUBSCRIBED, changed
 from sm_records.public_submissions.transition import Change, Outcome, transition
 from sm_records.records.services import records as record_service
@@ -55,13 +57,15 @@ __all__ = ["confirm", "leave", "unsubscribe"]
 _EXPIRED = "this link has expired or is no longer valid; sign up again"
 
 
-async def _subscriber(db: AsyncSession, link: links.Link) -> tuple[RecordType, Record] | None:
+async def _subscriber(
+    db: AsyncSession, link: links.Link, kinds: tuple[str, ...] = (KIND_SUBSCRIPTION,)
+) -> tuple[RecordType, Record] | None:
     """The live subscriber the link names, in the tenant it names (bound by
     the caller). Explicit ``tenant_id`` on both lookups (``get_type``,
     ``_by_uuid``)."""
     try:
         rtype = await get_type(db, link.type_key)
-        if (rtype.public_submissions or {}).get("kind") != KIND_SUBSCRIPTION:
+        if (rtype.public_submissions or {}).get("kind") not in kinds:
             return None
         return rtype, await record_service.get_record(db, rtype, link.uuid)
     except NotFound:
@@ -80,28 +84,45 @@ async def confirm(
     Decided from the row as it is when the write lands (:mod:`.transition`):
     an unsubscribe that rotated the nonce in between makes this link expired,
     and of two confirms only the one that wrote announces it."""
-    found = await _subscriber(db, link)
+    found = await _subscriber(db, link, (KIND_SUBSCRIPTION, KIND_REGISTRATION))
     if found is None or not (found[0].public_submissions or {}).get("enabled"):
         raise _expired()
     rtype, record = found
+    # A registration is *registered*, not "confirmed", and it is no newsletter subscription: its
+    # confirmation announces nothing to the newsletter's listeners.
+    registration = (rtype.public_submissions or {}).get("kind") == KIND_REGISTRATION
+    done = REGISTERED if registration else CONFIRMED
+
+    resolved_start: Any = None
 
     def derive(row: Record) -> Change | None:
         data = row.data or {}
         if row.is_deleted or not links.matches(secret, link, data.get("sm_nonce")):
             raise _expired()
-        if data.get("sm_status") == CONFIRMED:
+        if data.get("sm_status") == done:
             return None
         if data.get("sm_status") != PENDING:
             raise _expired()
-        return {"sm_status": CONFIRMED, "sm_confirmed_at": utcnow()}, None
+        change: dict[str, Any] = {"sm_status": done, "sm_confirmed_at": utcnow()}
+        if resolved_start is not None:
+            change["sm_occurrence_start"] = resolved_start  # refreshed: the event may have moved
+        return change, None
 
     try:
+        if registration:  # the seat, then ``registered``: one transaction, the global lock order
+            resolved_start = await take_seat(
+                db,
+                rtype,
+                record,
+                lambda row: links.matches(secret, link, (row.data or {}).get("sm_nonce")),
+            )
         outcome = await transition(db, rtype, record, derive, settings=settings)
     except NotFound:  # purged since the lookup, like a trashed row
         raise _expired() from None
     if not outcome.wrote:
         return "already_confirmed"
-    events.emit(db, changed(rtype, outcome.record, PENDING, CONFIRMED))
+    if not registration:
+        events.emit(db, changed(rtype, outcome.record, PENDING, CONFIRMED))
     return "confirmed"
 
 

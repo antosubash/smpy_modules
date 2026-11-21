@@ -1,6 +1,13 @@
 /** The editor's form state, and its conversion to and from the API's bodies.
  *  Times stay on the event's own wall clock (`YYYY-MM-DDTHH:MM`, or a date all
  *  day): the browser never converts to UTC or to another zone. */
+
+import {
+  blankRegistration,
+  fromRegistration,
+  type RegistrationForm,
+  toRegistration,
+} from './registration-form';
 import type {
   AttendanceMode,
   EventCreate,
@@ -38,7 +45,7 @@ export type FormState = {
   category_id: string;
   organiser: string;
   image: string;
-  registration_url: string;
+  registration: RegistrationForm;
   /** The event's type (fixed after create) and its plugin-owned `extra`. */
   type: string;
   extra: Record<string, unknown>;
@@ -77,7 +84,7 @@ export function emptyForm(timezone: string, locales: readonly string[], now?: Da
     category_id: '',
     organiser: '',
     image: '',
-    registration_url: '',
+    registration: blankRegistration(),
     type: 'event',
     extra: {},
     texts: Object.fromEntries(locales.map((locale, index) => [locale, blankText(index === 0)])),
@@ -101,7 +108,7 @@ export function toForm(event: EventDetail, locales: readonly string[]): FormStat
     category_id: event.category_id ?? '',
     organiser: event.organiser ?? '',
     image: event.image ?? '',
-    registration_url: event.registration_url ?? '',
+    registration: fromRegistration(event),
     type: event.type,
     extra: event.extra ?? {},
     texts: Object.fromEntries(
@@ -179,7 +186,6 @@ function fields(form: FormState): EventFields {
     category_id: text(form.category_id),
     organiser: text(form.organiser),
     image: text(form.image),
-    registration_url: text(form.registration_url),
   };
 }
 
@@ -200,6 +206,7 @@ export function toCreate(form: FormState, calendarId: string): EventCreate {
   for (const [locale, entry] of Object.entries(form.texts)) {
     if (entry.present) texts[locale] = textInput(entry);
   }
+  const registration = toRegistration(form.registration);
   return {
     calendar_id: calendarId,
     type: form.type,
@@ -207,6 +214,7 @@ export function toCreate(form: FormState, calendarId: string): EventCreate {
     times: times(form),
     texts,
     ...fields(form),
+    ...(registration ? { registration } : {}),
   };
 }
 
@@ -226,6 +234,11 @@ export function toPatch(base: FormState, form: FormState, revision: number): Eve
   for (const name of Object.keys(after) as (keyof EventFields)[]) {
     if (same(before[name], after[name])) continue;
     Object.assign(patch, { [name]: after[name] });
+    changed = true;
+  }
+  // Registration goes whole, and only when it changed. Switching it off sends `none`.
+  if (!form.registration.hidden && !same(base.registration, form.registration)) {
+    patch.registration = toRegistration(form.registration) ?? { mode: 'none' };
     changed = true;
   }
   // `extra` goes only when it changed: an event whose type is not installed has no section, so

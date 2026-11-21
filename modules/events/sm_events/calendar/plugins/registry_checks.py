@@ -13,6 +13,7 @@ from typing import Any, get_args
 from pydantic import BaseModel, SecretBytes, SecretStr
 
 from sm_events.calendar.plugins.extension_types import EventType
+from sm_events.calendar.plugins.registration_types import RegistrationProvider
 from sm_events.core import constants
 
 _ID = re.compile(constants.PLUGIN_ID_PATTERN)
@@ -138,3 +139,19 @@ def _check_type(etype: Any, label: str) -> None:
         raise InvalidExtension(f"{label}: public_fields {unknown} are not fields of its model")
     if etype.icon is not None and not (isinstance(etype.icon, str) and _ICON.match(etype.icon)):
         raise InvalidExtension(f"{label}: icon must match [a-z0-9-]{{1,40}} or None")
+
+
+def _check_provider(provider: Any, label: str) -> None:
+    if not isinstance(provider, RegistrationProvider):
+        raise InvalidExtension(
+            f"{label}: must be a RegistrationProvider, got {type(provider).__name__}"
+        )
+    for name in ("id", "label_key"):
+        value = getattr(provider, name)
+        if not isinstance(value, str) or not value:
+            raise InvalidExtension(f"{label}: {name} must be a non-empty str")
+    for name in ("check_target", "recipients"):
+        if not inspect.iscoroutinefunction(getattr(provider, name)):
+            raise InvalidExtension(f"{label}: {name} must be an 'async def' function")
+    if provider.can_read is not None and not inspect.iscoroutinefunction(provider.can_read):
+        raise InvalidExtension(f"{label}: can_read must be an 'async def' function")

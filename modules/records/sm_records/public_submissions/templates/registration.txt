@@ -1,0 +1,9 @@
+$intro
+
+$title
+$when$place$online
+
+$page_block$ics_block$confirm_block$cancel_label
+$cancel_link
+
+$why

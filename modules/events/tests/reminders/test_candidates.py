@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -192,9 +192,8 @@ async def test_expansion_is_window_bounded(db, monkeypatch):
         return page
 
     monkeypatch.setattr(candidates, "occurrences", spy)
-    began = time.perf_counter()
+    # No stopwatch: the spy above already proves the work per pass is bounded.
     got, deferred = await _cands(db, cap=1000)
-    assert time.perf_counter() - began < 3
     assert len(got) == 1000 and deferred == 9000
     assert [c.user_id for c in got] == sorted(c.user_id for c in got)  # a stable order
     assert len(seen) == 1 and seen[0][2] == frozenset({event.id})
@@ -243,9 +242,10 @@ async def test_impossible_rule_terminates(db):
     event.rrule = "FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=30"
     db.add(follow_row(event))
     await db.flush()
-    began = time.perf_counter()
-    assert (await _cands(db))[0] == []
-    assert time.perf_counter() - began < 1
+    # The point is that it ends at all: a rule with no dates must not be expanded forever.
+    # A stopwatch of one second failed on a loaded CI runner (1.14 s on Postgres), so the
+    # bound is a generous timeout and not a speed claim.
+    assert (await asyncio.wait_for(_cands(db), timeout=30))[0] == []
 
 
 async def test_no_follows_no_work(db, monkeypatch):

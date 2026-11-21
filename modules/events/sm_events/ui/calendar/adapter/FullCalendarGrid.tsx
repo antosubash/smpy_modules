@@ -41,6 +41,7 @@ export default function FullCalendarGrid({
   const calendar = useRef<CalendarRef>(null);
   const elements = useRef(new Map<string, HTMLElement>());
   const reportedDate = useRef(date);
+  const section = useRef<HTMLElement>(null);
 
   useImperativeHandle(ref, () => ({
     today: () => calendar.current?.getApi().today(),
@@ -106,7 +107,7 @@ export default function FullCalendarGrid({
   }
 
   return (
-    <section className="sm-ev-calendar" aria-label={ariaLabel}>
+    <section ref={section} className="sm-ev-calendar" aria-label={ariaLabel}>
       <FullCalendar
         ref={calendar}
         plugins={PLUGINS}
@@ -158,6 +159,9 @@ export default function FullCalendarGrid({
         datesSet={(info) => {
           const change = toRangeChange(info, timeZone);
           reportedDate.current = change.date;
+          // The view FullCalendar has actually drawn (not the one asked for): a stable hook for a
+          // test or a script to know the switch is done.
+          section.current?.setAttribute('data-view', change.view);
           onRangeChange(change);
         }}
       />

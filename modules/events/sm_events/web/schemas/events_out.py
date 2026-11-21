@@ -9,6 +9,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from sm_events.web.schemas.overrides import OverrideOut
+from sm_events.web.schemas.registration import RegistrationOut
 from sm_events.web.schemas.texts import TextOut
 
 
@@ -72,6 +73,7 @@ class EventOut(EventBase):
     organiser: str | None
     image: str | None
     registration_url: str | None
+    registration: RegistrationOut
     extra: dict[str, Any]
     created_at: datetime
     updated_at: datetime | None

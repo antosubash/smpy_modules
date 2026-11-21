@@ -40,7 +40,9 @@ from sm_records.core.constants import TYPE_KEY_PATTERN
 from sm_records.core.tenancy import valid_tenant
 
 __all__ = [
+    "CANCEL",
     "CONFIRM",
+    "CONFIRM_REGISTRATION_PAGE",
     "UNSUBSCRIBE",
     "Link",
     "LinkInvalid",
@@ -52,7 +54,13 @@ __all__ = [
 
 CONFIRM: Final = "confirm"
 UNSUBSCRIBE: Final = "unsubscribe"
-Action = Literal["confirm", "unsubscribe"]
+CANCEL: Final = "cancel"
+CONFIRM_REGISTRATION_PAGE: Final = "confirm-registration"
+"""The landing page of a registration's confirm link: the same signed ``confirm`` action, its own
+words (the newsletter's page says "subscription")."""
+"""A registration's cancel link: shaped like the unsubscribe link (no expiry, killed by the nonce,
+which a cancel rotates)."""
+Action = Literal["confirm", "unsubscribe", "cancel"]
 
 MAX_LINK_TOKEN: Final = 300
 _TYPE_KEY_RE: Final = re.compile(TYPE_KEY_PATTERN)
@@ -152,8 +160,13 @@ def matches(secret: str, link: Link, nonce: object) -> bool:
     return hmac.compare_digest(_mac(secret, "state", *_claims(link), nonce), link.mac)
 
 
-def url(base_url: str, action: Action, token: str, locale: str | None) -> str:
+def url(
+    base_url: str, action: Action, token: str, locale: str | None, *, page: str | None = None
+) -> str:
     """The absolute landing-page address the mail links to. ``l`` is only the
-    page's language — presentation, not a claim, so it is not signed."""
+    page's language — presentation, not a claim, so it is not signed. ``page`` names a landing
+    page with its own words for the same action (a registration's confirmation)."""
     query = {"t": token, **({"l": locale} if locale else {})}
-    return f"{base_url}{constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX}{action}?{urlencode(query)}"
+    return (
+        f"{base_url}{constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX}{page or action}?{urlencode(query)}"
+    )

@@ -64,3 +64,18 @@ async def test_a_source_can_name_why_it_failed(db):
     for bad in ("", "Has Space", "x" * 40, "ünï"):
         with pytest.raises(ValueError):
             SourceError(bad)
+
+
+async def test_the_shared_fallback_tolerates_a_session_with_no_transaction_yet(db):
+    """A fresh in-memory session has begun nothing: the fallback must not read that as the plugin
+    having opened a transaction of its own."""
+    from sm_events.calendar.plugins.plugin_isolation import run_isolated
+    from sqlalchemy import text
+
+    assert db.sync_session.get_transaction() is None
+
+    async def read(session):
+        return (await session.execute(text("SELECT 7"))).scalar_one()
+
+    assert await run_isolated(db, 1.0, read) == 7
+    assert await run_isolated(db, 1.0, read) == 7  # and again, now that one is open

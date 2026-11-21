@@ -5,6 +5,7 @@ import { EventWhen } from '../ui/public/EventWhen';
 import { LanguageSwitch } from '../ui/public/LanguageSwitch';
 import { PluginDetail } from '../ui/public/PluginDetail';
 import { PublicHead } from '../ui/public/PublicHead';
+import { RegistrationSlot } from '../ui/public/RegistrationSlot';
 import { RichText } from '../ui/public/RichText';
 import { SubEvents } from '../ui/public/SubEvents';
 import type { PublicEventProps } from '../ui/public/types';
@@ -101,8 +102,13 @@ function PublicEventPage(p: PublicEventProps) {
           locale={p.locale}
         />
         <SubEvents items={p.sub_events} locale={p.locale} />
+        {p.registration?.mode === 'builtin' ? (
+          <RegistrationSlot registration={p.registration} locale={p.locale} />
+        ) : null}
         <p className="flex flex-wrap gap-4">
-          {p.registration_url ? (
+          {p.registration?.mode === 'external' ? (
+            <RegistrationSlot registration={p.registration} locale={p.locale} />
+          ) : !p.registration && p.registration_url ? (
             <a href={p.registration_url} rel="noopener nofollow" className="font-medium underline">
               {t(copy.register)}
             </a>

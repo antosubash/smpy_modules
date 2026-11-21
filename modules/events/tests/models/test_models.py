@@ -30,6 +30,8 @@ TABLES = {
     "events_import_item",
     "events_follow",
     "events_reminder_sent",
+    "events_registration_count",
+    "events_registration_seat",
 }
 
 

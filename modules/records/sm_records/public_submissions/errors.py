@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sm_records.public_submissions.registration import codes as registration_codes
 from sm_records.records.services.errors import RecordsError
 
 __all__ = ["CODES", "SubmissionRefused"]
@@ -33,6 +34,7 @@ CODES: dict[str, int] = {
     "no_recipients": 409,
     "not_pending": 409,
     "link_expired": 410,
+    **dict.fromkeys(registration_codes.TABLE, 409),
 }
 """Every code and its status — what ``docs/api-reference.md`` lists."""
 

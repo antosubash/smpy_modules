@@ -37,9 +37,12 @@ test.beforeAll(async ({ browser }) => {
   await login(admin);
   seed = await seedBlocks(admin);
   const chosen = [{ slug: seed.community.slug }];
+  // The list names this run's calendars: on a retry this hook seeds again, and an unrestricted list
+  // would show the first run's events beside these (every title is the same).
+  const mine = [seed.community, seed.library, seed.newYork].map(({ slug }) => ({ slug }));
   both = await blockPage(
     admin,
-    [upcoming({ layout: 'cards' }), calendarBlock({ calendars: chosen })],
+    [upcoming({ layout: 'cards', calendars: mine }), calendarBlock({ calendars: chosen })],
     { german: true },
   );
   listOnly = await blockPage(admin, [upcoming({ heading: 'Next up', count: 3 })]);
@@ -166,15 +169,25 @@ test('the calendar block is read-only and shows only the chosen calendar', async
   await expect(grid.getByText(/Library programme/)).toHaveCount(0); // not a chosen calendar
   await expect(grid.getByText(seed.community.name)).toBeVisible(); // the filter names the one
   await page.getByRole('button', { name: 'List', exact: true }).click();
-  // The series starts a week or more ahead, which may be next month: step forward until it shows.
+  // Wait for the list view FullCalendar has actually drawn (the grid sets `data-view` on its datesSet):
+  // the month grid's chips stay in the DOM for a moment after the click, and a 'Writing circle'
+  // seen there is not one in the list.
+  const drawn = grid.locator('section.sm-ev-calendar');
+  await expect(drawn).toHaveAttribute('data-view', 'list');
+  const title = grid.getByTestId('calendar-title');
   const circle = grid.getByText('Writing circle').first();
-  for (let step = 0; step < 2; step++) {
-    const seen = await circle.waitFor({ state: 'visible', timeout: 3000 }).then(
-      () => true,
-      () => false,
-    );
-    if (seen) break;
+  const empty = grid.getByRole('status').filter({ hasText: 'Nothing in this range' });
+  // Each range has settled once it shows events or says it has none: never a bare wait.
+  const settled = () =>
+    expect.poll(async () => (await circle.isVisible()) || (await empty.isVisible())).toBe(true);
+  await settled();
+  // The series starts a week or more ahead, which may be next month: step forward until it shows.
+  for (let step = 0; step < 3 && !(await circle.isVisible()); step++) {
+    const before = await title.textContent();
     await grid.getByRole('button', { name: 'Next' }).click();
+    await expect(title).not.toHaveText(before ?? '');
+    await expect(drawn).toHaveAttribute('data-view', 'list');
+    await settled();
   }
   await expect(circle).toBeVisible();
   await expect(grid).not.toContainText('Poetry night');

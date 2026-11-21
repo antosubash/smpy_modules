@@ -50,7 +50,8 @@
     "event": "Event",
     "picker": "Type",
     "current": "Type: {name}",
-    "not_installed": "This event's type is not installed on this server. Its extra details are kept as they are and cannot be changed here."
+    "not_installed": "This event's type is not installed on this server. Its extra details are kept as they are and cannot be changed here.",
+    "loading_section": "Loading the event type's fields..."
   },
   "calendars": {
     "title": "Calendars",
@@ -165,7 +166,23 @@
     "not_published": "Only published events can send reminders.",
     "invalid_lead": "Choose one of the reminder times offered.",
     "reminders_unavailable": "Reminders are not available on this site right now.",
-    "reminders_no_access": "Reminders cannot be sent for this event with your current access."
+    "reminders_no_access": "Reminders cannot be sent for this event with your current access.",
+    "invalid_registration": "The registration settings are not valid.",
+    "registration_unavailable": "Registration on this site is not available right now.",
+    "unknown_registration_target": "That registration form does not exist, or you may not use it.",
+    "registrations_orphaned": "This change would remove a date that already has registrations. Move or cancel those registrations first.",
+    "registration_has_seats": "Somebody has already registered, so the registration form cannot be changed. Cancel the registrations first.",
+    "seats_busy": "The registrations are busy right now. Please try again.",
+    "registration_capacity_invalid": "Enter a whole number of seats from 1 to {max}.",
+    "registration_window_invalid": "Enter a valid date and time for when registration opens.",
+    "registration_closes_invalid": "Registration must close after it opens. Check the closing time (and the opening time).",
+    "registration_closes_before_opens": "Registration must close after it opens. Check the closing time (and the opening time).",
+    "registration_time_invalid": "Enter a valid date and time.",
+    "registration_url_required": "Enter the registration link.",
+    "registration_target_required": "Choose a registration form.",
+    "registration_provider_required": "Choose a kind of registration.",
+    "registration_reminder_invalid": "Choose one of the offered reminder times.",
+    "registration_option_not_allowed": "That setting does not apply to this way of registering."
   },
   "categories": {
     "title": "Categories",
@@ -351,7 +368,6 @@
     "organiser": "Organiser",
     "image": "Image address",
     "image_hint": "Use an image from this site's media library: its address starts with /. An image on another site does not load on the public pages.",
-    "registration_url": "Registration link",
     "cancelled": "This event is cancelled",
     "sub_events": "Sub-events",
     "is_sub_event": "This is a sub-event of another event. It cannot repeat.",
@@ -625,6 +641,7 @@
       "part_of": "Part of {title}",
       "sub_events": "Sessions",
       "register": "Register",
+      "register_pick": "Choose a date to register",
       "add_to_calendar": "Add to calendar"
     },
     "not_found": {
@@ -986,5 +1003,40 @@
       "site_default": "Use the site default",
       "help": "Suggested when someone chooses Remind me on this calendar. Nobody is followed automatically."
     }
+  },
+  "registration": {
+    "title": "Registration",
+    "mode_label": "How people register",
+    "mode_none": "No registration",
+    "mode_external": "On another site",
+    "mode_builtin": "On this site",
+    "url": "Registration link",
+    "provider": "Registration kind",
+    "capacity": "Seats",
+    "capacity_hint": "Leave empty for no limit.",
+    "opens": "Registration opens",
+    "closes": "Registration closes",
+    "window_hint": "Times on the event's own clock ({timezone}). Leave empty for no limit.",
+    "show_seats": "Show the remaining seats on the public page",
+    "reminder": "Remind registrants",
+    "reminder_none": "No reminder",
+    "no_provider": "This site has no registration form available.",
+    "hidden": "The registration form of this event is hidden from you. Its settings stay as they are.",
+    "not_installed": "The registration provider of this event is not installed on this server. Its settings are kept and cannot be changed.",
+    "counts_title": "Registrations per date",
+    "counts_loading": "Loading registrations...",
+    "counts_error": "The registrations could not be loaded.",
+    "counts_empty": "Nobody has registered yet.",
+    "counts_taken": "{taken} of {capacity}",
+    "counts_taken_open": "{taken} registered",
+    "counts_gone": "This date no longer exists on the calendar.",
+    "counts_retry": "Try again",
+    "diff": "Registration",
+    "diff_none": "None",
+    "diff_external": "Link: {url}",
+    "diff_builtin": "On this site, {capacity} seats",
+    "diff_builtin_open": "On this site, no seat limit",
+    "loading_providers": "Loading registration options...",
+    "capacity_warning": "Some dates already have more registrations than this capacity (the most: {taken} on {date}; capacity {capacity}). You can still save: nobody is removed, but no one new can register there until seats free up."
   }
 }

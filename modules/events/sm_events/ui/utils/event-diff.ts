@@ -23,7 +23,6 @@ const FIELDS: [keyof FormState, string][] = [
   ['category_id', E.category],
   ['organiser', E.organiser],
   ['image', E.image],
-  ['registration_url', E.registration_url],
 ];
 const TEXT_FIELDS: [keyof TextForm, string][] = [
   ['title', keys.events.texts.title],
@@ -52,6 +51,15 @@ function show(name: string, value: string | boolean, category: (id: string) => s
   return text.length > SHORT ? `${text.slice(0, SHORT)}…` : text;
 }
 
+/** The registration settings in a few words, for the conflict panel. */
+function registrationText(form: FormState): string {
+  const r = form.registration;
+  const copy = keys.events.registration;
+  if (r.mode === 'external') return t(copy.diff_external, { url: r.url });
+  if (r.mode !== 'builtin') return t(copy.diff_none);
+  return r.capacity ? t(copy.diff_builtin, { capacity: r.capacity }) : t(copy.diff_builtin_open);
+}
+
 export function diffForms(
   mine: FormState,
   theirs: FormState,
@@ -65,6 +73,15 @@ export function diffForms(
       label: t(name === 'end' && mine.all_day ? E.last_day : label),
       theirs: show(name, theirs[name] as string | boolean, category),
       mine: show(name, mine[name] as string | boolean, category),
+    });
+  }
+  const [wasMine, wasTheirs] = [registrationText(mine), registrationText(theirs)];
+  if (wasMine !== wasTheirs) {
+    out.push({
+      id: 'registration',
+      label: t(keys.events.registration.diff),
+      theirs: wasTheirs,
+      mine: wasMine,
     });
   }
   for (const locale of Object.keys(mine.texts)) {
