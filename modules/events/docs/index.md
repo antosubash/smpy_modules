@@ -399,19 +399,26 @@ last-write-wins; event writes use `expected_revision`.
 
 ## Status
 
-Delivered: calendars, categories, settings, the tenancy and access policy; events with texts,
-recurrence and overrides, the occurrences read, the workflow and scheduled publishing; the
-`Calendar` component and the console grid at `/admin/events/`; the public surface with calendar
-slug redirects ([Public pages](public.md), [Operating](operations.md)); private feed links and
-the `.ics` import ([Feeds](feeds.md), [Import](import.md)); the extension registry
-([Extensions](extensions.md)); the pagebuilder blocks and newsletter card
-([Blocks and cards](blocks.md)); and email reminders before events a user follows
-([Reminders](reminders.md)). Still to come:
+The module is complete: ten parts, delivered in order, each with its own guide.
 
-| PR | Delivers |
-| --- | --- |
-| 9 | Registration through records |
-| 10 | External ICS subscriptions |
+| Part | Delivers | Guide | Pull request |
+| --- | --- | --- | --- |
+| 1 | Calendars with private, internal and public visibility, sharing, categories, settings, tenancy and the access policy | this page | #413 |
+| 2 | Events with texts, recurrence and overrides, the occurrences read, the workflow, scheduled publishing, the API, the Events list and editor | this page | #414 |
+| 3 | The `Calendar` component and the console grid: views, create, drag, resize, timezone | this page | #415 |
+| 4 | The public site: pages, calendar slug redirects, `.ics` feeds, JSON-LD, sitemap | [Public pages](public.md), [Operating](operations.md) | #418 |
+| 5 | Private feed links and `.ics` import | [Feeds](feeds.md), [Import](import.md) | #420 |
+| 6 | The extension registry, the plugin guide and the records date-field source | [Writing a plugin](extensions.md) | #421 |
+| 7 | Pagebuilder blocks and the newsletter event card | [Blocks and cards](blocks.md) | #424 |
+| 8 | Reminders | [Reminders](reminders.md) | #425 |
+| 9 | Registration through records | [Registration](../../records/docs/registration.md) | #428 |
+| 10 | External ICS subscriptions: a calendar shows another calendar read-only | [Subscriptions](subscriptions.md) | #429 |
+
+## Subscriptions
+
+[External calendar subscriptions](subscriptions.md): what an external event can never do, the
+address policy and the intranet switch, how a fetch is made, refresh and backoff with every bound in
+a table the tests check, failure codes, and secrets.
 
 ## Feeds and import
 

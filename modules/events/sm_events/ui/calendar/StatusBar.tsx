@@ -44,7 +44,10 @@ export function StatusBar({
     <div className="space-y-2" data-testid="calendar-status">
       {loading ? <p role="status">{t(copy.loading)}</p> : null}
       {error ? (
-        <div role="alert" className="flex flex-wrap items-center gap-2 text-destructive">
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-2 text-destructive dark:text-red-400"
+        >
           <span>{errorText(error)}</span>
           <Button type="button" size="sm" variant="outline" onClick={onRetry}>
             {t(keys.events.common.retry)}
@@ -52,12 +55,12 @@ export function StatusBar({
         </div>
       ) : null}
       {noCalendars ? (
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground dark:text-zinc-400">
           {t(noneExist ? copy.none_yet : copy.no_calendars)} {noneExist ? action : null}
         </p>
       ) : null}
       {empty && !loading && !error && !noCalendars ? (
-        <p className="text-muted-foreground">{t(copy.empty)}</p>
+        <p className="text-muted-foreground dark:text-zinc-400">{t(copy.empty)}</p>
       ) : null}
       <SourceNotice sources={sources} labels={sourceLabels} />
       {truncated &&

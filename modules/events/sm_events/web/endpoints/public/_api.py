@@ -94,6 +94,7 @@ async def public_read(
     category_ids: frozenset[uuid.UUID] | None,
     locale: str,
     sources: frozenset[str] | None = _EVENTS_ONLY,
+    exclude_sources: frozenset[str] = frozenset(),
 ) -> OccurrencePage:
     """The occurrences read for the anonymous principal, as it comes back (event ids included:
     for the server's own use, never sent out; see :func:`public_page`).
@@ -113,6 +114,7 @@ async def public_read(
             locale=locale,
             include_unpublished=False,
             sources=sources,
+            exclude_sources=exclude_sources,
         ),
         default_locale=locales.default(),
     )
@@ -132,7 +134,12 @@ async def public_page(db: Any, **query: Any) -> OccurrencePage:
 
 
 async def occurrences_response(
-    request: Request, query: Any, db: Any, settings: EventsSettings
+    request: Request,
+    query: Any,
+    db: Any,
+    settings: EventsSettings,
+    *,
+    exclude_sources: frozenset[str] = frozenset(),
 ) -> Response:
     """The public occurrences read for a parsed query, as a cacheable JSON answer (the body of
     ``/api/occurrences`` and of the blocks' ``/api/events/public/occurrences``)."""
@@ -145,6 +152,7 @@ async def occurrences_response(
         category_ids=query.category_ids,
         locale=query.locale,
         sources=None,
+        exclude_sources=exclude_sources,
     )
     return machine_response(
         request,

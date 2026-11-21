@@ -38,11 +38,11 @@ export function UploadForm({
   }
 
   if (calendars.length === 0) {
-    return <p className="text-muted-foreground">{t(copy.no_calendars)}</p>;
+    return <p className="text-muted-foreground dark:text-zinc-400">{t(copy.no_calendars)}</p>;
   }
   return (
     <form onSubmit={submit} className="max-w-xl space-y-4">
-      <p className="text-sm text-muted-foreground">{t(copy.hint)}</p>
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.hint)}</p>
       <div className="space-y-1">
         <Label htmlFor="events-import-calendar">{t(copy.calendar)}</Label>
         <NativeSelect
@@ -70,7 +70,7 @@ export function UploadForm({
         />
       </div>
       {tooLarge && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive dark:text-red-400">
           {t(copy.too_large, { max: formatBytes(maxBytes) })}
         </p>
       )}

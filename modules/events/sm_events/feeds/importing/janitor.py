@@ -24,13 +24,22 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import all_tenants as unscoped
+from simple_module_db import mark_written
 from sqlalchemy import delete, distinct, or_, select
 
 from sm_events.core import constants
 from sm_events.core.constants import reminders_limits as limits
-from sm_events.core.tenancy import all_tenants, tenant_scope, valid_tenant
+from sm_events.core.tenancy import all_tenants, bound_tenant, tenant_scope, valid_tenant
 from sm_events.feeds.tokens.cleanup import sweep_revoked
-from sm_events.models import EventImport, EventImportItem, FeedToken, ReminderSent
+from sm_events.models import (
+    EventImport,
+    EventImportItem,
+    ExternalItem,
+    FeedToken,
+    FetchTarget,
+    ReminderSent,
+    Subscription,
+)
 from sm_events.reminders import cleanup as reminder_cleanup
 
 __all__ = ["janitor_async"]
@@ -44,7 +53,7 @@ async def _tenants(factory: Any, now: datetime) -> list[str]:
     found: set[str] = set()
     with unscoped():
         async with factory() as db:
-            for model in (EventImport, FeedToken):
+            for model in (EventImport, FeedToken, Subscription, FetchTarget):
                 stmt = all_tenants(select(distinct(model.tenant_id)))
                 found.update((await db.execute(stmt)).scalars())
             old = all_tenants(
@@ -85,8 +94,50 @@ async def _lost(db: Any, now: datetime) -> list[int]:
     return list((await db.execute(stmt)).scalars())
 
 
-async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[int], int, int]:
-    from simple_module_db import finalize_session, mark_written
+async def _purge_subscriptions(db: Any, now: datetime) -> int:
+    """Subscriptions deleted more than ``SUBSCRIPTION_DELETED_KEPT_DAYS`` ago, with their items
+    (a deleted one holds no address: it was emptied when it was deleted). Bounded per pass."""
+    subs, items = Subscription.__table__, ExternalItem.__table__
+    cutoff = now - timedelta(days=constants.SUBSCRIPTION_DELETED_KEPT_DAYS)
+    tenant = bound_tenant()  # Core: the statements carry their own predicate
+    ids = list(
+        (
+            await db.execute(
+                select(subs.c.id)
+                .where(
+                    subs.c.tenant_id == tenant,
+                    subs.c.is_deleted.is_(True),
+                    subs.c.deleted_at < cutoff,
+                )
+                .limit(constants.SUBSCRIPTION_STORE_CHUNK)
+                .execution_options(include_deleted=True)
+            )
+        ).scalars()
+    )
+    if ids:
+        await db.execute(
+            delete(items).where(items.c.tenant_id == tenant, items.c.subscription_id.in_(ids))
+        )
+        await db.execute(delete(subs).where(subs.c.tenant_id == tenant, subs.c.id.in_(ids)))
+        mark_written(db)  # Core DML: the ORM never sees it
+    return len(ids)
+
+
+async def _purge_targets(db: Any, now: datetime) -> None:
+    """Server-contact records older than an hour (nothing in them but a server and a time)."""
+    table = FetchTarget.__table__
+    await db.execute(
+        delete(table).where(
+            table.c.tenant_id == bound_tenant(),
+            table.c.last_attempt_at
+            < now - timedelta(hours=constants.SUBSCRIPTION_TARGET_KEPT_HOURS),
+        )
+    )
+    mark_written(db)  # Core DML: the ORM never sees it
+
+
+async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[int], int, int, int]:
+    from simple_module_db import finalize_session
 
     with tenant_scope(tenant):
         async with factory() as db:
@@ -94,26 +145,36 @@ async def _tenant(factory: Any, tenant: str, now: datetime) -> tuple[int, list[i
             lost = await _lost(db, now)
             tokens = await sweep_revoked(db, now=now)
             ledger = await reminder_cleanup.prune_ledger(db, now=now)
+            purged = await _purge_subscriptions(db, now)
+            await _purge_targets(db, now)
             mark_written(db)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(db)
-    return deleted, lost, tokens, ledger
+    return deleted, lost, tokens, ledger, purged
 
 
 async def janitor_async(
     factory: Any, *, now: datetime, relaunch: Callable[[str, int], None]
 ) -> dict[str, int]:
     """One pass; ``{"tenants", "deleted", "relaunched", "tokens"}``."""
-    summary = {"tenants": 0, "deleted": 0, "relaunched": 0, "tokens": 0, "ledger": 0}
+    summary = {
+        "tenants": 0,
+        "deleted": 0,
+        "relaunched": 0,
+        "tokens": 0,
+        "ledger": 0,
+        "subscriptions": 0,
+    }
     for tenant in await _tenants(factory, now):
         summary["tenants"] += 1
         try:
-            deleted, lost, tokens, ledger = await _tenant(factory, tenant, now)
+            deleted, lost, tokens, ledger, purged = await _tenant(factory, tenant, now)
         except Exception as exc:  # one tenant's failure never stops the rest
             logger.warning("events.janitor: a tenant failed (%s)", type(exc).__name__)
             continue
         summary["deleted"] += deleted
         summary["tokens"] += tokens
         summary["ledger"] += ledger
+        summary["subscriptions"] += purged
         for import_id in lost:
             try:
                 relaunch(tenant, import_id)
@@ -123,11 +184,12 @@ async def janitor_async(
                 summary["relaunched"] += 1
     logger.info(
         "events.janitor: %d tenant(s), %d import(s) deleted, %d relaunched, %d link(s) removed, "
-        "%d ledger row(s) pruned",
+        "%d ledger row(s) pruned, %d old subscription(s) purged",
         summary["tenants"],
         summary["deleted"],
         summary["relaunched"],
         summary["tokens"],
         summary["ledger"],
+        summary["subscriptions"],
     )
     return summary

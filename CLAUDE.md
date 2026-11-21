@@ -248,6 +248,21 @@ stored URL never carries credentials (`http_url`). A worker cannot re-check the 
 captured at apply expire after one hour (`rights_expired`); eager hosts re-check every slice. Log
 redaction covers the app only: redact `/feed/` in proxies and CDNs yourself.
 
+**Events subscriptions.** Fetch a subscription URL only through
+`sm_events.feeds.subscriptions.fetch` (the pinned transport, every hop re-checked, never an
+`httpx.AsyncClient`: its request log would print the URL). The URL is stored only as `enc:v2:`
+(`url_enc`, a column target of `scripts/reencrypt_secrets.py`) and shown only as `url_display`;
+nothing that leaves `fetch_feed` carries it (a failure is a code with no cause). Build a fetch
+`Policy` only through `policy.effective(setting, may_use_private=sub.may_use_private)`: the flag
+is set only from the saver's `events.manage` (`flag_after_save`), never from a body, and a public
+subscription is never fetched with it. One function (`rules.fetch_wait`) decides when a fetch may
+start; never clear an unexpired lease. The per-server spacing (3 s per tenant) is on the validated IP
+actually connected to (`target_gate`: every hop and every address tried, IPv6 by /64), never on the
+typed host; a tick's budget is shared by tenants by seconds used (`refresh.refresh_async`). External items are plain text with no description: never
+render them as HTML, never re-export them (feeds build plugin calls only), never remind or card
+them. The browser suite does not fetch (loopback is always refused): seed through
+`tests/e2e/support/seed_external.py`. Docs: `modules/events/docs/subscriptions.md`.
+
 **Events reminders are at most once.** `events.reminders` claims a row in `events_reminder_sent`
 (unique per tenant, event, occurrence, start, recipient and lead) and commits it before the send. A
 `sending` row is never reclaimed and a failed send is never retried; only an expired `claimed` row
@@ -391,7 +406,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news`, `billing`, `ai`, `images`, `newsletter`, `records` and `events` read no environment variables for their settings.** The exceptions are the stored-secret crypto's: ai, billing, newsletter and records read `SM_SECRET_KEY_PREVIOUS` (below), and ai and newsletter also fall back to `SM_SECRET_KEY`. Their settings are
+**`pagebuilder`, `news`, `billing`, `ai`, `images`, `newsletter`, `records` and `events` read no environment variables for their settings.** The exceptions are the stored-secret crypto's: ai, billing, newsletter and records read `SM_SECRET_KEY_PREVIOUS` (below), events does too, and ai, newsletter and events also fall back to `SM_SECRET_KEY`. Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -418,14 +433,16 @@ encryption, and `SM_DATABASE_URL`, only when `sm_ai.contracts.consume_requests`
 is called without a `session_factory` while billing is installed (it then opens
 its own NullPool engine on the host database, `metering._own_factory`). Images
 always passes its factory, so that fallback is for other callers.
-**Stored secrets rotate with `SM_SECRET_KEY_PREVIOUS` (#351).** ai, billing, newsletter and records
+**Stored secrets rotate with `SM_SECRET_KEY_PREVIOUS` (#351).** ai, billing, newsletter, records and events
 each keep a copy of one `core/crypto.py` (parity family "stored-secret crypto",
 `scripts/tests/parity_crypto.py`; byte vectors in `scripts/tests/test_secret_crypto_formats.py`):
 writes are `enc:v2:` (HKDF-SHA256 of the secret, info `<package>:settings`), `enc:v1:` is read until
 0.1.0, any other `enc:` is unreadable (never plaintext), and every copy decrypts with
 `SM_SECRET_KEY_PREVIOUS` too — one key or a JSON list, from the process env else the located `.env`.
-That variable is the one environment read billing and records make. Change the four copies
-together; `scripts/reencrypt_secrets.py` lists their fields in `reencrypt_support.TARGETS`. Signed
+That variable is the one environment read billing and records make. Change the five copies
+together; `scripts/reencrypt_secrets.py` lists their fields in `reencrypt_support.TARGETS` (and
+events', a column of every tenant's rows, in `COLUMN_TARGETS`: the subscription address is
+sealed in `events_subscription.url_enc`, the one stored secret that is not a setting). Signed
 things (sessions, newsletter and records links, form tokens, image tickets) are not covered:
 `docs/secret-key-rotation.md`.
 **Records' `public_submissions_captcha_secret` is never stored in the clear (#350).** It is a

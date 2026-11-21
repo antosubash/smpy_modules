@@ -96,7 +96,9 @@ export function RegistrationSection({
         {...invalidProps(id, errors[path])}
         onChange={(e) => set({ [field]: e.target.value }, path)}
       />
-      {extra.hint ? <p className="text-xs text-muted-foreground">{extra.hint}</p> : null}
+      {extra.hint ? (
+        <p className="text-xs text-muted-foreground dark:text-zinc-400">{extra.hint}</p>
+      ) : null}
       <FieldError id={fieldErrorId(id)}>{errors[path]}</FieldError>
     </div>
   );
@@ -129,11 +131,13 @@ export function RegistrationSection({
               </label>
             ))}
             {loading && !canBuiltin ? (
-              <p role="status" className="text-xs text-muted-foreground">
+              <p role="status" className="text-xs text-muted-foreground dark:text-zinc-400">
                 {t(copy.loading_providers)}
               </p>
             ) : !canBuiltin ? (
-              <p className="text-xs text-muted-foreground">{t(copy.no_provider)}</p>
+              <p className="text-xs text-muted-foreground dark:text-zinc-400">
+                {t(copy.no_provider)}
+              </p>
             ) : null}
           </div>
           {value.mode === 'external'
@@ -205,7 +209,7 @@ export function RegistrationSection({
                   },
                 )}
               </div>
-              <p className="-mt-2 text-xs text-muted-foreground">
+              <p className="-mt-2 text-xs text-muted-foreground dark:text-zinc-400">
                 {t(copy.window_hint, { timezone })}
               </p>
               <div className="flex items-center gap-2">

@@ -32,7 +32,7 @@ export function ConflictPanel({
       className="grid gap-3 rounded-md border border-destructive p-4"
       aria-label={t(copy.title)}
     >
-      <h3 role="alert" className="font-medium text-destructive">
+      <h3 role="alert" className="font-medium text-destructive dark:text-red-400">
         {t(copy.title)}
       </h3>
       <p className="text-sm">{t(copy.description)}</p>

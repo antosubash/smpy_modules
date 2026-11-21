@@ -4,9 +4,13 @@ Owned calendars with private, internal or public visibility, calendar sharing,
 multilingual categories, and events for SimpleModule hosts. Events have texts in
 each content language, one-off, all-day and recurring schedules, overrides for
 single occurrences, a review and publishing workflow, and a bounded occurrences
-read, a console calendar, a public site (pages, ICS feeds, JSON-LD, a sitemap), private feed links,
-an `.ics` import, a plugin registry, pagebuilder blocks, a newsletter event card and email reminders
-before the events a user follows. See the [guide](docs/index.md), [public pages](docs/public.md), [blocks and cards](docs/blocks.md), [reminders](docs/reminders.md), [operating](docs/operations.md) and the
+read, a console calendar, a public site (pages, ICS feeds, JSON-LD and a sitemap), private feed
+links and `.ics` import, pagebuilder blocks, reminders, registration through records and read-only
+subscriptions to external calendars. The module is complete (ten parts). See the
+[guide](docs/index.md), [public pages](docs/public.md), [feeds](docs/feeds.md),
+[import](docs/import.md), [blocks and cards](docs/blocks.md), [reminders](docs/reminders.md),
+[registration](../records/docs/registration.md), [subscriptions](docs/subscriptions.md),
+[operating](docs/operations.md) and the
 [approved design](../../docs/superpowers/specs/2026-11-17-events-module-design.md).
 
 ## Install
@@ -209,3 +213,19 @@ identical 404. See [Public pages](docs/public.md).
 A private subscription link per user and calendar (`/events/feed/<token>.ics`, shown once,
 revocable) and an `.ics` import screen (`/admin/events/import`). See
 [Private feed links](docs/feeds.md) and [Importing an .ics file](docs/import.md).
+
+## Subscriptions
+
+A calendar's owner (or an events manager) can subscribe it to an external `.ics` address in the
+Subscriptions dialog on the Calendars screen. The external events show on that calendar, marked
+**External**, read-only and as plain text; they are never re-published in this site's feeds,
+reminders or newsletter cards, and reach the public grid only when the subscription is marked
+public by someone with `events.publish`. The address is stored encrypted and shown only as
+`https://host/…`; it is fetched by a worker through a pinned, size- and time-bounded client that
+checks every resolved address and every redirect.
+
+Two settings (Settings screen, never the environment): `subscription_refresh_minutes` (default 60,
+kept between 15 and 1,440) and `allow_private_subscription_urls` (off; it lets a subscription saved
+by someone with `events.manage` use private ranges, plain `http` and any port, never loopback,
+link-local or metadata addresses: trusted networks only). Refreshing needs beat and a worker on
+the `events` queue (`events.refresh_subscriptions`). See [the guide](docs/subscriptions.md).

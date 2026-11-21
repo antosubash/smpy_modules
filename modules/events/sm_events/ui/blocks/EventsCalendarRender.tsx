@@ -84,7 +84,10 @@ function Inner(props: EventsCalendarProps & WithPuck) {
         ? t(copy.editor_hint.unresolved, { count: missing })
         : null;
     return editing && hint ? (
-      <p className="container mx-auto px-4 py-2 text-sm text-muted-foreground" data-editor-only="">
+      <p
+        className="container mx-auto px-4 py-2 text-sm text-muted-foreground dark:text-zinc-400"
+        data-editor-only=""
+      >
         {hint}
       </p>
     ) : (

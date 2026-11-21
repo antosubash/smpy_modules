@@ -66,3 +66,28 @@ class EventsSettings(DbBackedSettings):
     """How long before an event "Remind me" suggests being reminded, in minutes. Only 15, 60,
     1440 (a day) and 10080 (a week) are used; a calendar can have its own suggestion. Nobody is
     followed automatically."""
+
+    subscription_refresh_minutes: int = 60
+    """How often a subscribed calendar is fetched again, in minutes, unless a subscription sets
+    its own. Read where it is used and kept between 15 and 1440, whatever is stored here."""
+
+    allow_private_subscription_urls: bool = Field(
+        default=False,
+        json_schema_extra={
+            # A group heading is the one thing the settings screen always shows next to a field:
+            # a boolean's own description is hidden while a stored value overrides it.
+            "group": (
+                "Warning: with the switch below on, managers can make this server request "
+                "internal addresses (see the subscriptions guide)"
+            )
+        },
+    )
+    """Lets a subscription use an address on this site's own network (private ranges such as
+    10.x or 192.168.x, plain ``http://`` and any port). Never lets one reach this server's
+    loopback, link-local or cloud-metadata addresses. WARNING: with this on, anyone who may
+    subscribe a calendar and holds ``events.manage`` can make the server send GET requests to
+    internal http(s) addresses (including services on this server's own private address). What
+    they can learn is whether something reachable there answers with a calendar: a failure is
+    shown only as "unreachable" or "not a calendar", never as a port, TLS or status detail. A
+    system setting: only someone with
+    ``settings.edit`` changes it, never a calendar owner."""

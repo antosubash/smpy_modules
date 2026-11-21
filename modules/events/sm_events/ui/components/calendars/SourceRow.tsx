@@ -82,7 +82,9 @@ export function SourceRow({
             <Badge variant="outline" data-testid="source-public">
               {t(copy.public)}
             </Badge>
-            <span className="text-xs text-muted-foreground">{t(copy.public_hint)}</span>
+            <span className="text-xs text-muted-foreground dark:text-zinc-400">
+              {t(copy.public_hint)}
+            </span>
           </>
         ) : null}
       </div>
@@ -131,7 +133,9 @@ export function KeptSourceRow({ id, onRemove }: { id: string; onRemove: () => vo
           onConfirm={async () => onRemove()}
         />
       </div>
-      <p className="text-sm text-muted-foreground">{t(copy.not_installed_hint)}</p>
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">
+        {t(copy.not_installed_hint)}
+      </p>
     </li>
   );
 }

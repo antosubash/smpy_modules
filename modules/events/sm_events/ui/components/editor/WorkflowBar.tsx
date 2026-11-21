@@ -64,7 +64,7 @@ export function WorkflowBar({
       </Badge>
       {event.cancelled && <Badge variant="destructive">{t(keys.events.list.cancelled)}</Badge>}
       {event.scheduled && event.publish_at && (
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground dark:text-zinc-400">
           {t(copy.scheduled_for, { when: formatInstant(event.publish_at, event.timezone, locale) })}
         </span>
       )}
@@ -93,7 +93,9 @@ export function WorkflowBar({
         })}
       </span>
       {dirty && actions.length > 0 && (
-        <p className="basis-full text-sm text-muted-foreground">{t(copy.save_first)}</p>
+        <p className="basis-full text-sm text-muted-foreground dark:text-zinc-400">
+          {t(copy.save_first)}
+        </p>
       )}
     </section>
   );

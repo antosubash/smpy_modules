@@ -32,7 +32,9 @@ export function OrphanDialog({
       <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>{t(copy.orphan_title)}</AlertDialogTitle>
-          <AlertDialogDescription>{t(copy.orphan_description)}</AlertDialogDescription>
+          <AlertDialogDescription className="dark:text-zinc-400">
+            {t(copy.orphan_description)}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <ul className="list-disc space-y-1 pl-6 text-sm">
           {orphans?.map((o) => (

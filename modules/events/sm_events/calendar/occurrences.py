@@ -27,6 +27,7 @@ from sm_events.calendar.sources import TRUNCATED, ReadContext, sort_key
 from sm_events.calendar.times import supported_instant
 from sm_events.core import constants
 from sm_events.core.errors import InvalidRange
+from sm_events.feeds.subscriptions.source import SUBSCRIPTIONS_SOURCE
 
 __all__ = ["occurrences"]
 
@@ -113,6 +114,7 @@ async def occurrences(
     streams: list[AsyncIterator[Occurrence]] = []
     if filters.sources is None or constants.SOURCE_EVENTS in filters.sources:
         streams.append(registry.builtin_source().occurrences(db, ctx, start, end, filters))
+    streams.append(SUBSCRIPTIONS_SOURCE.occurrences(db, ctx, start, end, filters))
     streams.append(_stream(ran.items))
     merged = _merge(streams)
     items: list[Occurrence] = []

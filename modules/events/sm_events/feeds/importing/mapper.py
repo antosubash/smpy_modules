@@ -126,6 +126,7 @@ def _event(
         attendance_mode="online" if online else "in_person",
         venue_name=None if online else venue(location),
         online_url=online,
+        url=http_url(url.value) if url else None,
         latitude=lat,
         longitude=lon,
         category_id=category,

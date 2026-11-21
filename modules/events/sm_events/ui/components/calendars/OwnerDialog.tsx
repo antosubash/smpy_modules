@@ -76,7 +76,9 @@ export function OwnerDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{t(copy.transfer)}</DialogTitle>
-          <DialogDescription>{t(copy.transfer_description)}</DialogDescription>
+          <DialogDescription className="dark:text-zinc-400">
+            {t(copy.transfer_description)}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={save} noValidate className="grid gap-4">
           <Label htmlFor="owner-search">{t(keys.events.share.search_label)}</Label>
@@ -98,7 +100,9 @@ export function OwnerDialog({
                 <li key={candidate.id} className="flex items-center justify-between gap-2 py-2">
                   <span>
                     <Name>{candidate.display_name}</Name>
-                    <span className="block text-muted-foreground">{candidate.email}</span>
+                    <span className="block text-muted-foreground dark:text-zinc-400">
+                      {candidate.email}
+                    </span>
                   </span>
                   <Button
                     type="button"
@@ -114,7 +118,7 @@ export function OwnerDialog({
           )}
           {selected && <p>{withName(t, copy.selected_owner, selected.display_name)}</p>}
           {(error || search.error) && (
-            <p role="alert" className="text-destructive">
+            <p role="alert" className="text-destructive dark:text-red-400">
               {error ?? search.error}
             </p>
           )}

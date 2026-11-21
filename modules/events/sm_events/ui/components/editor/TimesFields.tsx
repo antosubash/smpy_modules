@@ -88,7 +88,7 @@ export function TimesFields({
             <option key={zone} value={zone} />
           ))}
         </datalist>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">
           {offset
             ? t(copy.clock_note, { timezone: form.timezone, offset })
             : t(copy.clock_note_plain, { timezone: form.timezone })}

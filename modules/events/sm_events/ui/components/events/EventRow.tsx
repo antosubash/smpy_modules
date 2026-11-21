@@ -147,9 +147,11 @@ export function EventRow({
       </TableCell>
       <TableCell>
         <div>{when(event, locale)}</div>
-        {event.all_day && <div className="text-xs text-muted-foreground">{t(copy.all_day)}</div>}
+        {event.all_day && (
+          <div className="text-xs text-muted-foreground dark:text-zinc-400">{t(copy.all_day)}</div>
+        )}
         {event.timezone !== browserZone() && (
-          <div className="text-xs text-muted-foreground">{event.timezone}</div>
+          <div className="text-xs text-muted-foreground dark:text-zinc-400">{event.timezone}</div>
         )}
       </TableCell>
       <TableCell>
@@ -160,7 +162,7 @@ export function EventRow({
           {event.cancelled && <Badge variant="destructive">{t(copy.cancelled)}</Badge>}
         </div>
         {event.scheduled && event.publish_at && (
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground dark:text-zinc-400">
             {t(copy.scheduled_for, {
               when: formatInstant(event.publish_at, event.timezone, locale),
             })}
@@ -204,7 +206,7 @@ export function EventRow({
             ))}
         </div>
         {error && (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {error}
           </p>
         )}

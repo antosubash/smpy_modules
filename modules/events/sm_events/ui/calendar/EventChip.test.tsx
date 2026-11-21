@@ -46,3 +46,14 @@ it('keeps the time first in a long block, a month cell and an all-day chip', asy
   expect(await texts({ occurrence: long })).toEqual(['time', 'title']);
   expect(await texts({ occurrence: { ...base }, view: 'month' })).toEqual(['time', 'title']);
 });
+
+it('clips a very long title with an ellipsis at three lines, breaking inside the word', async () => {
+  const long = { ...base, title: 'W'.repeat(400), end: '2026-03-23T11:00:00Z' };
+  const view = await mount(
+    <EventChip view="day" timeText="10:00 AM" Default={EventChip} occurrence={long} />,
+  );
+  const title = view.host.querySelector('[data-ev-title]') as HTMLElement;
+  expect(title.className).toContain('line-clamp-3');
+  expect(title.className).toContain('[overflow-wrap:anywhere]');
+  await view.unmount();
+});

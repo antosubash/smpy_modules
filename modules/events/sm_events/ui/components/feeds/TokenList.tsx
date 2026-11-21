@@ -23,7 +23,7 @@ export function TokenList({
   const day = (iso: string) => formatDay(iso, locale);
   if (tokens.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">
         {t(everyone ? copy.none_everyone : copy.none)}
       </p>
     );

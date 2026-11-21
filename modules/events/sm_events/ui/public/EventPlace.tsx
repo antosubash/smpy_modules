@@ -17,7 +17,7 @@ export function EventPlace({ place }: { place: Place }) {
         {t(copy.place)}
       </h2>
       {place.mode === 'online' || place.mode === 'hybrid' ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">
           {t(place.mode === 'online' ? copy.online : copy.hybrid)}
         </p>
       ) : null}

@@ -1,8 +1,8 @@
-"""The stored-secret formats, pinned by value across the four copies (#351, #350).
+"""The stored-secret formats, pinned by value across the five copies (#351, #350).
 
 ``parity_crypto.py`` pins that the copies are one design; this pins the bytes:
 a known secret derives a known ``enc:v2:`` key per module (RFC 5869 HKDF-SHA256,
-no salt, ``info = <package>:settings``), the four keys differ from each other
+no salt, ``info = <package>:settings``), the five keys differ from each other
 and from the 0.0.15 ``enc:v1:`` key, and each copy still opens a ``v1`` token
 made the 0.0.15 way. A change here strands every stored secret.
 """
@@ -17,6 +17,7 @@ import pytest
 from cryptography.fernet import Fernet
 from sm_ai.core import crypto as ai_crypto
 from sm_billing.core import crypto as billing_crypto
+from sm_events.core import crypto as events_crypto
 from sm_newsletter.core import crypto as newsletter_crypto
 from sm_records.core import crypto as records_crypto
 
@@ -28,6 +29,7 @@ V2_KEYS = {
     billing_crypto: "jyW-hNbxkQSmj-bydTrm4H16M1RJp3qx3C7DIKNIyBs=",
     newsletter_crypto: "AsZ9KyOIPI705H9TmiCwXEv4K1TZOJjmjSrbx0tV7r0=",
     records_crypto: "GoG28-KcF8RMX3djVR8r8wd97TD1MyWw4KFrqLOEoFg=",
+    events_crypto: "DLqLL-3pTseoN3xojfNR3jpEWsSRLXctHFu8SJyJ1Kk=",
 }
 V1_KEY = "Sj9vsKUhF1xNVvEk7w0eDWmR2wqDLx5Z7kw0EvtfwbY="
 MODULES = list(V2_KEYS)
@@ -113,3 +115,18 @@ def test_a_malformed_previous_fails_a_value_that_needs_it(module, monkeypatch):
         module.decrypt_value(old, "field")
     assert "SM_SECRET_KEY_PREVIOUS" in str(exc.value)
     assert "leaky-old-key" not in str(exc.value)
+
+
+def test_events_derives_with_its_own_info():
+    """The fifth copy: HKDF-SHA256, no salt, ``info = b"sm_events:settings"``."""
+    assert events_crypto._INFO == b"sm_events:settings"
+    assert events_crypto._v2_key(SECRET).decode() == V2_KEYS[events_crypto]
+
+
+def test_events_unreadable_error_carries_nothing():
+    from sm_events.core.errors_subscriptions import SecretUnreadable
+
+    stored = ai_crypto.encrypt_value("https://cal.example/private-TOKEN")
+    with pytest.raises(SecretUnreadable) as exc:
+        events_crypto.decrypt_value(stored, "url")
+    assert "TOKEN" not in str(exc.value) + repr(exc.value)

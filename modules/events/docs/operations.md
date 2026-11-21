@@ -57,9 +57,45 @@ included, to `/setup`.
 
 ## Extra checks
 
-`host/tests/test_events_wiring.py` boots the real host and checks the routes, the anonymous
+`host/tests/test_events_wiring.py` checks the mounted pages, menu and tables, and
+`host/tests/test_events_booted.py` boots the real host and checks the routes, the anonymous
 exemption (`GET`/`HEAD` only), the rate limits and the 304. `tests/web/public/test_leaks*.py` is the
 leak harness: every public route is in its table, and a route that is not fails a test.
+
+## Subscriptions to external calendars (beat and worker)
+
+Subscriptions are refreshed in the background, so a host needs the same pieces as the reminders:
+a **beat** (`make beat`) that runs `events.refresh_subscriptions` every minute, and a **worker**
+on the `events` queue (`make worker`; one with `SM_SECRET_KEY` or the stored key, because the
+address is stored encrypted). Without a beat nothing refreshes on a schedule: a subscription is
+fetched only when someone adds it or presses Refresh, and only where tasks run inline
+(`SM_BG_TASKS_TASK_ALWAYS_EAGER`). Without a worker the due subscriptions stay "Waiting". With a
+worker that has no key, nothing is fetched and nothing is recorded against the feeds. Nothing in
+the application can tell whether the beat is running; the Subscriptions dialog shows a feed's
+"Next update" time, which stops moving when it is not.
+
+## Subscriptions to internal calendars
+
+`allow_private_subscription_urls` (off by default) is a system setting: only someone with
+`settings.edit` changes it, never a calendar owner. With it on, a holder of `events.manage` can
+subscribe a calendar to `http(s)` addresses in 10/8, 172.16/12, 192.168/16, 100.64/10, 198.18/15
+and fc00::/7, on any port. That means the server will send GET requests to internal services,
+including services bound to this server's own private address, and the subscriber learns whether
+the answer parsed as a calendar. Loopback, link-local, multicast and the cloud metadata and
+control endpoints (169.254.0.0/16, 100.100.100.200, 168.63.129.16, 192.0.0.192, fd00:ec2::/32 and
+every IPv6 form embedding one) are refused whatever the setting says. The user-visible failure
+codes are the same closed set either way. Turn it on only if an intranet calendar server needs it.
+
+Who may use an internal address is stored per subscription (`may_use_private`): it is set when the
+address is saved, from the saver's `events.manage`, and cleared when someone without it changes
+the address; it is never taken from a request. The worker applies it at every fetch and every
+redirect hop together with the setting above, and the setting being off always wins. If the saver
+later loses `events.manage` the flag stays until the address is edited; the Subscriptions dialog tells
+holders of `events.manage`, and only them, which subscriptions may use internal addresses (the API
+field `may_use_internal_addresses` is `false` for everyone else).
+
+The list of refused addresses is best-effort (providers add endpoints; a unique-local address that
+embeds a metadata IPv4 is refused too). Turn the switch on only for trusted networks.
 
 ## Reminders
 

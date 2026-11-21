@@ -23,6 +23,9 @@ type Props = {
   content_locales?: string[];
   /** Where the public feeds live (`/events`). */
   public_prefix?: string;
+  /** Whether the caller holds `events.publish`. */
+  can_publish?: boolean;
+  subscription_defaults?: { refresh_minutes: number };
 };
 export default function Calendars({
   can_create,
@@ -31,6 +34,8 @@ export default function Calendars({
   default_timezone,
   content_locales,
   public_prefix,
+  can_publish,
+  subscription_defaults,
 }: Props) {
   const { t } = useT();
   const copy = keys.events.calendars;
@@ -93,6 +98,8 @@ export default function Calendars({
                     onSaved={list.reload}
                     contentLocales={content_locales}
                     publicPrefix={public_prefix}
+                    canPublish={can_publish}
+                    defaultRefreshMinutes={subscription_defaults?.refresh_minutes}
                   />
                 ))}
               </TableBody>

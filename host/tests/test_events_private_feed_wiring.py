@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from test_events_wiring import booted_host  # noqa: F401 - the shared fixture
+from test_events_booted import booted_host  # noqa: F401 - the shared fixture
 
 TOKEN = f"evf_{'0' * 43}"
 

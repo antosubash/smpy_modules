@@ -32,6 +32,9 @@ class MappedEvent(BaseModel):
     attendance_mode: str
     venue_name: str | None
     online_url: str | None
+    url: str | None = None
+    """The VEVENT's own ``URL`` when it is a web address (subscriptions link to it; the import
+    ignores it: its description already carries the link)."""
     latitude: float | None
     longitude: float | None
     category_id: uuid.UUID | None

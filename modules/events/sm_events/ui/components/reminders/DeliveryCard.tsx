@@ -29,7 +29,7 @@ export function DeliveryCard({ settingsUrl }: { settingsUrl: string }) {
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         {error ? (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {error}
           </p>
         ) : null}
@@ -57,7 +57,7 @@ export function DeliveryCard({ settingsUrl }: { settingsUrl: string }) {
               ))}
               <li>{t(copy.unfinished, { count: data.counts.unfinished })}</li>
             </ul>
-            <p className="text-muted-foreground">{t(copy.unfinished_note)}</p>
+            <p className="text-muted-foreground dark:text-zinc-400">{t(copy.unfinished_note)}</p>
           </>
         ) : null}
       </CardContent>

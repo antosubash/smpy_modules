@@ -2,7 +2,9 @@
 
 Kept apart from the command so the decisions can be tested without a database:
 which settings rows hold an encrypted secret, which copy of the stored-secret
-crypto owns each, and what each row needs.
+crypto owns each, and what each row needs. A secret is either a settings row
+(``TARGETS``) or a column of a module's own table (``COLUMN_TARGETS``: events'
+subscription addresses, which exist per row and per tenant).
 
 The targets are listed here rather than read from the installed modules, so a
 row left behind by a module that is no longer installed is still found (and
@@ -27,6 +29,12 @@ TARGETS: Final[dict[str, tuple[str, ...]]] = {
 }
 """``package → fields`` stored as ``enc:``. Every scope is scanned, because the
 settings table allows one; in practice they are SYSTEM rows."""
+
+COLUMN_TARGETS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
+    "sm_events": (("events_subscription", "url_enc"),),
+}
+"""``package → (table, column)`` pairs that hold an ``enc:`` value, one per row and tenant.
+A deleted subscription's column is empty, which is nothing to rewrite."""
 
 # Outcomes. The first two need nothing; the next three are rewritten; the last
 # two stop the whole run.
@@ -66,10 +74,32 @@ class Row:
 
 
 @dataclass(frozen=True)
+class ColumnRow:
+    """One sealed value in a module's own table (never printed: only where it is)."""
+
+    package: str
+    table: str
+    column: str
+    tenant_id: str
+    row_id: object
+    """As the database returns it (a UUID on Postgres, text on SQLite): compared back as it is."""
+    value: str
+
+    def where(self) -> str:
+        """How the row is named in output: the table, the tenant and the id, never the value."""
+        return f"{self.table}.{self.column} (tenant {self.tenant_id}, id {self.row_id})"
+
+
+@dataclass(frozen=True)
 class Plan:
-    row: Row
+    row: Row | ColumnRow
     outcome: str
     new_value: str | None = None  # the encoded column value to write
+
+
+def packages() -> list[str]:
+    """Every package that owns a secret, settings row or column."""
+    return list(dict.fromkeys([*TARGETS, *COLUMN_TARGETS]))
 
 
 def target_keys() -> list[str]:
@@ -89,7 +119,7 @@ def crypto_for(package: str) -> ModuleType | None:
 
 def install_secret(secret: str) -> None:
     """Make every installed copy encrypt under ``secret`` (the app's key)."""
-    for package in TARGETS:
+    for package in packages():
         crypto = crypto_for(package)
         if crypto is not None:
             crypto.set_secret_provider(lambda: secret)
@@ -97,7 +127,7 @@ def install_secret(secret: str) -> None:
 
 def _installed_copies():
     """Every installed package's crypto copy."""
-    for package in TARGETS:
+    for package in packages():
         crypto = crypto_for(package)
         if crypto is not None:
             yield crypto
@@ -143,6 +173,27 @@ def _encode(row: Row, value: str) -> str:
     return json.dumps(value) if row.value_type == "json" else value
 
 
+def _outcome(
+    crypto: ModuleType, stored: str, field: str, *, seal_plaintext: bool
+) -> tuple[str, str | None]:
+    """``(outcome, new stored string)`` for one non-empty stored value."""
+    if not crypto.is_encrypted(stored) and not seal_plaintext:
+        return PLAINTEXT_KEPT, None
+    try:
+        new = crypto.reencrypt_value(stored, field)
+    except RuntimeError:
+        raise  # no secret, or an unreadable SM_SECRET_KEY_PREVIOUS: stop the run
+    except Exception:  # each copy raises its own unreadable error
+        return UNREADABLE, None
+    if new is None:
+        return CURRENT, None
+    if stored.startswith(crypto.ENC_V2):
+        return ROTATE, new
+    if stored.startswith(crypto.ENC_V1):
+        return UPGRADE, new
+    return SEAL, new
+
+
 def plan_row(row: Row, *, seal_plaintext: bool = True) -> Plan:
     """What ``row`` needs. Never raises for a bad value; the plan says so."""
     crypto = crypto_for(row.package)
@@ -153,23 +204,19 @@ def plan_row(row: Row, *, seal_plaintext: bool = True) -> Plan:
         return Plan(row, UNREADABLE)
     if not stored:
         return Plan(row, EMPTY)
-    if not crypto.is_encrypted(stored) and not seal_plaintext:
-        return Plan(row, PLAINTEXT_KEPT)
-    try:
-        new = crypto.reencrypt_value(stored, row.field)
-    except RuntimeError:
-        raise  # no secret, or an unreadable SM_SECRET_KEY_PREVIOUS: stop the run
-    except Exception:  # each copy raises its own unreadable error
-        return Plan(row, UNREADABLE)
-    if new is None:
-        return Plan(row, CURRENT)
-    if stored.startswith(crypto.ENC_V2):
-        outcome = ROTATE
-    elif stored.startswith(crypto.ENC_V1):
-        outcome = UPGRADE
-    else:
-        outcome = SEAL
-    return Plan(row, outcome, _encode(row, new))
+    outcome, new = _outcome(crypto, stored, row.field, seal_plaintext=seal_plaintext)
+    return Plan(row, outcome, None if new is None else _encode(row, new))
+
+
+def plan_column_row(row: ColumnRow, *, seal_plaintext: bool = True) -> Plan:
+    """What one sealed column value needs. An empty one (a deleted row) needs nothing."""
+    crypto = crypto_for(row.package)
+    if crypto is None:
+        return Plan(row, NOT_INSTALLED)
+    if not row.value:
+        return Plan(row, EMPTY)
+    outcome, new = _outcome(crypto, row.value, row.column, seal_plaintext=seal_plaintext)
+    return Plan(row, outcome, new)
 
 
 def looks_encrypted(value: str) -> bool:

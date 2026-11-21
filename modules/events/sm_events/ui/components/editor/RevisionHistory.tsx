@@ -115,7 +115,7 @@ function HistoryList({
   return (
     <div className="grid gap-3 overflow-y-auto px-4 pb-4">
       {error && (
-        <p role="alert" className="text-destructive">
+        <p role="alert" className="text-destructive dark:text-red-400">
           {error}
         </p>
       )}
@@ -137,7 +137,7 @@ function HistoryList({
                 {t(copy.view)}
               </Button>
             </div>
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground dark:text-zinc-400">
               {row.is_self ? (
                 t(copy.actor_you)
               ) : row.actor_name ? (
@@ -159,7 +159,7 @@ function HistoryList({
         ))}
       </ol>
       {detailError && (
-        <p role="alert" className="text-destructive">
+        <p role="alert" className="text-destructive dark:text-red-400">
           {detailError}
         </p>
       )}

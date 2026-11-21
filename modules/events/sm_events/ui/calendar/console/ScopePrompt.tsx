@@ -42,7 +42,7 @@ export function ScopePrompt({ occurrence, onChoose, onClosed }: Props) {
       >
         <AlertDialogHeader>
           <AlertDialogTitle>{t(copy.title)}</AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription className="dark:text-zinc-400">
             {withName(t, copy.description, shown?.title ?? '')}
           </AlertDialogDescription>
         </AlertDialogHeader>

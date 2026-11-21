@@ -3200,8 +3200,13 @@ name = "simple-module-events"
 version = "0.0.15"
 source = { editable = "modules/events" }
 dependencies = [
+    { name = "anyio" },
     { name = "babel" },
+    { name = "cryptography" },
+    { name = "httpcore" },
+    { name = "httpx" },
     { name = "icalendar" },
+    { name = "idna" },
     { name = "jinja2" },
     { name = "pydantic-settings" },
     { name = "python-dateutil" },
@@ -3226,8 +3231,13 @@ pagebuilder = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4,<5" },
     { name = "babel", specifier = ">=2.12,<3" },
+    { name = "cryptography", specifier = ">=42" },
+    { name = "httpcore", specifier = ">=1,<2" },
+    { name = "httpx", specifier = ">=0.27,<1" },
     { name = "icalendar", specifier = ">=7,<8" },
+    { name = "idna", specifier = ">=3,<4" },
     { name = "jinja2", specifier = ">=3.1,<4" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },

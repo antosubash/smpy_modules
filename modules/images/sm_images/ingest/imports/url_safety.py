@@ -174,10 +174,8 @@ def resolve_public(
     for info in infos:
         ip = _parse_ip(str(info[4][0]))
         if not is_public_address(ip):
-            logger.warning(
-                "Blocked fetch of a non-public address",
-                extra={"host": host, "resolved_ip": str(ip)},
-            )
+            # Neither the name (a provider may put a token in a subdomain) nor the address.
+            logger.warning("Blocked fetch of a non-public address")
             raise UnsafeURLError("non_public_address")
         if str(ip) not in ips:
             ips.append(str(ip))

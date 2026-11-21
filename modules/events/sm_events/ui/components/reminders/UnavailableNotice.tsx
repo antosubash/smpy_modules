@@ -22,7 +22,7 @@ export function UnavailableNotice() {
     <p
       role="status"
       data-testid="reminders-unavailable"
-      className="rounded-md border p-3 text-sm text-muted-foreground"
+      className="rounded-md border p-3 text-sm text-muted-foreground dark:text-zinc-400"
     >
       {t(keys.events.reminders.control.unavailable)}
     </p>

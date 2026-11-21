@@ -157,6 +157,9 @@ area's top-level code sits at the top of that area's folder.
 a janitor that relaunches lost work) with the same file names. They are not a parity family
 (each differs in states and rights), so a change to the lease or slice rules in one is made in the
 other in the same PR, or the difference is written down in that module's docs.
+events' `feeds/subscriptions/lease.py` is a third copy of the idea with a different job (install-wide
+slot caps, a per-tenant share and a fence on the lease, not slices), so a change to what a lease
+means (its expiry, the compare-and-set claim, the fenced store) is made there too.
 
 **Parity exceptions.** `tests/pg_support.py`, the tenancy helpers and the worker
 runtime (`core/worker.py`, events and newsletter) are
@@ -211,6 +214,6 @@ Do it in small PRs, one module at a time, each containing only moves:
 | records | 6 | 10 | 0 | follows this layout |
 | analytics | 2 | 8 | 0 | follows this layout |
 | newsletter | 4 | 13 | 0 | follows this layout |
-| events | 4 | 11 | 0 | follows this layout (`feeds/` for ICS output, private tokens and `feeds/importing/` for the .ics import, `integrations/` for optional neighbours) |
+| events | 4 | 11 | 0 | follows this layout (`feeds/` for ICS output, private tokens, `feeds/importing/` for the .ics import and `feeds/subscriptions/` for the pinned fetcher, store and beat, `integrations/` for optional neighbours) |
 
 Update this table when a module moves.

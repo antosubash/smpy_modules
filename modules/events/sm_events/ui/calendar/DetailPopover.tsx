@@ -48,12 +48,12 @@ export function DefaultDetail({ occurrence: o, gridTimeZone, actions, lockReason
         {timeText(o, gridTimeZone, locale)}
       </p>
       {own ? (
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground dark:text-zinc-400">
           {t(copy.event_time, { zone: o.timezone })}: {own}
         </p>
       ) : null}
       {word ? <p>{word}</p> : null}
-      {lockReason ? <p className="text-muted-foreground">{lockReason}</p> : null}
+      {lockReason ? <p className="text-muted-foreground dark:text-zinc-400">{lockReason}</p> : null}
       {actions ? <div className="flex flex-wrap gap-2 pt-1">{actions}</div> : null}
     </div>
   );
@@ -105,7 +105,7 @@ export function DetailPopover({
         {selected ? (
           <>
             {calendar ? (
-              <p className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <p className="mb-2 flex items-center gap-2 text-xs text-muted-foreground dark:text-zinc-400">
                 <span
                   aria-hidden="true"
                   className="inline-block size-3 rounded-sm border"

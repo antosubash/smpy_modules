@@ -120,7 +120,9 @@ function CategoryForm({
     >
       <DialogHeader>
         <DialogTitle>{t(category ? copy.edit : copy.new)}</DialogTitle>
-        <DialogDescription>{t(copy.form_description)}</DialogDescription>
+        <DialogDescription className="dark:text-zinc-400">
+          {t(copy.form_description)}
+        </DialogDescription>
       </DialogHeader>
       <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={save}>
         <fieldset
@@ -170,7 +172,7 @@ function CategoryForm({
             }}
           />
           {category && (
-            <p id="category-slug-hint" className="text-xs text-muted-foreground">
+            <p id="category-slug-hint" className="text-xs text-muted-foreground dark:text-zinc-400">
               {t(copy.slug_fixed_hint)}
             </p>
           )}
@@ -206,7 +208,7 @@ function CategoryForm({
           <FieldError id={fieldErrorId('category-color')}>{errors.fields.color}</FieldError>
         </div>
         {errors.error && (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {errors.error}
           </p>
         )}

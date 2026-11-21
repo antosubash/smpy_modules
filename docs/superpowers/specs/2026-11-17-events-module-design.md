@@ -1,7 +1,7 @@
 # Events module (`simple_module_events`) — design
 
 Date: 2026-11-17
-Status: approved 2026-11-17 (design shown in conversation; issue #400)
+Status: approved 2026-11-17 (issue #400); implemented in PRs 1–10
 
 ## Intent
 
@@ -354,21 +354,31 @@ Migrations are in `host/migrations/versions/`, the first with
 
 ## Delivery
 
-| PR | Delivers |
-| --- | --- |
-| 1 | Scaffold, tenancy, settings, calendars with visibility and sharing, the Calendars screen, host migration, docs |
-| 2 | Events and texts, recurrence and overrides, the occurrences read, workflow, API, list and editor screens |
-| 3 | The `Calendar` component and the console calendar: views, create, drag, resize, grid timezone |
-| 4 | Public pages (with calendar slug redirects), public ICS, JSON-LD, sitemap, e2e spec |
-| 5 | Private feed tokens and `.ics` upload |
-| 6 | The extension registry, plugin guide, the records date-field source |
-| 7 | Pagebuilder blocks and the newsletter card |
-| 8 | Reminders |
-| 9 | Registration through records |
-| 10 | External ICS subscriptions |
+| PR | Delivers | Done |
+| --- | --- | --- |
+| 1 | Scaffold, tenancy, settings, calendars with visibility and sharing, the Calendars screen, host migration, docs | Done (#413) |
+| 2 | Events and texts, recurrence and overrides, the occurrences read, workflow, API, list and editor screens | Done (#414) |
+| 3 | The `Calendar` component and the console calendar: views, create, drag, resize, grid timezone | Done (#415) |
+| 4 | Public pages (with calendar slug redirects), public ICS, JSON-LD, sitemap, e2e spec | Done (#418) |
+| 5 | Private feed tokens and `.ics` upload | Done (#420) |
+| 6 | The extension registry, plugin guide, the records date-field source | Done (#421) |
+| 7 | Pagebuilder blocks and the newsletter card | Done (#424) |
+| 8 | Reminders | Done (#425) |
+| 9 | Registration through records | Done (#428) |
+| 10 | External ICS subscriptions | Done (#429) |
 
 Each PR goes through `/ship`. The framework bump (#405) lands first. PR 1
 creates every table of PRs 1 and 2 in one labelled revision.
+
+## Amendments (PR 10)
+
+External subscriptions are one built-in source, `subscriptions`, read in-process with an implicit
+entry per calendar (never stored in `events_calendar.sources`); an `origin_label` rides on the
+occurrence. The address is stored only encrypted (a fifth stored-secret crypto copy) and shown
+only masked. Items keep plain text, no description. The intranet switch is a system setting that
+never opens loopback, link-local or cloud-metadata addresses, and applies per subscription only if
+its saver held `events.manage`. The fetch never resolves on save: syntax and policy only, the
+result arrives as the subscription's status.
 
 ## Left to the builder
 

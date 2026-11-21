@@ -40,6 +40,12 @@ class Occurrence(BaseModel):
     event_id: uuid.UUID | None = None
     original_start: datetime | None = None
     event_status: str | None = None
+    origin_label: str | None = None
+    """Where an external entry comes from (a subscription's label, plain text); ``None`` for
+    this module's own events."""
+    location: str | None = None
+    """An external entry's place, one line of plain text cleaned when it was stored (never
+    markup); ``None`` for this module's own events and for an entry without one."""
 
 
 class PluginOccurrence(Occurrence):
@@ -70,6 +76,9 @@ class OccurrenceFilters:
     """A plugin's item is of the default type: a filter without that type excludes it."""
     sources: frozenset[str] | None = None
     """``None``: every applicable source. ``SOURCE_EVENTS`` names the built-in one."""
+    exclude_sources: frozenset[str] = frozenset()
+    """Sources to leave out of a read that names none (a surface that does not want, say,
+    external subscriptions, but keeps every plugin source it always had)."""
     locale: str | None = None
     include_unpublished: bool = True
     event_ids: frozenset[uuid.UUID] | None = None

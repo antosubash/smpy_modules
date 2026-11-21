@@ -175,10 +175,7 @@ def resolve_public(url: str | httpx2.URL) -> tuple[str, tuple[str, ...]]:
     for info in infos:
         ip = _parse_ip(str(info[4][0]))
         if not is_public_address(ip):
-            logger.warning(
-                "Refused an AI base URL that resolves to a non-public address",
-                extra={"host": host, "resolved_ip": str(ip)},
-            )
+            logger.warning("Refused an AI base URL that resolves to a non-public address")
             raise UnsafeURLError("non_public_address")
         if str(ip) not in ips:
             ips.append(str(ip))

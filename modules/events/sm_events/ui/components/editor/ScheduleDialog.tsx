@@ -97,7 +97,9 @@ function ScheduleForm({
     >
       <DialogHeader>
         <DialogTitle>{t(copy.approve_title)}</DialogTitle>
-        <DialogDescription>{t(copy.approve_description, { timezone })}</DialogDescription>
+        <DialogDescription className="dark:text-zinc-400">
+          {t(copy.approve_description, { timezone })}
+        </DialogDescription>
       </DialogHeader>
       <form ref={errors.formRef} className="grid gap-4" noValidate onSubmit={submit}>
         <div className="grid gap-2">
@@ -127,7 +129,7 @@ function ScheduleForm({
           </div>
         )}
         {errors.error && (
-          <p role="alert" className="text-destructive">
+          <p role="alert" className="text-destructive dark:text-red-400">
             {errors.error}
           </p>
         )}

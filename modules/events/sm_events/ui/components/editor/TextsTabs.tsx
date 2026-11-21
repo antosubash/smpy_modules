@@ -121,7 +121,9 @@ export function TextsTabs({
           <TabsContent key={code} value={code} lang={code} className="grid gap-4 pt-2">
             {!text.present ? (
               <div className="grid gap-2">
-                <p className="text-sm text-muted-foreground">{t(copy.missing_hint)}</p>
+                <p className="text-sm text-muted-foreground dark:text-zinc-400">
+                  {t(copy.missing_hint)}
+                </p>
                 <div>
                   <Button
                     type="button"

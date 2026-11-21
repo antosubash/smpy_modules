@@ -40,7 +40,7 @@ export function ItemBody({ item, locale }: { item: PublicListItem; locale: strin
       </a>
       {item.lang !== locale ? (
         <span
-          className="ml-2 rounded border px-1 text-xs font-medium uppercase text-muted-foreground"
+          className="ml-2 rounded border px-1 text-xs font-medium uppercase text-muted-foreground dark:text-zinc-400"
           title={otherLanguage(item.lang, locale, t)}
           role="img"
           aria-label={otherLanguage(item.lang, locale, t)}
@@ -54,7 +54,7 @@ export function ItemBody({ item, locale }: { item: PublicListItem; locale: strin
       {item.rescheduled ? (
         <span className="ml-2 text-sm font-medium">{t(copy.rescheduled)}</span>
       ) : null}
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">
         <time dateTime={item.start_local}>{itemTime(item, locale, t)}</time>
         {item.all_day ? <> · {t(copy.all_day)}</> : null}
         {item.venue_name ? <> · {item.venue_name}</> : null}
@@ -77,7 +77,11 @@ export function ItemRow({ item, locale }: { item: PublicListItem; locale: string
 export function UpcomingList({ groups, locale }: { groups: MonthGroup[]; locale: string }) {
   const { t } = useT();
   if (groups.length === 0) {
-    return <p className="text-muted-foreground">{t(keys.events.public.index.empty)}</p>;
+    return (
+      <p className="text-muted-foreground dark:text-zinc-400">
+        {t(keys.events.public.index.empty)}
+      </p>
+    );
   }
   return (
     <div className="space-y-6">

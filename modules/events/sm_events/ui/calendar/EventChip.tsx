@@ -49,7 +49,10 @@ export function EventChip({ occurrence: o, view, timeText, pending, lockReason }
       aria-busy={pending ? true : undefined}
     >
       {short ? null : time}
-      <span data-ev-title className={stacked ? 'line-clamp-3 break-words' : 'min-w-0 truncate'}>
+      <span
+        data-ev-title
+        className={stacked ? 'line-clamp-3 [overflow-wrap:anywhere]' : 'min-w-0 truncate'}
+      >
         <bdi>{o.title}</bdi>
       </span>
       {short ? time : null}

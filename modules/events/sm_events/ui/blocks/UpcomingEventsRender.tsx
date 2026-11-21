@@ -133,7 +133,10 @@ function Inner(props: UpcomingEventsProps & WithPuck) {
   ].filter((hint): hint is string => hint !== null);
   const hint =
     editing && hints.length > 0 ? (
-      <p className="container mx-auto px-4 py-2 text-sm text-muted-foreground" data-editor-only="">
+      <p
+        className="container mx-auto px-4 py-2 text-sm text-muted-foreground dark:text-zinc-400"
+        data-editor-only=""
+      >
         {hints.join(' ')}
       </p>
     ) : null;

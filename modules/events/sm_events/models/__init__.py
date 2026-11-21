@@ -6,7 +6,7 @@ seven tables of PRs 1 and 2 are declared now; events, texts, overrides, revision
 redirects get their behaviour in PR 2. PR 4 adds ``events_calendar_redirect``; PR 5 adds
 ``events_feed_token``, ``events_import`` and ``events_import_item``; PR 8 adds
 ``events_follow`` and ``events_reminder_sent``; PR 9 adds ``events_registration_count`` and
-``events_registration_seat``.
+``events_registration_seat``; PR 10 adds ``events_subscription`` and ``events_external_item``.
 """
 
 from __future__ import annotations
@@ -26,13 +26,16 @@ from sm_events.models.enums import (
 )
 from sm_events.models.event import Event
 from sm_events.models.event_text import EventText
+from sm_events.models.external_item import ExternalItem
 from sm_events.models.feed_token import FeedToken
+from sm_events.models.fetch_target import FetchTarget
 from sm_events.models.imports import EventImport, EventImportItem
 from sm_events.models.occurrence_override import OccurrenceOverride
 from sm_events.models.redirect import Redirect
 from sm_events.models.registration import RegistrationCount, RegistrationSeat
 from sm_events.models.reminders import EventFollow, ReminderSent
 from sm_events.models.revision import Revision
+from sm_events.models.subscription import Subscription
 
 __all__ = [
     "ATTENDANCE_MODES",
@@ -49,7 +52,9 @@ __all__ = [
     "EventImportItem",
     "EventStatus",
     "EventText",
+    "ExternalItem",
     "FeedToken",
+    "FetchTarget",
     "OccurrenceOverride",
     "OverrideKind",
     "Redirect",
@@ -57,5 +62,6 @@ __all__ = [
     "RegistrationSeat",
     "ReminderSent",
     "Revision",
+    "Subscription",
     "Visibility",
 ]

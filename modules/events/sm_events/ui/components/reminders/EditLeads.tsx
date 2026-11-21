@@ -59,7 +59,7 @@ export function EditLeads({
         ))}
       </ul>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-destructive dark:text-red-400">
           {error}
         </p>
       ) : null}

@@ -80,7 +80,7 @@ export function MyReminders() {
         {t(copy.mine)}
       </h2>
       {error ? (
-        <p role="alert" className="text-destructive">
+        <p role="alert" className="text-destructive dark:text-red-400">
           {error}
         </p>
       ) : null}
@@ -141,10 +141,10 @@ export function MyReminders() {
         </nav>
       ) : null}
       {data && data.hidden > 0 ? (
-        <p className="text-sm text-muted-foreground">{t(copy.hidden_note)}</p>
+        <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.hidden_note)}</p>
       ) : null}
       {data && data.total >= CAP ? (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p role="status" className="text-sm text-muted-foreground dark:text-zinc-400">
           {t(copy.cap_note, { count: CAP })}
         </p>
       ) : null}
@@ -153,9 +153,9 @@ export function MyReminders() {
           {t(copy.my_counts, { sent: counts.sent, failed, unfinished: counts.unfinished })}
         </p>
       ) : null}
-      <p className="text-sm text-muted-foreground">{t(copy.zone, { zone })}</p>
-      <p className="text-sm text-muted-foreground">{t(copy.not_retried)}</p>
-      <p className="text-sm text-muted-foreground">{t(copy.scheduler)}</p>
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.zone, { zone })}</p>
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.not_retried)}</p>
+      <p className="text-sm text-muted-foreground dark:text-zinc-400">{t(copy.scheduler)}</p>
     </section>
   );
 }
@@ -182,7 +182,9 @@ function Row({
   if (item.hidden) {
     return (
       <TableRow data-testid="hidden-follow">
-        <TableCell className="text-muted-foreground">{t(copy.hidden_event)}</TableCell>
+        <TableCell className="text-muted-foreground dark:text-zinc-400">
+          {t(copy.hidden_event)}
+        </TableCell>
         <TableCell className="hidden sm:table-cell" />
         <TableCell className="hidden sm:table-cell" />
         <TableCell />
@@ -213,7 +215,9 @@ function Row({
           </span>
         ) : null}
         {!item.deliverable ? (
-          <p className="text-xs text-destructive">{t(keys.events.errors.reminders_no_access)}</p>
+          <p className="text-xs text-destructive dark:text-red-400">
+            {t(keys.events.errors.reminders_no_access)}
+          </p>
         ) : null}
       </TableCell>
       <TableCell className="hidden sm:table-cell">

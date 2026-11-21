@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.metadata
 import importlib.resources
+import weakref
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -53,6 +54,26 @@ class EventsModule(ModuleBase):
             EventsSettings,
             lambda defaults: EventsServices(settings=self.settings or defaults),
         )
+        self._install_secret(app)
+
+    @staticmethod
+    def _install_secret(app: FastAPI) -> None:
+        """The running app's secret wins over the environment for the stored-secret crypto (hosts
+        may inject it through ``create_app(settings=...)``). Resolved lazily, because
+        ``app.state.sm`` is assigned after this phase, and through a weakref, because the
+        provider is process-global and must not keep a discarded app alive."""
+        from sm_events.core import crypto
+
+        app_ref = weakref.ref(app)
+
+        def live_secret() -> str:
+            live_app = app_ref()
+            if live_app is None:
+                return ""
+            sm = getattr(live_app.state, "sm", None)
+            return getattr(getattr(sm, "settings", None), "secret_key", "") or ""
+
+        crypto.set_secret_provider(live_secret)
 
     def register_exception_handlers(self, app: FastAPI) -> None:
         from sm_events.core.errors import install_exception_handlers
@@ -95,11 +116,15 @@ class EventsModule(ModuleBase):
         """The share dialog's user picker, per signed-in user: it is a search of
         the user directory, so it gets a budget of its own rather than the
         host's general ``rate_limit_authenticated``. So do the reminder follow writes."""
-        from sm_events.web.endpoints import reminders_api, shares_api
+        from sm_events.web.endpoints import reminders_api, shares_api, subscriptions_api
 
         registry.add_regex(
             shares_api.PATH_PATTERN,
             RateLimitRule(shares_api.RATE, key="user", methods=frozenset({"GET"})),
+        )
+        registry.add_regex(
+            subscriptions_api.PATH_PATTERN,
+            RateLimitRule(subscriptions_api.RATE, key="user", methods=frozenset({"POST", "PATCH"})),
         )
         registry.add_regex(
             reminders_api.PATH_PATTERN,
@@ -137,8 +162,10 @@ class EventsModule(ModuleBase):
         """Remember the current request for the ``events.calendar`` loader, which
         the framework's sharing router calls without one."""
         from sm_events.core.tenancy.request_context import RequestContextMiddleware
+        from sm_events.web.no_store import NoStoreSubscriptions
 
         app.add_middleware(RequestContextMiddleware)
+        app.add_middleware(NoStoreSubscriptions)
 
     def register_resource_types(self, registry: ResourceTypeRegistry) -> None:
         from sm_events.core.access import resource_types

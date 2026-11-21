@@ -250,6 +250,9 @@ export type Occurrence = {
   event_id: string | null;
   original_start: string | null;
   event_status: string | null;
+  origin_label?: string | null;
+  /** An external entry's place (plain text). */
+  location?: string | null;
 };
 export type OccurrencePage = {
   items: Occurrence[];

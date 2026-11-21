@@ -21,6 +21,11 @@ dependencies = [
     "babel>=2.12,<3",  # reminders format dates in the follower's language (format_date, format_time, Locale: all in 2.12)
     "jinja2>=3.1,<4",  # the reminder mail's HTML part (autoescaped)
     "pydantic-settings>=2.0",
+    "cryptography>=42",  # floor: the stored-secret crypto (Fernet, HKDF) the subscription address is sealed with
+    "anyio>=4,<5",  # floor: the netsafe copy shields a TLS handshake from cancellation (anyio.CancelScope)
+    "httpcore>=1,<2",  # floor: netsafe wraps httpcore's network backend
+    "httpx>=0.27,<1",  # floor: the pinned transport drives httpx.AsyncBaseTransport with the sni_hostname extension
+    "idna>=3,<4",  # floor: the A-label check of a subscription address (a dependency of httpx)
     "icalendar>=7,<8",  # floor: 7.x is the first major checked for RRULE/EXDATE/RECURRENCE-ID/VTIMEZONE round-trip (feeds)
 ]
 
