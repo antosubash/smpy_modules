@@ -10,7 +10,7 @@ migration. ``branch_labels = ("events",)`` names the revision only - see
 CLAUDE.md: ``events@base`` walks the whole shared history beneath it.
 
 Revision ID: b8e1d0783868
-Revises: 541bfbe29a28
+Revises: c7a41e9d2b60
 Create Date: 2026-11-17 17:13:36.086683
 """
 
@@ -21,7 +21,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b8e1d0783868"
-down_revision: str | None = "541bfbe29a28"
+down_revision: str | None = "c7a41e9d2b60"
 branch_labels: str | Sequence[str] | None = ("events",)
 depends_on: str | Sequence[str] | None = None
 

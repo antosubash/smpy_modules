@@ -132,11 +132,11 @@ async def test_a_304_carries_no_content_security_policy(authed_client: AsyncClie
     """A browser merges a 304's headers into the stored response (#322).
 
     The cached body's scripts carry the nonce of the policy it was served with;
-    ``public_csp`` here would replace that policy and block them all.
+    ``public_csp`` on a 304 would sit beside that policy and block them all.
     """
     await _publish(authed_client)
     first = await authed_client.get("/p/hello", headers=_ANON)
-    assert first.headers["Content-Security-Policy"] == PagebuilderSettings().public_csp
+    assert "frame-ancestors 'none'" in first.headers.get_list("content-security-policy")
     again = await authed_client.get(
         "/p/hello", headers={**_ANON, "If-None-Match": first.headers["ETag"]}
     )

@@ -209,6 +209,27 @@ name the module they affect.
 
 ### Changed
 
+- **The demo host runs framework 0.0.47** (was 0.0.44). The host ports the
+  one new framework revision, `e480d7dd348f` (`users_oauth_account` profile
+  columns), and adds `c7a41e9d2b60` of its own, which retypes
+  `users_access_token.expires_at` on SQLite only (Postgres is unaffected), so
+  `alembic check` is clean on both for a fresh database and one built before the
+  bump. The flat import paths
+  0.0.44 deprecated are removed by the framework in 0.0.46; no module imports one.
+  **Upgrading:** since 0.0.45 a response's own `Content-Security-Policy` is kept beside the
+  app policy and both are enforced (framework #870), where the app policy used to
+  replace it. pagebuilder's `public_csp` now defaults to `frame-ancestors 'none'` alone
+  (was a full policy with `script-src`, `style-src` and the rest; news' is empty), so
+  a host that stored no value sends only that: the app policy governs scripts,
+  styles and fonts, and public pages are not framed, not even by the same origin.
+  Under 0.0.44 the module's header had *replaced* the app policy, so its
+  `frame-ancestors 'none'` was the one in force; the new default keeps that. A host
+  that saved a value, the old default included, keeps sending exactly it beside the
+  app policy; check it against that policy, since it can only restrict further and
+  cannot carry the per-request nonce (a `script-src` in it blocks the host's own
+  scripts). Reset the field to its default, or set it to `frame-ancestors 'none'`, to
+  adopt the new default; a host that stored an empty value keeps sending no header.
+
 - **news, pagebuilder, analytics and records settings use the framework's
   `DbBackedSettings`** (#345), as ai, billing, images and newsletter already
   did, instead of each carrying its own `settings_customise_sources` (records'
@@ -328,7 +349,8 @@ name the module they affect.
   contract module or name its dependant imports.
 - pagebuilder and news no longer send `public_csp` on a `304 Not Modified`
   (#322). The browser merges a 304's headers into the cached page, so the
-  module's strict policy replaced the page's nonce-based one, and after
+  module's policy replaced the page's nonce-based one (before framework 0.0.45;
+  since then it sits beside it and blocks the nonce'd scripts), and after
   revalidation every script was blocked: a blank page in development, and in
   production the nonce'd scripts and any `register_csp_sources` allowance. A
   browser that already merged the old header keeps it until it next fetches
