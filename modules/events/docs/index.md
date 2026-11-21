@@ -375,7 +375,7 @@ have UUID primary keys; the remaining tables have big-int keys.
 | `events_revision` | PR 2: event snapshots |
 | `events_redirect` | PR 2: locale-scoped event slug redirects |
 
-The demo host's revision `b8e1d0783868` follows `541bfbe29a28` and creates all
+The demo host's revision `b8e1d0783868` follows `c7a41e9d2b60` and creates all
 seven tables; `f3c0b2daeaf2` follows it and adds the nullable
 `events_revision.note` (a reject note, or the overrides a series change
 dropped). Migrations belong to the host. The `events` branch label is a
