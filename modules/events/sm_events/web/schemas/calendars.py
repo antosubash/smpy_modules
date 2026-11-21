@@ -10,6 +10,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictInt,
     StringConstraints,
     field_validator,
     model_validator,
@@ -18,6 +19,7 @@ from pydantic import (
 from sm_events.calendar.plugins import source_entries
 from sm_events.core import constants
 from sm_events.models import Visibility
+from sm_events.reminders.leads import LEADS_INPUT_MAX
 from sm_events.web.schemas._fields import (
     Color,
     MultiLine,
@@ -54,6 +56,11 @@ class CalendarPatch(BaseModel):
     color: Color | None = None
     description: Description | None = None
     default_timezone: str | None = Field(default=None, max_length=constants.TZ_MAX)
+    default_reminder_minutes: list[StrictInt] | None = Field(
+        default=None, max_length=LEADS_INPUT_MAX
+    )
+    """Lead times "Remind me" preselects here; ``null`` goes back to the install-wide setting.
+    The values themselves are checked by the service (422 ``invalid_lead``)."""
 
     _lower_color = field_validator("color", mode="before")(lower_color)
     _tz = field_validator("default_timezone")(known_timezone)
@@ -86,6 +93,7 @@ class CalendarOut(BaseModel):
     owner_id: str
     owner_name: str | None = None
     default_timezone: str
+    default_reminder_minutes: list[int] | None = None
     sources: list[CalendarSourceOut] = []
     sources_version: str = ""
     """What a write to the sources must send back; empty for one who cannot manage them."""

@@ -6,7 +6,8 @@
     "calendars": "Kalender",
     "categories": "Veranstaltungskategorien",
     "calendar": "Kalender",
-    "import": "Termine importieren"
+    "import": "Termine importieren",
+    "reminders": "Erinnerungen"
   },
   "share": {
     "button": "Teilen",
@@ -159,7 +160,12 @@
     "import_state": "Dieser Import lässt sich in seinem jetzigen Zustand nicht ändern.",
     "import_too_large": "Die Datei ist größer als das Importlimit.",
     "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus.",
-    "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut."
+    "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut.",
+    "follow_limit": "Du folgst bereits so vielen Veranstaltungen, wie Erinnerungen erlauben: entferne zuerst eine (Veranstaltungen, die du nicht mehr sehen kannst, stehen dort ebenfalls).",
+    "not_published": "Nur veröffentlichte Veranstaltungen können erinnern.",
+    "invalid_lead": "Wähle einen der angebotenen Erinnerungszeitpunkte.",
+    "reminders_unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
+    "reminders_no_access": "Für diese Veranstaltung können mit deinen aktuellen Zugriffsrechten keine Erinnerungen gesendet werden."
   },
   "categories": {
     "title": "Kategorien",
@@ -881,6 +887,104 @@
       "unresolved_other": "{count} ausgewählte Kalender sind nicht öffentlich oder existieren nicht mehr.",
       "failed": "Die Veranstaltungen konnten nicht geladen werden.",
       "selection_unreadable": "Die Kalenderauswahl konnte nicht gelesen werden, deshalb wird nichts angezeigt. Wählen Sie die Kalender erneut aus."
+    }
+  },
+  "reminders": {
+    "page": {
+      "hidden_event": "Eine Veranstaltung, die du nicht mehr sehen kannst",
+      "title": "Erinnerungen",
+      "subtitle": "E-Mails vor den Veranstaltungen, denen du folgst.",
+      "mine": "Meine Erinnerungen",
+      "empty": "Du folgst keiner Veranstaltung. Öffne eine Veranstaltung im Kalender und wähle Erinnern.",
+      "col_event": "Veranstaltung",
+      "col_calendar": "Kalender",
+      "col_next": "Nächster Beginn",
+      "col_leads": "Erinnerungen",
+      "col_actions": "Aktionen",
+      "remove": "Entfernen",
+      "remove_for": "Erinnerungen für {name} entfernen",
+      "edit": "Ändern",
+      "edit_for": "Erinnerungszeiten für {name} ändern",
+      "hidden_note": "Einige deiner Erinnerungen gehören zu Veranstaltungen, die du nicht mehr sehen kannst. Sie senden nichts; entferne sie hier.",
+      "cap_note": "Du kannst höchstens {count} Veranstaltungen folgen. Entferne eine, um einer anderen zu folgen; Veranstaltungen, die du nicht mehr sehen kannst, zählen mit und stehen hier.",
+      "paging": "Seite {page} von {pages}",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "my_counts": "Deine letzten 30 Tage: {sent} gesendet, {failed} fehlgeschlagen, {unfinished} unvollendet.",
+      "not_retried": "Eine fehlgeschlagene Erinnerung wird nicht wiederholt: Eine verspätete ist wenig wert und eine doppelte schlimmer. Eine unvollendete geht verloren und wird nicht wiederholt.",
+      "scheduler": "Erinnerungen versendet ein Hintergrunddienst. Diese Seite kann nicht erkennen, ob er läuft; kommt nichts an, frage die Betreiber dieser Website.",
+      "zone": "Zeiten in der Zeitzone deines Browsers ({zone}).",
+      "removed": "Erinnerungen entfernt.",
+      "loading": "Deine Erinnerungen werden geladen …"
+    },
+    "mail": {
+      "subject": "Erinnerung: {title} ({date})",
+      "intro": "Erinnerung: Diese Veranstaltung beginnt {lead}.",
+      "when": "Wann: {when}",
+      "when_all_day": "{date} (ganztägig)",
+      "where": "Wo: {place}",
+      "online": "Online: {url}",
+      "moved": "Dieser Termin wurde verschoben, ursprünglich: {original}",
+      "open": "Veranstaltung öffnen:",
+      "manage": "Erinnerungen beenden oder ändern:",
+      "footer": "Du erhältst diese Nachricht, weil du auf {site} Erinnerungen angefordert hast.",
+      "lead_15": "in 15 Minuten",
+      "lead_60": "in 1 Stunde",
+      "lead_1440": "in 1 Tag",
+      "lead_10080": "in 1 Woche",
+      "lead_other": "in {minutes} Minuten"
+    },
+    "control": {
+      "remind_me": "Erinnern",
+      "reminding": "Erinnerung: {leads}",
+      "panel_title": "Vor dieser Veranstaltung erinnern",
+      "save": "Speichern",
+      "saving": "Speichern …",
+      "stop": "Nicht mehr erinnern",
+      "loading": "Erinnerungen werden geladen …",
+      "already": "Du wirst vor dieser Veranstaltung erinnert.",
+      "none_chosen": "Wähle mindestens einen Zeitpunkt oder beende die Erinnerung.",
+      "next_due": "{lead}: nächste Erinnerung {when}",
+      "too_late": "{lead}: zu spät für den nächsten Termin",
+      "unavailable": "Erinnerungen sind auf dieser Website derzeit nicht verfügbar.",
+      "time_zone": "Zeiten in der Zeitzone deines Browsers ({zone}); die Zeitzone der Veranstaltung ist {event_zone}.",
+      "over": "Diese Veranstaltung ist vorbei, es gibt nichts mehr, woran erinnert werden könnte.",
+      "see_list": "Deine Erinnerungen ansehen"
+    },
+    "leads": {
+      "m15": "15 Minuten vorher",
+      "m60": "1 Stunde vorher",
+      "m1440": "1 Tag vorher",
+      "m10080": "1 Woche vorher",
+      "s15": "15 Min.",
+      "s60": "1 Std.",
+      "s1440": "1 Tag",
+      "s10080": "1 Woche"
+    },
+    "delivery": {
+      "title": "Zustellung",
+      "enabled": "Erinnerungen sind eingeschaltet.",
+      "disabled": "Erinnerungen sind ausgeschaltet.",
+      "ok": "Erinnerungen können zugestellt werden.",
+      "reason_disabled": "Erinnerungen sind in den Einstellungen ausgeschaltet.",
+      "reason_no_public_base_url": "Die öffentliche Adresse der Website ist nicht gesetzt, daher wären Links in der E-Mail falsch.",
+      "reason_no_mail_transport": "Es ist kein Mailversand eingerichtet.",
+      "reason_console_mail": "Der Mailversand steht auf Konsole und schreibt nur ins Protokoll: Nichts erreicht ein Postfach.",
+      "defaults": "Vorgeschlagene Erinnerungszeiten: {leads}",
+      "settings": "Erinnerungseinstellungen ändern",
+      "counts_title": "Letzte {days} Tage, alle zusammen (nur Zahlen, nie wer)",
+      "sent": "Gesendet: {count}",
+      "failed": "Fehlgeschlagen: {count}",
+      "failed_code_send_failed": "Mail konnte nicht gesendet werden: {count}",
+      "failed_code_send_timeout": "Mailserver antwortete nicht rechtzeitig: {count}",
+      "failed_code_too_late": "Nicht gesendet: zu viele Erinnerungen waren gleichzeitig fällig: {count}",
+      "unfinished": "Unvollendet: {count}",
+      "unfinished_note": "Unvollendet heißt: reserviert, aber nie als gesendet bestätigt. Diese werden nicht wiederholt."
+    },
+    "defaults": {
+      "label": "Erinnerungszeiten",
+      "site_default": "Standard der Website verwenden",
+      "help": "Wird vorgeschlagen, wenn jemand in diesem Kalender Erinnern wählt. Niemand folgt automatisch."
     }
   }
 }

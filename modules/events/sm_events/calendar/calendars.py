@@ -24,6 +24,7 @@ from sm_events.core.access import POLICY, visible_calendars
 from sm_events.core.errors import Forbidden, NotFound, SlugTaken
 from sm_events.models import Calendar, Visibility
 from sm_events.models.calendar import CALENDAR_SLUG_CONSTRAINT
+from sm_events.reminders import leads
 from sm_events.web.schemas.calendars import CalendarCreate, CalendarPatch
 
 
@@ -77,6 +78,10 @@ async def create_calendar(
 async def update_calendar(db: Any, cal: Calendar, data: CalendarPatch) -> Calendar:
     """Apply a PATCH: only the fields the body set."""
     fields = data.model_dump(exclude_unset=True)
+    if fields.get("default_reminder_minutes") is not None:
+        fields["default_reminder_minutes"] = list(
+            leads.validate_leads(fields["default_reminder_minutes"])
+        )
     new_slug = fields.get("slug")
     if new_slug is not None:
         check_not_reserved(new_slug)

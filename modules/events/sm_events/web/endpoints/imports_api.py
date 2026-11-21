@@ -123,7 +123,7 @@ def _mine(who: ResourcePrincipal):
 async def list_imports(
     who: Principal,
     db=Depends(get_db),
-    page: Annotated[int, Query(ge=1)] = 1,
+    page: Annotated[int, Query(ge=1, le=constants.PAGE_MAX)] = 1,
     page_size: PageSize = 20,
 ) -> ImportPage:
     where = _mine(who)
@@ -188,7 +188,7 @@ async def list_items(
     db=Depends(get_db),
     verdict: Literal["new", "update", "unchanged", "skip"] | None = None,
     outcome: Literal["created", "updated", "unchanged", "skipped", "failed"] | None = None,
-    page: Annotated[int, Query(ge=1)] = 1,
+    page: Annotated[int, Query(ge=1, le=constants.PAGE_MAX)] = 1,
     page_size: PageSize = 50,
 ) -> ImportItemPage:
     where = [

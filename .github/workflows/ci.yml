@@ -132,9 +132,12 @@ jobs:
     # The records unit suite alone is ~3 min on SQLite (~4 min measured
     # against Postgres — postgres-2026-09-21.md § 3); the migration round
     # trip and perf smoke add a few minutes more, and pagebuilder, news and
-    # billing about as much again (#117). 30 gives room without chasing a
-    # hung step to the billable ceiling.
-    timeout-minutes: 30
+    # billing about as much again (#117). With the events module the job
+    # measured 29 min (events 8.5 min and records 8.5 min on Postgres) and
+    # was cancelled at 30 on the next PR, so the limit is 45: room for the
+    # suites as they are, still short of chasing a hung step to the
+    # billable ceiling.
+    timeout-minutes: 45
     services:
       # `postgres:16` is what postgres-2026-09-21.md verified against
       # (16.13). POSTGRES_DB pre-creates the database the migration round
@@ -694,9 +697,9 @@ jobs:
       SM_SECRET_KEY: bg-smoke-secret-key-not-for-production-use
       SM_USERS_BOOTSTRAP_EMAIL: admin@example.com
       SM_USERS_BOOTSTRAP_PASSWORD: changeme1
-      # The unsubscribe link a campaign carries is built from it; a campaign
-      # without one is refused at scheduling.
-      SM_PUBLIC_BASE_URL: http://127.0.0.1:8000
+      # No SM_PUBLIC_BASE_URL on purpose: the public address is stored in the database (the
+      # step below), the documented way, so the worker proves it reads it from there (the
+      # unsubscribe link of a campaign and every reminder link are built from it).
       # host/worker.py is imported as `worker` (the Makefile's CELERY line).
       PYTHONPATH: host
     steps:
@@ -729,12 +732,25 @@ jobs:
             from_address news@example.org \
             from_name "BG smoke" \
             physical_address "1 Test Street, 12345 Testville"
+          uv run --no-sync python scripts/set_setting.py host \
+            public_base_url http://127.0.0.1:8000
           uv run --no-sync python scripts/set_setting.py file_storage \
             fs_root_path "$RUNNER_TEMP/files"
 
+      # The events reminders mail through a sender that really delivers (the console one
+      # only logs, and reminders then report themselves unavailable): the mail module's SMTP
+      # backend, pointed at a local sink. Before the host and the worker start: both read it.
+      - name: Mail sink and settings (events reminders)
+        run: |
+          nohup uv run --no-sync python -m aiosmtpd -n -l 127.0.0.1:1025 \
+            > "$RUNNER_TEMP/smtp-sink.log" 2>&1 &
+          uv run --no-sync python scripts/set_setting.py mail \
+            backend smtp smtp_host 127.0.0.1 smtp_port 1025 smtp_tls false \
+            smtp_from reminders@example.org
+
       # One worker on the queues `make worker` serves (images, newsletter,
       # events, celery) and one beat: never two schedulers. The events queue carries
-      # events.publish_due, events.run_import and events.janitor.
+      # events.publish_due, events.run_import, events.janitor and events.reminders.
       - name: Start host, worker and beat
         run: |
           nohup uv run --no-sync --project host uvicorn main:app --app-dir host \
@@ -746,13 +762,13 @@ jobs:
 
       # Waits for /health/live itself, then 3 min for the image and 4 for the
       # campaign.
-      - name: Smoke (image pipeline, campaign dispatch)
+      - name: Smoke (image pipeline, campaign dispatch, event reminder)
         run: uv run --no-sync python scripts/bg_tasks_smoke.py --base-url http://127.0.0.1:8000
 
       - name: Host, worker and beat logs
         if: ${{ failure() }}
         run: |
-          for name in host worker beat; do
+          for name in host worker beat smtp-sink; do
             echo "::group::$name.log"
             cat "$RUNNER_TEMP/$name.log" || true
             echo "::endgroup::"

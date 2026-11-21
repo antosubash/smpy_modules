@@ -9,6 +9,7 @@ here, everything else inside the bodies. Routing, queues and beat are in
 * ``events.run_import(tenant_id, import_id)`` - one slice of an ``.ics`` import; it enqueues the
   next one itself while the import is not finished.
 * ``events.janitor()`` - hourly cleanup of imports and revoked private feed links.
+* ``events.reminders()`` - the beat every minute that sends the reminders that have fallen due.
 
 Bodies run through :mod:`sm_events.core.worker`: no app, a fresh event loop per
 task, and the body binds every tenant itself.
@@ -22,7 +23,7 @@ from typing import Any
 from celery import shared_task
 from celery.signals import worker_process_init
 
-from sm_events.task_config import JANITOR, PUBLISH_DUE, QUEUE_DEFAULT, RUN_IMPORT
+from sm_events.task_config import JANITOR, PUBLISH_DUE, QUEUE_DEFAULT, REMINDERS, RUN_IMPORT
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +98,27 @@ def janitor() -> dict[str, int]:
     return run_platform(lambda factory: janitor_async(factory, now=utcnow(), relaunch=enqueue))
 
 
+@shared_task(name=REMINDERS)
+def reminders() -> dict[str, int]:
+    """One reminder pass: every tenant with followers, in rotating order, inside the tick's
+    budgets; returns (and logs) counts, never an address or a name."""
+    from sm_events.core.clock import utcnow
+    from sm_events.core.worker import run_platform
+    from sm_events.reminders import worker_app
+    from sm_events.reminders.tick import reminders_async
+
+    return run_platform(
+        lambda factory: reminders_async(
+            factory, runtime_factory=worker_app.worker_runtime, now=utcnow()
+        )
+    )
+
+
 @worker_process_init.connect(weak=False, dispatch_uid="sm_events.forget_parent_runtime")
 def forget_parent_runtime(**_: Any) -> None:
     """A prefork child must not reuse its parent's engine."""
     from sm_events.core.worker import reset_worker_runtime
+    from sm_events.reminders.worker_app import reset_worker_app
 
     reset_worker_runtime()
+    reset_worker_app()

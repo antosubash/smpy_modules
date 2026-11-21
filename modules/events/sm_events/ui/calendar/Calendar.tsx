@@ -1,9 +1,11 @@
 /** The calendar component: state, fetching, toolbar, filters, status, the lazily loaded
  *  grid, the detail popover and the render slots. It never sees a FullCalendar type; the
  *  grid behind `adapter/` is the one thing a replacement would rewrite. */
+
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RemindMe } from '../reminders/RemindMe';
 import { keys, useT } from '../utils/i18n';
 import { DetailPopover, type Selected } from './DetailPopover';
 import { useOccurrences } from './data/useOccurrences';
@@ -98,6 +100,24 @@ export function Calendar(props: CalendarProps) {
   });
   const items = nothingShown ? [] : data.items;
 
+  // A link can name one occurrence to show: open it once, when it is on the grid.
+  const pendingOpen = useRef(props.initialOpen ?? null);
+  useEffect(() => {
+    const key = pendingOpen.current;
+    const found = key ? items.find((o) => o.key === key) : undefined;
+    if (!found) return;
+    const frame = requestAnimationFrame(() => {
+      pendingOpen.current = null;
+      grid.current?.focusEvent(found.key);
+      const active = document.activeElement;
+      setSelected({
+        occurrence: found,
+        element: active instanceof HTMLElement ? active : document.body,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [items]);
+
   const first = useRef(true);
   const report = useRef(props.onStateChange);
   report.current = props.onStateChange;
@@ -147,6 +167,16 @@ export function Calendar(props: CalendarProps) {
         >
           {t(copy.detail.move)}
         </Button>
+      ) : null}
+      {editing &&
+      selectedOccurrence.source === 'events' &&
+      selectedOccurrence.event_id &&
+      selectedOccurrence.event_status === 'published' ? (
+        <RemindMe
+          key={selectedOccurrence.event_id}
+          eventId={selectedOccurrence.event_id}
+          eventZone={selectedOccurrence.timezone}
+        />
       ) : null}
     </>
   ) : null;

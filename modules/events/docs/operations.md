@@ -60,3 +60,12 @@ included, to `/setup`.
 `host/tests/test_events_wiring.py` boots the real host and checks the routes, the anonymous
 exemption (`GET`/`HEAD` only), the rate limits and the 304. `tests/web/public/test_leaks*.py` is the
 leak harness: every public route is in its table, and a route that is not fails a test.
+
+## Reminders
+
+`events.reminders` runs every minute on the `events` queue (a queued tick expires after 55 s, so a
+backlog is dropped, never run late). It needs a worker, a beat, a mail sender that delivers and the
+host's `public_base_url`; see [Reminders](reminders.md). Nothing detects a missing beat: check that
+`events.reminders` appears in the worker log each minute (`events.reminders: N tenant(s), N sent, ...`,
+counts only). `events.janitor` also prunes the ledger. The first build of the worker's headless app
+takes about 16 s and 200 MB per process.

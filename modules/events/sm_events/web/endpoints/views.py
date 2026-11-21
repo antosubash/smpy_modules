@@ -49,6 +49,20 @@ async def calendars_page(request: Request, inertia: InertiaDep) -> InertiaRespon
     )
 
 
+@router.get("/reminders", response_model=None, dependencies=[require_view])
+async def reminders_page(request: Request, inertia: InertiaDep) -> InertiaResponse:
+    """The caller's reminders and, for a manager, the delivery card; both load from the API."""
+    held = await ensure_resolved_permissions(request)
+    return await inertia.render(
+        constants._PAGE_REMINDERS,
+        {
+            **tenancy.view_props(request),
+            "is_manager": grants(held, constants.PERM_MANAGE),
+            "settings_url": constants.SETTINGS_URL,
+        },
+    )
+
+
 def _import_id(raw: str | None) -> int | None:
     """``?id=`` as an import id (an integer a column holds), else ``None``: a reload resumes it,
     and the API (which checks the caller against the import) decides whether it is theirs."""

@@ -48,17 +48,20 @@ def test_publish_due_runs_every_minute_on_the_events_queue():
 
 def test_import_tasks_and_the_hourly_janitor():
     assert (RUN_IMPORT, JANITOR) == ("events.run_import", "events.janitor")
+    from sm_events.task_config import REMINDERS
+
     assert TASK_ROUTES == {
         PUBLISH_DUE: {"queue": "events"},
         RUN_IMPORT: {"queue": "events"},
         JANITOR: {"queue": "events"},
+        REMINDERS: {"queue": "events"},
     }
     assert BEAT_SCHEDULE["events-janitor"] == {
         "task": JANITOR,
         "schedule": 3600.0,
         "options": {"queue": "events", "expires": 3500},
     }
-    assert set(BEAT_SCHEDULE) == {"events-publish-due", "events-janitor"}
+    assert set(BEAT_SCHEDULE) == {"events-publish-due", "events-janitor", "events-reminders"}
 
 
 def test_a_worker_scoped_to_the_events_queue_imports_the_events_tasks():
@@ -76,3 +79,17 @@ def test_a_worker_scoped_to_the_events_queue_imports_the_events_tasks():
     assert chosen("images", "newsletter", "events", default) == packages  # `make worker`'s -Q
     assert chosen("images") == []
     assert chosen(default) == ["sm_events_test_absent"]
+
+
+def test_the_reminders_beat():
+    from sm_events.task_config import REMINDERS
+
+    assert REMINDERS == "events.reminders"
+    assert TASK_ROUTES[REMINDERS] == {"queue": "events"}
+    assert BEAT_SCHEDULE["events-reminders"] == {
+        "task": REMINDERS,
+        "schedule": 60.0,
+        "options": {"queue": "events", "expires": 55},
+    }
+    mod = importlib.import_module("sm_events.tasks")
+    assert REMINDERS in {getattr(obj, "name", None) for obj in vars(mod).values()}

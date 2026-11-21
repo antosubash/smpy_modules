@@ -54,6 +54,7 @@ from sm_events.core.constants.public import (
     UPCOMING_BLOCK_MAX,
     XML_MEDIA_TYPE,
 )  # isort: skip
+from sm_events.core.constants.reminders import *  # noqa: F403 - reminders (PR 8)
 
 from sm_events.core.constants.names import MODULE_NAME  # isort: skip
 
@@ -154,6 +155,9 @@ MAX_RANGE_DAYS = 366
 # A path number and an occurrence's original start: what a signed 32-bit column holds and
 # the years a calendar means (a bound keeps ``+ 1 microsecond`` and zone maths in range).
 INT32_MAX = 2**31 - 1
+PAGE_MAX = 10_000
+"""The highest page number a list takes: ``(page - 1) * page_size`` stays far inside every
+integer column and OFFSET, on SQLite and Postgres."""
 ORIGINAL_START_MIN_YEAR = 1900
 ORIGINAL_START_MAX_YEAR = 9000
 MAX_OCCURRENCES = 2000

@@ -94,6 +94,8 @@ def test_all_tenants_call_sites():
         "feeds/importing/runner.py",
         "feeds/tokens/cleanup.py",
         "feeds/tokens/resolve.py",
+        "reminders/cleanup.py",  # the UserDeleted delete, with its own user predicate
+        "reminders/tick.py",  # the one narrow enumeration of tenants with followers
     }
     assert "feeds/tokens/resolve.py" in found
     assert found <= allowed, found - allowed

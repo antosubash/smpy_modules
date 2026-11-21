@@ -246,3 +246,14 @@ async def test_list_and_get_never_load_the_raw_upload(world):
         event.remove(sync_engine, "before_cursor_execute", spy)
     assert seen
     assert not [s for s in seen if "events_import.source" in s or ", source" in s], seen
+
+
+@pytest.mark.parametrize("page", [9223372036854775807, 99999999999999999999, 2147483648, 10001])
+async def test_paging_refuses_numbers_the_database_cannot_use(world, page):
+    """The same overflow as reminders' ``mine``: an unbounded page was a 500 on the OFFSET."""
+    client, cals = world
+    stamp = (await upload(client, cals["P"])).json()["id"]
+    assert (await client.get(BASE, params={"page": page}, headers=MGR)).status_code == 422
+    items = f"{BASE}/{stamp}/items"
+    assert (await client.get(items, params={"page": page}, headers=MGR)).status_code == 422
+    assert (await client.get(BASE, params={"page": 10000}, headers=MGR)).status_code == 200

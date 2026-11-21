@@ -25,6 +25,13 @@ export function readState(search: string): Partial<CalendarState> {
   return state;
 }
 
+/** The occurrence a link asks to open (a reminder mail names it): its key, or ``null``. Read once
+ *  and never written back. */
+export function readOpen(search: string): string | null {
+  const key = new URLSearchParams(search).get('event');
+  return key && key.length <= 200 ? key : null;
+}
+
 export function writeState(state: CalendarState, allCalendars: string[]): string {
   const query = new URLSearchParams();
   query.set('view', state.view);

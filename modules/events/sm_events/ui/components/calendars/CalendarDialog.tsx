@@ -25,6 +25,7 @@ import {
   VISIBILITIES,
   type Visibility,
 } from '../../utils/types';
+import { ReminderDefaultsField } from './ReminderDefaultsField';
 
 /** The 422 paths this form has an input (and a message line) for. */
 const SHOWN = ['name', 'slug', 'color', 'description', 'default_timezone'] as const;
@@ -90,6 +91,9 @@ function CalendarForm({
   const [description, setDescription] = useState(calendar?.description ?? '');
   const [timezone, setTimezone] = useState(calendar?.default_timezone ?? defaultTimezone);
   const [visibility, setVisibility] = useState<Visibility>('private');
+  const [reminders, setReminders] = useState<number[] | null>(
+    calendar?.default_reminder_minutes ?? null,
+  );
   const [pending, setPending] = useState(false);
   const errors = useFormErrors(keys.events.errors.calendar_gone, onGone, SHOWN);
   const [zones] = useState(() => new Set(['UTC', ...Intl.supportedValuesOf('timeZone')]));
@@ -111,6 +115,7 @@ function CalendarForm({
       color,
       description: description || null,
       default_timezone: timezone,
+      ...(calendar ? { default_reminder_minutes: reminders } : {}),
       ...(slug ? { slug } : {}),
       ...(!calendar ? { visibility } : {}),
     };
@@ -223,6 +228,7 @@ function CalendarForm({
             ))}
           </datalist>
         </div>
+        {calendar && <ReminderDefaultsField value={reminders} onChange={setReminders} />}
         {!calendar && (
           <div className="grid gap-2">
             <Label htmlFor="calendar-visibility">{t(copy.visibility)}</Label>

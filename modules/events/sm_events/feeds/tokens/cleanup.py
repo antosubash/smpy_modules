@@ -27,10 +27,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from simple_module_db import all_tenants as unscoped
-from simple_module_db import finalize_session
-from sqlalchemy import delete, func
+from simple_module_db import finalize_session, mark_written
+from sqlalchemy import delete
 
-from sm_events.core import constants
+from sm_events.core import constants, user_ids
 from sm_events.core.tenancy import bound_tenant, tenant_scope, valid_tenant
 from sm_events.models import FeedToken
 
@@ -47,12 +47,6 @@ logger = logging.getLogger(__name__)
 _TABLE = FeedToken.__table__
 
 
-def _spellings(user_id: uuid.UUID | str) -> tuple[str, ...]:
-    """Every way a user id is written (lower case, hyphenated or bare) that a link could hold."""
-    text = str(user_id).lower()
-    return (text, text.replace("-", ""))
-
-
 async def _run(
     factory: Callable[[], Any],
     statement: Any,
@@ -61,6 +55,7 @@ async def _run(
     with scope:
         async with factory() as session:
             removed = (await session.execute(statement)).rowcount
+            mark_written(session)  # Core DML: mark it, whatever the session class listens for
             await finalize_session(session)
     return int(removed or 0)
 
@@ -68,7 +63,7 @@ async def _run(
 async def delete_user_tokens(factory: Callable[[], Any], user_id: uuid.UUID | str) -> int:
     """Every link of ``user_id`` in every tenant: the one narrow cross-tenant delete, whose only
     predicate is the user."""
-    statement = delete(_TABLE).where(func.lower(_TABLE.c.user_id).in_(_spellings(user_id)))
+    statement = delete(_TABLE).where(user_ids.user_match(_TABLE.c.user_id, user_id))
     return await _run(factory, statement, unscoped())
 
 
@@ -78,7 +73,7 @@ async def delete_member_tokens(factory: Callable[[], Any], tenant_id: str, user_
         return 0
     statement = delete(_TABLE).where(
         _TABLE.c.tenant_id == tenant_id,
-        func.lower(_TABLE.c.user_id).in_(_spellings(user_id)),
+        user_ids.user_match(_TABLE.c.user_id, user_id),
     )
     return await _run(factory, statement, tenant_scope(tenant_id))
 

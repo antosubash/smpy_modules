@@ -32,6 +32,8 @@ EVENTS_TABLES = {
     "events_feed_token",
     "events_import",
     "events_import_item",
+    "events_follow",
+    "events_reminder_sent",
 }
 
 
@@ -57,6 +59,7 @@ def test_views_and_menu_mounted():
         "/admin/events/categories",
         "/admin/events/import",
         "/admin/events/list",
+        "/admin/events/reminders",
         "/admin/events/edit/new",
         "/admin/events/edit/{event_id}",
     }
@@ -67,6 +70,7 @@ def test_views_and_menu_mounted():
         "/admin/events/calendars",
         "/admin/events/categories",
         "/admin/events/import",
+        "/admin/events/reminders",
     }
     assert min(items, key=lambda i: i.order).url == "/admin/events/"
     assert {i.url: i.permissions for i in items} == {
@@ -75,6 +79,7 @@ def test_views_and_menu_mounted():
         "/admin/events/calendars": ["events.view"],
         "/admin/events/categories": ["events.view", "events.manage"],
         "/admin/events/import": ["events.view", "events.manage"],
+        "/admin/events/reminders": ["events.view"],
     }
 
 
@@ -243,6 +248,7 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
     what the framework's forwarded-host allow-list accepts (nothing, here: the list is empty, so
     only ``Host`` counts) and the response varies on ``Host``."""
     from httpx import ASGITransport, AsyncClient
+    from sm_events.core import host_settings
 
     app = booted_host
 
@@ -260,7 +266,9 @@ def test_generated_urls_ignore_a_spoofed_host(booted_host, monkeypatch):
             AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as http,
         ):
             for slot, base in zip(out, ("https://events.example.org", ""), strict=True):
-                monkeypatch.setattr(app.state.sm.settings, "public_base_url", base, raising=False)
+                # The address is read from the live host settings, so that is what to set.
+                live = host_settings.host_settings(app)
+                monkeypatch.setattr(live, "public_base_url", base, raising=False)
                 for path in paths:
                     slot[path] = await http.get(path, headers={"Host": "evil.test"} | spoof)
         return out

@@ -25,6 +25,7 @@ def build_api_router() -> APIRouter:
         feed_tokens_api,
         imports_api,
         occurrences_api,
+        reminders_api,
         shares_api,
     )
 
@@ -39,6 +40,7 @@ def build_api_router() -> APIRouter:
         events_api.router,
         events_actions_api.router,
         occurrences_api.router,
+        reminders_api.router,
     ):
         router.include_router(sub)
     return router

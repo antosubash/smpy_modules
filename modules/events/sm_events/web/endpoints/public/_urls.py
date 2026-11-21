@@ -24,12 +24,13 @@ from urllib.parse import quote
 from fastapi import Request
 from simple_module_core.environments import NON_PROD_ENVIRONMENTS
 
-from sm_events.core import constants, locales
+from sm_events.core import constants, host_settings, locales
 from sm_events.core.tenancy import TenancyMode, mode_of
 
 __all__ = [
     "absolute",
     "api_path",
+    "build_event_path",
     "calendar_ics_path",
     "calendar_path",
     "configured_origin",
@@ -79,10 +80,16 @@ def calendar_path(slug: str, locale: str) -> str:
     return f"{_base(locale)}/{constants.SEGMENT_CALENDAR}/{_segment(slug)}"
 
 
+def build_event_path(slug: str, *, base: str, date: date | None = None) -> str:
+    """An event's page under ``base`` (the prefix plus the language's, ``/de/events``): pure, so
+    the reminder worker, which has no process-wide prefix or locale list, builds the same path."""
+    path = f"{base}/{_segment(slug)}"
+    return path if date is None else f"{path}?date={date.isoformat()}"
+
+
 def event_path(slug: str, locale: str, date: date | None = None) -> str:
     """An event's page; ``date`` names one occurrence of a series (``?date=``)."""
-    path = f"{_base(locale)}/{_segment(slug)}"
-    return path if date is None else f"{path}?date={date.isoformat()}"
+    return build_event_path(slug, base=_base(locale), date=date)
 
 
 def event_ics_path(slug: str, locale: str) -> str:
@@ -110,15 +117,11 @@ def api_path() -> str:
     return f"{_prefix}/{constants.SEGMENT_API}/occurrences"
 
 
-def _host_settings(app: Any) -> Any:
-    return getattr(getattr(app.state, "sm", None), "settings", None)
-
-
 def configured_origin(app: Any) -> str:
     """The host's ``public_base_url`` on a single-tenant host, else ``""``."""
     if mode_of(app) is not TenancyMode.SINGLE:
         return ""
-    return str(getattr(_host_settings(app), "public_base_url", "") or "").strip().rstrip("/")
+    return host_settings.public_base_url(app)
 
 
 def guessed(app: Any) -> bool:
@@ -143,7 +146,7 @@ def warn_if_unset(app: Any, mode: TenancyMode) -> bool:
     """Log once at startup when a production single-tenant host has no ``public_base_url``;
     returns whether it warned. Not on a multi-tenant host, where blank is right, nor in
     development or testing."""
-    environment = getattr(_host_settings(app), "environment", None)
+    environment = getattr(host_settings.host_settings(app), "environment", None)
     if not guessed(app) or environment in NON_PROD_ENVIRONMENTS:
         return False
     if mode is not TenancyMode.SINGLE:
