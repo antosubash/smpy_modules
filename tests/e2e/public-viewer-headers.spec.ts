@@ -47,12 +47,13 @@ test.describe('Public viewer headers', () => {
     expect(anonymous.headers().vary).toMatch(/Accept-Language/);
     await anon.close();
 
-    // CSP header is injected for every published response; the host
-    // overrides the default in dev to widen connect-src for Vite, so we
-    // only assert the baseline restrictive directives are present.
+    // Two policies are enforced together: the app's (nonce-based, `default-src 'self'`)
+    // and pagebuilder's `public_csp`, which forbids framing by default. Playwright
+    // joins a repeated header with ", ", so assert on the combined value.
     const csp = headers['content-security-policy'];
     expect(csp, 'CSP header missing').toBeTruthy();
     expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("frame-ancestors 'none'");
 
     // Cleanup.
     // Teardown deletes through the table, so ask for it —
