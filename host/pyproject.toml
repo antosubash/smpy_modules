@@ -22,6 +22,7 @@ dependencies = [
     "simple_module_images",
     "simple_module_analytics[geoip]",
     "simple_module_newsletter",
+    "simple_module_events",
 ]
 
 # Host is an application, not a distributable package.
@@ -48,6 +49,9 @@ workspace = true
 workspace = true
 
 [tool.uv.sources.simple_module_newsletter]
+workspace = true
+
+[tool.uv.sources.simple_module_events]
 workspace = true
 
 [dependency-groups]

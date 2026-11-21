@@ -1,0 +1,73 @@
+"""Names the module registers under; one place so nothing spells them twice."""
+
+from __future__ import annotations
+
+PACKAGE = "sm_events"
+MODULE_NAME = "Events"
+DISTRIBUTION = "simple_module_events"
+LOCALE_NAMESPACE = "events"
+BASE_NAME = "events"
+
+ROUTE_PREFIX_API = "/api/events"
+VIEW_PREFIX = "/admin/events"
+
+PERM_GROUP = MODULE_NAME
+PERM_GROUP_KEY = "events.permission_group"
+PERM_VIEW = "events.view"
+PERM_EDIT = "events.edit"
+PERM_PUBLISH = "events.publish"
+PERM_MANAGE = "events.manage"
+PERMISSIONS = (PERM_VIEW, PERM_EDIT, PERM_PUBLISH, PERM_MANAGE)
+
+_MODULE_SETTINGS = "Settings"
+_MODULE_SHARING = "Sharing"
+DEPENDS_ON = (_MODULE_SETTINGS, _MODULE_SHARING)
+
+TENANT_REQUIRED_CODE = "tenant_required"
+NOT_FOUND_DETAIL = "Not found"
+
+# Column widths and the shapes a slug, a timezone name and a colour may take.
+SLUG_MAX = 80
+SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+TEXT_SLUG_MAX = 200
+TZ_MAX = 64
+LOCALE_MAX = 16
+COLOR_PATTERN = r"^#[0-9a-f]{6}$"
+DEFAULT_COLOR = "#2563eb"
+
+OWNER_ONLY_DETAIL = "Only the calendar's owner or an events manager can do this"
+
+# Calendars.
+CALENDARS_MAX = 500
+CALENDAR_SLUG_FALLBACK = "calendar"
+SLUG_TAKEN_DETAIL = "That slug is already in use"
+EDIT_REFUSED_DETAIL = "You can see this calendar but not change it"
+OWNER_NOT_ALLOWED_CODE = "owner_not_allowed"
+OWNER_NOT_ALLOWED_DETAIL = "The new owner must be an active member of this organisation"
+
+# The share picker and the owner check read the user directory.
+CANDIDATES_MAX = 20
+CANDIDATES_SCAN = 100
+DIRECTORY_UNAVAILABLE_CODE = "user_directory_unavailable"
+DIRECTORY_UNAVAILABLE_DETAIL = "The user directory is not available"
+
+# Categories.
+CATEGORY_NAME_MAX = 100
+CATEGORY_SLUG_FALLBACK = "category"
+CATEGORIES_MAX = 500
+DEFAULT_LOCALE_REQUIRED_DETAIL = "A name in the default language is required"
+UNKNOWN_LOCALE_DETAIL = "That language is not one of the content locales"
+
+# Console pages and sidebar entries.
+_PAGE_CALENDARS = f"{MODULE_NAME}/Calendars"
+_PAGE_CATEGORIES = f"{MODULE_NAME}/Categories"
+CALENDARS_URL = f"{VIEW_PREFIX}/calendars"
+CATEGORIES_URL = f"{VIEW_PREFIX}/categories"
+MENU_GROUP = MODULE_NAME
+MENU_GROUP_KEY = "events.menu.group"
+MENU_LABEL_CALENDARS = "Calendars"
+MENU_LABEL_KEY_CALENDARS = "events.menu.calendars"
+MENU_ICON_CALENDARS = "calendar"
+MENU_LABEL_CATEGORIES = "Event categories"
+MENU_LABEL_KEY_CATEGORIES = "events.menu.categories"
+MENU_ICON_CATEGORIES = "tag"

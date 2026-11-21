@@ -5,6 +5,18 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+### Added
+
+- **events: a new module** (`simple_module_events`, #400): calendars with private,
+  internal and public visibility, shared through the sharing module, the
+  Calendars and Categories screens and their API. Hosts add the dependency
+  and run the `events` migration. Calendars carry a nullable `owner_name` (an
+  active member's display name, never an address; a failing directory or
+  membership lookup, a failed query included, leaves it blank without failing
+  the request). Names are single line (control and direction characters are
+  a 422), and a name with no slug-able characters gets the slug `calendar` or
+  `category`.
+
 ### Security
 
 - **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in

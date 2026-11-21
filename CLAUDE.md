@@ -126,10 +126,10 @@ is `POST /pages/{id}/translations`, which creates a sibling sharing a
 `translation_group`. Every slug lookup and redirect takes a locale; adding one
 that does not is how `/de/p/x` starts serving the English page.
 
-**Every pagebuilder, news, records, images and newsletter entry point binds a tenant (#38, #112).**
+**Every pagebuilder, news, records, images, newsletter and events entry point binds a tenant (#38, #112).**
 Their tables carry `MultiTenantMixin`, and the framework filters them only
 while a tenant is bound — on a host with `multi_tenant` off nothing is bound
-and a read is *unfiltered*. So all five install one fail-closed ORM guard
+and a read is *unfiltered*. So all six install one fail-closed ORM guard
 (`core/tenancy/_guard.py`, records' `_tenant_guard.py`, parity-checked, #335):
 an unbound statement on their tables raises `TenantUnbound`, and a deliberate
 cross-tenant read is tagged `tenancy.all_tenants(stmt)`; Core and `text()`
@@ -146,7 +146,8 @@ The scheduler opens one session per tenant under `tenant_context`. News has its
 own copy, `news.core.tenancy`, and its scheduler ticks per tenant the same way;
 records' is `sm_records.core.tenancy` (its 403 is the `{"detail","code"}` envelope,
 code `tenant_required`), images' `sm_images.core.tenancy` is a copy of it, and newsletter's
-`sm_newsletter.core.tenancy` is a copy of images'; images'
+`sm_newsletter.core.tenancy` is a copy of images', and events'
+`sm_events.core.tenancy` is a copy of newsletter's; images'
 Celery tasks never run unscoped — `images.reconcile` and `images.janitor`
 enumerate tenants in one narrow `all_tenants()` read and do each tenant's work
 under `tenant_context`, and newsletter's hourly reconcile does the same, enumerating
@@ -157,6 +158,22 @@ through `pagebuilder.contracts` (news' search calls
 contract pins `tenant_id` itself. A bundle section
 (`pagebuilder.contracts.bundle`, #80) applies through the restore's own
 session and bound tenant, and never commits or resolves a tenant itself.
+
+**Events access goes through `sm_events.core.access.POLICY`.** Every calendar
+route requires `events.view`; owners, edit shares and managers edit metadata,
+only owners and managers change visibility, share, trash or restore, and only
+managers transfer ownership. `events.edit` grants creating calendars and writing
+events on internal/public ones, never metadata edits on someone else's calendar.
+The share picker needs three trimmed characters, matches a user whose label has
+no at-sign (any variant) by name or exact full address, and a user whose label
+has one only by the exact full address (compared NFC-normalised and
+case-insensitively); it never parses labels. It masks every address, bare or inside a label, unless the
+query is the full address. Keep calendar responses naming an owner (`owner_name`)
+only for an active member of the bound tenant with a display name: a label that
+carries an address resolves to `null`, never a masked or raw address (that is
+the picker's, for owners and managers alone). A failing name lookup must leave
+the names `null`, never fail the list; the picker and the transfer
+eligibility check must still fail closed.
 
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
@@ -283,7 +300,7 @@ one place provider state becomes local state), and response models
 (`PlanOut`) must not inherit input bounds — a stored row that predates a bound
 would 500 every screen listing plans. Its docs are in `modules/billing/docs/`.
 
-**`pagebuilder`, `news`, `billing`, `ai`, `images`, `newsletter` and `records` read no environment variables for their settings.** The exceptions are the stored-secret crypto's: ai, billing, newsletter and records read `SM_SECRET_KEY_PREVIOUS` (below), and ai and newsletter also fall back to `SM_SECRET_KEY`. Their settings are
+**`pagebuilder`, `news`, `billing`, `ai`, `images`, `newsletter`, `records` and `events` read no environment variables for their settings.** The exceptions are the stored-secret crypto's: ai, billing, newsletter and records read `SM_SECRET_KEY_PREVIOUS` (below), and ai and newsletter also fall back to `SM_SECRET_KEY`. Their settings are
 DB-backed through the framework's settings module (`register_module_settings`),
 and each class drops pydantic-settings' env, `.env` and secrets sources — so
 adding a field means adding it to the class, not to `.env.example`, and an
@@ -518,7 +535,7 @@ the target fails without it.
 
 ## Known deferred work
 
-- **UI i18n — done in every module, in English and German.** All seven ship
+- **UI i18n — done in every module, in English and German.** All nine ship
   `locales/en.json` and `locales/de.json` and route every string through
   `t()`. `scripts/check_locales.py` (in `make lint` and CI) fails when a
   translation's key tree or placeholders drift from `en.json` — add a key to
@@ -535,7 +552,7 @@ the target fails without it.
   redundant. The framework modules' screens (users, settings, …) ship German
   since 0.0.38 as well.
 
-  news, pagebuilder, ai, billing, records and images call
+  news, pagebuilder, ai, billing, records, images and events call
   `t(keys.<module>.<section>.<key>)`, with no `defaultValue` — each
   module's `utils/i18n.ts` supplies the English text from `en.json`. A
   family of keys chosen at runtime (`filters.op.<op>`) is a
