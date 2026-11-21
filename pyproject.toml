@@ -67,6 +67,7 @@ include = [
     # The contracts packages.
     "modules/ai/sm_ai/contracts",
     "modules/billing/sm_billing/contracts",
+    "modules/events/sm_events/contracts",
     "modules/images/sm_images/contracts",
     "modules/news/news/contracts",
     "modules/pagebuilder/pagebuilder/contracts",

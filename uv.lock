@@ -3187,6 +3187,8 @@ version = "0.0.15"
 source = { editable = "modules/events" }
 dependencies = [
     { name = "pydantic-settings" },
+    { name = "python-dateutil" },
+    { name = "simple-module-background-tasks" },
     { name = "simple-module-core" },
     { name = "simple-module-db" },
     { name = "simple-module-hosting" },
@@ -3207,6 +3209,8 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
+    { name = "python-dateutil", specifier = ">=2.9,<4" },
+    { name = "simple-module-background-tasks", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-core", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-db", specifier = ">=0.0.44,<0.1" },
     { name = "simple-module-hosting", specifier = ">=0.0.44,<0.1" },

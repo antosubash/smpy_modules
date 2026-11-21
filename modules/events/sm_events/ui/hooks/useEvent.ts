@@ -1,0 +1,133 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { errorText, isGone } from '../utils/api';
+import { getEvent } from '../utils/api-events';
+import { emptyForm, type FormState, type TextForm, toForm } from '../utils/event-form';
+import { mergeOnto } from '../utils/form-merge';
+import type { EventDetail } from '../utils/types-events';
+import { useLatestRequest } from './useLatestRequest';
+import type { ScopedRequest } from './useRequestScope';
+
+export type LoadState = 'loading' | 'ready' | 'gone' | 'error';
+
+/** The editor's event and its form. `base` is what the form is compared with to
+ *  find what to save: the loaded event, or after a conflict the newer one the
+ *  form is about to be saved over. */
+export function useEvent({
+  eventId,
+  locales,
+  timezone,
+}: {
+  eventId: string | null;
+  locales: readonly string[];
+  timezone: string;
+}) {
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [state, setState] = useState<LoadState>(eventId ? 'loading' : 'ready');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(() => emptyForm(timezone, locales));
+  const [base, setBase] = useState<FormState>(form);
+  const [tab, setTab] = useState(locales[0] ?? 'en');
+  const begin = useLatestRequest();
+  /** What the form and its base are right now, for a completion that must not
+   *  trust what it captured when its request started. */
+  const latest = useRef({ form, base });
+  latest.current = { form, base };
+
+  const adopt = useCallback(
+    (next: EventDetail) => {
+      const loaded = toForm(next, locales);
+      setEvent(next);
+      setForm(loaded);
+      setBase(loaded);
+      setState('ready');
+    },
+    [locales],
+  );
+  /** Their version becomes the base the form is saved against, and the form
+   *  becomes their version with only the user's own edits on top: what differs
+   *  between `started` (the version the user began from, by default the current
+   *  base) and the form. A field the user left alone takes their value, so a
+   *  later save sends only what the user changed. The answer is whether any
+   *  edit remains. Every conflict path goes through here. */
+  const rebase = useCallback(
+    (theirs: EventDetail, started: FormState = latest.current.base) => {
+      const loaded = toForm(theirs, locales);
+      const merged = mergeOnto(started, latest.current.form, loaded);
+      latest.current = { form: merged, base: loaded };
+      setEvent(theirs);
+      setBase(loaded);
+      setForm(merged);
+      return JSON.stringify(merged) !== JSON.stringify(loaded);
+    },
+    [locales],
+  );
+  const fetchEvent = useCallback(
+    (request: ScopedRequest) => getEvent(eventId ?? '', undefined, request.signal),
+    [eventId],
+  );
+  const load = useCallback(async () => {
+    if (!eventId) return;
+    const request = begin();
+    setState('loading');
+    setLoadError(null);
+    try {
+      const next = await fetchEvent(request);
+      if (request.alive()) adopt(next);
+    } catch (e) {
+      if (!request.alive()) return;
+      if (isGone(e)) setState('gone');
+      else {
+        setState('error');
+        setLoadError(errorText(e));
+      }
+    }
+  }, [eventId, begin, fetchEvent, adopt]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  /** Fetch again and replace the form: for use only when it holds no edits. */
+  const reload = useCallback(async () => {
+    const request = begin();
+    const next = await fetchEvent(request);
+    if (request.alive()) adopt(next);
+  }, [begin, fetchEvent, adopt]);
+
+  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(base), [form, base]);
+  const setFields = useCallback(
+    (patch: Partial<FormState>) => setForm((now) => ({ ...now, ...patch })),
+    [],
+  );
+  const setText = useCallback(
+    (locale: string, patch: Partial<TextForm>) =>
+      setForm((now) => {
+        const current = now.texts[locale];
+        return current
+          ? { ...now, texts: { ...now.texts, [locale]: { ...current, ...patch } } }
+          : now;
+      }),
+    [],
+  );
+  return {
+    event,
+    state,
+    loadError,
+    form,
+    base,
+    dirty,
+    latest,
+    tab,
+    setTab,
+    setForm,
+    setFields,
+    setText,
+    adopt,
+    rebase,
+    fetchEvent,
+    load,
+    reload,
+    markGone: useCallback(() => setState('gone'), []),
+  };
+}
+
+export type EventState = ReturnType<typeof useEvent>;

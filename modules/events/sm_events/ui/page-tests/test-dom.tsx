@@ -119,3 +119,10 @@ export async function settle(): Promise<void> {
 }
 
 export { act };
+
+/** Radix tabs activate on `mousedown`, not `click`. */
+export async function pickTab(el: Element | null | undefined): Promise<void> {
+  await act(async () => {
+    el?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
+  });
+}

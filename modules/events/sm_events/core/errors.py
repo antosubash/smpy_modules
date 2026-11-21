@@ -2,8 +2,8 @@
 
 Services never import FastAPI, so they raise these and the app-level handler
 installed by :func:`install_exception_handlers` renders them. The body is
-``{"detail": ..., "code": ...}``; FastAPI's own request-validation 422 keeps its
-standard shape.
+``{"detail": ..., "code": ...}``, plus ``"field"`` when the refusal belongs to one
+input; FastAPI's own request-validation 422 keeps its standard shape.
 """
 
 from __future__ import annotations
@@ -20,12 +20,21 @@ class EventsError(Exception):
     status_code: int = 400
     code: str = "events_error"
     detail: str = "Events error"
+    headers: dict[str, str] | None = None
+    """Extra response headers; the body is always exactly ``detail`` and ``code``."""
+    field: str | None = None
+    """The request input the refusal belongs to (a dotted path such as ``times.end`` or
+    ``texts.de.slug``), when the server knows. It is the body's only extra key."""
 
-    def __init__(self, detail: str | None = None, code: str | None = None) -> None:
+    def __init__(
+        self, detail: str | None = None, code: str | None = None, field: str | None = None
+    ) -> None:
         if detail is not None:
             self.detail = detail
         if code is not None:  # else the class default stands
             self.code = code
+        if field is not None:
+            self.field = field
         super().__init__(self.detail)
 
 
@@ -79,6 +88,103 @@ class UnknownLocale(Invalid):
     detail = constants.UNKNOWN_LOCALE_DETAIL
 
 
+class Stale(Conflict):
+    """The caller's ``expected_revision`` is not the event's. The current one rides
+    in a header (and on the instance), never in the body."""
+
+    code = constants.STALE_CODE
+    detail = constants.STALE_DETAIL
+
+    def __init__(self, current_revision: int | None = None) -> None:
+        super().__init__()
+        self.current_revision = current_revision
+        if current_revision is not None:
+            self.headers = {constants.CURRENT_REVISION_HEADER: str(current_revision)}
+
+
+class OverridesOrphaned(Conflict):
+    code = constants.OVERRIDES_ORPHANED_CODE
+    detail = constants.OVERRIDES_ORPHANED_DETAIL
+
+
+class HasSubEvents(Conflict):
+    code = constants.HAS_SUB_EVENTS_CODE
+    detail = constants.HAS_SUB_EVENTS_DETAIL
+
+
+class InvalidTransition(Conflict):
+    code = constants.INVALID_TRANSITION_CODE
+    detail = constants.INVALID_TRANSITION_DETAIL
+
+
+class PublishRequired(Forbidden):
+    """A writer who may see the event but not change a locked one."""
+
+    code = constants.PUBLISH_REQUIRED_CODE
+    detail = constants.PUBLISH_REQUIRED_DETAIL
+
+
+class InvalidRule(Invalid):
+    """Also raised with ``rrule_frequency_refused`` and ``start_not_in_rule``."""
+
+    code = constants.INVALID_RRULE_CODE
+    detail = constants.INVALID_RRULE_DETAIL
+
+
+class InvalidTimes(Invalid):
+    """Also raised with ``end_before_start`` and ``duration_too_long``."""
+
+    code = constants.INVALID_LOCAL_TIME_CODE
+    detail = constants.INVALID_LOCAL_TIME_DETAIL
+
+
+class InvalidRange(Invalid):
+    """Also raised with ``range_too_long``."""
+
+    code = constants.INVALID_RANGE_CODE
+    detail = constants.INVALID_RANGE_DETAIL
+
+
+class DefaultLocaleRequired(Invalid):
+    code = constants.DEFAULT_LOCALE_REQUIRED_CODE
+    detail = constants.DEFAULT_LOCALE_REQUIRED_DETAIL
+
+
+class UnknownCategory(Invalid):
+    code = constants.UNKNOWN_CATEGORY_CODE
+    detail = constants.UNKNOWN_CATEGORY_DETAIL
+
+
+class UnknownType(Invalid):
+    code = constants.UNKNOWN_TYPE_CODE
+    detail = constants.UNKNOWN_TYPE_DETAIL
+
+
+class InvalidParent(Invalid):
+    code = constants.INVALID_PARENT_CODE
+    detail = constants.INVALID_PARENT_DETAIL
+
+
+class ImmutableField(Invalid):
+    code = constants.IMMUTABLE_FIELD_CODE
+    detail = constants.IMMUTABLE_FIELD_DETAIL
+
+
+class NotRecurring(Invalid):
+    code = constants.NOT_RECURRING_CODE
+    detail = constants.NOT_RECURRING_DETAIL
+
+
+class NotAnOccurrence(Invalid):
+    code = constants.NOT_AN_OCCURRENCE_CODE
+    detail = constants.NOT_AN_OCCURRENCE_DETAIL
+
+
+class DescriptionTooLong(Invalid):
+    code = constants.DESCRIPTION_TOO_LONG_CODE
+    detail = constants.DESCRIPTION_TOO_LONG_DETAIL
+
+
 class ServiceUnavailable(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 503
     code = "service_unavailable"
@@ -91,5 +197,11 @@ def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(EventsError)
     async def _events_error(_request: Request, exc: EventsError) -> JSONResponse:
         return JSONResponse(
-            status_code=exc.status_code, content={"detail": exc.detail, "code": exc.code}
+            status_code=exc.status_code,
+            content={
+                "detail": exc.detail,
+                "code": exc.code,
+                **({"field": exc.field} if exc.field else {}),
+            },
+            headers=exc.headers,
         )

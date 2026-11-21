@@ -12,7 +12,7 @@ from sm_events.models import (
     EventText,
     Visibility,
 )
-from sqlalchemy import Index, UniqueConstraint
+from sqlalchemy import Index, UniqueConstraint, select
 from sqlalchemy.exc import IntegrityError
 
 TABLES = {
@@ -150,3 +150,15 @@ async def test_calendar_defaults(db):
     assert cal.color == "#2563eb"
     assert cal.default_timezone == "UTC"
     assert cal.sources == []
+
+
+async def test_revision_note_nullable(db):
+    from sm_events.models import Revision
+
+    event = await _event(db, await _calendar(db))
+    db.add(Revision(event_id=event.id, number=1, action="created"))
+    db.add(Revision(event_id=event.id, number=2, action="rejected", note="x" * 1000))
+    await db.flush()
+    rows = (await db.execute(select(Revision).order_by(Revision.number))).scalars().all()
+    assert rows[0].note is None
+    assert rows[1].note == "x" * 1000

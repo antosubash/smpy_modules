@@ -733,13 +733,13 @@ jobs:
             fs_root_path "$RUNNER_TEMP/files"
 
       # One worker on the queues `make worker` serves (images, newsletter,
-      # celery) and one beat: never two schedulers.
+      # events, celery) and one beat: never two schedulers.
       - name: Start host, worker and beat
         run: |
           nohup uv run --no-sync --project host uvicorn main:app --app-dir host \
             --host 127.0.0.1 --port 8000 > "$RUNNER_TEMP/host.log" 2>&1 &
           nohup uv run --no-sync --project host celery -A worker:celery worker -l info \
-            -Q images,newsletter,celery -c 2 > "$RUNNER_TEMP/worker.log" 2>&1 &
+            -Q images,newsletter,events,celery -c 2 > "$RUNNER_TEMP/worker.log" 2>&1 &
           nohup uv run --no-sync --project host celery -A worker:celery beat -l info \
             -s "$RUNNER_TEMP/celerybeat-schedule" > "$RUNNER_TEMP/beat.log" 2>&1 &
 

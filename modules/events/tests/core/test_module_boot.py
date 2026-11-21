@@ -28,7 +28,7 @@ def test_meta():
     assert meta.name == "Events"
     assert meta.route_prefix == "/api/events"
     assert meta.view_prefix == "/admin/events"
-    assert set(meta.depends_on) == {"Settings", "Sharing"}
+    assert set(meta.depends_on) == {"Settings", "Sharing", "BackgroundTasks"}
 
 
 async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch):

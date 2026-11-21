@@ -11,7 +11,7 @@ One calendar policy supplies every caller's rights. `M` is `events.manage`,
 `Pr`, `In` and `Pu` mean private, internal and public calendars. The table
 assumes three calendars with the same owner and, for share holders, the same
 unexpired share on each. A dash means none. “Edit” is calendar metadata;
-“Write” and “Publish” describe the event rights PR 2 will consume.
+“Write” and “Publish” are the event rights: Write creates and edits drafts, and Publish approves, schedules, unpublishes and changes a locked event.
 
 | Principal | Permissions | View | Edit | Delete / share | Write | Publish |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ API requests need `events.view`; creation also needs `events.edit`. Calendar
 pages need `events.view`, and Categories needs both `events.view` and
 `events.manage`; category API
 writes need both view and manage. The framework sharing API additionally needs
-`sharing.share`. No anonymous event API or page ships in PR 1.
+`sharing.share`. No anonymous event API or page ships yet.
 
 Calendar responses carry `owner_name`, a string or `null`. Every viewer of a
 calendar sees its owner's display name when the owner is an active member of the
@@ -77,6 +77,138 @@ and case-insensitively, so a query typed with decomposed accents matches; a
 directory provider that does not return a user for such a query is outside the
 module's control. The UI displays that response verbatim.
 
+## Events and texts
+
+An event belongs to one calendar and has a type (`event`), a status
+(`draft`, `in_review`, `published`) and a text per content locale
+(`content_locales`, the first is the default and always required). A text has a
+title, a slug unique per tenant and locale, a summary, a rich-text description
+and search fields. An absent slug is derived from the title. Renaming a slug
+records a redirect in that locale only; claiming a slug removes a redirect to it.
+`calendar_id`, `parent_id` and `type` cannot change after creation. A sub-event
+has a parent in the same calendar (one level only); a series cannot have
+sub-events and a sub-event cannot repeat.
+
+The description is rich text. The server cleans it when it is saved
+(`content/richtext.py`, an allow-list of `p br strong em u s a ul ol li blockquote
+h2 h3`, links only `http`, `https` or `mailto`) and returns the cleaned HTML.
+The editor never trusts input either: HTML it loads, pastes or emits goes
+through its own copy of the allow-list (`ui/utils/richtext.ts`), and a read-only
+description is shown in a sandboxed frame. Nothing outside the allow-list is
+ever inserted as markup.
+
+## Times and all-day
+
+The API takes the event's local wall clock plus an IANA `timezone`, never UTC:
+`times: {all_day, timezone, start, end}` with `YYYY-MM-DDTHH:MM` for a timed
+event and `YYYY-MM-DD` for an all-day one, whose `end` is the inclusive last
+day. Responses carry the UTC `starts_at` and `ends_at` and the same local form
+(`start_local`, `end_local`). A time in a daylight-saving gap is refused
+(`invalid_local_time`); a time that occurs twice uses its first occurrence. An
+all-day event is stored from local midnight of its first day to local midnight
+after its last. A timed event lasts up to 366 days, a recurring event or a moved
+occurrence up to 31.
+
+A refusal that belongs to one input carries its dotted request path as `field`
+beside `detail` and `code`: `times.start` or `times.end` for `invalid_local_time`
+(an override's own are `start` and `end`), `times.end` for `end_before_start` and
+`duration_too_long`, `publish_at_local` for an approve time in a gap,
+`texts.<locale>.slug` for `slug_taken` and `texts.<locale>.description` for
+`description_too_long`. Every other refusal keeps exactly `detail` and `code`.
+The console shows the message at that input; the list's date filters are the
+console user's days in their own time zone, sent as instants, and a new event
+starts on today's date on its calendar's clock.
+
+## Recurrence
+
+The rule is an RRULE string, stored normalised. Allowed: `FREQ` of `DAILY`,
+`WEEKLY`, `MONTHLY` or `YEARLY` (sub-daily rules are `rrule_frequency_refused`),
+`INTERVAL` 1 to 99, `COUNT` 1 to 730 or `UNTIL` (not both), and the parts
+`BYDAY`, `BYMONTHDAY`, `BYMONTH`, `BYSETPOS` and `WKST`. `BYHOUR`, `BYMINUTE`,
+`BYSECOND`, `BYWEEKNO`, `BYYEARDAY` and anything else are `invalid_rrule`. The start
+must be the first occurrence of its rule (`start_not_in_rule`). Occurrences
+keep their wall-clock time across daylight-saving changes; an instance in a gap
+moves forward by the gap. Expansion is lazy and always bounded by an `until`:
+never expand a rule without one. The editor covers daily, weekly (weekdays),
+monthly (day of month, or the nth or last weekday) and yearly, ending never,
+after N times or on a date. Any other stored rule (including an interval or count
+outside those limits) is shown read-only as text and sent back unchanged unless
+the user edits it as text or replaces it with a repeat from the form.
+
+## Overrides
+
+One override exists per (event, original start). `skipped` removes the
+occurrence, `cancelled` keeps it marked cancelled, `moved` changes only the start
+and end (on the event's clock). An override needs a recurring event
+(`not_recurring`) and a real occurrence (`not_an_occurrence`). Changing a series'
+rule, start, timezone or all-day flag first runs `POST /recurrence/preview`: if
+overrides would no longer match, the save needs `drop_orphaned_overrides`
+(409 `overrides_orphaned` otherwise), and the editor asks for that confirmation.
+
+## The occurrences read
+
+`GET /occurrences` and `sm_events.contracts.occurrences` answer every range
+question within fixed bounds: a range of at most 366 days (`range_too_long`,
+`invalid_range`), at most 2,000 items, sorted by (start, end, source, key), with
+`truncated` set when there are more. Series are expanded lazily and merged, so
+the work does not depend on how many instances the range holds. An occurrence
+key is the event id, plus the original start for a series instance (a moved
+one keeps its original key). A viewer without write rights never receives a
+draft, an event in review or a scheduled one.
+
+## Workflow
+
+Every transition is a `POST` with `expected_revision`; a state it cannot leave is
+409 `invalid_transition`.
+
+| Action | From | To | Needs |
+| --- | --- | --- | --- |
+| `submit` | draft | in review | write |
+| `withdraw` | in review | draft | write |
+| `approve` (optional `publish_at_local`) | draft, in review | published, or scheduled for a future time | write and publish |
+| `reject` (`note` required) | in review | draft | write and publish |
+| `unschedule` | scheduled | same status, no time | write and publish |
+| `unpublish` | published | draft | write and publish |
+
+*Scheduled* is a draft or event in review with `publish_at`. A published or
+scheduled event is **locked**: changing, trashing, restoring or overriding it
+needs write and publish (403 `publish_required` otherwise). A caller who cannot
+see an event gets 404. The editor mirrors that rule (`workflowActions`): an
+action is offered only when the caller can write the event and, for every action
+but submit and withdraw, also publish. It shows a read-only reason instead of a
+form for a locked event.
+
+## Revisions and conflicts
+
+Every write, the beat's included, increments `revision` and records a revision
+with its action, actor (`null` for the beat) and, for a rejection or dropped
+overrides, a note. The newest 100 are kept. History is read-only. Its rows carry
+`actor_name`, resolved in one batch with the owner-name rules above (an actor who
+is not a named member is `null`), and `system: true` for the beat's rows, which
+have no actor at all; the console shows the name, else "Unknown user", else
+"System". A write's first
+statement is a compare-and-set on `expected_revision`: a stale one is 409
+`stale` and writes nothing. The editor then loads the newer event, shows the
+fields that differ and offers "Load their version" or "Save mine over theirs",
+an explicit click that resends with the new revision. It never retries by itself.
+
+## Bus events
+
+`sm_events.contracts.events`: `EventPublished`, `EventRescheduled` (a time,
+timezone, all-day or rule change of a published event, or a moved occurrence),
+`EventCancelled` and `EventDeleted`, for events that are or were published, and
+only after the write commits. Reinstating, unpublishing and skipping emit
+nothing yet. A scheduled publish runs in a worker with no in-process bus, so it
+emits nothing either.
+
+## Scheduled publishing (needs beat)
+
+`events.publish_due` runs every 60 seconds on the `events` queue (`expires`
+55 s) and publishes up to 200 due events per tenant, each tenant under its own
+session. It does not re-check the scheduler's right: the `scheduled` revision
+records who scheduled it. A host without Celery beat never publishes on a
+schedule. `make worker` serves the `events` queue.
+
 ## Tenancy
 
 Every table carries `MultiTenantMixin`. `sm_events.core.tenancy` copies
@@ -116,20 +248,24 @@ have UUID primary keys; the remaining tables have big-int keys.
 | `events_redirect` | PR 2: locale-scoped event slug redirects |
 
 The demo host's revision `b8e1d0783868` follows `c7a41e9d2b60` and creates all
-seven tables. Migrations belong to the host. The `events` branch label is a
+seven tables; `f3c0b2daeaf2` follows it and adds the nullable
+`events_revision.note` (a reject note, or the overrides a series change
+dropped). Migrations belong to the host. The `events` branch label is a
 named target in a shared history, not a way to roll back this module alone.
-No background task or public contract ships in PR 1. Calendar metadata is
-last-write-wins; event writes will use `expected_revision` from PR 2.
+Calendar metadata is
+last-write-wins; event writes use `expected_revision`.
 
 ## Status
 
-PR 1 provides the Calendars and Categories screens and API, settings, the
-tenancy/access policy and all seven tables. Browser QA and the shipping
-pipeline follow branch verification. Later delivery remains:
+PR 2 adds events: texts, recurrence and overrides, the occurrences read, the
+workflow, scheduled publishing, the API, and the Events list and editor. PR 1
+provided calendars, categories, settings, the tenancy and access policy and all
+seven tables. Browser QA and the shipping pipeline follow branch verification.
+Later delivery remains:
 
 | PR | Delivers |
 | --- | --- |
-| 2 | Events and texts, recurrence and overrides, occurrences read, workflow, API, list and editor |
+| 2 (this release) | Events and texts, recurrence and overrides, occurrences read, workflow, API, list and editor |
 | 3 | Calendar component and console grid: views, create, drag, resize, timezone |
 | 4 | Public pages, calendar slug redirects, public ICS, JSON-LD and sitemap |
 | 5 | Private feed tokens and `.ics` upload |

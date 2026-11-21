@@ -14,9 +14,10 @@ from sqlalchemy.exc import IntegrityError
 
 from sm_events.core import constants
 from sm_events.core.errors import SlugTaken
+from sm_events.models import EventText
 from sm_events.models._base import Base
 
-__all__ = ["free_slug", "slug_taken", "slug_write", "slugify"]
+__all__ = ["free_slug", "free_text_slug", "slug_taken", "slug_write", "slugify", "text_slug_taken"]
 
 _NOT_SLUG = re.compile(r"[^a-z0-9]+")
 
@@ -89,6 +90,30 @@ async def free_slug(db: Any, model: type, base: str) -> str:
     """``base``, else ``base-2``, ``base-3``... the first one nobody holds."""
     slug, n = base, 1
     while await slug_taken(db, model, slug):
+        n += 1
+        suffix = f"-{n}"
+        slug = f"{base[: constants.SLUG_MAX - len(suffix)].rstrip('-')}{suffix}"
+    return slug
+
+
+async def text_slug_taken(db: Any, locale: str, slug: str, *, except_event: Any = None) -> bool:
+    """Is ``slug`` used by an event text in ``locale``? Texts are never
+    soft-deleted, so a trashed event's slug stays held (the index covers it)."""
+    stmt = (
+        select(func.count())
+        .select_from(EventText)
+        .where(EventText.locale == locale, EventText.slug == slug)
+    )
+    if except_event is not None:
+        stmt = stmt.where(EventText.event_id != except_event)
+    return bool((await db.execute(stmt)).scalar_one())
+
+
+async def free_text_slug(db: Any, locale: str, base: str, *, except_event: Any = None) -> str:
+    """``free_slug`` scoped to one language: ``base``, ``base-2``... the first
+    one no other event's text holds in ``locale``."""
+    slug, n = base, 1
+    while await text_slug_taken(db, locale, slug, except_event=except_event):
         n += 1
         suffix = f"-{n}"
         slug = f"{base[: constants.SLUG_MAX - len(suffix)].rstrip('-')}{suffix}"
