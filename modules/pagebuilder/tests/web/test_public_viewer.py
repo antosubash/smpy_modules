@@ -56,7 +56,38 @@ async def test_published_page_renders_with_headers(authed_client: AsyncClient) -
     assert response.status_code == 200
     assert response.headers.get("ETag", "").startswith('W/"')
     assert response.headers["Cache-Control"].startswith("public, max-age=")
-    assert response.headers.get("Content-Security-Policy", "").startswith("default-src 'self'")
+    # The module's default only forbids framing; the app's own policy is separate.
+    assert response.headers["Content-Security-Policy"] == "frame-ancestors 'none'"
+
+
+async def test_a_stored_public_csp_is_sent(authed_client: AsyncClient) -> None:
+    await _create_published(authed_client)
+    settings = authed_client._transport.app.state.pagebuilder.settings  # type: ignore[attr-defined]
+    settings.public_csp = "img-src 'self'"
+    response = await authed_client.get("/p/hello", headers={**_INERTIA_HEADERS, **_ANON})
+    assert response.status_code == 200
+    assert response.headers["Content-Security-Policy"] == "img-src 'self'"
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\n\t "])
+async def test_a_blank_public_csp_sends_no_header(authed_client: AsyncClient, blank: str) -> None:
+    """Empty and whitespace-only are both off, on the page route and the 404 route."""
+    await _create_published(authed_client)
+    settings = authed_client._transport.app.state.pagebuilder.settings  # type: ignore[attr-defined]
+    settings.public_csp = blank
+    page = await authed_client.get("/p/hello", headers={**_INERTIA_HEADERS, **_ANON})
+    assert page.status_code == 200
+    assert page.headers.get_list("content-security-policy") == []
+    missing = await authed_client.get("/p/nope", headers={**_INERTIA_HEADERS, **_ANON})
+    assert missing.status_code == 404
+    assert missing.headers.get_list("content-security-policy") == []
+
+
+async def test_the_default_policy_is_on_the_404(authed_client: AsyncClient) -> None:
+    await _create_published(authed_client)
+    missing = await authed_client.get("/p/nope", headers={**_INERTIA_HEADERS, **_ANON})
+    assert missing.status_code == 404
+    assert "frame-ancestors 'none'" in missing.headers.get_list("content-security-policy")
 
 
 async def test_published_page_unpublishes_to_404(authed_client: AsyncClient) -> None:

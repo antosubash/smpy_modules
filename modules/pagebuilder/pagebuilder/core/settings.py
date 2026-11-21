@@ -62,22 +62,18 @@ class PagebuilderSettings(MediaSettings):
     404ing the entire site at the first request.
     """
 
-    public_csp: str = (
-        "default-src 'self'; "
-        "script-src 'self'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' https: data:; "
-        "font-src 'self' data:; "
-        "connect-src 'self'; "
-        "frame-ancestors 'none'; "
-        "base-uri 'self'; "
-        "form-action 'self'"
-    )
-    """Content-Security-Policy header value for ``/p/{slug}`` responses.
+    public_csp: str = "frame-ancestors 'none'"
+    """An ADDITIONAL ``Content-Security-Policy`` for ``/p/{slug}`` responses.
 
-    Widen it on the Settings screen for analytics, fonts, CDNs, etc. Set to
-    an empty string to disable. Read per response, so a change is live on
-    save.
+    The default only forbids framing: the app policy's ``frame-ancestors`` is
+    ``'self'``, and the two are enforced together, so public pages are not
+    framed even by the same origin. It has no ``script-src``, ``style-src`` or
+    ``font-src``, so it never conflicts with the app's nonce-based policy.
+    Since framework 0.0.45 a response's own policy is sent *beside* the app's
+    and the browser enforces both, so a value can only restrict further, never
+    widen. It is static and cannot carry the per-request nonce: a ``script-src``
+    in it blocks the host's own scripts. Set it empty to send no header of its
+    own. Read per response, so a change is live on save.
     """
 
     public_cache_max_age: int = 60
