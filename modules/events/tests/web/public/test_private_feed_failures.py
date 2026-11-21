@@ -139,8 +139,21 @@ def _comparable(answer):
 
 
 async def test_a_revoked_token_is_throttled_exactly_like_an_invented_one(monkeypatch):
-    """Row exists but refused vs no such row: the same budget, and at the limit the same 429."""
+    """Row exists but refused vs no such row: the same budget, and at the limit the same 429.
+
+    The throttle's clock is frozen: ``Retry-After`` is the window less the time since a
+    burst's first hit, so on a loaded machine two bursts of unequal length differ by a
+    second, which says nothing about the token."""
+    from sm_events.feeds.tokens.throttle import TokenThrottle
+
     monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    frozen = TokenThrottle(
+        limit=constants.FEED_TOKEN_RATE,
+        window=constants.FEED_TOKEN_WINDOW_SECONDS,
+        max_keys=constants.FEED_THROTTLE_KEYS,
+        clock=lambda: 1000.0,
+    )
+    monkeypatch.setattr(_private_feed, "THROTTLE", frozen)
     async with private_http() as http:
         world = await seed_world(http)
         await _revoke(http, world)
@@ -173,3 +186,18 @@ async def test_a_refused_row_is_evicted_by_junk_like_an_invented_token(monkeypat
             await http.get(feed_path(f"evf_{i:043d}"))
         assert (await http.get(world.path)).status_code == 404
         assert (await http.get(mine)).status_code == 404
+
+
+async def test_the_fetch_after_a_revoke_answers_is_refused(monkeypatch):
+    """The revoke endpoint commits before its 204 leaves, so the next fetch is the refusal."""
+    from tests.support.app import as_user
+
+    monkeypatch.setattr(constants, "FEED_DENY_FLOOR_SECONDS", 0)
+    async with private_http() as http:
+        world = await seed_world(http)
+        assert (await http.get(world.path)).status_code == 200
+        gone = await http.delete(
+            f"/api/events/feed-tokens/{world.token_id}", headers=as_user("sv", "events.view")
+        )
+        assert gone.status_code == 204, gone.text
+        assert (await http.get(world.path)).status_code == 404
