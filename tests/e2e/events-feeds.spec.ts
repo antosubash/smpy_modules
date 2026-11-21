@@ -22,10 +22,14 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(() => expect(problems).toEqual([]));
 
-async function openSubscribe(page: Page, name: string) {
+/** A calendar's row by its slug: the name is plain (screenshots), so a retry's calendar shares it. */
+const calendarRow = (page: Page, slug: string) =>
+  page.getByRole('row').filter({ has: page.getByRole('cell', { name: slug, exact: true }) });
+
+async function openSubscribe(page: Page, cal: { name: string; slug: string }) {
   await page.goto('/admin/events/calendars');
-  const row = page.getByRole('row').filter({ hasText: name });
-  await row.getByRole('button', { name: `Subscribe to ${name}` }).click();
+  const row = calendarRow(page, cal.slug);
+  await row.getByRole('button', { name: `Subscribe to ${cal.name}` }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Subscribe to this calendar' })).toBeVisible();
   return dialog;
@@ -85,7 +89,7 @@ test('a private link is shown once, serves the published events, and stops when 
     end: '2027-03-11T21:00',
   });
 
-  const dialog = await openSubscribe(page, cal.name);
+  const dialog = await openSubscribe(page, cal);
   await dialog.getByLabel('Name for this link').fill('My phone');
   await dialog.getByRole('button', { name: 'Create a private link' }).click();
   await expect(dialog.getByText('You will not see this link again')).toBeVisible();
@@ -104,7 +108,7 @@ test('a private link is shown once, serves the published events, and stops when 
   // Close and reopen: the label is listed, the link is gone from the page.
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  const reopened = await openSubscribe(page, cal.name);
+  const reopened = await openSubscribe(page, cal);
   await expect(reopened.getByText('My phone')).toBeVisible();
   await expect(reopened.getByLabel('Private calendar link')).toHaveCount(0);
   expect(await page.content()).not.toContain(url.split('/').pop()?.replace('.ics', '') ?? 'x');
@@ -114,8 +118,21 @@ test('a private link is shown once, serves the published events, and stops when 
   await reopened.getByRole('button', { name: 'Everyone’s links' }).click();
   await expect(reopened.getByText('My phone')).toBeVisible();
 
+  // The revoke is held back, as a slow commit does on CI. While the confirm is pending the
+  // Subscribe dialog is `aria-hidden`, so `reopened` matches nothing and "My phone is gone"
+  // would pass at once: only the DELETE's answer and the closed confirm prove it happened.
+  await page.route('**/api/events/feed-tokens/*', async (route) => {
+    if (route.request().method() === 'DELETE') await new Promise((r) => setTimeout(r, 750));
+    await route.continue();
+  });
+  const revoking = page.waitForResponse(
+    (r) => r.request().method() === 'DELETE' && r.url().includes('/api/events/feed-tokens/'),
+  );
   await reopened.getByRole('button', { name: 'Revoke My phone' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Revoke', exact: true }).click();
+  expect((await revoking).status()).toBe(204);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(reopened.getByRole('heading', { name: 'Subscribe to this calendar' })).toBeVisible();
   await expect(reopened.getByText('My phone')).toHaveCount(0);
 
   // After revoking: exactly what an invented link gets.
@@ -139,7 +156,7 @@ test('the dialog speaks German and fits a phone', async ({ page, context }) => {
     plain: true,
   });
   await page.goto('/admin/events/calendars');
-  const row = page.getByRole('row').filter({ hasText: cal.name });
+  const row = calendarRow(page, cal.slug);
   await row.getByRole('button', { name: `${cal.name} abonnieren` }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Diesen Kalender abonnieren' })).toBeVisible();
