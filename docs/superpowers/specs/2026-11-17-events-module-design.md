@@ -424,3 +424,20 @@ zone being edited); overrides and workflow actions apply to the saved event and
 wait for unsaved edits; a save over a newer revision shows what differs and
 resends only on an explicit click; a sub-event is created with
 `/admin/events/edit/new?calendar=<id>&parent=<id>`.
+
+## Amendments (PR 3)
+
+The approved PR 3 rulings refine the design above. FullCalendar is imported only
+under `ui/calendar/adapter/`, stricter than `ui/calendar/` (ruling 2), and the
+grid is a lazily loaded chunk so no other screen or importer pays for it (4).
+The fetch range is the visible range plus seven days a side, at most 366 days,
+cached eight pages deep and aborted on every new fetch (11). "Calendar time" is
+the one shown calendar's zone, else the tenant's; "my time" is the browser's
+(12). A grid change becomes the event's own wall clock through Temporal, never
+UTC; a drop on the second occurrence of a repeated autumn hour is refused
+client-side (13). "All occurrences" shifts the master on the event's wall clock
+and never rewrites the rule, so a weekday change on a `BYDAY` series is the
+server's `start_not_in_rule` (14). An occurrence carries no revision, so a write
+reads the event first and stops as stale when the grid is out of date (15).
+The interaction plugin must be in the adapter's plugin list: without it FullCalendar 7
+cannot drag, resize or select.

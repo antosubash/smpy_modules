@@ -156,6 +156,132 @@ key is the event id, plus the original start for a series instance (a moved
 one keeps its original key). A viewer without write rights never receives a
 draft, an event in review or a scheduled one.
 
+## The calendar
+
+`/admin/events/` (`events.view`) draws the occurrences read as month, week,
+day and list. The toolbar has Today, Previous, Next, the range title and the
+view switcher; the sidebar filters by calendar (the legend: swatch, name and
+visibility in words), category and, once a second type exists, type. The state
+is mirrored in the query string (`view`, `date`, `tz`, repeated `calendar`,
+`category`, `type`) and read back on load; "every calendar" is the default and
+is not written. The grid fetches the visible range plus seven days on each
+side (never more than 366 days), keeps the last eight answers, and a navigation
+that stays inside a fetched range makes no request. A new fetch aborts the one
+in flight. A truncated answer (2,000 items) shows a persistent notice.
+
+**State is never colour alone.** A draft has a dashed border and the word
+"Draft", an event in review a dotted border and "In review", a cancelled
+occurrence a struck-through title and "Cancelled" (in month cells the word is
+there for screen readers). An occurrence the viewer may not change on a
+calendar they can write to shows a lock whose name gives the reason.
+
+**Create.** Click a slot (a 60-minute event) or drag-select in the time grid,
+or click or select days in the month and all-day row (an all-day event). The
+quick-create dialog takes the title, the calendar (writable ones only), all-day,
+and start and end in that calendar's zone; **Create** saves a draft, **More
+options** opens the editor prefilled.
+
+**Move and resize.** Drag an event to another slot or day, or drag its lower
+edge to change its end. The grid shows the drop at once; the write runs in the
+background (the event is `aria-busy` and cannot be dragged meanwhile), and any
+refusal puts it back. A drag between the all-day row and the time grid is
+refused: change all-day in the editor. Cancelled occurrences, cancelled events
+and occurrences the viewer may not edit (a published event without
+`events.publish`, a calendar they only view) cannot be dragged, and the detail
+popover says why.
+
+**Keyboard.** Events are focusable; Enter or Space opens the detail popover,
+Escape closes it and returns focus to the event. **Move…** in the popover opens
+the Move dialog (start, end, and for a series "Only this occurrence" or "All
+occurrences"), which is the keyboard path for move and resize and goes through
+the same write as a drag. Dialogs trap focus and give it back to the event.
+
+**The grid time zone.** "Calendar time" is the zone of the one calendar shown,
+or the tenant's default when several are; "My time" is the browser's. The
+toggle shows both zone names, and says so when they are the same. All-day
+occurrences are dates and ignore the toggle. FullCalendar reports instants in
+the grid's zone; `ui/calendar/time/zones.ts` (Temporal) converts them into the
+**event's** own wall clock (`YYYY-MM-DDTHH:MM`), which is what the API takes,
+never UTC and never the grid's zone. A move keeps the duration, a resize
+changes only the end. A drop on the second occurrence of a repeated autumn hour
+is refused client-side (`repeated_local_time`), because the server reads a wall
+clock as the first.
+
+**What a drag does to a series.** The grid asks "Only this occurrence" or "All
+occurrences". One writes a `moved` override for that occurrence (a second
+write replaces it). All shifts the master's start and end by the wall-clock
+difference; the rule text is never rewritten, so moving a `BYDAY` series to
+another weekday is a 422 `start_not_in_rule` ("open the editor"), and a shift
+that orphans overrides asks for the confirmation the editor asks for.
+
+"All occurrences" leaves an occurrence that has its own exception where the
+exception put it: only the master moves. A change another session made to a field
+the drag does not write (a venue, say) does not make the drag stale; the write
+sends the fetched revision and keeps that field. The browser console logs the
+expected 409 and 422 answers as "Failed to load resource" lines; they are the
+network's report, not a script error.
+
+**A click near a clock jump.** On the day the clocks jump forward (02:00 to 03:00
+in Vienna) the grid still draws the slots in the skipped hour, and FullCalendar
+moves a click there forward, so the callback cannot say which slot was meant.
+Quick create therefore follows one rule: when the proposed start, on the
+calendar's clock, lies in the window after a jump (from where it ends up to one
+jump's length later: 03:00 to 03:59 in Vienna, 02:30 to 02:59 for Lord Howe's
+half-hour jump), it says "On this day the clock jumps from 02:00 to 03:00
+(Europe/Vienna). Check the start time." The note is true for a click on the
+skipped slots and on the real ones alike. A drag or resize onto a skipped hour is
+refused (`invalid_local_time`), because there the intended wall time is rebuilt
+from the old position and the delta.
+
+An occurrence carries no revision, so a write first reads the event and stops as
+stale, sending nothing, if what the grid showed no longer matches; otherwise it
+sends the fetched revision.
+
+| Answer | What the user sees |
+| --- | --- |
+| 200 / 201 | "Moved" or "Resized"; the range is refetched |
+| stale (client or 409 `stale`) | "This event changed since it was loaded…"; the grid refreshes |
+| 409 `overrides_orphaned` | the orphaned-overrides confirm; confirming resends with `drop_orphaned_overrides` |
+| 403 `publish_required` / `forbidden` | the server's message |
+| 404 | "This event no longer exists" |
+| 422 `start_not_in_rule` | the weekday message, with a link to the editor |
+| other 422, network, 5xx | the error text |
+
+## Embedding `Calendar`
+
+`import { Calendar } from '@simple-module-py/events'`. Props (types are
+exported alongside): `fetchOccurrences(query, signal)` (aware-UTC half-open
+range, calendar, category and type filters, locale), `calendars`
+(`id`, `name`, `color`, `visibility`, `default_timezone`, `can_write_events`),
+`categories`, `types` (the filter shows with two or more), `defaultTimezone`,
+`initialState` (read once), `onStateChange`, `refreshToken` (bump to refetch),
+`editing` and `slots`. No FullCalendar type appears in the props.
+
+`editing` is a callback surface: `canCreate`, `onCreate(slot)`, `onChange(change)`
+(resolve `true` to keep the optimistic position, `false` to revert), `onMove`
+and `pendingKeys`. Leave it out and the calendar is read-only (the public
+site). `slots` are `EventChip`, `Detail`, `ToolbarStart` and `ToolbarEnd`; the
+first two receive `Default`, so a slot can wrap or fall back for occurrences it
+does not know. The grid is a lazy chunk (`React.lazy`): a consumer that never
+renders one pays for the shell only, and the console's Calendars and Events
+screens never request it.
+
+## FullCalendar
+
+The grid is FullCalendar 7 (`@fullcalendar/react` `^7.1.5`, as every module ranges its
+third-party packages; `package-lock.json` holds the resolved version), MIT packages only: the allow-list
+is `@fullcalendar/react`, `@fullcalendar/core` and `@full-ui/headless-calendar`,
+and `boundaries.test.ts` fails on any other `@fullcalendar/*` or `@full-ui/*`
+package, on a name containing `scheduler`, `resource`, `timeline` or `premium`,
+and on an allow-listed lockfile entry that is not MIT. It also fails on any
+import of `@fullcalendar/` outside `sm_events/ui/calendar/adapter/`. The
+adapter loads the day-grid, time-grid, list and **interaction** plugins (without
+interaction nothing can be dragged, resized or selected) and the `classic`
+theme, whose variables `adapter/calendar.css` maps onto the console's tokens, so
+light and dark follow it. Replacing the library means rewriting `adapter/` to the
+`GridProps`/`GridHandle` contract in `ui/calendar/types.ts`. Production CSP
+needs nothing special: the library uses no `eval` and inserts no script.
+
 ## Workflow
 
 Every transition is a `POST` with `expected_revision`; a state it cannot leave is
@@ -257,16 +383,17 @@ last-write-wins; event writes use `expected_revision`.
 
 ## Status
 
-PR 2 adds events: texts, recurrence and overrides, the occurrences read, the
-workflow, scheduled publishing, the API, and the Events list and editor. PR 1
+PR 3 adds the calendar: the `Calendar` component and the console grid at
+`/admin/events/`. PR 2 adds events: texts, recurrence and overrides, the
+occurrences read, the workflow, scheduled publishing, the API, and the Events list and editor. PR 1
 provided calendars, categories, settings, the tenancy and access policy and all
 seven tables. Browser QA and the shipping pipeline follow branch verification.
 Later delivery remains:
 
 | PR | Delivers |
 | --- | --- |
-| 2 (this release) | Events and texts, recurrence and overrides, occurrences read, workflow, API, list and editor |
-| 3 | Calendar component and console grid: views, create, drag, resize, timezone |
+| 2 | Events and texts, recurrence and overrides, occurrences read, workflow, API, list and editor |
+| 3 (this release) | Calendar component and console grid: views, create, drag, resize, timezone |
 | 4 | Public pages, calendar slug redirects, public ICS, JSON-LD and sitemap |
 | 5 | Private feed tokens and `.ics` upload |
 | 6 | Extension registry, plugin guide and records date-field source |

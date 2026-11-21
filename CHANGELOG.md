@@ -30,6 +30,17 @@ name the module they affect.
   column on `events_revision`), and start Celery beat and a worker for the
   `events` queue (`events.publish_due`) or scheduled events never publish.
 
+- **events: the calendar** (PR 3 of the events module). `/admin/events/` is now
+  a calendar (it used to redirect to Calendars): month, week, day and list views
+  with calendar and category filters, a calendar-time or my-time toggle, state in
+  the URL, create by click or drag-select, drag and resize with a "this one or
+  all" prompt for series, and a Move dialog as the keyboard path. A drag writes
+  the event's own wall clock and never rewrites a rule. The reusable `Calendar`
+  component (`@simple-module-py/events`) takes a fetcher, calendars, optional
+  `editing` and render slots. **New dependency:** FullCalendar 7 (MIT, `^7.1.5`; the lockfile holds the resolved version)
+  and `temporal-polyfill`; the grid is a lazy chunk of about 295 kB (81 kB gzipped) plus 17 kB (4 kB gzipped) of CSS; the Temporal polyfill is a shared 65 kB (22 kB gzipped) chunk that the calendar, list and editor pages load. No
+  migration.
+
 ### Security
 
 - **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in

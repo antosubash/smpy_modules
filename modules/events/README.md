@@ -51,7 +51,16 @@ return that address in full.
 Open `/admin/events/categories` with `events.view` and `events.manage` to enter category names in each configured
 content language. The first language is required. Categories have an optional
 colour and a slug fixed at creation. Deletion leaves events uncategorised.
-`/admin/events/` redirects to Calendars until the calendar grid arrives.
+
+`/admin/events/` (`events.view`) is the calendar: month, week, day and list
+views over every calendar the caller can read, with a filter per calendar and
+category, a toggle between the calendar's time zone and the browser's, and
+live state in the URL (`?view=week&date=2026-03-25&tz=mine&calendar=<id>`). A
+caller who may write events can click or drag-select a slot to create a draft,
+drag an event to another time or day, drag its edge to change the end, or open
+it and choose **Move…**, the keyboard path for both. A drag moves one
+occurrence of a series or the whole series (a prompt asks) and never rewrites
+the repeat rule. See the guide's [The calendar](docs/index.md#the-calendar).
 
 Open `/admin/events/list` (`events.view`) for the Events list: filter by
 calendar, status (draft, in review, published, scheduled), category, date range

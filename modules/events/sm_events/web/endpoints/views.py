@@ -9,7 +9,6 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from simple_module_hosting.permissions import ensure_resolved_permissions
 from simple_module_inertia import InertiaResponse
 from sqlmodel import select
-from starlette.responses import RedirectResponse
 
 from sm_events.calendar import calendars as calendar_service
 from sm_events.calendar import categories as category_service
@@ -24,14 +23,10 @@ from sm_events.web.endpoints.deps import (
     require_manage,
     require_view,
 )
+from sm_events.web.endpoints.prefill import parse_prefill
 from sm_events.web.schemas.categories import CategoryOut
 
 router = APIRouter(dependencies=[Depends(tenancy.bind_admin)])
-
-
-@router.get("/", dependencies=[require_view])
-async def root() -> RedirectResponse:
-    return RedirectResponse(constants.CALENDARS_URL, status_code=303)
 
 
 @router.get("/calendars", response_model=None, dependencies=[require_view])
@@ -70,11 +65,39 @@ def _calendar_props(cal: Calendar, request: Request, *, can_write_events: bool) 
         "id": str(cal.id),
         "name": cal.name,
         "color": cal.color,
+        "visibility": cal.visibility,
         "default_timezone": timezones.effective(
             cal.default_timezone or get_settings(request).default_timezone
         ),
         "can_write_events": can_write_events,
     }
+
+
+async def _viewer_calendars(db, who, request: Request) -> list[dict]:
+    """The calendars the viewer can see, with what the screens need of each."""
+    rows = await calendar_service.list_calendars(db, who)
+    rights = await calendar_rights_many(db, who, rows)
+    return [
+        _calendar_props(row, request, can_write_events=rights[row.id].write_events) for row in rows
+    ]
+
+
+@router.get("/", response_model=None, dependencies=[require_view])
+async def calendar_page(
+    request: Request, inertia: InertiaDep, who: Principal, db=Depends(get_db)
+) -> InertiaResponse:
+    settings = get_settings(request)
+    return await inertia.render(
+        constants._PAGE_CALENDAR,
+        {
+            **tenancy.view_props(request),
+            "calendars": await _viewer_calendars(db, who, request),
+            "categories": await _categories(db),
+            "default_timezone": timezones.effective(settings.default_timezone),
+            "content_locales": list(settings.content_locales),
+            "editor_url": constants.EDITOR_URL,
+        },
+    )
 
 
 def _editor_props(request: Request, cal: Calendar, can_write: bool, categories: list[dict]) -> dict:
@@ -92,11 +115,7 @@ def _editor_props(request: Request, cal: Calendar, can_write: bool, categories: 
 async def events_page(
     request: Request, inertia: InertiaDep, who: Principal, db=Depends(get_db)
 ) -> InertiaResponse:
-    rows = await calendar_service.list_calendars(db, who)
-    rights = await calendar_rights_many(db, who, rows)
-    calendars = [
-        _calendar_props(row, request, can_write_events=rights[row.id].write_events) for row in rows
-    ]
+    calendars = await _viewer_calendars(db, who, request)
     return await inertia.render(
         constants._PAGE_EVENTS,
         {
@@ -127,7 +146,10 @@ async def editor_new_page(
     if cal is None or not (await calendar_rights(db, who, cal)).write_events:
         raise NotFound
     props = _editor_props(request, cal, True, await _categories(db))
-    return await inertia.render(constants._PAGE_EVENT_EDITOR, {**props, "event_id": None})
+    prefill = parse_prefill(request.query_params)
+    return await inertia.render(
+        constants._PAGE_EVENT_EDITOR, {**props, "event_id": None, "prefill": prefill}
+    )
 
 
 @router.get("/edit/{event_id}", response_model=None, dependencies=[require_view])

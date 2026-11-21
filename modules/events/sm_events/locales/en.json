@@ -4,7 +4,8 @@
     "group": "Events",
     "events": "Events",
     "calendars": "Calendars",
-    "categories": "Event categories"
+    "categories": "Event categories",
+    "calendar": "Calendar"
   },
   "share": {
     "button": "Share",
@@ -115,6 +116,7 @@
     "invalid_rrule": "This repeat rule is not valid.",
     "rrule_frequency_refused": "Events can repeat daily, weekly, monthly or yearly.",
     "start_not_in_rule": "The start must be the first date the repeat rule produces. Change the start or the rule.",
+    "invalid_datetime": "Enter a valid date and time.",
     "invalid_local_time": "This time does not exist in the timezone: the clocks skip it.",
     "end_before_start": "The end must be after the start.",
     "duration_too_long": "An event can last at most {oneOff} days; when it repeats, each occurrence at most {series} days.",
@@ -439,5 +441,103 @@
     "no": "No",
     "save_blocked": "Choose Load their version or Save mine over theirs above before saving.",
     "language_changed": "{language}: text added or removed"
+  },
+  "calendar": {
+    "title": "Calendar",
+    "subtitle": "Every event across your calendars, by month, week, day or list.",
+    "region": "Calendar",
+    "toolbar": {
+      "label": "Calendar navigation",
+      "today": "Today",
+      "previous": "Previous",
+      "next": "Next",
+      "views": "Calendar view"
+    },
+    "views": {
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "list": "List"
+    },
+    "filters": {
+      "label": "Filter the calendar",
+      "calendars": "Calendars",
+      "categories": "Categories",
+      "types": "Types"
+    },
+    "type_event": "Events",
+    "status": {
+      "draft": "Draft",
+      "in_review": "In review",
+      "cancelled": "Cancelled",
+      "loading": "Loading events…",
+      "empty": "Nothing in this range",
+      "no_calendars": "Select a calendar to see its events.",
+      "none_yet": "There are no calendars yet.",
+      "open_calendars": "Open Calendars",
+      "error": "The events could not be loaded.",
+      "truncated": "Showing the first {count} items in this range. Narrow the filters or switch to a shorter view."
+    },
+    "chip": {
+      "locked": "Locked"
+    },
+    "detail": {
+      "title": "Event details",
+      "open_editor": "Open in editor",
+      "move": "Move…",
+      "grid_time": "In {zone}",
+      "event_time": "Event time in {zone}",
+      "calendar": "Calendar",
+      "status": "Status",
+      "read_only": "You can view this calendar only",
+      "needs_publish": "Published: only a publisher can change it",
+      "external": "This entry comes from another source and cannot be changed here",
+      "lang_fallback": "Shown in {language}"
+    },
+    "writes": {
+      "moved": "Moved",
+      "resized": "Resized",
+      "stale": "This event changed since it was loaded. The calendar has been refreshed; try again.",
+      "repeated_local_time": "That time happens twice in {zone} on that day; choose another time.",
+      "not_in_rule": "Moving the whole series to another weekday changes its rule; open the editor.",
+      "open_editor": "Open the editor"
+    },
+    "scope": {
+      "title": "Change a repeating event",
+      "description": "{name} repeats. Apply the change to:",
+      "one": "Only this occurrence",
+      "all": "All occurrences"
+    },
+    "create": {
+      "skipped_hour": "On this day the clock jumps from {from} to {to} ({zone}). Check the start time.",
+      "title": "New event",
+      "description": "Creates a draft. Open the full editor for everything else.",
+      "title_label": "Title",
+      "calendar": "Calendar",
+      "all_day": "All day",
+      "start": "Start",
+      "end": "End",
+      "last_day": "Last day",
+      "zone_note": "Times are in {zone}",
+      "create": "Create",
+      "more_options": "More options",
+      "created": "Event created as a draft"
+    },
+    "move": {
+      "title": "Move or resize",
+      "description": "Change when this happens. Times are in {zone}, the time zone of the event.",
+      "start": "Start",
+      "end": "End",
+      "last_day": "Last day",
+      "scope": "Apply to",
+      "submit": "Move",
+      "unchanged": "Nothing to change."
+    },
+    "tz": {
+      "label": "Time zone of the calendar",
+      "calendar": "Calendar time",
+      "mine": "My time",
+      "same": "Your time is the same"
+    }
   }
 }

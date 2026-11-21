@@ -20,10 +20,51 @@ def headers(*perms):
     return {**as_user("owner", *perms), "X-Inertia": "true", "X-Inertia-Version": "test"}
 
 
-async def test_root_redirects_to_calendars(client):
-    response = await client.get("/admin/events/", headers=headers("events.view"))
-    assert response.status_code == 303
-    assert response.headers["location"] == "/admin/events/calendars"
+async def test_root_renders_calendar_page(client):
+    cals = await cast(client)
+    client.app.state.sm_events.settings.content_locales = ("en", "de")
+    response = await client.get("/admin/events/", headers=STRANGER | _inertia())
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["component"] == "Events/Calendar"
+    props = body["props"]
+    assert props["content_locales"] == ["en", "de"]
+    assert props["editor_url"] == "/admin/events/edit"
+    assert props["categories"] == []
+    assert isinstance(props["default_timezone"], str)
+    by_id = {c["id"]: c for c in props["calendars"]}
+    assert set(by_id) >= {cals["I"], cals["U"]}
+    internal = by_id[cals["I"]]
+    assert {"id", "name", "color", "visibility", "default_timezone", "can_write_events"} == set(
+        internal
+    )
+    assert internal["visibility"] == "internal"
+    assert internal["can_write_events"] is True
+
+
+async def test_root_lists_only_calendars_the_viewer_sees(client):
+    cals = await cast(client)
+    response = await client.get("/admin/events/", headers=VIEWER | _inertia())
+    assert response.status_code == 200, response.text
+    props = response.json()["props"]
+    ids = {c["id"] for c in props["calendars"]}
+    assert cals["P"] not in ids
+    assert {cals["I"], cals["U"]} <= ids
+    assert all(c["can_write_events"] is False for c in props["calendars"])
+
+
+async def test_root_needs_view(client):
+    assert (await client.get("/admin/events/", headers=headers())).status_code == 403
+
+
+def test_calendar_is_the_first_entry_of_the_events_group():
+    from sm_events.web.endpoints.menu import menu_items
+
+    items = sorted(menu_items(), key=lambda item: item.order)
+    assert [item.label for item in items] == ["Calendar", "Events", "Calendars", "Event categories"]
+    assert items[0].url == "/admin/events/"
+    assert items[0].permissions == ["events.view"]
+    assert items[0].label_key == "events.menu.calendar"
 
 
 @pytest.mark.parametrize(
@@ -110,6 +151,55 @@ async def test_editor_new_needs_write(client):
     assert {"name", "default_timezone"} <= set(props["calendar"])
     assert props["default_timezone"] == props["calendar"]["default_timezone"]
     assert "content_locales" in props and "categories" in props
+
+
+async def _prefill(client, cals, query):
+    url = f"/admin/events/edit/new?calendar={cals['I']}&{query}"
+    response = await client.get(url, headers=STRANGER | _inertia())
+    assert response.status_code == 200, response.text
+    return response.json()["props"]["prefill"]
+
+
+async def test_editor_prefill_passed_and_validated(client):
+    cals = await cast(client)
+    assert await _prefill(
+        client, cals, "all_day=0&start=2026-07-01T10%3A00&end=2026-07-01T11%3A00&title=Team%20sync"
+    ) == {
+        "all_day": False,
+        "start": "2026-07-01T10:00",
+        "end": "2026-07-01T11:00",
+        "title": "Team sync",
+    }
+    assert await _prefill(client, cals, "all_day=1&start=2026-08-01&end=2026-08-03") == {
+        "all_day": True,
+        "start": "2026-08-01",
+        "end": "2026-08-03",
+        "title": None,
+    }
+    plain = await client.get(
+        f"/admin/events/edit/new?calendar={cals['I']}", headers=STRANGER | _inertia()
+    )
+    assert plain.json()["props"]["prefill"] is None
+
+
+async def test_editor_prefill_drops_what_does_not_check_out(client):
+    cals = await cast(client)
+    # Garbage, a mixed pair, a flag that disagrees, an end before the start: no times.
+    for query in (
+        "start=garbage&end=2026-07-01T11%3A00",
+        "start=2026-07-01&end=2026-07-01T11%3A00",
+        "all_day=1&start=2026-07-01T10%3A00&end=2026-07-01T11%3A00",
+        "start=2026-07-01T12%3A00&end=2026-07-01T11%3A00",
+        "start=2026-13-45&end=2026-13-46",
+        "start=2026-07-01T10%3A00",
+    ):
+        assert await _prefill(client, cals, query) is None, query
+    # A two-line or over-long title is dropped; the times next to it stay.
+    kept = await _prefill(client, cals, "start=2026-07-01&end=2026-07-01&title=one%0Atwo")
+    assert kept == {"all_day": True, "start": "2026-07-01", "end": "2026-07-01", "title": None}
+    assert await _prefill(client, cals, "title=" + "x" * 301) is None
+    assert (await _prefill(client, cals, "title=" + "x" * 300))["title"] == "x" * 300
+    assert await _prefill(client, cals, "title=%20%20") is None
 
 
 async def test_editor_new_without_calendar_is_404(client):

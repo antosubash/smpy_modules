@@ -4,7 +4,8 @@
     "group": "Veranstaltungen",
     "events": "Veranstaltungen",
     "calendars": "Kalender",
-    "categories": "Veranstaltungskategorien"
+    "categories": "Veranstaltungskategorien",
+    "calendar": "Kalender"
   },
   "share": {
     "button": "Teilen",
@@ -115,6 +116,7 @@
     "invalid_rrule": "Diese Wiederholungsregel ist ungültig.",
     "rrule_frequency_refused": "Veranstaltungen können täglich, wöchentlich, monatlich oder jährlich wiederkehren.",
     "start_not_in_rule": "Der Beginn muss das erste Datum sein, das die Wiederholungsregel erzeugt. Ändern Sie den Beginn oder die Regel.",
+    "invalid_datetime": "Geben Sie ein gültiges Datum und eine gültige Uhrzeit ein.",
     "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: Die Uhren überspringen sie.",
     "end_before_start": "Das Ende muss nach dem Beginn liegen.",
     "duration_too_long": "Eine Veranstaltung kann höchstens {oneOff} Tage dauern; wiederholt sie sich, jeder Termin höchstens {series} Tage.",
@@ -439,5 +441,103 @@
     "no": "Nein",
     "save_blocked": "Wählen Sie oben „Andere Version laden“ oder „Meine Version darüber speichern“, bevor Sie speichern.",
     "language_changed": "{language}: Text hinzugefügt oder entfernt"
+  },
+  "calendar": {
+    "title": "Kalender",
+    "subtitle": "Alle Veranstaltungen Ihrer Kalender, nach Monat, Woche, Tag oder als Liste.",
+    "region": "Kalender",
+    "toolbar": {
+      "label": "Kalendernavigation",
+      "today": "Heute",
+      "previous": "Zurück",
+      "next": "Weiter",
+      "views": "Kalenderansicht"
+    },
+    "views": {
+      "month": "Monat",
+      "week": "Woche",
+      "day": "Tag",
+      "list": "Liste"
+    },
+    "filters": {
+      "label": "Kalender filtern",
+      "calendars": "Kalender",
+      "categories": "Kategorien",
+      "types": "Arten"
+    },
+    "type_event": "Veranstaltungen",
+    "status": {
+      "draft": "Entwurf",
+      "in_review": "In Prüfung",
+      "cancelled": "Abgesagt",
+      "loading": "Veranstaltungen werden geladen…",
+      "empty": "In diesem Zeitraum gibt es nichts",
+      "no_calendars": "Wählen Sie einen Kalender, um seine Veranstaltungen zu sehen.",
+      "none_yet": "Es gibt noch keine Kalender.",
+      "open_calendars": "Kalender öffnen",
+      "error": "Die Veranstaltungen konnten nicht geladen werden.",
+      "truncated": "Es werden die ersten {count} Einträge dieses Zeitraums angezeigt. Grenzen Sie die Filter ein oder wechseln Sie zu einer kürzeren Ansicht."
+    },
+    "chip": {
+      "locked": "Gesperrt"
+    },
+    "detail": {
+      "title": "Veranstaltungsdetails",
+      "open_editor": "Im Editor öffnen",
+      "move": "Verschieben…",
+      "grid_time": "In {zone}",
+      "event_time": "Zeit der Veranstaltung in {zone}",
+      "calendar": "Kalender",
+      "status": "Status",
+      "read_only": "Sie können diesen Kalender nur ansehen",
+      "needs_publish": "Veröffentlicht: Nur wer veröffentlichen darf, kann diese Veranstaltung ändern.",
+      "external": "Dieser Eintrag stammt aus einer anderen Quelle und kann hier nicht geändert werden",
+      "lang_fallback": "Angezeigt auf {language}"
+    },
+    "writes": {
+      "moved": "Verschoben",
+      "resized": "Dauer geändert",
+      "stale": "Diese Veranstaltung wurde geändert, seit sie geladen wurde. Der Kalender wurde aktualisiert; versuchen Sie es erneut.",
+      "repeated_local_time": "Diese Uhrzeit gibt es in {zone} an diesem Tag zweimal; wählen Sie eine andere Zeit.",
+      "not_in_rule": "Wenn Sie die ganze Serie auf einen anderen Wochentag verschieben, ändert sich ihre Regel; öffnen Sie den Editor.",
+      "open_editor": "Editor öffnen"
+    },
+    "scope": {
+      "title": "Wiederkehrende Veranstaltung ändern",
+      "description": "{name} wiederholt sich. Die Änderung gilt für:",
+      "one": "Nur diesen Termin",
+      "all": "Alle Termine"
+    },
+    "create": {
+      "skipped_hour": "An diesem Tag wird die Uhr von {from} auf {to} Uhr vorgestellt ({zone}). Bitte die Startzeit prüfen.",
+      "title": "Neue Veranstaltung",
+      "description": "Legt einen Entwurf an. Alles Weitere erledigen Sie im vollständigen Editor.",
+      "title_label": "Titel",
+      "calendar": "Kalender",
+      "all_day": "Ganztägig",
+      "start": "Beginn",
+      "end": "Ende",
+      "last_day": "Letzter Tag",
+      "zone_note": "Die Zeiten gelten in {zone}",
+      "create": "Anlegen",
+      "more_options": "Weitere Optionen",
+      "created": "Veranstaltung als Entwurf angelegt"
+    },
+    "move": {
+      "title": "Verschieben oder Dauer ändern",
+      "description": "Ändern Sie, wann dies stattfindet. Die Zeiten gelten in {zone}, der Zeitzone der Veranstaltung.",
+      "start": "Beginn",
+      "end": "Ende",
+      "last_day": "Letzter Tag",
+      "scope": "Gilt für",
+      "submit": "Verschieben",
+      "unchanged": "Es gibt nichts zu ändern."
+    },
+    "tz": {
+      "label": "Zeitzone des Kalenders",
+      "calendar": "Kalenderzeit",
+      "mine": "Meine Zeit",
+      "same": "Ihre Zeit ist dieselbe"
+    }
   }
 }

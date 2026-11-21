@@ -62,7 +62,7 @@ describe('limits and fields named in a refusal', () => {
   it('a recurring event says it once, not in the preview and at the field', async () => {
     stubFetch({
       [`GET ${API}/e1`]: () => eventDetail({ rrule: 'FREQ=DAILY;COUNT=3', revision: 1 }),
-      ['POST /api/events/recurrence/preview']: () => refuse('duration_too_long', 'times.end'),
+      'POST /api/events/recurrence/preview': () => refuse('duration_too_long', 'times.end'),
       [`PATCH ${API}/e1`]: () => refuse('duration_too_long', 'times.end'),
     });
     const view = await mount(<EventEditor {...props} event_id="e1" />);

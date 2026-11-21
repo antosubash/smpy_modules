@@ -21,6 +21,7 @@ import { usePreview } from '../ui/hooks/usePreview';
 import { diffForms } from '../ui/utils/event-diff';
 import { times } from '../ui/utils/event-form';
 import { keys, useT } from '../ui/utils/i18n';
+import type { Prefill } from '../ui/utils/prefill';
 import type { Category } from '../ui/utils/types';
 
 type Props = {
@@ -29,6 +30,8 @@ type Props = {
   content_locales: string[];
   categories: Category[];
   default_timezone: string;
+  /** `?start=&end=&all_day=&title=` of a new event, as the calendar's quick create sends it. */
+  prefill?: Prefill | null;
 };
 
 const LIST = '/admin/events/list';
@@ -37,7 +40,12 @@ export default function EventEditor(props: Props) {
   const { t, locale } = useT();
   const copy = keys.events.editor;
   const { calendar, content_locales: locales } = props;
-  const ev = useEvent({ eventId: props.event_id, locales, timezone: props.default_timezone });
+  const ev = useEvent({
+    eventId: props.event_id,
+    locales,
+    timezone: props.default_timezone,
+    prefill: props.prefill,
+  });
   const parentId = props.event_id ? null : new URLSearchParams(location.search).get('parent');
   const [incomplete, setIncomplete] = useState(false);
   const guard = useLeaveGuard(ev.dirty, LIST);
