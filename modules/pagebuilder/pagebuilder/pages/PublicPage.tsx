@@ -108,8 +108,8 @@ export default function PublicPage({
         {!index_in_search && <meta name="robots" content="noindex,nofollow" />}
         {jsonLdScript && (
           // Emitting author-composed JSON-LD is the feature. The content is
-          // written by permission-holding editors and served under the CSP in
-          // PagebuilderSettings.public_csp.
+          // written by permission-holding editors and served under the app's CSP
+          // (and PagebuilderSettings.public_csp, when set).
           // biome-ignore lint/security/noDangerouslySetInnerHtml: author-composed JSON-LD is the feature
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
         )}

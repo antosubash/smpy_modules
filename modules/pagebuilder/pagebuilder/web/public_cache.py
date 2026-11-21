@@ -109,3 +109,8 @@ def cache_control(settings: PagebuilderSettings) -> str:
     if settings.public_cache_swr > 0:
         parts.append(f"stale-while-revalidate={settings.public_cache_swr}")
     return "public, " + ", ".join(parts)
+
+
+def csp_header(settings: PagebuilderSettings) -> str | None:
+    """The module's own ``Content-Security-Policy``, or ``None`` when it is blank."""
+    return settings.public_csp if settings.public_csp.strip() else None

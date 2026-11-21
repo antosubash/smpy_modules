@@ -130,6 +130,6 @@ async def render_not_found(
     response.headers["Vary"] = public_cache.VARY
     response.headers["Content-Language"] = locale
     vary_on_tenant(response, request)
-    if settings.public_csp:
-        response.headers["Content-Security-Policy"] = settings.public_csp
+    if csp := public_cache.csp_header(settings):
+        response.headers["Content-Security-Policy"] = csp
     return response

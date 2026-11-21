@@ -13,7 +13,7 @@ development app that mounts them; it is never published.
 
 **Pin policy differs by role.** Published modules depend on the framework with
 *ranges* (`simple_module_core>=0.0.36,<0.1`). The host pins *exactly*
-(`simple_module_hosting==0.0.44`). Never give a published module an `==` pin —
+(`simple_module_hosting==0.0.47`). Never give a published module an `==` pin —
 it becomes uninstallable in any host running a newer framework build.
 `scripts/check_rules.py` (in `make lint` and CI) rejects one, and also any
 requirement on another module of this repo (news' `pagebuilder` extra) without
@@ -75,21 +75,35 @@ a raw token must keep the plaintext itself (the table holds only a digest).
 label, because `ca297bbf33bf` already carries it here and Alembic refuses a
 label used twice — keep dropping a duplicate label when porting.
 0.0.43's `a738c2e4f601` and `e731a1b2c3d4` and 0.0.44's `e805a1b2c3d4`,
-`c5d8e2f1a903` and `f6c2d4e8b109` follow `c4e9b2a7d613`. Upstream's
+`c5d8e2f1a903` and `f6c2d4e8b109` follow `c4e9b2a7d613`; 0.0.46's `e480d7dd348f`
+(`users_oauth_account` profile columns) follows the then head `541bfbe29a28`.
+`0a30d2baa903` is shipped and stays as it was (`TIMESTAMPAware`); the model is
+`AwareDateTime` since 0.0.45, which SQLite reports as a type change against the
+reflected `TIMESTAMP`, so `c7a41e9d2b60` retypes `users_access_token.expires_at` on
+SQLite only (a no-op on Postgres) and old and new databases converge. Upstream's
 `b8d4f2a6c901` (audit_log) and `c9d2e4f6a810` (oidc) are not ported: neither
 module is installed here, so their tables do not exist. `e731a1b2c3d4` refuses
 to run while two accounts' emails differ only by letter case, and prints them masked
 (`a***@host`) with the query that lists them.
-`host/migrations/env.py` ignores the false change autogenerate reports on SQLite
-for a mixed column-and-expression index (it reflects `created_at DESC` as a plain
-column, so `tenant_browse` would be dropped and recreated on every run). One on
-other columns is still reported; a missing one only by the Postgres check, because
-Alembic skips expression indexes on SQLite.
+Since 0.0.45 the framework's `make_include_object` skips the false change SQLite
+reports for `tenant_browse` (`created_at DESC` reflects as a plain column), so
+`host/migrations/env.py` carries no workaround. An index on other columns is still
+reported; a missing expression index only by the Postgres check, because Alembic
+skips those on SQLite.
 **Since 0.0.44 most framework modules follow the module layout**, and the old
-flat paths (`tenants.resolver`, `settings.service`, …) warn and go in 0.0.46
-(a few in 0.1.0). Import the new path, and raise that dependency's floor to the
-release that first shipped it; `host/tests/test_host_boots.py` fails on any
-import of a path the installed framework marks `deprecated_module`.
+flat paths (`tenants.resolver`, `settings.service`, …) are gone since 0.0.46
+(`ModuleNotFoundError`; a few remain until 0.1.0). Import the new path, and raise
+that dependency's floor to the release that first shipped it;
+`host/tests/test_host_boots.py` fails on any import of a path the installed
+framework marks `deprecated_module`.
+**Since 0.0.45 a response's own `Content-Security-Policy` is kept beside the app
+policy** (the browser enforces both; framework #870): a module's policy can only
+restrict further, and being static it cannot carry the per-request nonce, so a
+script a module policy's `script-src` does not allow is blocked whatever the app
+allows. news' `public_csp` therefore defaults to empty (no second header), and
+pagebuilder's to `frame-ancestors 'none'` alone (no `script-src`, so it cannot clash
+with the nonce policy; the app's own is `'self'`, so public pages are not framed
+even by the same origin). Set one only to restrict something the app policy allows.
 **Since 0.0.43 the production CSP is nonce-based** (`'nonce-…' 'strict-dynamic'`,
 no `unsafe-inline` or `unsafe-eval`): an executable `<script>` in a template needs
 `nonce="{{ request.state.csp_nonce }}"`, and `eval`/`new Function` no longer run.
@@ -469,7 +483,7 @@ docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e
 ```
 
 Redis and Celery are used by the **images** and **newsletter** modules (framework
-`background_tasks`, host pinned `==0.0.44`): `SM_REDIS_URL` points at dev-services'
+`background_tasks`, host pinned `==0.0.47`): `SM_REDIS_URL` points at dev-services'
 Redis, and `make worker` / `worker-imports` / `worker-heavy` / `worker-gpu` /
 `beat` run `host/worker.py` (`build_runner_celery`) with one queue set each.
 `make dev` starts none of them. With no worker, set

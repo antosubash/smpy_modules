@@ -29,15 +29,9 @@ def test_etag_handles_missing_updated_at() -> None:
     assert _etag_for(1, None).startswith('W/"')
 
 
-def test_default_csp_has_strict_baseline() -> None:
-    csp = PagebuilderSettings().public_csp
-    assert "default-src 'self'" in csp
-    assert "frame-ancestors 'none'" in csp
-
-
-def test_csp_can_be_disabled_via_empty_string() -> None:
-    settings = PagebuilderSettings(public_csp="")
-    assert settings.public_csp == ""
+def test_default_csp_only_forbids_framing() -> None:
+    """Beside the app's nonce policy the module's must restrict framing and nothing else."""
+    assert PagebuilderSettings().public_csp == "frame-ancestors 'none'"
 
 
 def test_cache_settings_have_safe_defaults() -> None:
