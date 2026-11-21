@@ -15,7 +15,13 @@ type Props = {
   onToday: () => void;
   onPrev: () => void;
   onNext: () => void;
-  tz: { mode: TzMode; calendarZone: string; myZone: string; onMode: (mode: TzMode) => void };
+  tz: {
+    mode: TzMode;
+    calendarZone: string;
+    myZone: string;
+    calendarTime: boolean;
+    onMode: (mode: TzMode) => void;
+  };
   start?: ReactNode;
   end?: ReactNode;
 };

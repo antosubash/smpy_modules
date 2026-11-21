@@ -539,5 +539,74 @@
       "mine": "Meine Zeit",
       "same": "Ihre Zeit ist dieselbe"
     }
+  },
+  "public": {
+    "index": {
+      "region": "Veranstaltungen",
+      "tab_list": "Liste",
+      "tab_calendar": "Kalender",
+      "tabs": "Veranstaltungen anzeigen als",
+      "empty": "Keine kommenden Veranstaltungen.",
+      "page_of": "Seite {page} von {count}",
+      "previous": "Vorherige Seite",
+      "next": "Nächste Seite",
+      "pagination": "Seiten",
+      "filter": {
+        "label": "Veranstaltungen filtern",
+        "category": "Kategorie",
+        "all": "Alle Kategorien",
+        "calendars": "Kalender"
+      }
+    },
+    "item": {
+      "cancelled": "Abgesagt",
+      "rescheduled": "Verschoben",
+      "in_zone": "{time} ({zone})",
+      "all_day": "Ganztägig",
+      "online": "Online",
+      "hybrid": "Vor Ort und online",
+      "view_event": "Veranstaltung ansehen",
+      "in_language": "auf {language}"
+    },
+    "subscribe": {
+      "title": "Abonnieren",
+      "hint": "Fügen Sie diese Veranstaltungen Ihrem eigenen Kalender hinzu. Er aktualisiert sich selbst.",
+      "feed": "Kalenderlink (https)",
+      "webcal": "In der Kalender-App öffnen",
+      "copy": "Link kopieren",
+      "copied": "Link kopiert"
+    },
+    "grid": {
+      "loading": "Kalender wird geladen…"
+    },
+    "language": {
+      "label": "Sprache"
+    },
+    "event": {
+      "when": "Wann",
+      "your_time": "Ihre Zeit: {time}",
+      "rescheduled_from": "Verschoben von {time}",
+      "cancelled_banner": "Diese Veranstaltung wurde abgesagt",
+      "cancelled_occurrence": "Dieser Termin wurde abgesagt",
+      "series": "Wiederholt sich",
+      "next_dates": "Nächste Termine",
+      "next_cancelled": "{time} (abgesagt)",
+      "place": "Wo",
+      "online": "Online",
+      "hybrid": "Vor Ort und online",
+      "join_online": "Online teilnehmen",
+      "map": "Auf der Karte zeigen",
+      "organiser": "Veranstaltet von {name}",
+      "part_of": "Teil von {title}",
+      "sub_events": "Programmpunkte",
+      "register": "Anmelden",
+      "add_to_calendar": "Zum Kalender hinzufügen"
+    },
+    "not_found": {
+      "title": "Seite nicht gefunden",
+      "message": "Wir konnten nicht finden, wonach Sie gesucht haben.",
+      "index": "Alle Veranstaltungen ansehen",
+      "suggestions": "Demnächst"
+    }
   }
 }

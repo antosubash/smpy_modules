@@ -190,6 +190,19 @@ drags. A grid change (an instant in the grid's zone) is converted into the
 **event's** wall clock through `ui/calendar/time/zones.ts`, never UTC or the grid's
 zone, and a drag never rewrites a rule (a series "all" shifts the master). The
 calendar JS is a lazy chunk that no other screen may request.
+**Everything anonymous in events goes through `core/access/public.py`.** Read
+`public_events()` and `public_calendars()` (published events of public calendars of the bound
+tenant, never trashed), or the occurrences read with `ANONYMOUS` and
+`include_unpublished=False`; never build a predicate on `status` or `visibility`, take a viewer
+from the request, or answer "not here" in more than one way (`_not_found.py`: same status, body and
+`no-store` for every cause, a redirect to a hidden target included). Every new public route is added
+to `tests/web/public/leaks.py` (`surfaces()` and `ROUTE_SURFACES`) in the same commit; the
+route-table test fails otherwise. Feeds are built only in `feeds/` with `icalendar`, text passing
+through `feeds/sanitize.py`, reading rows through the gate, never the occurrences read. JSON-LD is
+serialised only by `_head.safe_json_ld` (Python) and `utils/jsonLd.ts`; the description is rendered
+from `content/richtext_tree.py`, never injected. Constants live in `core/constants/` (`public.py` for
+the public surface). **Production must set the host's `public_base_url`:** without it canonical, `og:url`,
+`hreflang`, feed and sitemap URLs follow the client's `Host` header (the response then varies on `Host`).
 `make worker` serves the `events` queue; scheduled publishing needs beat, which
 enumerates tenants under the framework's `all_tenants()` and then gives each
 tenant its own session and `tenant_scope`, one savepoint per event. A scheduled

@@ -25,6 +25,7 @@ CASES = [
     (errors.NotRecurring, 422, "not_recurring"),
     (errors.NotAnOccurrence, 422, "not_an_occurrence"),
     (errors.DescriptionTooLong, 422, "description_too_long"),
+    (errors.SlugReserved, 422, "slug_reserved"),
 ]
 
 EXTRA_CODES = [

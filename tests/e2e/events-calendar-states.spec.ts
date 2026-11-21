@@ -1,11 +1,18 @@
 import { expect, test } from '@playwright/test';
 
-import { calendarUrl, guard, seedWeek, seedWriter } from './events-calendar-helpers';
+import {
+  calendarUrl,
+  chip,
+  guard,
+  seedWeek,
+  seedWriter,
+  viennaTenInNewYork,
+} from './events-calendar-helpers';
 import { login } from './helpers';
 
 /**
  * The console calendar's edges on the production bundle: what a view-only user may start,
- * the phone layout and the Move dialog's keyboard path. Standalone: each test seeds its own
+ * the phone layout, the Move dialog's keyboard path, the grid time zone and the German console. Standalone: each test seeds its own
  * calendar and events through the API.
  */
 
@@ -59,3 +66,44 @@ for (const width of [390, 360]) {
     }
   });
 }
+
+test.describe('the grid time zone', () => {
+  test.use({ timezoneId: 'America/New_York' });
+
+  test('calendar time shows Vienna 10:00; my time shows the New York hour', async ({ page }) => {
+    const { cal, day, one } = await seedWeek(page);
+    const hour = viennaTenInNewYork(day);
+    expect(['4', '5']).toContain(hour);
+
+    await page.goto(calendarUrl(cal.id, 'week', day));
+    await expect(chip(page, one)).toContainText('10:00');
+    await page.getByRole('button', { name: /^My time/ }).click();
+    await expect(page.getByRole('button', { name: /^My time/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(chip(page, one)).toContainText(`${hour}:00`);
+    await expect(chip(page, one)).not.toContainText('10:00');
+    await page.getByRole('button', { name: /^Calendar time/ }).click();
+    await expect(chip(page, one)).toContainText('10:00');
+  });
+});
+
+test('German console: the week starts on Monday and times are 24-hour', async ({
+  page,
+  context,
+}) => {
+  const { cal, day, series } = await seedWeek(page);
+  const origin = new URL('/', page.url()).toString();
+  await context.addCookies([{ name: 'locale', value: 'de', url: origin }]);
+  try {
+    await page.goto(calendarUrl(cal.id, 'week', day));
+    const headers = page.getByText(/^(Mo|Di|Mi|Do|Fr|Sa|So)\.? \d+$/);
+    await expect(headers.first()).toHaveText(/^Mo\.? \d+$/);
+    await expect(chip(page, series)).toContainText('13:00');
+    await page.goto(calendarUrl(cal.id, 'month', day));
+    await expect(page.getByText(/^Mo\.?$/).first()).toBeVisible();
+  } finally {
+    await context.addCookies([{ name: 'locale', value: 'en', url: origin }]);
+  }
+});

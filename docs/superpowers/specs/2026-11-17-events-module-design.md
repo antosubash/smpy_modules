@@ -441,3 +441,21 @@ server's `start_not_in_rule` (14). An occurrence carries no revision, so a write
 reads the event first and stops as stale when the grid is out of date (15).
 The interaction plugin must be in the adapter's plugin list: without it FullCalendar 7
 cannot drag, resize or select.
+
+## Amendments (PR 4)
+
+The approved PR 4 rulings refine the design above. A sub-event is shown on its own merits: a
+published child of a public calendar has its page even when its parent is not public, and then
+names no parent anywhere (4). The public category filter lists only categories used by a public
+event (5). `calendar`, `c`, `api`, `feed` and `sitemap` are reserved slugs (9). An occurrence is
+addressed `{slug}?date=YYYY-MM-DD`; a skipped or non-instance date is the 404 (10). The index is
+list-first with a read-only calendar tab and no past events (14). A cancelled event or occurrence
+stays 200 and indexable with a banner (16). The description is rendered from a node tree, never
+injected HTML (18). Cache lifetimes derive from `public_cache_seconds`; a signed-in visitor's page
+is `private, no-store` (20). A feed holds 30 days back to 366 ahead, at most 1,000 events and 5,000
+components, counts every override toward the cap, drops a series it cannot hold whole and says so
+in `X-Events-Truncated` (25). A series' bare page lists its next ten occurrences in JSON-LD (30).
+The sitemap is bounded at 10,000 addresses and lists no `?date=` address (31). Added by review:
+feed `VTIMEZONE`s list transitions for 20 years ahead, not rules; the all-calendars feed and the
+index are named by the `public_title` setting; the public prefix is checked against other
+modules' configured prefixes.

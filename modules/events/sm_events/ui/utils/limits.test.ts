@@ -4,7 +4,10 @@ import { EVENT_MAX_DAYS, OCCURRENCE_LIMIT, SERIES_EVENT_MAX_DAYS } from './limit
 
 describe('limits', () => {
   it('agree with the backend', () => {
-    const python = readFileSync(new URL('../../core/constants.py', import.meta.url), 'utf8');
+    const python = readFileSync(
+      new URL('../../core/constants/__init__.py', import.meta.url),
+      'utf8',
+    );
     const read = (name: string) => Number(new RegExp(`^${name} = (\\d+)`, 'm').exec(python)?.[1]);
     expect(EVENT_MAX_DAYS).toBe(read('MAX_EVENT_DAYS'));
     expect(SERIES_EVENT_MAX_DAYS).toBe(read('MAX_SERIES_EVENT_DAYS'));

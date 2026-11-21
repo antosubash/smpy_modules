@@ -90,7 +90,10 @@ describe('gridTimeZone', () => {
   it('is the one shown calendar zone', () => {
     expect(gridTimeZone('calendar', [a], 'UTC', 'America/New_York')).toBe('Europe/Vienna');
   });
-  it('is the tenant default for several or none', () => {
+  it('is their shared zone when several calendars agree, not the tenant default', () => {
+    expect(gridTimeZone('calendar', [a, cal('c', 'Europe/Vienna')], 'UTC')).toBe('Europe/Vienna');
+  });
+  it('is the tenant default for calendars that disagree, or none', () => {
     expect(gridTimeZone('calendar', [a, b], 'UTC')).toBe('UTC');
     expect(gridTimeZone('calendar', [], 'UTC')).toBe('UTC');
   });

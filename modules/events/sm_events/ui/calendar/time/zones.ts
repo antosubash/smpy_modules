@@ -8,7 +8,13 @@ export { browserZone as browserTimeZone } from '../../utils/zones';
 
 export type TzMode = 'calendar' | 'mine';
 
-/** The grid's zone: the one shown calendar's own, else the tenant's; or the browser's. */
+/** The zone every shown calendar has as its default, or `null` when they differ (or none). */
+export function sharedZone(shown: CalendarInfo[]): string | null {
+  const zones = new Set(shown.map((c) => c.default_timezone).filter(Boolean));
+  return zones.size === 1 ? ([...zones][0] ?? null) : null;
+}
+
+/** The grid's zone: the zone the shown calendars share, else the tenant's; or the browser's. */
 export function gridTimeZone(
   mode: TzMode,
   shown: CalendarInfo[],
@@ -16,6 +22,5 @@ export function gridTimeZone(
   mine: string = browserZone(),
 ): string {
   if (mode === 'mine') return mine;
-  const only = shown.length === 1 ? shown[0] : undefined;
-  return only?.default_timezone || tenantDefault;
+  return sharedZone(shown) ?? tenantDefault;
 }

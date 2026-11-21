@@ -185,6 +185,13 @@ class DescriptionTooLong(Invalid):
     detail = constants.DESCRIPTION_TOO_LONG_DETAIL
 
 
+class SlugReserved(Invalid):
+    """An explicit slug that a public route segment already owns."""
+
+    code = constants.SLUG_RESERVED_CODE
+    detail = constants.SLUG_RESERVED_DETAIL
+
+
 class ServiceUnavailable(EventsError):  # noqa: N818 - HTTP vocabulary, deliberately
     status_code = 503
     code = "service_unavailable"

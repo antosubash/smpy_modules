@@ -50,6 +50,20 @@ const rowOf = (view: { host: HTMLElement }, title: string) =>
   [...view.host.querySelectorAll('tr')].find((r) => r.textContent?.includes(title));
 
 describe('Events list', () => {
+  it("mirrors its filters into the address without dropping Inertia's history state", async () => {
+    // Inertia keeps the page it will restore on Back in `history.state`; a `null` here made a
+    // Back from the editor to this list stay on the editor (a race the leave-guard e2e hit).
+    const state = { page: { component: 'Events/Events', url: '/admin/events/list' } };
+    history.replaceState(state, '', '/admin/events/list');
+    stubFetch({ [`GET ${API}`]: page([eventItem({ id: 'a', title: 'Draft one' })]) });
+    const view = await mount(<Events {...props} />);
+    await flush();
+    await setValue(field('filter-status'), 'published');
+    await flush();
+    expect(history.state).toEqual(state);
+    await view.unmount();
+  });
+
   it('renders rows with status and scheduled badges', async () => {
     stubFetch({
       [`GET ${API}`]: page([

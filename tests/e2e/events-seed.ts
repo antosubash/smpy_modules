@@ -42,6 +42,10 @@ export type EventSeed = {
   zone?: string;
   venue?: string | null;
   description?: string;
+  /** A sub-event of this event (same calendar, not recurring). */
+  parent?: string;
+  /** More languages: `{ de: { title: 'Konzert' } }`. */
+  texts?: Record<string, { title: string; slug?: string }>;
 };
 export type CreatedEvent = { id: string; revision: number; calendar_id: string };
 
@@ -58,7 +62,9 @@ export async function postEvent(page: Page, seed: EventSeed): Promise<CreatedEve
       },
       rrule: seed.rrule ?? null,
       venue_name: seed.venue ?? null,
+      parent_id: seed.parent ?? null,
       texts: {
+        ...seed.texts,
         en: {
           title: seed.title,
           ...(seed.description === undefined ? {} : { description: seed.description }),
@@ -68,4 +74,87 @@ export async function postEvent(page: Page, seed: EventSeed): Promise<CreatedEve
   });
   expect(created.status(), await created.text()).toBe(201);
   return (await created.json()) as CreatedEvent;
+}
+
+/** Draft -> in review -> published, as the admin (who holds events.publish). */
+export async function publishEvent(
+  page: Page,
+  event: { id: string; revision: number },
+): Promise<number> {
+  const headers = await moduleCsrfHeader(page, CSRF_VIEW);
+  const submit = await page.request.post(`/api/events/events/${event.id}/submit`, {
+    headers,
+    data: { expected_revision: event.revision },
+  });
+  expect(submit.status(), await submit.text()).toBe(200);
+  const { revision } = (await submit.json()) as { revision: number };
+  const approve = await page.request.post(`/api/events/events/${event.id}/approve`, {
+    headers,
+    data: { expected_revision: revision },
+  });
+  expect(approve.status(), await approve.text()).toBe(200);
+  return ((await approve.json()) as { revision: number }).revision;
+}
+
+export type ApiOccurrence = { original_start: string | null; start: string };
+
+/** The occurrences of a calendar in a window: the exact `original_start` instants an override names. */
+export async function occurrencesOf(
+  page: Page,
+  calendar: string,
+  from: string,
+  to: string,
+): Promise<ApiOccurrence[]> {
+  const url = `/api/events/occurrences?calendar=${calendar}&start=${from}T00:00:00Z&end=${to}T00:00:00Z`;
+  const res = await page.request.get(url);
+  expect(res.status(), await res.text()).toBe(200);
+  return ((await res.json()) as { items: ApiOccurrence[] }).items;
+}
+
+/** Skip, cancel or move one occurrence of a published series. Returns the new revision. */
+export async function setOverride(
+  page: Page,
+  event: { id: string },
+  revision: number,
+  original: string,
+  kind: 'skipped' | 'cancelled' | 'moved',
+  times?: { start: string; end: string },
+): Promise<number> {
+  const res = await page.request.post(`/api/events/events/${event.id}/overrides`, {
+    headers: await moduleCsrfHeader(page, CSRF_VIEW),
+    data: { expected_revision: revision, original_start: original, kind, ...times },
+  });
+  expect(res.status(), await res.text()).toBe(200);
+  return ((await res.json()) as { event_revision: number }).event_revision;
+}
+
+/** The event's slug in a language, as the server derived or stored it. */
+export async function slugOf(page: Page, id: string, locale = 'en'): Promise<string> {
+  const res = await page.request.get(`/api/events/events/${id}`);
+  const body = (await res.json()) as { texts: Record<string, { slug: string }> };
+  return body.texts[locale]?.slug ?? '';
+}
+
+/** Rename a slug through the API (what records the redirect). Returns the new revision. */
+export async function renameEventSlug(
+  page: Page,
+  id: string,
+  revision: number,
+  title: string,
+  slug: string,
+): Promise<number> {
+  const res = await page.request.patch(`/api/events/events/${id}`, {
+    headers: await moduleCsrfHeader(page, CSRF_VIEW),
+    data: { expected_revision: revision, texts: { en: { title, slug } } },
+  });
+  expect(res.status(), await res.text()).toBe(200);
+  return ((await res.json()) as { revision: number }).revision;
+}
+
+export async function renameCalendarSlug(page: Page, id: string, slug: string): Promise<void> {
+  const res = await page.request.patch(`/api/events/calendars/${id}`, {
+    headers: await moduleCsrfHeader(page, CSRF_VIEW),
+    data: { slug },
+  });
+  expect(res.status(), await res.text()).toBe(200);
 }

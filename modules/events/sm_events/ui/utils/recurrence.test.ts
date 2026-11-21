@@ -210,7 +210,10 @@ describe('the rule editor never rewrites what it cannot express', () => {
   });
 
   it('agrees with the backend limits', () => {
-    const python = readFileSync(new URL('../../core/constants.py', import.meta.url), 'utf8');
+    const python = readFileSync(
+      new URL('../../core/constants/__init__.py', import.meta.url),
+      'utf8',
+    );
     const read = (name: string) => Number(new RegExp(`^${name} = (\\d+)`, 'm').exec(python)?.[1]);
     expect(RRULE_MAX_LEN).toBe(read('RRULE_MAX_LEN'));
     expect(INTERVAL_MAX).toBe(read('RRULE_MAX_INTERVAL'));

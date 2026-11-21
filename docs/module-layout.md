@@ -203,6 +203,6 @@ Do it in small PRs, one module at a time, each containing only moves:
 | records | 6 | 10 | 0 | follows this layout |
 | analytics | 2 | 8 | 0 | follows this layout |
 | newsletter | 4 | 13 | 0 | follows this layout |
-| events | 4 | 9 | 0 | follows this layout |
+| events | 4 | 11 | 0 | follows this layout (`feeds/` for ICS output, `integrations/` for optional neighbours) |
 
 Update this table when a module moves.

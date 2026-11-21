@@ -1,9 +1,56 @@
 """Names the module registers under; one place so nothing spells them twice."""
 
+# ruff: noqa: F401 - the re-exports below are the point
 from __future__ import annotations
 
+# The public surface's names live in ``public.py`` and are re-exported here, so every
+# ``constants.X`` keeps working.
+from sm_events.core.constants.public import (
+    _PAGE_PUBLIC_EVENT,
+    _PAGE_PUBLIC_INDEX,
+    _PAGE_PUBLIC_NOT_FOUND,
+    DEFAULT_PUBLIC_PREFIX,
+    FEED_DAYS_AHEAD,
+    FEED_DAYS_BACK,
+    FEED_MAX_COMPONENTS,
+    FEED_MAX_EVENTS,
+    FEED_RATE,
+    FEED_ZONE_LAST_YEAR,
+    FEED_ZONE_YEARS_AHEAD,
+    ICS_MEDIA_TYPE,
+    INVALID_QUERY_CODE,
+    INVALID_QUERY_DETAIL,
+    JSON_MEDIA_TYPE,
+    NEXT_OCCURRENCES,
+    NOT_FOUND_SUGGESTIONS,
+    NOT_FOUND_WINDOW_DAYS,
+    PAGE_DIGITS_MAX,
+    PAGE_SIZE,
+    PRODID,
+    PUBLIC_API_RATE,
+    PUBLIC_CACHE_SECONDS,
+    PUBLIC_LISTING_CACHE_MAX,
+    PUBLIC_METHODS,
+    PUBLIC_PREFIX_PATTERN,
+    PUBLIC_SWR_SECONDS,
+    RESERVED_PREFIX_SEGMENTS,
+    RESERVED_SLUGS,
+    SEGMENT_API,
+    SEGMENT_CALENDAR,
+    SEGMENT_CALENDAR_FEED,
+    SEGMENT_PRIVATE_FEED,
+    SEGMENT_SITEMAP,
+    SITEMAP_MAX_URLS,
+    SITEMAP_NAMESPACE,
+    SLUG_RESERVED_CODE,
+    SLUG_RESERVED_DETAIL,
+    SUB_EVENTS_MAX,
+    XML_MEDIA_TYPE,
+)  # isort: skip
+
+from sm_events.core.constants.names import MODULE_NAME  # isort: skip
+
 PACKAGE = "sm_events"
-MODULE_NAME = "Events"
 DISTRIBUTION = "simple_module_events"
 LOCALE_NAMESPACE = "events"
 BASE_NAME = "events"

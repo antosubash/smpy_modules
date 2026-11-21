@@ -19,7 +19,7 @@ export class ApiError extends Error {
   }
 }
 
-/** The error codes the editor branches on (`sm_events/core/constants.py`). */
+/** The error codes the editor branches on (`sm_events/core/constants/__init__.py`). */
 export const CODE = {
   stale: 'stale',
   overridesOrphaned: 'overrides_orphaned',

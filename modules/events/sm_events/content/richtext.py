@@ -45,7 +45,7 @@ _EDGE = " \t\n\r\x0c\x00"
 _BAD_CATEGORIES = frozenset({"Cc", "Cf", "Zs", "Zl", "Zp", "Cs", "Co", "Cn"})
 
 
-def _href(value: str | None) -> str | None:
+def safe_href(value: str | None) -> str | None:
     """The URL a browser would follow, or ``None``. Tabs and newlines inside are
     dropped first (a browser drops them too, so ``jav&#9;ascript:`` is read the
     way it will be run); anything else invisible, any space and any control or
@@ -177,7 +177,7 @@ class _Cleaner(HTMLParser):
             return
         href = None
         if name == "a":
-            href = _href(next((v for k, v in attrs if k == "href"), None))
+            href = safe_href(next((v for k, v in attrs if k == "href"), None))
             if href is None or any(n == "a" for n, _ in self.stack):
                 self.stack.append(("a", None))  # unwrapped, but its </a> must not close another
                 return

@@ -41,6 +41,21 @@ name the module they affect.
   and `temporal-polyfill`; the grid is a lazy chunk of about 295 kB (81 kB gzipped) plus 17 kB (4 kB gzipped) of CSS; the Temporal polyfill is a shared 65 kB (22 kB gzipped) chunk that the calendar, list and editor pages load. No
   migration.
 
+- **events: the public site** (PR 4 of the events module). A public calendar's
+  published events are served to anonymous visitors under `public_prefix` (default
+  `/events`, restart-only) with `/{locale}` prefixes: an upcoming list with a
+  read-only calendar tab, calendar pages, event pages (`?date=` selects one occurrence
+  of a series; moved and cancelled ones are shown), `.ics` files and subscription feeds
+  (`RRULE`, `EXDATE`, `RECURRENCE-ID` with `TZID`), `Event` JSON-LD and a sitemap at
+  `{prefix}/sitemap.xml`. Drafts, internal and private calendars, trash and other
+  tenants answer one identical `no-store` 404. Renaming a calendar's slug records a
+  redirect (`301`, the `.ics` too). `calendar`, `c`, `api`, `feed` and `sitemap` are
+  reserved slugs. **New settings:** `public_prefix`, `public_title`,
+  `public_cache_seconds`. **New dependency:** `icalendar` (BSD-2-Clause, `>=7,<8`).
+  **Upgrading:** run the host's new migration (`events_calendar_redirect`). Add
+  `Sitemap: https://<site>/events/sitemap.xml` to `robots.txt`. Feeds carry time zone
+  definitions for the next 20 years.
+
 ### Security
 
 - **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in

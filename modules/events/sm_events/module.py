@@ -58,14 +58,16 @@ class EventsModule(ModuleBase):
         install_exception_handlers(app)
 
     async def on_startup(self, app: FastAPI) -> None:
-        """The tenancy mode, read off the built middleware stack, and the
-        fail-closed guard on the framework's session class - as images does."""
-        from sm_events.core import tenancy
+        """The tenancy mode, read off the built middleware stack, the fail-closed guard on
+        the framework's session class (as images does), and, once the settings are hydrated,
+        the public routes: where they mount and in which languages depend on the database."""
+        from sm_events.core import boot, tenancy
 
         tenancy.configure(app)
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
             tenancy.install_guard(session_class)
+        boot.wire_public(app)
 
     def register_routes(self, api_router: APIRouter, view_router: APIRouter) -> None:
         from simple_module_hosting.csrf import RequiresCsrf

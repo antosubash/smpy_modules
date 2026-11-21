@@ -77,7 +77,9 @@ async def test_category_without_sluggable_name_gets_its_own_fallback(client):
     second = await client.post(CATS, json={"names": {"en": "שלום"}}, headers=MANAGER)
     assert [first.json()["slug"], second.json()["slug"]] == ["category", "category-2"]
     cal = await make(client, OWNER, name="😀")
-    assert cal["slug"] == "calendar"
+    # The fallback slug is also a public route segment (``/events/calendar.ics``), so
+    # derivation skips it: the first calendar with no slug-able name is ``calendar-2``.
+    assert cal["slug"] == "calendar-2"
 
 
 @pytest.mark.parametrize("bad", LINE_SEPARATORS + BIDI)
