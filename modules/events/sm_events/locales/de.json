@@ -5,7 +5,8 @@
     "events": "Veranstaltungen",
     "calendars": "Kalender",
     "categories": "Veranstaltungskategorien",
-    "calendar": "Kalender"
+    "calendar": "Kalender",
+    "import": "Termine importieren"
   },
   "share": {
     "button": "Teilen",
@@ -35,7 +36,9 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "loading": "Wird geladen…",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "copy_link": "Link kopieren",
+    "link_copied": "Link kopiert"
   },
   "visibility": {
     "private": "Privat",
@@ -140,7 +143,14 @@
     "note_invalid": "Geben Sie eine Notiz mit 1 bis 1000 Zeichen ein.",
     "stale_reloaded": "Jemand anderes hat diese Veranstaltung geändert. Die neue Version ist jetzt geladen; prüfen Sie sie und versuchen Sie es erneut.",
     "edited_meanwhile": "Die Aktion wurde ausgeführt. Ihre zwischenzeitlichen Änderungen bleiben erhalten und sind noch nicht gespeichert.",
-    "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt."
+    "action_stale": "Jemand anderes hat diese Veranstaltung geändert. Ihre Aktion wurde nicht ausgeführt.",
+    "token_limit": "Du hast bereits die meisten privaten Links, die dieser Kalender erlaubt. Widerrufe zuerst einen.",
+    "private_feeds_unavailable": "Private Links sind für dein Konto nicht verfügbar.",
+    "import_busy": "Du hast zu viele wartende Importe. Wende einen an oder verwirf einen.",
+    "import_state": "Dieser Import lässt sich in seinem jetzigen Zustand nicht ändern.",
+    "import_too_large": "Die Datei ist größer als das Importlimit.",
+    "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus.",
+    "import_busy_tenant": "In dieser Organisation warten zu viele Importe. Versuche es später erneut."
   },
   "categories": {
     "title": "Kategorien",
@@ -572,9 +582,7 @@
       "title": "Abonnieren",
       "hint": "Fügen Sie diese Veranstaltungen Ihrem eigenen Kalender hinzu. Er aktualisiert sich selbst.",
       "feed": "Kalenderlink (https)",
-      "webcal": "In der Kalender-App öffnen",
-      "copy": "Link kopieren",
-      "copied": "Link kopiert"
+      "webcal": "In der Kalender-App öffnen"
     },
     "grid": {
       "loading": "Kalender wird geladen…"
@@ -607,6 +615,171 @@
       "message": "Wir konnten nicht finden, wonach Sie gesucht haben.",
       "index": "Alle Veranstaltungen ansehen",
       "suggestions": "Demnächst"
+    }
+  },
+  "feeds": {
+    "button": "Abonnieren",
+    "button_for": "{name} abonnieren",
+    "title": "Diesen Kalender abonnieren",
+    "description": "Füge diesen Kalender deiner eigenen Kalender-App hinzu.",
+    "private_title": "Privater Link",
+    "private_hint": "Ein privater Link zeigt, was du in diesem Kalender sehen darfst, und hört auf zu funktionieren, wenn dein Zugriff endet.",
+    "label": "Name für diesen Link",
+    "label_placeholder": "Handy, Laptop …",
+    "language": "Sprache",
+    "create": "Privaten Link erstellen",
+    "creating": "Wird erstellt…",
+    "created_title": "Dein neuer Link",
+    "created_warning": "Du siehst diesen Link nicht noch einmal. Wer ihn hat, sieht, was du in diesem Kalender sehen darfst.",
+    "link": "Privater Kalenderlink",
+    "webcal": "In deiner Kalender-App öffnen",
+    "done": "Ich habe ihn kopiert",
+    "mine": "Deine Links",
+    "everyone": "Links aller",
+    "tabs": "Links",
+    "none": "Du hast keine privaten Links für diesen Kalender.",
+    "none_everyone": "Niemand hat einen privaten Link für diesen Kalender.",
+    "created": "Erstellt",
+    "last_used": "Zuletzt verwendet",
+    "never_used": "nie",
+    "unknown_user": "Unbekannte Person",
+    "revoke": "Widerrufen",
+    "revoke_for": "{name} widerrufen",
+    "revoke_title": "{name} widerrufen?",
+    "revoke_description": "Kalender-Apps, die diesen Link verwenden, erhalten keine Termine mehr.",
+    "revoked": "Link widerrufen"
+  },
+  "import": {
+    "title": "Termine importieren",
+    "subtitle": "Lade eine .ics-Datei hoch, sieh dir die Vorschau an und importiere sie dann.",
+    "calendar": "In Kalender",
+    "file": "Kalenderdatei (.ics)",
+    "upload": "Hochladen und Vorschau",
+    "uploading": "Wird hochgeladen…",
+    "too_large": "Diese Datei ist größer als {max}.",
+    "no_calendars": "Du kannst noch in keinem Kalender Termine schreiben.",
+    "hint": "Termine werden als Entwürfe importiert. Eine erneut importierte Datei aktualisiert die Termine, die sie schon angelegt hat.",
+    "progress": {
+      "uploaded": "Wartet auf den Start…",
+      "parsing": "Datei wird gelesen…",
+      "queued": "Wartet auf einen Worker…",
+      "running": "Import läuft… {done} von {total}"
+    },
+    "preview": {
+      "title": "Vorschau",
+      "summary": "{filename} in {calendar}",
+      "all": "Alle",
+      "filter": "Anzeigen",
+      "col_title": "Titel",
+      "col_start": "Beginn",
+      "col_what": "Was geschieht",
+      "col_why": "Hinweis",
+      "repeats": "Wiederholt sich",
+      "all_day": "Ganztägig",
+      "empty": "Nichts anzuzeigen.",
+      "more": "{shown} von {total} angezeigt.",
+      "next": "Mehr",
+      "dropped": "Nicht importiert",
+      "verdict": {
+        "new": "Neu",
+        "update": "Aktualisierung",
+        "unchanged": "Unverändert",
+        "skip": "Übersprungen"
+      }
+    },
+    "apply_drafts": "Als Entwürfe importieren",
+    "apply_publish": "Importieren und veröffentlichen",
+    "locked_hint": "Bestehende veröffentlichte Termine werden nur aktualisiert, wenn du veröffentlichen darfst.",
+    "start_again": "Neu beginnen",
+    "result": {
+      "title": "Ergebnis",
+      "created": "Angelegt {count}",
+      "updated": "Aktualisiert {count}",
+      "unchanged": "Unverändert {count}",
+      "skipped": "Übersprungen {count}",
+      "failed": "Fehlgeschlagen {count}",
+      "open": "Öffnen"
+    },
+    "failed_title": "Der Import ist fehlgeschlagen",
+    "outcome": {
+      "created": "Angelegt",
+      "updated": "Aktualisiert",
+      "unchanged": "Unverändert",
+      "skipped": "Übersprungen",
+      "failed": "Fehlgeschlagen"
+    },
+    "reasons": {
+      "unknown_timezone": "Die Zeitzone ist uns unbekannt, der Termin wurde ausgelassen.",
+      "invalid_times": "Beginn oder Ende konnten nicht gelesen werden.",
+      "end_before_start": "Der Termin endet vor seinem Beginn.",
+      "duration_too_long": "Der Termin dauert länger als erlaubt.",
+      "unsupported_rule": "Diese Wiederholung wird nicht unterstützt (nur täglich, wöchentlich, monatlich und jährlich).",
+      "too_many_overrides": "Die Serie hat zu viele geänderte oder übersprungene Termine.",
+      "override_without_master": "Ein geänderter Termin ohne seine Serie.",
+      "uid_too_long": "Die Kennung des Termins ist zu lang.",
+      "uid_invalid": "Die Kennung des Termins enthält unzulässige Zeichen.",
+      "uid_in_trash": "Ein Termin mit dieser Kennung liegt im Papierkorb dieses Kalenders.",
+      "duplicate_uid": "Ein anderer Termin in der Datei oder im Kalender hat diese Kennung bereits.",
+      "changed_since_preview": "Der Termin wurde nach der Vorschau geändert oder entfernt.",
+      "publish_required": "Ein veröffentlichter Termin lässt sich nur mit der Veröffentlichungsberechtigung ändern.",
+      "write_failed": "Der Termin konnte nicht geschrieben werden.",
+      "forbidden": "Du darfst in diesem Kalender keine Termine mehr schreiben.",
+      "private_kept": "In der Datei als privat markiert, ein veröffentlichter Termin bleibt unberührt.",
+      "invalid_event": "Die Angaben des Termins wurden nicht akzeptiert.",
+      "floating_time": "Keine Zeitzone angegeben: in der Zeitzone des Kalenders gelesen.",
+      "default_duration": "Kein Ende angegeben: eine Stunde angenommen.",
+      "shifted_local_time": "Die Uhrzeit gibt es an diesem Tag nicht (Zeitumstellung): vorgeschoben.",
+      "start_adjusted": "Der erste Termin gehörte nicht zur Wiederholung: auf den ersten passenden verschoben.",
+      "exdate_ignored": "Einige übersprungene Tage gehören nicht zur Wiederholung und wurden ignoriert.",
+      "override_fields_dropped": "Geänderte Termine behalten Titel und Ort der Serie; nur ihre Zeiten werden übernommen.",
+      "override_dropped": "Einige geänderte Termine waren nicht verwendbar und wurden ausgelassen.",
+      "category_dropped": "Die Kategorie kennt diese Website nicht: ausgelassen.",
+      "kept_draft_private": "In der Datei als privat markiert: als Entwurf behalten.",
+      "untitled": "Kein Titel: „Termin ohne Titel“.",
+      "uid_generated": "Keine Kennung in der Datei: aus Datum und Titel gebildet.",
+      "description_truncated": "Die Beschreibung wurde auf die Höchstlänge gekürzt.",
+      "kept_utc": "Ein sich wiederholender Termin in UTC: seine Zeiten bleiben in UTC und wandern nicht mit der Zeitumstellung.",
+      "invalid_local_time": "Diese Uhrzeit gibt es in der Zeitzone nicht: die Uhr überspringt sie.",
+      "too_many_properties": "Dieser Termin hat zu viele Eigenschaften und wurde nicht importiert.",
+      "too_many_parameters": "Eine Eigenschaft dieses Termins hat zu viele Parameter; er wurde nicht importiert.",
+      "event_too_large": "Dieser Termin ist zu groß und wurde nicht importiert.",
+      "too_many_attendees": "Dieser Termin hat zu viele Teilnehmende und wurde nicht importiert.",
+      "title_truncated": "Der Titel wurde auf die Maximallänge gekürzt.",
+      "place_truncated": "Der Ort wurde auf die Maximallänge gekürzt."
+    },
+    "failure": {
+      "ics_encoding": "Die Datei ist kein gültiger Text (UTF-8). Speichere den Kalender neu und versuche es erneut.",
+      "ics_invalid": "Das sieht nicht wie eine Kalenderdatei aus, oder sie ist größer oder komplexer, als ein Import erlaubt.",
+      "too_many_events": "Die Datei enthält mehr Termine, als ein Import aufnimmt. Teile sie und importiere die Teile.",
+      "import_failed": "Der Import konnte nicht abgeschlossen werden. Es wurde nichts weiter geschrieben.",
+      "importer_gone": "Dein Konto darf hier nicht mehr importieren, der Import wurde angehalten.",
+      "too_complex": "Die Datei ist zu komplex, um sie in der erlaubten Zeit zu lesen. Teile sie in kleinere Dateien.",
+      "rights_expired": "Deine Importrechte sind abgelaufen, bevor der Import fertig war. Es wurde nichts mehr importiert; lade die Datei erneut hoch.",
+      "file_too_large": "Die Datei ist größer, als ein Import verarbeitet.",
+      "too_many_lines": "Die Datei hat zu viele Zeilen.",
+      "line_too_long": "Die Datei enthält eine zu lange Zeile.",
+      "too_many_components": "Die Datei enthält zu viele Kalenderkomponenten.",
+      "too_deep": "Die Datei verschachtelt ihre Komponenten zu tief.",
+      "too_many_timezones": "Die Datei definiert zu viele Zeitzonen.",
+      "component_too_large": "Eine Komponente in der Datei hat zu viele Eigenschaften."
+    },
+    "dropped": {
+      "ATTENDEE": "Teilnehmende",
+      "ORGANIZER": "Organisatoren",
+      "VALARM": "Erinnerungen",
+      "ATTACH": "Anhänge",
+      "RELATED-TO": "Verknüpfungen",
+      "X-ALT-DESC": "formatierte Beschreibungen",
+      "X-*": "Erweiterungseigenschaften",
+      "other": "weitere Eigenschaften"
+    },
+    "waiting_title": "Deine unfertigen Importe",
+    "announce": {
+      "uploading": "Die Datei wird hochgeladen.",
+      "preview": "Vorschau bereit: {total} Termine, {new} neu, {update} zu aktualisieren, {unchanged} unverändert, {skip} übersprungen.",
+      "done": "Import abgeschlossen: {created} angelegt, {updated} aktualisiert, {unchanged} unverändert, {skipped} übersprungen, {failed} fehlgeschlagen.",
+      "failed": "Der Import ist fehlgeschlagen: {reason}",
+      "working": "Der Import läuft."
     }
   }
 }

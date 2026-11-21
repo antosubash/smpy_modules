@@ -47,4 +47,14 @@ def menu_items() -> list[MenuItem]:
             group_key=c.MENU_GROUP_KEY,
             permissions=[c.PERM_VIEW, c.PERM_MANAGE],
         ),
+        MenuItem(
+            label=c.MENU_LABEL_IMPORT,
+            label_key=c.MENU_LABEL_KEY_IMPORT,
+            url=c.IMPORT_URL,
+            icon=c.MENU_ICON_IMPORT,
+            order=420,
+            group=c.MENU_GROUP,
+            group_key=c.MENU_GROUP_KEY,
+            permissions=[c.PERM_VIEW, c.PERM_MANAGE],
+        ),
     ]

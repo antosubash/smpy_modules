@@ -209,6 +209,16 @@ tenant its own session and `tenant_scope`, one savepoint per event. A scheduled
 publish in the worker emits no bus event. Its `core/worker.py` is a parity-checked
 copy of newsletter's (family "worker runtime").
 
+**Events private feeds and the .ics import.** `/events/feed/{token}.ics` is the THIRD documented
+token-bound public route (after newsletter's `/u/` and records' form token): it binds the token
+row's tenant and answers one padded 404 for every token state. Tokens are never logged (the
+redaction filter) and only their SHA-256 is stored. `feeds/importing/scan.py` is the only `.ics`
+parser; no library parses an upload. Imported items are always drafts. `create_core` and
+`apply_patch` live in `content/_core.py`; only the write path and the importer import them. A
+stored URL never carries credentials (`http_url`). A worker cannot re-check the importer, so the rights
+captured at apply expire after one hour (`rights_expired`); eager hosts re-check every slice. Log
+redaction covers the app only: redact `/feed/` in proxies and CDNs yourself.
+
 **Records' website-submission routes are anonymous writes (#101).** The record
 type is the trust anchor: never trust the `RecordForm` block's props —
 which fields are public, the consent text and the recipients live on
@@ -386,7 +396,7 @@ install-wide `dispatch_lock` per slice (at most 10 counted sends), and each reci
 row is committed before its SMTP call; the worker never renders, it personalises the render
 snapshot written when the campaign was scheduled. `/newsletter/u/{token}` is the **second
 documented exception** to "the public surface binds the resolved tenant", after records' signed
-form token: it binds the tenant from the HMAC-verified token, answers an unknown, foreign or
+form token (events' `/events/feed/{token}.ics` is the third): it binds the tenant from the HMAC-verified token, answers an unknown, foreign or
 forged token exactly as it answers a real one (so it cannot probe which tokens exist), and
 carries no CSRF on purpose (RFC 8058). `/newsletter/o/` and `/newsletter/c/` follow the same rule
 (tenant from the verified token, purpose-bound MACs, one answer for forged tokens); only a

@@ -53,6 +53,11 @@ def event_ics(fx: PublicFixture, locale: str, hidden: str | None) -> str:
     return _urls.event_ics_path(fx.slug(fx.hidden[hidden], locale), locale)
 
 
+def private_feed_path() -> str:
+    """A well-formed private feed address whose token nobody holds."""
+    return f"{_urls.prefix()}/feed/evf_{'0' * 43}.ics"
+
+
 def _api_url(locale: str) -> str:
     return f"{_urls.api_path()}?start=2026-01-01T00:00:00Z&end=2026-12-31T00:00:00Z&locale={locale}"
 
@@ -79,6 +84,10 @@ def surfaces(fx: PublicFixture, locale: str) -> list[Surface]:
         Surface(
             "calendar feed", "listing", lambda f, loc, _: _urls.calendar_ics_path(f.pub.slug, loc)
         ),
+        # A private feed needs a link, which an anonymous visitor has none of: a well-formed link
+        # nobody holds is the 404, and the body names nothing. What a *held* link serves, and why
+        # it stops, is ``test_private_feed_leaks.py``'s.
+        Surface("private feed", "listing", lambda f, loc, _: private_feed_path(), status=404),
     ]
 
 
@@ -104,6 +113,7 @@ ROUTE_SURFACES: dict[str, str] = {
     "/{prefix}/api/occurrences": "occurrences api",
     "/{prefix}/calendar.ics": "all calendars feed",
     "/{prefix}/c/{{calendar}}.ics": "calendar feed",
+    "/{prefix}/feed/{{token}}.ics": "private feed",
     "/{prefix}/c/{{calendar}}": "calendar page",
     "/{prefix}/": "index",
     "/{prefix}/{{slug}}.ics": "event ics",
@@ -111,8 +121,8 @@ ROUTE_SURFACES: dict[str, str] = {
 }
 """Every ``GET`` route under the public prefix and the :class:`Surface` that covers it (the
 meta-test in ``test_leaks_routes.py`` fails on a route that is not here, and on a name that is
-not a surface). ``{prefix}`` is the mounted prefix of a language; the sitemap and the API exist
-on the default language's only. A redirect-only route is named ``"redirect"``."""
+not a surface). ``{prefix}`` is the mounted prefix of a language; the sitemap, the API and the
+private feed exist on the default language's only. A redirect-only route is named ``"redirect"``."""
 
 REDIRECT_ONLY = "redirect"
 

@@ -7,6 +7,8 @@ import importlib.resources
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from simple_module_core.body_limits import BodyLimitRegistry
+from simple_module_core.events import EventBus
 from simple_module_core.menu import MenuRegistry
 from simple_module_core.module import ModuleBase, ModuleMeta
 from simple_module_core.permissions import PermissionRegistry
@@ -60,9 +62,12 @@ class EventsModule(ModuleBase):
     async def on_startup(self, app: FastAPI) -> None:
         """The tenancy mode, read off the built middleware stack, the fail-closed guard on
         the framework's session class (as images does), and, once the settings are hydrated,
-        the public routes: where they mount and in which languages depend on the database."""
+        the public routes: where they mount and in which languages depend on the database. The log
+        filter that keeps a private feed token out of every request log goes on first."""
         from sm_events.core import boot, tenancy
+        from sm_events.feeds.tokens import log_redact
 
+        log_redact.install()  # first: nothing below may log a request before the filter is on
         tenancy.configure(app)
         db = getattr(getattr(app.state, "sm", None), "db", None)
         if (session_class := getattr(db, "sync_session_class", None)) is not None:
@@ -93,6 +98,26 @@ class EventsModule(ModuleBase):
         registry.add_regex(
             shares_api.PATH_PATTERN,
             RateLimitRule(shares_api.RATE, key="user", methods=frozenset({"GET"})),
+        )
+
+    def register_event_handlers(self, bus: EventBus, app: FastAPI | None = None) -> None:
+        """Private feed links go when their user, membership or tenant does. A worker builds no
+        app (``app`` is ``None``) and has nothing to subscribe: a link whose owner is gone
+        serves nothing anyway, so this only removes the rows."""
+        if app is None:
+            return
+        from sm_events.feeds.tokens import cleanup
+
+        cleanup.subscribe(bus, app)
+
+    def register_body_limits(self, registry: BodyLimitRegistry) -> None:
+        """The import upload's body ceiling: the largest file an operator may allow plus 1 MiB of
+        multipart framing. It runs before settings hydrate, so it cannot read ``import_max_bytes``;
+        the handler enforces the stored cap (clamped) while it reads."""
+        registry.add_regex(
+            rf"^{constants.ROUTE_PREFIX_API}/imports/?$",
+            constants.IMPORT_BODY_CEILING + constants.IMPORT_MIB,
+            methods={"POST"},
         )
 
     def register_middleware(self, app: FastAPI) -> None:

@@ -99,3 +99,20 @@ def test_the_task_is_registered_under_its_name():
 
     assert PUBLISH_DUE in current_app.tasks
     assert not hasattr(tasks, "BEAT_SCHEDULE")  # one place, or the entry doubles
+
+
+def test_the_import_task_unbinds_the_callers_tenant(worker_db):
+    """``run_import`` is a platform body too: under the suite's bound ``default`` it must not
+    nest into the import's own tenant (an import that is not there answers ``gone``)."""
+    assert tasks.run_import("default", 12345) == "gone"
+    assert tasks.run_import("not a tenant", 1) == "gone"
+
+
+async def test_the_import_task_refuses_a_running_loop():
+    with pytest.raises(RuntimeError, match="event loop"):
+        tasks.run_import("default", 1)
+
+
+def test_the_janitor_task_runs_through_the_worker_runtime(worker_db):
+    summary = tasks.janitor()
+    assert set(summary) >= {"tenants", "deleted", "relaunched", "tokens"}

@@ -73,6 +73,13 @@ export function errorText(error: unknown, gone?: string): string {
     not_recurring: keys.events.errors.not_recurring,
     not_an_occurrence: keys.events.errors.not_an_occurrence,
     description_too_long: keys.events.errors.description_too_long,
+    token_limit: keys.events.errors.token_limit,
+    import_busy: keys.events.errors.import_busy,
+    import_busy_tenant: keys.events.errors.import_busy_tenant,
+    import_state: keys.events.errors.import_state,
+    import_too_large: keys.events.errors.import_too_large,
+    ics_invalid: keys.events.errors.ics_invalid,
+    private_feeds_unavailable: keys.events.errors.private_feeds_unavailable,
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);

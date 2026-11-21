@@ -32,7 +32,6 @@ from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 from simple_module_core.rate_limit import RateLimitRegistry
 from simple_module_core.resources import ResourceTypeRegistry
-from simple_module_core.user_directory import DirectoryUser
 from simple_module_db import tenant_context
 from simple_module_hosting.csrf import get_csrf_token
 from simple_module_inertia import InertiaConfig, inertia_dependency_factory
@@ -44,11 +43,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from tests.pg_support import make_db_state
+from tests.support.directory import ROLE_MAP, Directory  # noqa: F401 - re-exported for the suites
 
 TEMPLATES = Path(__file__).parent / "templates"
 USER_HEADER = "X-Test-User"
 PERMS_HEADER = "X-Test-Perms"
 TENANT_HEADER = "X-Test-Tenant"
+TENANT_SOURCE_HEADER = "X-Test-Tenant-Source"
 
 
 def as_user(user_id: str, *perms: str, tenant: str | None = None) -> dict[str, str]:
@@ -57,36 +58,6 @@ def as_user(user_id: str, *perms: str, tenant: str | None = None) -> dict[str, s
     if tenant is not None:
         headers[TENANT_HEADER] = tenant
     return headers
-
-
-class Directory:
-    """A user directory over a dict: ``{id: (email, full_name, is_active)}``."""
-
-    entity_type = None
-
-    def __init__(self, users: dict[str, tuple[str, str | None, bool]] | None = None) -> None:
-        self.users = users or {}
-        self.searches: list[str | None] = []
-
-    def _user(self, uid: str) -> DirectoryUser:
-        email, name, active = self.users[uid]
-        return DirectoryUser(id=uid, email=email, full_name=name, is_active=active)
-
-    async def get_many(self, db, ids, *, with_roles=False):
-        return {i: self._user(i) for i in ids if i in self.users}
-
-    async def search(self, db, term, *, limit):
-        self.searches.append(term)
-        needle = (term or "").lower()
-        hits = [
-            self._user(uid)
-            for uid, (email, name, _a) in self.users.items()
-            if needle in email.lower() or needle in (name or "").lower()
-        ]
-        return hits[:limit]
-
-    def match_ids(self, term):
-        return None
 
 
 class _Auth(BaseHTTPMiddleware):
@@ -100,6 +71,10 @@ class _Auth(BaseHTTPMiddleware):
         tenant = request.headers.get(TENANT_HEADER)
         if tenant:
             request.state.tenant_id = tenant
+            if (source := request.headers.get(TENANT_SOURCE_HEADER)) is not None:
+                # What ``TenantMiddleware`` records: where the tenant came from (``subdomain``
+                # and ``fixed`` are the host's; anything else is the visitor's).
+                request.state.tenant_source = source
         if tenant and getattr(request.app.state, "events_bind_tenant", False):
             # What the framework's ``TenantMiddleware`` does on a multi-tenant
             # host: the resolved tenant is also the one bound for the request.
@@ -119,6 +94,8 @@ async def build_app(
     module.settings = EventsSettings(**(settings or {}))
     permissions = PermissionRegistry()
     module.register_permissions(permissions)
+    for role, perms in ROLE_MAP.items():
+        permissions.map_role(role, perms)
     app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
     app.state.sm = SimpleNamespace(
         db=state,

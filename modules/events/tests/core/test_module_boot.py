@@ -52,3 +52,30 @@ async def test_on_startup_configures_tenancy_and_installs_the_guard(monkeypatch)
     bare = SimpleNamespace(state=SimpleNamespace())
     await EventsModule().on_startup(bare)
     assert calls == [("configure", bare)]
+
+
+async def test_on_startup_installs_the_token_log_filter():
+    import logging
+    from types import SimpleNamespace
+
+    from sm_events.feeds.tokens import log_redact
+
+    for name in log_redact.LOGGERS:  # a clean slate: another test may have installed it
+        target = logging.getLogger(name)
+        target.filters = [f for f in target.filters if not isinstance(f, log_redact.Filter)]
+    await EventsModule().on_startup(SimpleNamespace(state=SimpleNamespace()))
+    for name in log_redact.LOGGERS:
+        assert any(isinstance(f, log_redact.Filter) for f in logging.getLogger(name).filters), name
+
+
+def test_import_upload_body_limit_is_registered():
+    from simple_module_core.body_limits import BodyLimitRegistry
+
+    registry = BodyLimitRegistry()
+    EventsModule().register_body_limits(registry)
+    ceiling = 21 * 1024 * 1024
+    for path in ("/api/events/imports", "/api/events/imports/"):
+        assert registry.limit_for("POST", path) == ceiling
+    assert registry.limit_for("GET", "/api/events/imports") is None
+    assert registry.limit_for("POST", "/api/events/imports/1/apply") is None
+    assert registry.limit_for("POST", "/api/events/calendars") is None

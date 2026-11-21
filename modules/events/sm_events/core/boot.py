@@ -166,3 +166,11 @@ def register_public_rate_limits(app: FastAPI, prefix: str, languages: tuple[str,
     registry.add_exact(
         _urls.api_path(), RateLimitRule(constants.PUBLIC_API_RATE, key="ip", methods=methods)
     )
+    # Private feed links, on the default language's prefix only. Its own, lower budget: a link is
+    # polled a few times a day, and a flood of guesses is what this limits. The pattern is one
+    # segment (``[^/]+``), exactly what the route matches, and none of the ``.ics`` rules above
+    # reach it (they take a single segment before ``.ics``).
+    registry.add_regex(
+        rf"^{re.escape(prefix)}/{constants.FEED_PATH_SEGMENT}/[^/]+\.ics$",
+        RateLimitRule(constants.FEED_PRIVATE_RATE, key="ip", methods=methods),
+    )

@@ -52,3 +52,7 @@ class EventsSettings(DbBackedSettings):
     public_title: str = constants.MODULE_NAME
     """The title of the public events pages and of the all-calendars feed (``calendar.ics``):
     what the site calls its events, for example ``What's on``."""
+
+    import_max_bytes: int = constants.IMPORT_DEFAULT_BYTES
+    """The largest ``.ics`` file an import accepts, in bytes (default 5 MiB). Read per request
+    and kept between 64 KiB and 20 MiB, whatever is stored here."""

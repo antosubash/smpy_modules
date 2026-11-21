@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { guardPublic, type PublicSeed, seedPublic, XSS_TITLE } from './events-public-helpers';
+import { shoot } from './events-shots';
 import { login } from './helpers';
 
 /**
@@ -13,7 +14,6 @@ test.skip(
 );
 test.describe.configure({ mode: 'serial' });
 
-const SHOTS = '.skill-state/qa/pr4-shots';
 let seed: PublicSeed;
 let problems: string[] = [];
 
@@ -41,7 +41,7 @@ test('the list shows public published events only', async ({ page }) => {
   await expect(page.getByRole('link', { name: seed.weekly.title }).first()).toBeVisible();
   await expect(body(page)).not.toContainText(seed.draft.title);
   await expect(body(page)).not.toContainText(seed.hidden.title);
-  await page.screenshot({ path: `${SHOTS}/01-index-list.png`, fullPage: true });
+  await shoot(page, '01-index-list', { fullPage: true });
 });
 
 test('the calendar chunk loads only for the grid view, which is read-only', async ({ page }) => {
@@ -69,7 +69,7 @@ test('the calendar chunk loads only for the grid view, which is read-only', asyn
   expect(chunks.length).toBeGreaterThan(0);
   await expect(body(page)).not.toContainText(seed.draft.title);
   await expect(page.getByRole('button', { name: /Move/ })).toHaveCount(0);
-  await page.screenshot({ path: `${SHOTS}/02-index-grid.png`, fullPage: true });
+  await shoot(page, '02-index-grid', { fullPage: true });
   await page.getByText(seed.weekly.title).first().click();
   await expect(page.getByRole('link', { name: 'View event' })).toBeVisible();
   await expect(body(page)).not.toContainText('Open in editor');
@@ -83,7 +83,7 @@ test('a calendar page narrows the list and offers the feed', async ({ page }) =>
     'href',
     /^webcal:\/\/.+\.ics$/,
   );
-  await page.screenshot({ path: `${SHOTS}/03-calendar.png`, fullPage: true });
+  await shoot(page, '03-calendar', { fullPage: true });
 });
 
 test('an event page: place, description, sub-events, JSON-LD with a nonce', async ({
@@ -94,7 +94,7 @@ test('an event page: place, description, sub-events, JSON-LD with a nonce', asyn
   await expect(page.getByRole('heading', { level: 1, name: seed.conference.title })).toBeVisible();
   await expect(page.getByText('Main hall')).toBeVisible();
   for (const talk of seed.talks) await expect(page.getByRole('link', { name: talk })).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/04-event.png`, fullPage: true });
+  await shoot(page, '04-event', { fullPage: true });
 
   const source = await (await request.get(`/events/${seed.conference.slug}`)).text();
   const scripts = source.match(/<script[^>]*application\/ld\+json[^>]*>[\s\S]*?<\/script>/g) ?? [];
@@ -134,7 +134,7 @@ test('series: the bare page, a moved and a cancelled date, a skipped one is the 
   await expect(page.getByText('Rescheduled from')).toBeVisible();
   await page.goto(`/events/${slug}?date=${dates[2]}`);
   await expect(page.getByRole('status')).toHaveText('This date has been cancelled');
-  await page.screenshot({ path: `${SHOTS}/05-event-series-date.png`, fullPage: true });
+  await shoot(page, '05-event-series-date', { fullPage: true });
 
   const skipped = await page.goto(`/events/${slug}?date=${dates[3]}`);
   expect(skipped?.status()).toBe(404);
@@ -160,7 +160,7 @@ test('German: the prefix, the language and the alternate links', async ({ page }
     'href',
     en,
   );
-  await page.screenshot({ path: `${SHOTS}/06-event-de.png`, fullPage: true });
+  await shoot(page, '06-event-de', { fullPage: true });
   await page.goto('/de/events/');
   await expect(page.getByRole('link', { name: seed.conference.deTitle })).toBeVisible();
   await expect(page.locator('a[lang=en]').first()).toBeVisible(); // an event with no German text
@@ -196,7 +196,7 @@ test('a draft, an internal event and an internal calendar are the module 404', a
   const missing = await page.goto('/events/no-such-event-at-all');
   expect(missing?.status()).toBe(404);
   const heading = await page.getByRole('heading', { level: 1 }).first().innerText();
-  await page.screenshot({ path: `${SHOTS}/07-not-found.png`, fullPage: true });
+  await shoot(page, '07-not-found', { fullPage: true });
   for (const path of [`/events/${seed.draft.slug}`, `/events/${seed.hidden.slug}`]) {
     const response = await page.goto(path);
     expect(response?.status(), path).toBe(404);
@@ -222,10 +222,10 @@ test('dark scheme: the pages stay legible', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto(`/events/${seed.conference.slug}`);
   await expect(page.getByRole('heading', { level: 1, name: seed.conference.title })).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/08-dark-event.png`, fullPage: true });
+  await shoot(page, '08-dark-event', { fullPage: true });
   await page.goto('/events/');
   await expect(page.getByRole('link', { name: seed.conference.title })).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/08-dark-index.png`, fullPage: true });
+  await shoot(page, '08-dark-index', { fullPage: true });
 });
 
 test('390 px wide: nothing scrolls sideways', async ({ page }) => {
@@ -242,7 +242,7 @@ test('390 px wide: nothing scrolls sideways', async ({ page }) => {
     expect(await noSideScroll(page), path).toBe(true);
   }
   await page.goto('/events/');
-  await page.screenshot({ path: `${SHOTS}/09-phone.png`, fullPage: true });
+  await shoot(page, '09-phone', { fullPage: true });
 });
 
 test('markup in a title is text', async ({ page, browser }) => {

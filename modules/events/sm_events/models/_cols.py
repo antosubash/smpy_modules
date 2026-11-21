@@ -25,6 +25,19 @@ def pk_uuid() -> Any:
     return Field(default_factory=uuid.uuid4, sa_column=Column(Uuid, primary_key=True))
 
 
+def fk_big(target: str, *, ondelete: str) -> Any:
+    """An indexed foreign key to a table keyed by :func:`big_pk`."""
+    return Field(
+        default=None,
+        sa_column=Column(_BIG, ForeignKey(target, ondelete=ondelete), nullable=False, index=True),
+    )
+
+
+def counter() -> Any:
+    """A ``NOT NULL`` integer that starts at zero."""
+    return Field(default=0, sa_column=Column(Integer, nullable=False, default=0))
+
+
 def fk_uuid(target: str, *, nullable: bool = False, ondelete: str | None = None) -> Any:
     """An indexed foreign key to a UUID-keyed table."""
     return Field(

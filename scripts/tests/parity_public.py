@@ -12,7 +12,17 @@ PB = "modules/pagebuilder/pagebuilder"
 NEWS = "modules/news/news"
 EVENTS = "modules/events/sm_events"
 
+NEWSLETTER = "modules/newsletter/sm_newsletter"
+
 PUBLIC_FAMILIES: tuple[Family, ...] = (
+    Family(
+        "tenant a host resolved, for a token link (newsletter, events)",
+        (
+            Copy(f"{NEWSLETTER}/web/endpoints/public_tenant.py"),
+            Copy(f"{EVENTS}/web/endpoints/public/_host_tenant.py"),
+        ),
+        shared=("HOST_SOURCES", "host_tenant"),
+    ),
     Family(
         "public cache-control (pagebuilder, news)",
         (

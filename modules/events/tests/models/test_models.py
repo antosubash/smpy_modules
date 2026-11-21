@@ -25,6 +25,9 @@ TABLES = {
     "events_revision",
     "events_redirect",
     "events_calendar_redirect",
+    "events_feed_token",
+    "events_import",
+    "events_import_item",
 }
 
 
@@ -34,16 +37,26 @@ def test_every_table_is_tenant_owned():
         assert "tenant_id" in table.c, table.name
 
 
+ACROSS_TENANTS = {"uq_events_feed_token_hash"}
+"""The one unique key that deliberately does not lead with ``tenant_id``: a private feed's
+token is looked up by its hash before any tenant is known, so the hash is unique install-wide."""
+
+
 def test_tenant_scoped_uniques_lead_with_tenant():
     seen = 0
+    exempt = set()
     for table in Base.metadata.sorted_tables:
         for item in table.constraints | table.indexes:
             unique = isinstance(item, UniqueConstraint) or (isinstance(item, Index) and item.unique)
             if not unique or item.__class__.__name__ == "PrimaryKeyConstraint":
                 continue
+            if item.name in ACROSS_TENANTS:
+                exempt.add(item.name)
+                continue
             seen += 1
             assert next(iter(item.columns)).name == "tenant_id", (table.name, item.name)
     assert seen >= 7
+    assert exempt == ACROSS_TENANTS
 
 
 async def _calendar(db, slug="team", **kwargs) -> Calendar:
