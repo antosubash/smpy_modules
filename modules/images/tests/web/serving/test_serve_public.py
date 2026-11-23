@@ -3,7 +3,7 @@
 Only a public collection is served there, to anyone: the twin answers as the
 anonymous surface even to a signed-in owner. And only there, for a rendition
 or display copy, on a host where nothing request-specific picked the tenant,
-is a response shareable (CLAUDE.md, records #196, pagebuilder/news #192).
+is a response shareable (AGENTS.md, records #196, pagebuilder/news #192).
 """
 
 from __future__ import annotations

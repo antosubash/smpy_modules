@@ -199,12 +199,12 @@ may go to (#348):
 
 - **Who is vouched for.** The caller's own address (the signed-in user's
   email); an active account of the campaign's organisation, found through the
-  framework's user directory by exact address (its substring search is widened
+  framework's user directory (`UserDirectory`, via `get_user_directory`) by exact address (its substring search is widened
   20, 100, then 500 rows until the exact match shows or the results run out),
   with a proven email (`DirectoryUser.email_verified`, re-read through
   `get_many`; `False` is refused, `None` from a provider that does not track it
   is accepted) and, on a multi-tenant host, kept
-  only when the tenants module says it is a member of the tenant newsletter
+  only when `tenant_member_ids` (`simple_module_core.tenancy`) says it is a member of the tenant newsletter
   bound for the request (the resolved one, never `user.tenant_id`; on a
   single-tenant host every active account belongs to the one organisation); and
   the addresses in the setting `test_send_extra_recipients` (SYSTEM scope, up to

@@ -2,7 +2,7 @@
 
 ``ArticlesService.get_by_slug_published`` used to fall back to the default
 language when no locale was passed. Pagebuilder's equivalent has always required
-one, and CLAUDE.md's rule is that every slug lookup takes a locale: a lookup
+one, and AGENTS.md's rule is that every slug lookup takes a locale: a lookup
 that does not is how ``/de/news/x`` starts serving the English article.
 """
 

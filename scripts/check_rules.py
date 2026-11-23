@@ -1,4 +1,4 @@
-"""Enforce CLAUDE.md rules that were honour-system until #135.
+"""Enforce AGENTS.md rules that were honour-system until #135.
 
 1. **No exact pin on the framework or a sibling in a published module.**
    ``modules/*/pyproject.toml`` may not ``==`` (or ``===``) any
@@ -108,7 +108,7 @@ def check_python_pins(pyproject: Path, root: Path) -> list[str]:
         if _pins_exactly(req):
             errors.append(
                 f"{_rel(pyproject, root)}: '{raw}' pins exactly; a published module "
-                "takes a range (CLAUDE.md pin policy)"
+                "takes a range (AGENTS.md pin policy)"
             )
     return errors
 
@@ -142,7 +142,7 @@ def check_npm_pins(package_json: Path, root: Path) -> list[str]:
             if target.startswith(NPM_SCOPE) and _npm_exact(rng):
                 errors.append(
                     f"{_rel(package_json, root)}: {key}['{name}'] = '{spec}' pins exactly; "
-                    "a published module takes a range (CLAUDE.md pin policy)"
+                    "a published module takes a range (AGENTS.md pin policy)"
                 )
     return errors
 
@@ -238,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
             print(e, file=sys.stderr)
         print(f"\nFAIL: {len(errors)} rule violation(s).", file=sys.stderr)
         return 1
-    print("CLAUDE.md rules OK (pins, pages/, sibling floors).")
+    print("AGENTS.md rules OK (pins, pages/, sibling floors).")
     return 0
 
 

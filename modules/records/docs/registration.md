@@ -116,3 +116,31 @@ handler) that rewrites the value to `<redacted>`; a proxy or load balancer in fr
 logs paths itself and must redact the `t` query of `/records/submissions/` too. Before this change
 records' own confirm and unsubscribe links were logged in full the same way (pre-existing).
 
+
+## For contributors
+
+Events owns the seats (`events_registration_count` is the lock target;
+`events_registration_seat` is unique per tenant, provider and holder) and records owns the
+person (the record IS the registration, kind `registration`). They meet only in
+`sm_events.contracts.registration`, which runs in the caller's transaction and never commits.
+
+- **Lock order:** records' type and row locks come first. Admit then locks the event
+  (`FOR SHARE`); every seat change locks counter rows in ascending id (`FOR UPDATE`)
+  before seats. Release does not lock the event. `release` restarts under the
+  union of what it needs, bounded, and ends in `SeatsBusy` (409 `seats_busy`). A database
+  deadlock inside the contract is also `SeatsBusy`.
+- Keep the [seat timing](#when-a-seat-is-taken) and [public answer rules](#one-answer).
+- The routes under `/api/records/submissions/` that carry a **registration token**
+  (`{digest}.{issued}.{nonce}.{event_id}.{occurrence_key}.{mac}`, HMAC purpose `registration`;
+  the event comes only from it) are records' form-token surface (the first documented
+  exception to "the public surface binds the resolved tenant"), with two extra routes: the
+  confirm and cancel links (`/records/submissions/confirm-registration`, `/cancel`; GET pages
+  are inert, only the POST acts).
+- Follow the [submission bounds and captcha charging order](#bounds-on-the-anonymous-route-defaults)
+  and the [configured-origin link rule](#links). "My registrations"
+  (`/api/records/registrations/mine`) matches the caller's address as the account directory
+  reports it verified.
+- `sm_records.contracts.dated` serves events' `records:dates` source: published, untrashed
+  records only, under the caller's own access (`records.view`, `allowed_roles`, a type grant;
+  never wider than the list API), `is_public` types only for the public, tenant pinned.
+  `integrations/events/` is the only code that imports `sm_events`.

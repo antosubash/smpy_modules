@@ -662,6 +662,11 @@ restart.
   opens (the `secret_key` was rotated without `SM_SECRET_KEY_PREVIOUS`) refuses
   submissions with `503 captcha_unavailable` and logs the field name, never the
   value — re-enter it, or follow `docs/secret-key-rotation.md` at the repo root.
+  **For a developer:** the field is typed `SealedSecret`
+  (`core/settings/settings_public_submissions.py`), a `str | None` whose
+  serializer encrypts on dump. The framework treats such a field as `json` and
+  stores its validated dump, which is what seals it. A new records secret field
+  uses `SealedSecret` too, never a plain `str`.
 - **Retention.** Every process runs a loop that, every
   `public_submissions_retention_interval_seconds` (3600), deletes contact-form
   submissions past their type's retention, newsletter signups never confirmed

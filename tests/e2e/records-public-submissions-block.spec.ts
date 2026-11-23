@@ -15,7 +15,7 @@ import {
  * fetches the type's live definition, the submission lands as a record of
  * that type, and a signup as a pending subscriber.
  *
- * Stands alone (CLAUDE.md): it seeds its own types and pages over the APIs,
+ * Stands alone (AGENTS.md): it seeds its own types and pages over the APIs,
  * as `records-widget.spec.ts` builds its pages — nothing here tests Puck's
  * drag and drop. The server refuses a form sent within
  * `public_submissions_min_fill_seconds` (3 s) of loading it, so the visitor

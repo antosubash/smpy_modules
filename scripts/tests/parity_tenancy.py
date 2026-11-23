@@ -90,7 +90,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
                 {"news": "MODULE"},
                 own={
                     "search_tenant": "News' search reads pagebuilder's tables from outside "
-                    "pagebuilder, so it pins tenant_id itself (CLAUDE.md, #38).",
+                    "pagebuilder, so it pins tenant_id itself (AGENTS.md, #38).",
                 },
             ),
         ),

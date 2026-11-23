@@ -163,7 +163,7 @@ def test_the_body_ceiling_is_bounded():
 
 
 def test_the_environment_is_not_a_source(monkeypatch):
-    """Stored settings only (CLAUDE.md): a stray variable changes nothing."""
+    """Stored settings only (AGENTS.md): a stray variable changes nothing."""
     for name in ("PUBLIC_SUBMISSIONS_ENABLED", "SM_RECORDS_PUBLIC_SUBMISSIONS_ENABLED"):
         monkeypatch.setenv(name, "false")
     assert RecordsSettings().public_submissions_enabled is True

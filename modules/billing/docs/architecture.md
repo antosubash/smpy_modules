@@ -349,6 +349,14 @@ changed it:
 - The ledger purge goes by the charge's server-side `recorded_at`, never the
   caller-supplied `occurred_at`, and a refund goes with its charge.
 
+## Response models do not inherit input bounds
+
+`PlanOut` (`web/schemas.py`) is deliberately not a subclass of `PlanIn`. The
+input model's bounds and validators guard writes; a stored row that predates a
+bound must still be readable, otherwise one legacy value raises a validation
+error and 500s every screen that lists plans. Keep it that way: a new bound goes
+on the input model only.
+
 ## Settings and secrets
 
 `BillingSettings` subclasses `DbBackedSettings` (no env sources) and is

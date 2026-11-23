@@ -427,6 +427,9 @@ name the module they affect.
 
 ### Fixed
 
+- Every package's `Repository` URL, and images' import User-Agent, name the
+  repository by its current name, `antosubash/smpy_modules`; they still named
+  the old `simple_module_python_modules`.
 - **billing's last four bare `commit()` calls are `finalize_session`** (#340):
   the webhook claim and finish, the seat-quantity push and the default-plan
   seed. None queued `on_commit` work, so nothing changed today, but a later

@@ -29,7 +29,7 @@ from pathlib import Path
 
 import tomlkit
 
-CANONICAL_REPO = "https://github.com/antosubash/simple_module_python_modules"
+CANONICAL_REPO = "https://github.com/antosubash/smpy_modules"
 PLACEHOLDER_DESCRIPTIONS = {"", "Add your description here"}
 NON_MODULE_TESTPATHS = ("host/tests", "scripts/tests")
 

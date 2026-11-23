@@ -1,4 +1,4 @@
-"""Packaging contract: extras, floors and no exact pins (CLAUDE.md pin policy)."""
+"""Packaging contract: extras, floors and no exact pins (AGENTS.md pin policy)."""
 
 import re
 import tomllib

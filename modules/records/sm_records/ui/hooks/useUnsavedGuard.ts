@@ -14,7 +14,7 @@ import { keys, translate } from '../utils/i18n';
  * `allow` is a ref, not state: a save that then navigates away sets it
  * before calling `router.visit`, so the guard never asks about the edits
  * that were just written. Read `t` inside the handler, never at module
- * scope, so the confirm text follows the boot locale (CLAUDE.md § i18n).
+ * scope, so the confirm text follows the boot locale (AGENTS.md § i18n).
  */
 export function useUnsavedGuard(dirty: boolean): { allow: () => void } {
   const allowRef = useRef(false);

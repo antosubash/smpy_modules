@@ -1,4 +1,4 @@
-"""CLAUDE.md's pin, pages/ and sibling-floor rules (#135)."""
+"""AGENTS.md's pin, pages/ and sibling-floor rules (#135)."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 """``render_public_page`` names its language (#131).
 
 It used to fall back to the default language when a caller left ``locale``
-out. CLAUDE.md's rule is that every slug lookup takes a locale: a viewer that
+out. AGENTS.md's rule is that every slug lookup takes a locale: a viewer that
 forgot it would serve the default-language page at a translated address, which
 is how ``/de/p/x`` starts serving the English one.
 """

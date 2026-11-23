@@ -143,7 +143,8 @@ A suppression says "never mail this address". Suppressions are **tenant-wide**:
   The row records the list it came from as provenance, and there is one row per
   list.
 - `hard_bounce`, `complaint` and `imported_cleaned` rows are **address-wide**.
-- The address is stored as `email_hash = sha256(email.strip().lower())`, unkeyed.
+- The address is stored as `email_hash = sha256(normalise_email(email))`, unkeyed
+  (the legacy `strip().lower()` key is still read; see `sending.md`).
 - A double-opt-in confirmation on list L (the subscriber following records'
   confirm link) clears L's `unsubscribed` row and any `hard_bounce` or
   `imported_cleaned` row created at or before the confirmation. It never clears

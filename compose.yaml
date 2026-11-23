@@ -4,7 +4,7 @@
 #   docker compose up -d --build  # http://localhost:8090
 #   docker compose down           # add -v to drop the data volumes
 #
-# There is deliberately no database service. CLAUDE.md forbids a per-project
+# There is deliberately no database service. AGENTS.md forbids a per-project
 # Postgres container, so the host runs on SQLite in the `smpy-data` volume by
 # default, or on the shared dev-services Postgres: add compose.devnet.yaml to
 # join its network and set SMPY_DATABASE_URL (see that file).

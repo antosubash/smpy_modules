@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/antosubash/simple_module_python_modules"
+Repository = "https://github.com/antosubash/smpy_modules"
 
 [project.entry-points.simple_module]
 records = "sm_records.module:RecordsModule"

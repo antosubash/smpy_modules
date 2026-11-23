@@ -38,7 +38,7 @@ function hiddenField<Value>(): CustomField<Value> {
  * `pagebuilder-blocks.ts` eagerly, before `configureI18n()` ever runs
  * (`host/client_app/app.tsx`/`blocks.ts`), so a `t()` call baked into a
  * top-level object literal here would run before i18next has any messages
- * and freeze that way forever (the same risk CLAUDE.md flags for a Zod
+ * and freeze that way forever (the same risk as a Zod
  * schema built at module scope). `resolveFields` below is a function Puck
  * calls later, well after boot, so calling the non-hook `t` inside it is
  * safe and picks up the active locale each time.

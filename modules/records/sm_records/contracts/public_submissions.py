@@ -5,7 +5,7 @@ Plain ``SQLModel`` DTOs, per the contracts rule. The column is plain JSON and
 stores :meth:`PublicSubmissionsConfig.model_dump` of this shape; ``TypeRead``
 reads it back as a plain ``dict`` rather than through this class, so a stored
 row that predates a bound added here still reads (the billing ``PlanOut``
-lesson in ``CLAUDE.md``). What the shape alone cannot say — the rules that need
+lesson in ``AGENTS.md``). What the shape alone cannot say — the rules that need
 the type's fields or its ``is_public`` — is
 :func:`sm_records.public_submissions.config.settle`.
 """

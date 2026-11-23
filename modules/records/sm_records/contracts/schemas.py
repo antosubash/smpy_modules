@@ -1,7 +1,7 @@
 """HTTP-facing DTOs for the Records API and admin views — Record Type and
 Record CRUD.
 
-SQLModel throughout, per ``CLAUDE.md`` — never a plain pydantic ``BaseModel``.
+SQLModel throughout — never a plain pydantic ``BaseModel``.
 The read shapes (``TypeRead``, ``RecordRead``, ``RevisionRead``) are built by
 :func:`type_read` / :func:`record_read` / :func:`revision_read` rather than
 constructed ad hoc at each call site, so the API and the Inertia views render

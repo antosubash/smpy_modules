@@ -60,7 +60,7 @@ def get_settings(request: Request) -> RecordsSettings:
     ``request.app.state.sm_records`` is the container
     :meth:`~sm_records.module.RecordsModule.register_settings` mounts; reading
     through it rather than a captured default is what makes a settings-screen
-    edit take effect without a restart (``CLAUDE.md``: env → DB → default).
+    edit take effect without a restart (``AGENTS.md``: env → DB → default).
     """
     return request.app.state.sm_records.settings
 
@@ -80,7 +80,7 @@ async def request_db(request: Request, db: AsyncSession = Depends(get_db)) -> As
 
     Registering it here rather than taking it from the framework is a version
     thing: ``simple_module_db`` at the range this module depends on
-    (``CLAUDE.md``: published modules pin ranges, never ``==``) exposes no
+    (``AGENTS.md``: published modules pin ranges, never ``==``) exposes no
     request-scoped session accessor. ``get_db`` is still the dependency doing
     the work, and FastAPI caches it per request, so a route mixing
     ``Depends(get_db)`` and ``Depends(request_db)`` gets one session, not two.
