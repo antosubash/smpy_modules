@@ -118,13 +118,15 @@ make dev         # API on :8000, Vite on :5050
 - **Migrations.** `make migration msg="…"` autogenerates a revision in
   `host/migrations/versions/`, `make migrate` runs `upgrade heads`, and
   `make downgrade` steps back one revision.
-- **Background tasks.** images and newsletter run work on Celery. `.env.example`
+- **Background tasks.** images, newsletter and events run work on Celery. `.env.example`
   sets `SM_BG_TASKS_TASK_ALWAYS_EAGER=true`, so tasks run inline in the web
   process. Recurring work still needs beat: without `make beat` a scheduled
-  newsletter campaign is never dispatched
-  ([operations](modules/newsletter/docs/operations.md)). To run them the way production does,
+  newsletter campaign is never dispatched, and events' scheduled publishing,
+  reminders and periodic subscription refreshes do not run
+  ([newsletter operations](modules/newsletter/docs/operations.md),
+  [events tasks](modules/events/docs/rules.md#worker-and-beat)). To run them the way production does,
   point `SM_REDIS_URL` at a Redis, drop the eager line, and start the workers
-  beside `make dev`: `make worker` (the `images`, `newsletter` and `celery`
+  beside `make dev`: `make worker` (the `images`, `newsletter`, `events` and `celery`
   queues), `make worker-imports`, `make worker-heavy`, `make worker-gpu`, and
   one `make beat`.
 
@@ -167,8 +169,8 @@ docker compose down            # -v also drops the data volumes
   so compose sets `SM_BG_TASKS_TASK_ALWAYS_EAGER=true`, the `memory://` broker,
   the `cache+memory://` result backend and
   `SM_BG_TASKS_BROADCAST_INVALIDATIONS=false` (production refuses the default
-  localhost broker even when eager). That is enough for a demo. A real images
-  or newsletter deployment needs Redis, overrides for all four, and worker and
+  localhost broker even when eager). That is enough for a demo. A real images,
+  newsletter or events deployment needs Redis, overrides for all four, and worker and
   beat processes like the `make worker` targets.
 - **Migrations** run on every start, which is right for the one container
   compose starts and wrong for several: nothing locks the upgrade, so replicas
@@ -286,7 +288,7 @@ modules), `biome check`, `make typecheck` (`tsc` over each module's
 | Frontend build | `sync-module-deps`, `gen-pages`, `make typecheck`, `npm run build` |
 | Frontend unit tests | `npx vitest run` |
 | Docker image | builds the image and waits for `/health/live` under production settings |
-| Background tasks | host, worker and beat against Redis and Postgres; `scripts/bg_tasks_smoke.py` runs an image pipeline and a campaign send |
+| Background tasks | host, worker and beat against Redis and Postgres; `scripts/bg_tasks_smoke.py` runs an image pipeline, a campaign send and an event reminder |
 | E2E shard 1–3, E2E (Playwright) | the bundle suite in three shards; the last job merges their reports and is the one status covering all three |
 | E2E (multi-tenant), (billing per user), (newsletter) | the opt-in specs, each in its own job |
 | Repo checks | the `scripts/` checks above, and `pytest scripts/tests` |

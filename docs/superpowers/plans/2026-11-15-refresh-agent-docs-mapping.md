@@ -38,7 +38,7 @@ rules is split into rows. Lines are the old file's.
 | 29 | **`billing` commits … `finalize_session`** (248–259) | `test_commit_sites.py`, `RequestSession`/`on_commit`, metering transactions, `db=` | AGENTS § Per-module invariants (billing); `modules/billing/docs/architecture.md#transactions--the-rule-that-bites`, § Transaction rules |
 | 30 | same (260–265) | `subject_mode = user`, images bills `user:<owner>`, subject per hold replayed | AGENTS § Per-module invariants (billing); `modules/billing/docs/subjects.md` § Images bills the collection's owner |
 | 31 | same (266–270) | Webhooks never trusted (`resync`/`apply_snapshot`), `PlanOut` no input bounds | AGENTS § Per-module invariants (billing); `modules/billing/docs/architecture.md` § From Stripe to local state, § Response models do not inherit input bounds |
-| 32 | **… read no environment variables for their settings** (272–282) | DB-backed settings, no env sources, `on_startup` reads, `_RESTART` | AGENTS § Settings and the environment (now "all eight", incl. analytics) |
+| 32 | **… read no environment variables for their settings** (272–282) | DB-backed settings, no env sources, `on_startup` reads, `_RESTART` | AGENTS § Settings and the environment (all nine, incl. analytics and events) |
 | 33 | same (283–289) | Newsletter `smtp_password` storage, endpoint, workers refuse plaintext, `manage_url` | AGENTS § Per-module invariants (newsletter SMTP); `modules/newsletter/docs/operations.md#the-secret`, `index.md` § Settings; `crypto.is_encrypted` rule in AGENTS § Stored secrets |
 | 34 | same (290–298) | ai SYSTEM scope, its three env reads, `metering._own_factory`, images passes its factory | AGENTS § Per-module invariants (ai); `modules/ai/docs/operations.md` § Settings (three subsections) and § Secret key rotation |
 | 35 | **Stored secrets rotate with `SM_SECRET_KEY_PREVIOUS`** (299–308) | Crypto parity family, formats, previous keys, reencrypt TARGETS, signed things not covered | AGENTS § Stored secrets; `docs/secret-key-rotation.md` |
@@ -63,7 +63,7 @@ rules is split into rows. Lines are the old file's.
 | 54 | same (487–492) | `images-models` only; **no AGPL**, MIT models, no torch/ultralytics | AGENTS § Per-module invariants (images); § Checks (`images-models.yml`); `modules/images/docs/index.md#anonymize-models-and-licences` |
 | 55 | § Working against an unreleased framework (494–503) | Whole section | AGENTS § Working against an unreleased framework |
 | 56 | § Known deferred work (505) | Heading | dropped: nothing in it is deferred any more (i18n is done; its contents moved, rows 57–62) |
-| 57 | **UI i18n — done** (507–522) | Catalogues, `check_locales.py`, host locales, `set-locale`, `ui` catalogue, overrides test | AGENTS § i18n (console UI, host chrome); "All seven" fixed to every (eight) module; `host/locale_switch.py` gone (history) dropped |
+| 57 | **UI i18n — done** (507–522) | Catalogues, `check_locales.py`, host locales, `set-locale`, `ui` catalogue, overrides test | AGENTS § i18n (console UI, host chrome); "All seven" fixed to all nine modules; `host/locale_switch.py` gone (history) dropped |
 | 58 | same (524–531) | `t(keys…)` with no `defaultValue`, runtime families, namespace = directory | AGENTS § i18n |
 | 59 | **The trap, if you add a module** (533–545) | npm package lacks module keys; `gen-i18n` not enough | AGENTS § i18n ("The trap when adding a module") |
 | 60 | same (547–553) | Derive keys from `en.json`, news reference | AGENTS § i18n; "about ninety lines" fixed to 182 |
@@ -93,29 +93,31 @@ rules is split into rows. Lines are the old file's.
 
 Merged after framework 0.0.47 and the events module landed. "AGENTS § X" is a
 section of `AGENTS.md`; "events rules" is `modules/events/docs/rules.md`
-(new, the contributor rules the other events pages did not state).
+(the contributor entry point, linking existing detail and adding missing boundaries).
+Every module-doc path below is relative to that module's `docs/` directory unless
+written in full. AGENTS' per-module entries are short pointers to these destinations.
 
 | # | Main added or changed | New home |
 | --- | --- | --- |
 | A1 | Host pin `==0.0.44` → `==0.0.47` | AGENTS § Dependencies |
-| A2 | 0.0.46 `e480d7dd348f`; `0a30d2baa903` stays as shipped; `c7a41e9d2b60` SQLite-only retype (`AwareDateTime`, 0.0.45) | `host/migrations/README.md` § Framework revisions ported (0.0.45, 0.0.46); AGENTS § Migrations points at it |
+| A2 | 0.0.46 `e480d7dd348f`; `0a30d2baa903` stays as shipped; host-only `c7a41e9d2b60` fixes the 0.0.45 type change after `e480d7dd348f` | `host/migrations/README.md` § Framework revisions ported (0.0.45, 0.0.46, Host-only correction); AGENTS § Migrations points at it |
 | A3 | `make_include_object` replaces the `env.py` `tenant_browse` workaround | `host/migrations/README.md` § Rules ("The SQLite index check is the framework's"); AGENTS § Migrations pointer reworded |
 | A4 | Flat paths gone since 0.0.46 | AGENTS § Framework behaviour to code against; `docs/adding-a-module.md` |
 | A5 | 0.0.45 second `Content-Security-Policy` kept beside the app policy; news and pagebuilder `public_csp` defaults | AGENTS § Framework behaviour to code against |
 | A6 | Events joins the tenancy rule (six guards, `sm_events.core.tenancy` copy of newsletter's) | AGENTS § Tenancy (entry points, guard, copies, background work) |
-| A7 | Events access `POLICY`, share picker, names, `claim_revision`, recurrence, sanitisers, wall clock + IANA zone, durable bus events | AGENTS § Per-module invariants (events, one line); events rules § Access |
-| A8 | FullCalendar adapter rules | AGENTS § Per-module invariants; events rules § The calendar |
-| A9 | Public gate `core/access/public.py`, `leaks.py`, feeds, JSON-LD, `public_base_url`; cards contract and blocks | AGENTS § Per-module invariants; events rules § The public surface |
+| A7 | Events access `POLICY`, share picker, names, `claim_revision`, recurrence, sanitisers, wall clock + IANA zone, durable bus events | Events rules § Access; events `index.md` §§ Access, Events and texts, Times and all-day, Recurrence, Workflow, Revisions and conflicts; `extensions.md` § Bus events |
+| A8 | FullCalendar adapter rules | Events rules § The calendar; events `index.md` §§ The calendar, Embedding `Calendar`, FullCalendar |
+| A9 | Public gate `core/access/public.py`, `leaks.py`, feeds, JSON-LD, `public_base_url`; cards contract and blocks | Events rules § The public surface; events `public.md` and `blocks.md` |
 | A10 | Worker and beat, `events` queue, `core/worker.py` parity copy | AGENTS § Local setup (Workers), § Per-module invariants; events rules § Worker and beat |
-| A11 | Registration seats, lock order, registration token, submit bounds, "My registrations" | AGENTS § Per-module invariants (records, registration), § Tenancy exceptions; `modules/records/docs/registration.md` § For contributors (new) |
-| A12 | Private feeds and the `.ics` import (third token-bound route) | AGENTS § Tenancy exceptions and § Per-module invariants; events rules § Private feeds and the .ics import |
-| A13 | Subscriptions fetch, `url_enc`, `Policy`, `fetch_wait`, `target_gate`, `seed_external` | AGENTS § Per-module invariants and § Stored secrets; events rules § Subscriptions |
-| A14 | Reminders at most once | AGENTS § Per-module invariants; events rules § Reminders are at most once |
+| A11 | Registration seats, lock order, registration token, submit bounds, "My registrations" | AGENTS § Tenancy exceptions; `modules/records/docs/registration.md` §§ For contributors, When a seat is taken, One answer, Bounds on the anonymous route (defaults), Links |
+| A12 | Private feeds and the `.ics` import (third token-bound route) | AGENTS § Tenancy exceptions; events rules § Private feeds and the .ics import; events `feeds.md` and `import.md` |
+| A13 | Subscriptions fetch, `url_enc`, `Policy`, `fetch_wait`, `target_gate`, `seed_external` | AGENTS § Stored secrets; events rules § Subscriptions; events `subscriptions.md` §§ How a fetch is made, The intranet switch, Refresh, backoff and the worker, Secrets and rotation, Tests make no real network connection |
+| A14 | Reminders at most once | Events rules § Reminders are at most once; events `reminders.md` §§ Guarantees and their cost, Who can be reminded, and who cannot, The headless worker app, Privacy |
 | A15 | Records' `contracts.dated` | AGENTS § Per-module invariants (records, registration); `modules/records/docs/registration.md` § For contributors |
 | A16 | Newsletter event cards (`sm_events.contracts.cards`, snapshot, frozen at scheduling) | AGENTS § Per-module invariants (newsletter); already stated in `modules/newsletter/docs/content.md` § Event cards |
-| A17 | No-environment-variables rule includes events; `SM_SECRET_KEY_PREVIOUS`, `SM_SECRET_KEY` fallback | AGENTS § Settings and the environment |
+| A17 | No-environment-variables rule includes events; `SM_SECRET_KEY_PREVIOUS`, `SM_SECRET_KEY` fallback | AGENTS §§ Settings and the environment, Stored secrets |
 | A18 | Stored-secret crypto: five copies, `COLUMN_TARGETS`, `events_subscription.url_enc` | AGENTS § Stored secrets |
-| A19 | `events_extensions.py` plugin loader | AGENTS § Per-module invariants; events rules § Plugins |
+| A19 | `events_extensions.py` plugin loader | Events rules § Plugins; events `extensions.md` §§ Registration, and why a file and not `on_startup`, What the runner does around your call, Who sees what, An event type, Frontend, Worked example: records |
 | A20 | e2e: `newsletter-events.spec.ts` under `E2E_NEWSLETTER=1` | AGENTS § Background work, releases, e2e |
 | A21 | Redis/Celery users and `make worker` queues | AGENTS § Local setup (Workers) |
 | A22 | i18n: "All nine", events calls `t(keys.…)` | AGENTS § i18n |

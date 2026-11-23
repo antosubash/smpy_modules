@@ -71,8 +71,9 @@ dependencies = [
 ]
 ```
 
-Since framework 0.0.44 most framework modules follow the module layout (the old
-flat paths are gone since 0.0.46); import the new paths, and set the floor to the release that first shipped the path
+Since framework 0.0.44 most framework modules follow the module layout. Most old
+flat paths are gone since 0.0.46 (a few remain until 0.1.0); import the new paths,
+and set the floor to the release that first shipped the path
 you import. `host/tests/test_host_boots.py` fails on an import the installed
 framework marks deprecated.
 

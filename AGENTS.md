@@ -287,16 +287,16 @@ doesn't is how `/de/p/x` serves the English page.
   [operations](modules/records/docs/operations.md#website-forms-and-newsletters).
 - **records, registration**: events owns the seats, records the person; they meet
   only in `sm_events.contracts.registration` (caller's transaction, never commits).
-  Lock order, everywhere: records' type and row locks, the event row (`FOR SHARE`),
+  Lock order: records' type and row locks, the event row (`FOR SHARE`, admit only),
   counter rows in ascending id (`FOR UPDATE`), seats; contention is `SeatsBusy`. A
   registration token is records' form-token surface (the first documented
   exception). `sm_records.contracts.dated` serves events' `records:dates` under the
-  caller's own access; `integrations/events/` alone imports `sm_events`.
-  [registration](modules/records/docs/registration.md#for-contributors).
+  caller's own access; `integrations/events/` alone imports `sm_events`
+  ([registration](modules/records/docs/registration.md#for-contributors)).
 - **events** ([rules](modules/events/docs/rules.md)):
-  - Access goes through `core.access.POLICY`; every write starts with
-    `claim_revision`; recurrence expands only in `calendar/occurrences.py`, with an
-    `until`; the API takes a wall clock plus an IANA zone, never UTC
+  - Access goes through `core.access.POLICY`; a change to an existing event starts
+    with `claim_revision`; recurrence never expands without an `until`; the API
+    takes a wall clock plus an IANA zone, never UTC
     ([access](modules/events/docs/rules.md#access)).
   - FullCalendar is imported only under `ui/calendar/adapter/` (MIT packages on the
     allow-list); grid changes convert through `ui/calendar/time/zones.ts`
@@ -305,10 +305,9 @@ doesn't is how `/de/p/x` serves the English page.
     here" one way; a new public route joins `tests/web/public/leaks.py`; production
     sets `public_base_url`. `contracts.cards` and the blocks' routes are the same
     projection, fetched live ([public](modules/events/docs/rules.md#the-public-surface)).
-  - `make worker` serves the `events` queue and scheduled publishing needs beat
-    ([worker](modules/events/docs/rules.md#worker-and-beat)).
   - Private feeds and `.ics` import: one padded 404, SHA-256 tokens only, `scan.py`
-    the only parser, imports are drafts ([feeds](modules/events/docs/rules.md#private-feeds-and-the-ics-import)).
+    the only parser, a private item stays a draft
+    ([feeds](modules/events/docs/rules.md#private-feeds-and-the-ics-import)).
   - Subscription URLs are fetched only through `feeds.subscriptions.fetch`, stored
     only as `enc:v2:` (`url_enc`), and a fetch `Policy` comes only from
     `policy.effective` ([subscriptions](modules/events/docs/rules.md#subscriptions)).

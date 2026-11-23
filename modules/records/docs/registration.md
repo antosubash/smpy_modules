@@ -124,23 +124,20 @@ Events owns the seats (`events_registration_count` is the lock target;
 person (the record IS the registration, kind `registration`). They meet only in
 `sm_events.contracts.registration`, which runs in the caller's transaction and never commits.
 
-- **Lock order, everywhere:** records' type and row locks, then the event row (`FOR SHARE`),
-  then counter rows in ascending id (`FOR UPDATE`), then seats. `release` restarts under the
+- **Lock order:** records' type and row locks come first. Admit then locks the event
+  (`FOR SHARE`); every seat change locks counter rows in ascending id (`FOR UPDATE`)
+  before seats. Release does not lock the event. `release` restarts under the
   union of what it needs, bounded, and ends in `SeatsBusy` (409 `seats_busy`). A database
   deadlock inside the contract is also `SeatsBusy`.
-- **A seat is taken at the confirmation** for a double opt-in form (a submit takes none and
-  answers one neutral 202 for every address), and at submit for a single opt-in form (whose
-  public availability shows states, never a number).
+- Keep the [seat timing](#when-a-seat-is-taken) and [public answer rules](#one-answer).
 - The routes under `/api/records/submissions/` that carry a **registration token**
   (`{digest}.{issued}.{nonce}.{event_id}.{occurrence_key}.{mac}`, HMAC purpose `registration`;
   the event comes only from it) are records' form-token surface (the first documented
   exception to "the public surface binds the resolved tenant"), with two extra routes: the
   confirm and cancel links (`/records/submissions/confirm-registration`, `/cancel`; GET pages
   are inert, only the POST acts).
-- The submit route is bounded by per-IP, a per-form total (`public_submissions_type_rate`,
-  charged only after the captcha passes), a per-address mail bound and the optional captcha;
-  raise the total before a large event opens.
-- Mail links come from the configured origin only, never a request header. "My registrations"
+- Follow the [submission bounds and captcha charging order](#bounds-on-the-anonymous-route-defaults)
+  and the [configured-origin link rule](#links). "My registrations"
   (`/api/records/registrations/mine`) matches the caller's address as the account directory
   reports it verified.
 - `sm_records.contracts.dated` serves events' `records:dates` source: published, untrashed

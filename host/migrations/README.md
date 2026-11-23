@@ -51,8 +51,9 @@ only by the Postgres check.
 
 ## Framework revisions ported
 
-Ids are upstream's, unchanged, except `9d83e789a5b4`, which is host-only (the
-framework ships no revision for it).
+Ported revisions keep upstream's ids unchanged. Host-only additions are
+`c9e3a5f1b7d2` (the missing initial task-execution table), `9d83e789a5b4` and
+`c7a41e9d2b60` (type corrections); the framework ships no matching revisions.
 
 - **0.0.37 / 0.0.38**: `307543b6146a` through `b65e04cf65d7`
   (`307543b6146a` is file_storage upload sessions, `b65e04cf65d7` the leases
@@ -81,10 +82,12 @@ framework ships no revision for it).
 - **0.0.44**: `e805a1b2c3d4`, `c5d8e2f1a903` and `f6c2d4e8b109`.
 - **0.0.45**: the model is `AwareDateTime` (was `TIMESTAMPAware`), which SQLite
   reports as a type change against the reflected `TIMESTAMP`. `0a30d2baa903` is
-  shipped and stays as it was; `c7a41e9d2b60` retypes
-  `users_access_token.expires_at` on SQLite only (a no-op on Postgres), so old and
-  new databases converge.
+  shipped and stays as it was.
 - **0.0.46**: `e480d7dd348f` (`users_oauth_account` profile columns) follows the
   then head `541bfbe29a28`.
+- **Host-only correction** (not an upstream port): `c7a41e9d2b60` follows
+  `e480d7dd348f` and retypes `users_access_token.expires_at` on SQLite only
+  (a no-op on Postgres), so databases created before and after the 0.0.45 type
+  change converge without editing a shipped revision.
 - **Not ported**: upstream's `b8d4f2a6c901` (audit_log) and `c9d2e4f6a810`
   (oidc). Neither module is installed here, so their tables do not exist.
