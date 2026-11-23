@@ -14,8 +14,8 @@ in clear because the caller compares it; the MAC covers it.
 enumerating the IPv4 space does not reverse it; per tenant, so two
 organisations' rows cannot be joined on it.
 
-Rotating ``secret_key`` invalidates every outstanding form token, which costs
-a visitor one automatic retry.
+Retired keys in ``SM_SECRET_KEY_PREVIOUS`` keep outstanding form tokens valid
+within their original age limits; removing a key revokes its tokens.
 """
 
 from __future__ import annotations
@@ -23,10 +23,14 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import logging
 import secrets
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+
+from sm_records.core import crypto
 
 __all__ = [
     "FormToken",
@@ -37,6 +41,8 @@ __all__ = [
     "sign_form",
     "verify_form",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class TokenError(ValueError):
@@ -71,6 +77,19 @@ def _mac(secret: str, *parts: object) -> str:
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
 
+def _with_previous(secret: str, matches: Callable[[str], bool]) -> bool:
+    """Try retired keys only after a current-key mismatch; never return a key."""
+    if not secret:
+        return False
+    if matches(secret):
+        return True
+    try:
+        return any(matches(key) for key in crypto.previous_secrets())
+    except (RuntimeError, UnicodeError):
+        logger.error("records: invalid SM_SECRET_KEY_PREVIOUS; token refused")
+        return False
+
+
 def sign_form(
     secret: str, tenant: str, type_key: str, digest: str, *, now: float | None = None
 ) -> str:
@@ -98,8 +117,12 @@ def verify_form(
     if len(parts) != 4 or not parts[0].isalnum() or not parts[1].isdigit():
         raise TokenError("malformed form token")
     digest, issued, nonce, mac = parts[0], int(parts[1]), parts[2], parts[3]
-    expected = _mac(secret, "form", tenant, type_key, digest, issued, nonce)
-    if not hmac.compare_digest(expected, mac):
+    if not _with_previous(
+        secret,
+        lambda key: hmac.compare_digest(
+            _mac(key, "form", tenant, type_key, digest, issued, nonce), mac
+        ),
+    ):
         raise TokenError("form token does not verify")
     age = (time.time() if now is None else now) - issued
     if age < min_fill:

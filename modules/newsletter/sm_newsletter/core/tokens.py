@@ -1,7 +1,9 @@
 """The per-send tokens every tracked link carries (S10, T17).
 
 ``{tenant}.{campaign_id}.{send_id}.{mac}``: HMAC-SHA256 under the host's
-``secret_key``, base64url, truncated to 128 bits, compared in constant time.
+current ``secret_key``, base64url, truncated to 128 bits, compared in constant
+time. Verification also accepts keys retained in ``SM_SECRET_KEY_PREVIOUS``;
+removing a key revokes its links. Signing always uses the supplied current key.
 The MAC covers a purpose (``u`` unsubscribe, ``o`` open, ``c`` click) that is
 never in the token: each route implies it, so a token minted for one purpose
 fails ``parse`` for the others and a leaked click URL cannot unsubscribe anyone.
@@ -19,6 +21,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
+from sm_newsletter.core import crypto
 from sm_newsletter.core.constants import CLICK_PREFIX, OPEN_PREFIX, UNSUBSCRIBE_PREFIX
 from sm_newsletter.core.tenancy import valid_tenant
 
@@ -71,7 +74,11 @@ def sign(secret: str, *, purpose: Purpose, tenant_id: str, campaign_id: int, sen
 
 
 def parse(secret: str, token: object, *, purpose: Purpose) -> SendToken | None:
-    """The claims when the MAC verifies, else ``None``. Never raises."""
+    """Claims under the current or a retained key, else ``None``. Never raises.
+
+    Read retired keys only after the current MAC fails. Malformed retired-key
+    configuration refuses fallback without revealing its value.
+    """
     if not secret or purpose not in PURPOSES or not isinstance(token, str):
         return None
     if not token.isascii() or len(token) > MAX_TOKEN:
@@ -90,7 +97,16 @@ def parse(secret: str, token: object, *, purpose: Purpose) -> SendToken | None:
     if f"{campaign_id}.{send_id}" != f"{campaign_raw}.{send_raw}":
         return None  # a leading zero: one send has exactly one token
     if not hmac.compare_digest(_mac(secret, purpose, tenant_id, campaign_id, send_id), mac):
-        return None
+        try:
+            matched = any(
+                hmac.compare_digest(_mac(key, purpose, tenant_id, campaign_id, send_id), mac)
+                for key in crypto.previous_secrets()
+            )
+        except (RuntimeError, UnicodeEncodeError):
+            logger.error("newsletter: invalid SM_SECRET_KEY_PREVIOUS; token refused")
+            return None
+        if not matched:
+            return None
     return SendToken(tenant_id, campaign_id, send_id)
 
 

@@ -629,6 +629,14 @@ restart.
   (visibly — "not sent" — and *Resend* recovers it). A newsletter's
   confirmation always takes the after-commit path, because its links need the
   host's `secret_key`, which an outbox worker does not have.
+- **Signing-key rotation.** Set `SM_SECRET_KEY_PREVIOUS` to the retired key
+  (or a JSON list) to keep issued form, confirmation and unsubscribe tokens
+  working. New tokens use only the current host key. Form age limits,
+  confirmation expiry and subscriber nonce revocation still apply. Unsubscribe
+  links do not expire: retaining every old link requires retaining its key
+  indefinitely, even after stored credentials are re-encrypted. Remove a
+  compromised key to revoke its links. Follow `docs/secret-key-rotation.md` at
+  the repo root for the full procedure.
 - **The CAPTCHA.** `public_submissions_captcha_provider` is `none` by
   default. To turn on `turnstile` or `hcaptcha`, set
   `public_submissions_captcha_site_key` and `public_submissions_captcha_secret`

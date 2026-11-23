@@ -1,5 +1,5 @@
 """``reencrypt_secrets.py`` rotates, upgrades and seals, all or nothing (#351),
-and ``set_setting.py`` stores records' CAPTCHA secret encrypted (#350).
+and ``set_setting.py`` seals records' CAPTCHA and billing's Stripe secrets.
 
 Each run is a subprocess against a private copy of a migrated SQLite database,
 with ``SM_PROJECT_ROOT`` pointed at an empty directory so the repo's own
@@ -193,21 +193,24 @@ def test_a_json_null_is_empty_not_an_error():
     assert rs.plan_row(row).outcome == rs.EMPTY
 
 
-def test_set_setting_stores_the_captcha_secret_encrypted(db, tmp_path):
+@pytest.mark.parametrize("field", [CAPTCHA_KEY, BILLING_KEY, "sm_billing.stripe_webhook_secret"])
+def test_set_setting_stores_secrets_encrypted(db, tmp_path, field):
+    package, name = field.split(".")
+    plain = "secret-from-headless-script"
     result = _run(
         db,
         tmp_path,
         "scripts/set_setting.py",
-        "sm_records",
-        "public_submissions_captcha_secret",
-        json.dumps(PLAIN[CAPTCHA_KEY]),
+        package,
+        name,
+        json.dumps(plain),
         previous=None,
     )
     assert result.returncode == 0, result.stderr
-    assert PLAIN[CAPTCHA_KEY] not in result.stdout
-    stored = _stored(db)[CAPTCHA_KEY]
-    assert PLAIN[CAPTCHA_KEY] not in stored[0]
-    assert _decrypt(CAPTCHA_KEY, stored, NEW) == PLAIN[CAPTCHA_KEY]
+    assert plain not in result.stdout
+    stored = _stored(db)[field]
+    assert stored[1] == "json" and plain not in stored[0]
+    assert _decrypt(field, stored, NEW) == plain
 
 
 def test_a_missing_secret_is_one_check_before_planning():

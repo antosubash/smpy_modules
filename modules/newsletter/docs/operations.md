@@ -88,9 +88,13 @@ non-empty SMTP password stored without an `enc:` prefix (`enc:v2:`, or the
 The secret signs the unsubscribe, open and click links as well. Rotate it as
 `docs/secret-key-rotation.md` (repo root) describes: with the old key in
 `SM_SECRET_KEY_PREVIOUS` the password keeps decrypting, and
-`scripts/reencrypt_secrets.py` re-encrypts it under the new key. The links are
-**not** covered: those already sent stop verifying after a rotation (they answer
-the same page, but unsubscribe nobody). A worker keeps decrypting the SMTP
+`scripts/reencrypt_secrets.py` re-encrypts it under the new key. Retained keys
+also preserve issued unsubscribe, open and click links; new links use only the
+current key. Re-encryption cannot re-sign mail already delivered. Unsubscribe
+links do not expire, so preserving them requires retaining their signing keys
+indefinitely. Removing a key revokes its links (the routes answer the same but
+do nothing); remove a compromised key even if this breaks old links. A worker
+keeps decrypting the SMTP
 password with the first secret it resolved until it restarts (tokens re-resolve
 the secret each tick), so restart the workers after each step of a rotation.
 
