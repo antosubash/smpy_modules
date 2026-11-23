@@ -1,4 +1,4 @@
-"""Packaging contract: the extras, their floors, and no exact pins (CLAUDE.md pin policy)."""
+"""Packaging contract: the extras, their floors, and no exact pins (AGENTS.md pin policy)."""
 
 from __future__ import annotations
 
