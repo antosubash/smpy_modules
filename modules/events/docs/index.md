@@ -444,3 +444,7 @@ date cannot disappear, while somebody holds a seat there (`registration_has_seat
 release, describe, summaries, seat holders); see `modules/records/docs/registration.md` for the
 people side.
 
+## Rules for contributors
+
+[rules.md](rules.md): the invariants a change to this module must keep (access, the public gate, the
+calendar adapter, seats, feeds, subscriptions, reminders, plugins).
