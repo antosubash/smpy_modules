@@ -8,7 +8,7 @@ rules is split into rows. Lines are the old file's.
 | # | Old (line) | Content | New home |
 | --- | --- | --- | --- |
 | 1 | Intro (1–4) | Guidance for Claude Code, README for general docs | AGENTS intro; `CLAUDE.md` now `@AGENTS.md` + Claude Code notes |
-| 2 | § What this repo is (6–10) | Distributable add-ons, PyPI names, host never published | AGENTS § What this repo is (now lists all eight modules) |
+| 2 | § What this repo is (6–10) | Distributable add-ons, PyPI names, host never published | AGENTS § What this repo is (now lists all nine modules, events included) |
 | 3 | **Pin policy differs by role** (14–22) | Ranges in modules, `==` in host, `check_rules.py`, `# floor:` comments, floor not compared with lockstep | AGENTS § Dependencies; `check_rules.py` row in § Checks |
 | 4 | same (23–28) | `check_sibling_contracts.py` floor/tag rule, next-release exception, needs tags | AGENTS § Dependencies ("The floor must ship what you import"); § Checks (`git fetch --tags`) |
 | 5 | same (29–32) | Contracts-only boundary, `BOUNDARY_ALLOWLIST` empty (#336) | AGENTS § Module boundaries |
@@ -88,3 +88,34 @@ rules is split into rows. Lines are the old file's.
   and "the host's copy, `host/locale_switch.py`, is gone" (history, no rule), and
   the list of extras `--all-extras` installs (`quality`, `ai`, `billing`,
   `pagebuilder`; implied by the flag).
+
+## Added on main since `dda286dd` (`git diff dda286dd origin/main -- CLAUDE.md`)
+
+Merged after framework 0.0.47 and the events module landed. "AGENTS § X" is a
+section of `AGENTS.md`; "events rules" is `modules/events/docs/rules.md`
+(new, the contributor rules the other events pages did not state).
+
+| # | Main added or changed | New home |
+| --- | --- | --- |
+| A1 | Host pin `==0.0.44` → `==0.0.47` | AGENTS § Dependencies |
+| A2 | 0.0.46 `e480d7dd348f`; `0a30d2baa903` stays as shipped; `c7a41e9d2b60` SQLite-only retype (`AwareDateTime`, 0.0.45) | `host/migrations/README.md` § Framework revisions ported (0.0.45, 0.0.46); AGENTS § Migrations points at it |
+| A3 | `make_include_object` replaces the `env.py` `tenant_browse` workaround | `host/migrations/README.md` § Rules ("The SQLite index check is the framework's"); AGENTS § Migrations pointer reworded |
+| A4 | Flat paths gone since 0.0.46 | AGENTS § Framework behaviour to code against; `docs/adding-a-module.md` |
+| A5 | 0.0.45 second `Content-Security-Policy` kept beside the app policy; news and pagebuilder `public_csp` defaults | AGENTS § Framework behaviour to code against |
+| A6 | Events joins the tenancy rule (six guards, `sm_events.core.tenancy` copy of newsletter's) | AGENTS § Tenancy (entry points, guard, copies, background work) |
+| A7 | Events access `POLICY`, share picker, names, `claim_revision`, recurrence, sanitisers, wall clock + IANA zone, durable bus events | AGENTS § Per-module invariants (events, one line); events rules § Access |
+| A8 | FullCalendar adapter rules | AGENTS § Per-module invariants; events rules § The calendar |
+| A9 | Public gate `core/access/public.py`, `leaks.py`, feeds, JSON-LD, `public_base_url`; cards contract and blocks | AGENTS § Per-module invariants; events rules § The public surface |
+| A10 | Worker and beat, `events` queue, `core/worker.py` parity copy | AGENTS § Local setup (Workers), § Per-module invariants; events rules § Worker and beat |
+| A11 | Registration seats, lock order, registration token, submit bounds, "My registrations" | AGENTS § Per-module invariants (records, registration), § Tenancy exceptions; `modules/records/docs/registration.md` § For contributors (new) |
+| A12 | Private feeds and the `.ics` import (third token-bound route) | AGENTS § Tenancy exceptions and § Per-module invariants; events rules § Private feeds and the .ics import |
+| A13 | Subscriptions fetch, `url_enc`, `Policy`, `fetch_wait`, `target_gate`, `seed_external` | AGENTS § Per-module invariants and § Stored secrets; events rules § Subscriptions |
+| A14 | Reminders at most once | AGENTS § Per-module invariants; events rules § Reminders are at most once |
+| A15 | Records' `contracts.dated` | AGENTS § Per-module invariants (records, registration); `modules/records/docs/registration.md` § For contributors |
+| A16 | Newsletter event cards (`sm_events.contracts.cards`, snapshot, frozen at scheduling) | AGENTS § Per-module invariants (newsletter); already stated in `modules/newsletter/docs/content.md` § Event cards |
+| A17 | No-environment-variables rule includes events; `SM_SECRET_KEY_PREVIOUS`, `SM_SECRET_KEY` fallback | AGENTS § Settings and the environment |
+| A18 | Stored-secret crypto: five copies, `COLUMN_TARGETS`, `events_subscription.url_enc` | AGENTS § Stored secrets |
+| A19 | `events_extensions.py` plugin loader | AGENTS § Per-module invariants; events rules § Plugins |
+| A20 | e2e: `newsletter-events.spec.ts` under `E2E_NEWSLETTER=1` | AGENTS § Background work, releases, e2e |
+| A21 | Redis/Celery users and `make worker` queues | AGENTS § Local setup (Workers) |
+| A22 | i18n: "All nine", events calls `t(keys.…)` | AGENTS § i18n |

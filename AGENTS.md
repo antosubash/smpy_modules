@@ -7,9 +7,9 @@ introduction. Where a rule has more detail, the link says where.
 
 A monorepo of **distributable** SimpleModule add-ons plus a demo host. Each
 `modules/<name>/` is published to PyPI as `simple_module_<name>`; `host/` is a
-development app that mounts them and is never published. The eight modules,
+development app that mounts them and is never published. The nine modules,
 each with docs in `modules/<name>/docs/`: **ai**, **analytics**, **billing**,
-**images**, **news**, **newsletter**, **pagebuilder**, **records**.
+**events**, **images**, **news**, **newsletter**, **pagebuilder**, **records**.
 
 New code must run on **Python 3.12** (the `requires-python` floor) and **3.14**
 (the Docker runtime); CI tests both. Run Python entry points (`scripts/*.py`,
@@ -59,7 +59,7 @@ models) and `release.yml` (`docs/releasing.md`).
 ### Dependencies
 
 - **Modules take framework *ranges*** (`simple_module_core>=0.0.36,<0.1`); the
-  host pins *exactly* (`simple_module_hosting==0.0.44`). An `==` in a module makes
+  host pins *exactly* (`simple_module_hosting==0.0.47`). An `==` in a module makes
   it uninstallable on a newer framework.
 - **A requirement on another module here** (news' `pagebuilder` extra) has a `>=`
   floor and a `# floor: <reason>` comment naming what that release first shipped.
@@ -139,15 +139,25 @@ A later move needs aliases the same way.
   upstream revision unchanged (same id, chained linearly, a duplicate
   `branch_labels` dropped), then `alembic check` on SQLite *and* Postgres.
 
-`host/migrations/README.md` has the detail, `env.py`'s SQLite index exception and
-the port log (0.0.37–0.0.44, incl. 0.0.40 invalidating every token).
+`host/migrations/README.md` has the detail, the SQLite index check and the port
+log (0.0.37–0.0.46, incl. 0.0.40 invalidating every token and `0a30d2baa903`
+staying as shipped).
 
 ### Framework behaviour to code against
 
-- **Since 0.0.44 most framework modules follow the module layout**; old flat
-  paths (`tenants.resolver`, `settings.service`, …) warn and go in 0.0.46 (a few
-  in 0.1.0). Import the new path, raise the floor to the release that shipped it;
-  `host/tests/test_host_boots.py` fails on a `deprecated_module` import.
+- **Since 0.0.44 most framework modules follow the module layout**; the old flat
+  paths (`tenants.resolver`, `settings.service`, …) are gone since 0.0.46
+  (`ModuleNotFoundError`; a few remain until 0.1.0). Import the new path, raise the
+  floor to the release that shipped it; `host/tests/test_host_boots.py` fails on a
+  `deprecated_module` import.
+- **Since 0.0.45 a response's own `Content-Security-Policy` is kept beside the app
+  policy** (the browser enforces both; framework #870): a module's policy can only
+  restrict further, and being static it cannot carry the per-request nonce, so a
+  script its `script-src` does not allow is blocked whatever the app allows. news'
+  `public_csp` defaults to empty (no second header) and pagebuilder's to
+  `frame-ancestors 'none'` alone (no `script-src`; the app's own is `'self'`, so
+  public pages are not framed even by the same origin). Set one only to restrict
+  something the app policy allows.
 - **Production CSP is nonce-based** (0.0.43, no `unsafe-inline`/`unsafe-eval`): a
   template `<script>` needs `nonce="{{ request.state.csp_nonce }}"`, and
   `eval`/`new Function` do not run. An Inertia GET without `X-Inertia-Version`
@@ -163,7 +173,7 @@ the port log (0.0.37–0.0.44, incl. 0.0.40 invalidating every token).
 Tables carry `MultiTenantMixin`, filtered only while a tenant is bound; with
 `multi_tenant` off nothing is bound and a read is *unfiltered*.
 
-- **Every pagebuilder, news, records, images, newsletter and analytics entry
+- **Every pagebuilder, news, records, images, newsletter, events and analytics entry
   point binds a tenant** (`tenancy.bind_admin`/`bind_public`), per request:
   single-tenant → `"default"`; multi → the tenant the framework resolved
   (`request.state.tenant_id`, the active membership; never `user.tenant_id` or a
@@ -171,7 +181,7 @@ Tables carry `MultiTenantMixin`, filtered only while a tenant is bound; with
   tenant resolved upstream always wins, so a mis-detected child app fails closed,
   and a public answer for another tenant is never shareable-cached (records #196;
   pagebuilder and news #192).
-- **Fail-closed guard** in pagebuilder, news, records, images and newsletter
+- **Fail-closed guard** in pagebuilder, news, records, images, newsletter and events
   (`core/tenancy/_guard.py`, records' `_tenant_guard.py`, parity-checked by
   `scripts/tests/parity_tenancy.py`, #335): an unbound statement raises
   `TenantUnbound`; a deliberate cross-tenant read is `tenancy.all_tenants(stmt)`;
@@ -179,13 +189,15 @@ Tables carry `MultiTenantMixin`, filtered only while a tenant is bound; with
   has no guard**: each of its queries carries a `tenant_id` predicate; keep it so.
 - **Copies, not imports**: `news.core.tenancy`, `sm_records.core.tenancy` (403 as
   the `{"detail","code"}` envelope), images' copy of records', newsletter's of
-  images'. Billing reads `request.state.tenant_id` via `context.billing_context`.
+  images', events' (`sm_events.core.tenancy`) of newsletter's. Billing reads `request.state.tenant_id` via `context.billing_context`.
 - **Background work runs per tenant** under `tenant_context`: schedulers open one
-  session per tenant; `images.reconcile`, `images.janitor` and newsletter's hourly
+  session per tenant (events' beat: `all_tenants()`, then one session and
+  `tenant_scope` per tenant); `images.reconcile`, `images.janitor` and newsletter's hourly
   reconcile enumerate tenants in one narrow `all_tenants()` read (newsletter via
   records' worker-only `subscription_list_tenants`). Tasks never run unscoped.
 - **Exceptions** bind the tenant from a verified token: records' signed form
-  token and newsletter's `/newsletter/u/`, `/o/`, `/c/` (below).
+  token (a registration token included), newsletter's `/newsletter/u/`, `/o/`,
+  `/c/` and, third, events' `/events/feed/{token}.ics` (below).
 
 ### Settings and the environment
 
@@ -193,7 +205,8 @@ Tables carry `MultiTenantMixin`, filtered only while a tenant is bound; with
   (`register_module_settings`; `DbBackedSettings` drops env, `.env` and secrets
   sources): a field goes on the class, not `.env.example`; `SM_PAGEBUILDER_*`
   lines are dead. Set them on the Settings screen or with `scripts/set_setting.py`.
-  The only env reads are the crypto's (below) and ai's (Per-module invariants).
+  The only env reads are the crypto's (below) and ai's (Per-module invariants);
+  events reads `SM_SECRET_KEY` and `SM_SECRET_KEY_PREVIOUS` the same way.
 - **Boot-time values** (route prefixes, `content_locales`, the media mount) are
   read from `app.state.<package>.settings` in `on_startup`, never during app
   construction (hydration is at lifespan start); mark them `json_schema_extra=_RESTART`.
@@ -216,15 +229,18 @@ Tables carry `MultiTenantMixin`, filtered only while a tenant is bound; with
 
 ### Stored secrets (#351)
 
-ai, billing, newsletter and records keep copies of one `core/crypto.py`
+ai, billing, newsletter, records and events keep copies of one `core/crypto.py`
 (`scripts/tests/parity_crypto.py`; vectors in
-`scripts/tests/test_secret_crypto_formats.py`); change all four together. Writes
+`scripts/tests/test_secret_crypto_formats.py`); change all five together. Writes
 are `enc:v2:` (HKDF-SHA256, info `<package>:settings`), `enc:v1:` is read until
 0.1.0, any other `enc:` is unreadable (never plaintext); test with
 `crypto.is_encrypted`, not a prefix. Every copy also decrypts with
 `SM_SECRET_KEY_PREVIOUS` (key or JSON list; env, else the located `.env`), the
-one env read billing and records make; ai and newsletter read `SM_SECRET_KEY`
-too. `scripts/reencrypt_secrets.py` lists the fields (`reencrypt_support.TARGETS`).
+one env read billing and records make; ai, newsletter and events read
+`SM_SECRET_KEY` too. `scripts/reencrypt_secrets.py` lists the settings fields
+(`reencrypt_support.TARGETS`) and events' column of every tenant's rows
+(`COLUMN_TARGETS`: `events_subscription.url_enc`, the one stored secret that is
+not a setting).
 Signed things (sessions, links, form tokens, image tickets) are not covered:
 `docs/secret-key-rotation.md`.
 
@@ -252,7 +268,7 @@ doesn't is how `/de/p/x` serves the English page.
   `E2E_MULTI_TENANT=1` (`billing-tenant`, `news-tenant`, `records-tenant`;
   `tenants.subdomain_base=localhost`, so `<org-slug>.localhost` is an org's site),
   `E2E_BILLING_USER=1` (`billing-user`, #274; `subject_mode` set before boot) and
-  `E2E_NEWSLETTER=1` (`newsletter.spec.ts`, non-bundle host with
+  `E2E_NEWSLETTER=1` (`newsletter.spec.ts` and `newsletter-events.spec.ts`, non-bundle host with
   `SM_ENVIRONMENT=development`, since `testing` blanks the console under the CSP
   and the dispatch hook is absent in production; locally
   `E2E_NEWSLETTER=1 npx playwright test`).
@@ -269,9 +285,43 @@ doesn't is how `/de/p/x` serves the English page.
 - **records, secret fields** are `SealedSecret`, never `str` (captcha secret, #350;
   provider installed in `core/boot.register_settings` for headless scripts).
   [operations](modules/records/docs/operations.md#website-forms-and-newsletters).
+- **records, registration**: events owns the seats, records the person; they meet
+  only in `sm_events.contracts.registration` (caller's transaction, never commits).
+  Lock order, everywhere: records' type and row locks, the event row (`FOR SHARE`),
+  counter rows in ascending id (`FOR UPDATE`), seats; contention is `SeatsBusy`. A
+  registration token is records' form-token surface (the first documented
+  exception). `sm_records.contracts.dated` serves events' `records:dates` under the
+  caller's own access; `integrations/events/` alone imports `sm_events`.
+  [registration](modules/records/docs/registration.md#for-contributors).
+- **events** ([rules](modules/events/docs/rules.md)):
+  - Access goes through `core.access.POLICY`; every write starts with
+    `claim_revision`; recurrence expands only in `calendar/occurrences.py`, with an
+    `until`; the API takes a wall clock plus an IANA zone, never UTC
+    ([access](modules/events/docs/rules.md#access)).
+  - FullCalendar is imported only under `ui/calendar/adapter/` (MIT packages on the
+    allow-list); grid changes convert through `ui/calendar/time/zones.ts`
+    ([calendar](modules/events/docs/rules.md#the-calendar-fullcalendar-7)).
+  - Everything anonymous goes through `core/access/public.py` and answers "not
+    here" one way; a new public route joins `tests/web/public/leaks.py`; production
+    sets `public_base_url`. `contracts.cards` and the blocks' routes are the same
+    projection, fetched live ([public](modules/events/docs/rules.md#the-public-surface)).
+  - `make worker` serves the `events` queue and scheduled publishing needs beat
+    ([worker](modules/events/docs/rules.md#worker-and-beat)).
+  - Private feeds and `.ics` import: one padded 404, SHA-256 tokens only, `scan.py`
+    the only parser, imports are drafts ([feeds](modules/events/docs/rules.md#private-feeds-and-the-ics-import)).
+  - Subscription URLs are fetched only through `feeds.subscriptions.fetch`, stored
+    only as `enc:v2:` (`url_enc`), and a fetch `Policy` comes only from
+    `policy.effective` ([subscriptions](modules/events/docs/rules.md#subscriptions)).
+  - Reminders are at most once: claim in `events_reminder_sent`, commit, then send
+    ([reminders](modules/events/docs/rules.md#reminders-are-at-most-once)).
+  - Plugins register from `events_extensions.py`, never `on_startup`, installed in
+    the web and every worker image; plugin settings are never secret
+    ([plugins](modules/events/docs/rules.md#plugins)).
 - **newsletter**:
   - HTML only from `sm_newsletter.content.render`; cards only via
-    `content/integrations/`; writes guarded by `expected_revision` ([content](modules/newsletter/docs/content.md)).
+    `content/integrations/` (news, pagebuilder and `sm_events.contracts.cards`; an
+    event card is a snapshot of a published event of a public calendar, frozen at
+    scheduling, its id never printed); writes guarded by `expected_revision` ([content](modules/newsletter/docs/content.md)).
   - Test sends go only to vouched-for addresses, under the dispatch lock and
     budget; a refusal writes no row ([test sends](modules/newsletter/docs/sending.md#test-sends)).
   - Suppressions are tenant-wide; only a double-opt-in confirmation or an admin
@@ -318,8 +368,9 @@ doesn't is how `/de/p/x` serves the English page.
   `devnet`; `make up` there; add the database to its `init/01-databases.sql`), no
   per-project Postgres beside it (stop an old one on 5432, don't remap). Without
   it: `docker run -d --name smpy-postgres -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=smpy_modules postgres:16`.
-- **Workers**: images and newsletter use Redis/Celery. `make worker`,
-  `worker-imports`, `worker-heavy`, `worker-gpu`, `beat` run `host/worker.py`
+- **Workers**: images, newsletter and events use Redis/Celery. `make worker`
+  (the `images`, `newsletter`, `events` and `celery` queues), `worker-imports`,
+  `worker-heavy`, `worker-gpu` and `beat` run `host/worker.py`
   (`build_runner_celery`), one queue set each; `make dev` starts none. Without
   one, `SM_BG_TASKS_TASK_ALWAYS_EAGER=true` (e2e adds `..._EAGER_PROPAGATES=true`).
 - **Tenancy**: the demo host is single-tenant; `SM_MULTI_TENANT=true` boots every
@@ -334,7 +385,7 @@ venv; `make unlink-framework` reverts. Neither touches a tracked file;
 
 ## i18n
 
-- **Console UI is English and German everywhere**: `locales/en.json` and
+- **Console UI is English and German in all nine modules**: `locales/en.json` and
   `de.json`, every string through `t(keys.<module>.<section>.<key>)`, no
   `defaultValue`. Add a key to every catalogue at once. A runtime-chosen family
   (`filters.op.<op>`) is a `Record<Union, string>` of `keys.…` leaves. The

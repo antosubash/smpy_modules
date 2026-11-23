@@ -41,12 +41,13 @@ means porting each new revision into this history:
   Alembic refuses a label used twice;
 - run `alembic check` on SQLite **and** on Postgres afterwards.
 
-**`env.py` ignores one false change on SQLite.** For an index that mixes columns
+**The SQLite index check is the framework's.** For an index that mixes columns
 and an expression, SQLite reflects `created_at DESC` as a plain column, so
 autogenerate would drop and recreate file_storage's `tenant_browse` on every run.
-`include_object` skips that comparison, and only when the columns agree: an index
-on other columns is still reported. Alembic skips expression indexes on SQLite
-altogether, so a missing one is caught only by the Postgres check.
+Since 0.0.45 the framework's `make_include_object` skips that false change, so
+`env.py` carries no workaround. An index on other columns is still reported.
+Alembic skips expression indexes on SQLite altogether, so a missing one is caught
+only by the Postgres check.
 
 ## Framework revisions ported
 
@@ -78,5 +79,12 @@ framework ships no revision for it).
   `e731a1b2c3d4` refuses to run while two accounts' emails differ only by letter
   case, and prints them masked (`a***@host`) with the query that lists them.
 - **0.0.44**: `e805a1b2c3d4`, `c5d8e2f1a903` and `f6c2d4e8b109`.
+- **0.0.45**: the model is `AwareDateTime` (was `TIMESTAMPAware`), which SQLite
+  reports as a type change against the reflected `TIMESTAMP`. `0a30d2baa903` is
+  shipped and stays as it was; `c7a41e9d2b60` retypes
+  `users_access_token.expires_at` on SQLite only (a no-op on Postgres), so old and
+  new databases converge.
+- **0.0.46**: `e480d7dd348f` (`users_oauth_account` profile columns) follows the
+  then head `541bfbe29a28`.
 - **Not ported**: upstream's `b8d4f2a6c901` (audit_log) and `c9d2e4f6a810`
   (oidc). Neither module is installed here, so their tables do not exist.
