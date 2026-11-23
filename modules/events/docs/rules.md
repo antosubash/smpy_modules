@@ -8,6 +8,7 @@ rules; this page adds implementation boundaries they do not cover.
 
 Use `sm_events.core.access.POLICY` for calendars and `core/access/events.py` for
 events. Follow the [access matrix and picker rules](index.md#access),
+[unpublished-event visibility](index.md#the-occurrences-read),
 [workflow locks](index.md#workflow) and [revision rules](index.md#revisions-and-conflicts).
 Owner and actor names share `web/services/names.py`; never parse an address-bearing
 label to recover a name.

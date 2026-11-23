@@ -305,8 +305,8 @@ doesn't is how `/de/p/x` serves the English page.
     here" one way; a new public route joins `tests/web/public/leaks.py`; production
     sets `public_base_url`. `contracts.cards` and the blocks' routes are the same
     projection, fetched live ([public](modules/events/docs/rules.md#the-public-surface)).
-  - Private feeds and `.ics` import: one padded 404, SHA-256 tokens only, `scan.py`
-    the only parser, a private item stays a draft
+  - Private feeds and `.ics` import: one padded 404; store only SHA-256 hashes of
+    feed tokens; `scan.py` is the only parser, and a private item stays a draft
     ([feeds](modules/events/docs/rules.md#private-feeds-and-the-ics-import)).
   - Subscription URLs are fetched only through `feeds.subscriptions.fetch`, stored
     only as `enc:v2:` (`url_enc`), and a fetch `Policy` comes only from
