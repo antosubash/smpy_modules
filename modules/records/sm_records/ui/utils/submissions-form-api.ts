@@ -31,7 +31,7 @@ export type SubmissionField = {
 };
 
 export type SubmissionDefinition = {
-  kind: 'form' | 'subscription';
+  kind: 'form' | 'subscription' | 'registration';
   schema_version: number;
   fields: SubmissionField[];
   consent: { required: boolean; text: string } | null;
@@ -39,6 +39,8 @@ export type SubmissionDefinition = {
   captcha: { provider: 'turnstile' | 'hcaptcha'; site_key: string } | null;
   /** How old `token` must be before the server accepts it. */
   min_fill_seconds?: number;
+  /** The registration kind only: whether the visitor confirms by mail first. */
+  double_opt_in?: boolean | null;
 };
 
 export type DefinitionResult =

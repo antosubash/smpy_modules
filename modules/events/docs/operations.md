@@ -1,0 +1,107 @@
+# Operating the public surface
+
+## Settings (Settings screen, SYSTEM scope)
+
+| Setting | Meaning |
+| --- | --- |
+| `public_prefix` | Where the public pages mount (default `/events`). **Needs a restart.** One path of lower-case letters, digits and hyphens. A value that is empty, starts with a framework path (`/api`, `/admin`, `/users`, `/static`, ...), starts with another module's public prefix (news' `public_route_prefix`, read from its settings) or with a content-language tag is **ignored** with an error in the log, and `/events` is served. |
+| `public_title` | What the site calls its events: the index page's title and the name of `calendar.ics`. Applies at once. |
+| `public_cache_seconds` | How long a browser or cache may keep a page, feed or sitemap (default 300; the index, calendar pages and the occurrences API at most 60). `0` sends `no-store`. |
+| `content_locales` | Languages events are published in (needs a restart); the first is the default. |
+
+## Caching
+
+Anonymous pages are `public` and revalidate with a weak `ETag`, only when no tenant was picked by
+anything request-specific and the host is single-tenant. Otherwise they are `private`, and `Vary`
+names `Cookie` and the tenant header. A signed-in visitor's page is `private, no-store`. Every
+response that names the origin adds `Host` to `Vary` until the host's `public_base_url` is set. **Production must
+set it** on a single-tenant host (the startup log warns): without it, canonical, `og:url`, `hreflang`, feed
+and sitemap URLs follow the client's `Host` header, which anyone can choose. The framework sends a fresh session
+cookie on every anonymous response, so a CDN will not cache these pages until that is fixed
+upstream; browsers and private caches do.
+
+**An unpublished event can outlive its unpublishing in a shared cache.** An event page is cached
+`public, max-age=300` on a single-tenant host (feeds and the sitemap the same; the index, calendar
+pages and the occurrences API at most 60 seconds), so a CDN or proxy in front may keep serving an
+event for up to five minutes after the origin stopped (the origin answers the 404 at once). To
+shorten it, lower `public_cache_seconds` on the Settings screen (`0` is `no-store`, which also
+drops the `ETag`), or purge the event's address (and `/events/`, the calendar page, `calendar.ics`
+and `sitemap.xml`) from the cache when unpublishing something urgent.
+
+A `304` carries `ETag`, `Cache-Control` and `Vary` and, on the framework 0.0.44 host, no
+`Content-Security-Policy` (pinned by `host/tests/test_events_wiring.py`).
+
+A scheduled publish becomes visible on the next request, but a cached page or feed may lag by up to
+`public_cache_seconds`.
+
+## Feeds
+
+- The time zone definitions in a feed list explicit transitions for the current year and the **20
+  years after it** (or to the end of a bounded series). A client expanding an open-ended series past
+  that horizon applies the last offset. The file changes once a year, not daily, so `ETag`s are stable.
+- A feed is capped (see [Public pages](public.md#subscribing)); `X-Events-Truncated: 1` says it was cut.
+- Text is stripped of control characters on the way in; the library escapes and folds lines.
+- `.ics` and `sitemap.xml` are limited to 60 requests a minute per IP and the occurrences API to 120,
+  on top of the host's `rate_limit_public` for pages.
+
+## Sitemap and robots.txt
+
+The sitemap is at `{public_prefix}/sitemap.xml` (default language prefix only). Neither pagebuilder
+nor news has a registry for another module's sitemap, so add the line to the site's `robots.txt`
+yourself: `Sitemap: https://example.org/events/sitemap.xml`.
+
+## A fresh install
+
+Until the first-run setup wizard is complete the framework redirects **every** request, public pages
+included, to `/setup`.
+
+## Extra checks
+
+`host/tests/test_events_wiring.py` checks the mounted pages, menu and tables, and
+`host/tests/test_events_booted.py` boots the real host and checks the routes, the anonymous
+exemption (`GET`/`HEAD` only), the rate limits and the 304. `tests/web/public/test_leaks*.py` is the
+leak harness: every public route is in its table, and a route that is not fails a test.
+
+## Subscriptions to external calendars (beat and worker)
+
+Subscriptions are refreshed in the background, so a host needs the same pieces as the reminders:
+a **beat** (`make beat`) that runs `events.refresh_subscriptions` every minute, and a **worker**
+on the `events` queue (`make worker`; one with `SM_SECRET_KEY` or the stored key, because the
+address is stored encrypted). Without a beat nothing refreshes on a schedule: a subscription is
+fetched only when someone adds it or presses Refresh, and only where tasks run inline
+(`SM_BG_TASKS_TASK_ALWAYS_EAGER`). Without a worker the due subscriptions stay "Waiting". With a
+worker that has no key, nothing is fetched and nothing is recorded against the feeds. Nothing in
+the application can tell whether the beat is running; the Subscriptions dialog shows a feed's
+"Next update" time, which stops moving when it is not.
+
+## Subscriptions to internal calendars
+
+`allow_private_subscription_urls` (off by default) is a system setting: only someone with
+`settings.edit` changes it, never a calendar owner. With it on, a holder of `events.manage` can
+subscribe a calendar to `http(s)` addresses in 10/8, 172.16/12, 192.168/16, 100.64/10, 198.18/15
+and fc00::/7, on any port. That means the server will send GET requests to internal services,
+including services bound to this server's own private address, and the subscriber learns whether
+the answer parsed as a calendar. Loopback, link-local, multicast and the cloud metadata and
+control endpoints (169.254.0.0/16, 100.100.100.200, 168.63.129.16, 192.0.0.192, fd00:ec2::/32 and
+every IPv6 form embedding one) are refused whatever the setting says. The user-visible failure
+codes are the same closed set either way. Turn it on only if an intranet calendar server needs it.
+
+Who may use an internal address is stored per subscription (`may_use_private`): it is set when the
+address is saved, from the saver's `events.manage`, and cleared when someone without it changes
+the address; it is never taken from a request. The worker applies it at every fetch and every
+redirect hop together with the setting above, and the setting being off always wins. If the saver
+later loses `events.manage` the flag stays until the address is edited; the Subscriptions dialog tells
+holders of `events.manage`, and only them, which subscriptions may use internal addresses (the API
+field `may_use_internal_addresses` is `false` for everyone else).
+
+The list of refused addresses is best-effort (providers add endpoints; a unique-local address that
+embeds a metadata IPv4 is refused too). Turn the switch on only for trusted networks.
+
+## Reminders
+
+`events.reminders` runs every minute on the `events` queue (a queued tick expires after 55 s, so a
+backlog is dropped, never run late). It needs a worker, a beat, a mail sender that delivers and the
+host's `public_base_url`; see [Reminders](reminders.md). Nothing detects a missing beat: check that
+`events.reminders` appears in the worker log each minute (`events.reminders: N tenant(s), N sent, ...`,
+counts only). `events.janitor` also prunes the ledger. The first build of the worker's headless app
+takes about 16 s and 200 MB per process.

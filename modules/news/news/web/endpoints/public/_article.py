@@ -78,9 +78,7 @@ async def alternates(
     if len(siblings) < 2:
         return []
     base = public_base_url(request, settings)
-    entries = [
-        {"locale": item.locale, "url": f"{base}{item.url}"} for item in siblings
-    ]
+    entries = [{"locale": item.locale, "url": f"{base}{item.url}"} for item in siblings]
     # x-default names the version to serve someone whose language nobody
     # matched. The site's own default is the only defensible answer.
     default = next((e for e in entries if locales.is_default(e["locale"])), None)
@@ -154,7 +152,7 @@ def article_router(locale: str) -> APIRouter:
             response.headers["Content-Language"] = locale
             # Not on a 304: the browser merges it into the cached response, whose
             # scripts carry the nonce of the policy they were served with (#322).
-            if settings.public_csp and response.status_code != 304:
+            if settings.public_csp.strip() and response.status_code != 304:
                 response.headers["Content-Security-Policy"] = settings.public_csp
             return response
 
@@ -210,9 +208,7 @@ def default_locale_alias_router(prefix: str) -> APIRouter:
     ) -> Response:
         if tenant is None:
             # The same layout-less 404 as `/news/x` without a tenant (#248).
-            return await not_found(
-                request, inertia, db, locale=locales.default(), tenant=None
-            )
+            return await not_found(request, inertia, db, locale=locales.default(), tenant=None)
         return RedirectResponse(f"{prefix.rstrip('/')}/{slug}", status_code=301)
 
     return router

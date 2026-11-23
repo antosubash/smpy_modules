@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "aiosmtplib>=3.0,<6",
     "email-validator>=2.1",
+    "babel>=2.12,<3",  # the event card's dates are formatted in the render's language
 ]
 
 [project.urls]
@@ -38,6 +39,10 @@ news = [
 pagebuilder = [
     # floor: 0.0.16 — the first pagebuilder release with contracts.cards
     "simple_module_pagebuilder>=0.0.16,<0.1",
+]
+events = [
+    # floor: 0.0.16 — the first events release, with contracts.cards
+    "simple_module_events>=0.0.16,<0.1",
 ]
 dev = [
     "aiosmtpd>=1.4.6",
@@ -87,3 +92,4 @@ markers = [
 simple_module_records = { workspace = true }
 simple_module_news = { workspace = true }
 simple_module_pagebuilder = { workspace = true }
+simple_module_events = { workspace = true }

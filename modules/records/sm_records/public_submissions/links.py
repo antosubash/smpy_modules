@@ -16,8 +16,9 @@ covers ``action|tenant|type|uuid[|exp]`` and is checked **before any
 statement runs** — a forged tenant, type or uuid is refused without touching
 the database, and so learns nothing. ``mac`` covers the same plus the
 record's ``sm_nonce``, and is checked once the record is loaded. Rotating the
-nonce (a re-subscribe, an unsubscribe) kills every link minted before it;
-rotating ``secret_key`` kills all of them.
+nonce (a re-subscribe, an unsubscribe) kills every link minted before it.
+Retired keys in ``SM_SECRET_KEY_PREVIOUS`` preserve their links; removing a
+key revokes them. Both MACs must verify under the same key.
 
 The tenant is the leftmost part and the only one that may itself contain a
 dot (``TENANT_RE``); type keys, uuids, digits and base64url never do, so the
@@ -31,16 +32,19 @@ import hashlib
 import hmac
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final, Literal
 from urllib.parse import urlencode
 
 from sm_records.core import constants
 from sm_records.core.constants import TYPE_KEY_PATTERN
 from sm_records.core.tenancy import valid_tenant
+from sm_records.public_submissions.tokens import _with_previous
 
 __all__ = [
+    "CANCEL",
     "CONFIRM",
+    "CONFIRM_REGISTRATION_PAGE",
     "UNSUBSCRIBE",
     "Link",
     "LinkInvalid",
@@ -52,7 +56,13 @@ __all__ = [
 
 CONFIRM: Final = "confirm"
 UNSUBSCRIBE: Final = "unsubscribe"
-Action = Literal["confirm", "unsubscribe"]
+CANCEL: Final = "cancel"
+CONFIRM_REGISTRATION_PAGE: Final = "confirm-registration"
+"""The landing page of a registration's confirm link: the same signed ``confirm`` action, its own
+words (the newsletter's page says "subscription")."""
+"""A registration's cancel link: shaped like the unsubscribe link (no expiry, killed by the nonce,
+which a cancel rotates)."""
+Action = Literal["confirm", "unsubscribe", "cancel"]
 
 MAX_LINK_TOKEN: Final = 300
 _TYPE_KEY_RE: Final = re.compile(TYPE_KEY_PATTERN)
@@ -75,6 +85,7 @@ class Link:
     uuid: str
     exp: int | None
     mac: str
+    _gate: str = field(default="", repr=False, compare=False)
 
 
 def _mac(secret: str, *parts: object) -> str:
@@ -135,10 +146,12 @@ def parse(secret: str, action: Action, token: object, *, now: float | None = Non
     else:
         tenant, type_key, uuid, gate, mac = parts
         exp = None
-    link = Link(action, tenant, type_key, uuid, exp, mac)
+    link = Link(action, tenant, type_key, uuid, exp, mac, gate)
     if not _well_formed(link):
         raise LinkInvalid("malformed")
-    if not hmac.compare_digest(_mac(secret, "gate", *_claims(link)), gate):
+    if not _with_previous(
+        secret, lambda key: hmac.compare_digest(_mac(key, "gate", *_claims(link)), gate)
+    ):
         raise LinkInvalid("does not verify")
     if exp is not None and (time.time() if now is None else now) > exp:
         raise LinkInvalid("expired")
@@ -149,11 +162,23 @@ def matches(secret: str, link: Link, nonce: object) -> bool:
     """Whether ``link`` was minted for the subscriber's current ``sm_nonce``."""
     if not isinstance(nonce, str) or not nonce:
         return False
-    return hmac.compare_digest(_mac(secret, "state", *_claims(link), nonce), link.mac)
+    # Recheck the public gate so a gate/state splice cannot mix signing keys.
+    return _with_previous(
+        secret,
+        lambda key: (
+            hmac.compare_digest(_mac(key, "gate", *_claims(link)), link._gate)
+            and hmac.compare_digest(_mac(key, "state", *_claims(link), nonce), link.mac)
+        ),
+    )
 
 
-def url(base_url: str, action: Action, token: str, locale: str | None) -> str:
+def url(
+    base_url: str, action: Action, token: str, locale: str | None, *, page: str | None = None
+) -> str:
     """The absolute landing-page address the mail links to. ``l`` is only the
-    page's language — presentation, not a claim, so it is not signed."""
+    page's language — presentation, not a claim, so it is not signed. ``page`` names a landing
+    page with its own words for the same action (a registration's confirmation)."""
     query = {"t": token, **({"l": locale} if locale else {})}
-    return f"{base_url}{constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX}{action}?{urlencode(query)}"
+    return (
+        f"{base_url}{constants.PUBLIC_SUBMISSIONS_VIEW_PREFIX}{page or action}?{urlencode(query)}"
+    )

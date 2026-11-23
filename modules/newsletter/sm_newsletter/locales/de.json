@@ -3,7 +3,10 @@
   "email": {
     "footer_reason": "Sie erhalten diese E-Mail, weil Sie Neuigkeiten von {app_name} abonniert haben.",
     "unsubscribe": "Abmelden",
-    "read_more": "Weiterlesen"
+    "read_more": "Weiterlesen",
+    "add_to_calendar": "Zum Kalender hinzufügen",
+    "cancelled": "Abgesagt",
+    "online": "Online"
   },
   "unsubscribe_page": {
     "title": "Abmelden",
@@ -330,11 +333,14 @@
     "card": {
       "article": "Artikel",
       "page": "Seite",
+      "event": "Veranstaltung",
       "current": "In der E-Mail angezeigt",
       "none": "Noch nichts ausgewählt.",
       "search_label": "Suchen",
       "search_article": "Veröffentlichte Artikel durchsuchen",
       "search_page": "Veröffentlichte Seiten durchsuchen",
+      "search_event": "Kommende Veranstaltungen durchsuchen",
+      "date_passed": "Dieser Termin ist vorbei. Aktualisieren Sie, um den nächsten anzuzeigen.",
       "searching": "Suche läuft",
       "no_results": "Keine Treffer.",
       "refresh": "Aus der Quelle aktualisieren",
@@ -419,6 +425,9 @@
     },
     "page_card": {
       "label": "Seitenkarte"
+    },
+    "event_card": {
+      "label": "Veranstaltungskarte"
     },
     "card_empty": "Wählen Sie in den Blockeinstellungen einen Eintrag aus."
   },

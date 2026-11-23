@@ -96,6 +96,14 @@ def public_config(settings: RecordsSettings) -> dict[str, str] | None:
     return {"provider": provider, "site_key": site_key}
 
 
+def enforced(settings: RecordsSettings) -> bool:
+    """Whether a visitor can be asked to solve a CAPTCHA at all: a known provider *and* a site key.
+    The same test the form's widget uses (:func:`public_config`), so the submit path's order of
+    charges and the form agree. A provider named without its key is not enforced here; ``verify``
+    still fails closed (503) for it."""
+    return public_config(settings) is not None
+
+
 async def verify(settings: RecordsSettings, response: str | None, remote_ip: str) -> None:
     """Refuse the submission unless the provider vouches for ``response``.
     A no-op while no provider is configured."""
@@ -166,6 +174,18 @@ def _pagebuilder_csp(app: Any) -> str | None:
     return site.public_csp(app)
 
 
+_LOADING_DIRECTIVES = frozenset(
+    {"default-src", "script-src", "script-src-elem", "frame-src", "child-src"}
+)
+
+
+def _governs_loading(csp: str) -> bool:
+    """Whether ``csp`` can block the widget: only a script or frame directive can.
+    A policy of ``frame-ancestors`` alone (pagebuilder's default) cannot."""
+    names = (part.split(None, 1)[0].lower() for part in csp.split(";") if part.strip())
+    return any(name in _LOADING_DIRECTIVES for name in names)
+
+
 def csp_warning(app: Any, settings: RecordsSettings) -> str | None:
     """A warning when a CAPTCHA is on and pagebuilder's public CSP does not
     name the provider's host — the widget would be blocked on every page.
@@ -174,7 +194,7 @@ def csp_warning(app: Any, settings: RecordsSettings) -> str | None:
     if provider is None:
         return None
     csp = _pagebuilder_csp(app)
-    if csp is None:
+    if csp is None or not _governs_loading(csp):
         return None
     host = PROVIDERS[provider]["host"]
     if host in csp:

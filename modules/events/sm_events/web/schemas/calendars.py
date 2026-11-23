@@ -1,0 +1,113 @@
+"""Calendar request bodies (bounded) and responses (not)."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Annotated, Any
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+
+from sm_events.calendar.plugins import source_entries
+from sm_events.core import constants
+from sm_events.models import Visibility
+from sm_events.reminders.leads import LEADS_INPUT_MAX
+from sm_events.web.schemas._fields import (
+    Color,
+    MultiLine,
+    SingleLine,
+    Slug,
+    known_timezone,
+    lower_color,
+)
+from sm_events.web.schemas.extensions import CalendarSourceOut
+
+Name = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200), SingleLine
+]
+Description = Annotated[str, Field(max_length=2000), MultiLine]
+
+
+class CalendarCreate(BaseModel):
+    name: Name
+    slug: Slug | None = None
+    color: Color = constants.DEFAULT_COLOR
+    description: Description | None = None
+    visibility: Visibility = Visibility.PRIVATE
+    default_timezone: str | None = Field(default=None, max_length=constants.TZ_MAX)
+
+    _lower_color = field_validator("color", mode="before")(lower_color)
+    _tz = field_validator("default_timezone")(known_timezone)
+
+
+class CalendarPatch(BaseModel):
+    """Every field optional; ``visibility`` is set only by ``PUT .../visibility``."""
+
+    name: Name | None = None
+    slug: Slug | None = None
+    color: Color | None = None
+    description: Description | None = None
+    default_timezone: str | None = Field(default=None, max_length=constants.TZ_MAX)
+    default_reminder_minutes: list[StrictInt] | None = Field(
+        default=None, max_length=LEADS_INPUT_MAX
+    )
+    """Lead times "Remind me" preselects here; ``null`` goes back to the install-wide setting.
+    The values themselves are checked by the service (422 ``invalid_lead``)."""
+
+    _lower_color = field_validator("color", mode="before")(lower_color)
+    _tz = field_validator("default_timezone")(known_timezone)
+
+    @model_validator(mode="after")
+    def _no_null_for_required(self) -> CalendarPatch:
+        for field in ("name", "slug", "color", "default_timezone"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
+
+
+class VisibilityIn(BaseModel):
+    visibility: Visibility
+
+
+class OwnerIn(BaseModel):
+    owner_id: Annotated[str, Field(min_length=1, max_length=64)]
+
+
+class CalendarOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    color: str
+    description: str | None
+    visibility: str
+    owner_id: str
+    owner_name: str | None = None
+    default_timezone: str
+    default_reminder_minutes: list[int] | None = None
+    sources: list[CalendarSourceOut] = []
+    sources_version: str = ""
+    """What a write to the sources must send back; empty for one who cannot manage them."""
+    created_at: datetime
+    updated_at: datetime | None
+    deleted_at: datetime | None
+    can_edit: bool = False
+    can_own: bool = False
+    can_write_events: bool = False
+    can_publish: bool = False
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def _stored_entries(cls, raw: Any) -> list[dict[str, Any]]:
+        """The column holds ids and settings; what a caller sees is added by ``shown``, and
+        settings stay out until the caller is known to manage the calendar."""
+        return source_entries.shown(raw, with_settings=False)

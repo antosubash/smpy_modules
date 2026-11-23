@@ -226,4 +226,28 @@ describe('RecordCell', () => {
     expect(out).toContain('media-42');
     expect(out).not.toContain('<img');
   });
+
+  it('translates a registration status (a system select) instead of printing its stored word', () => {
+    const status = field({
+      key: 'sm_status',
+      type: 'select',
+      system: 'readonly',
+      options: { choices: [{ value: 'registered', label: 'registered' }] },
+    });
+    expect(html(status, 'registered')).toContain('Registered');
+    expect(html(status, 'cancelled')).toContain('Cancelled');
+    expect(
+      html(field({ type: 'select', options: { choices: [{ value: 'a', label: 'Alpha' }] } }), 'a'),
+    ).toContain('Alpha');
+  });
+
+  it('words a system datetime with its zone label, an ordinary one without', () => {
+    const when = '2026-09-21T12:00:00+00:00';
+    const system = html(
+      field({ key: 'sm_occurrence_start', type: 'datetime', system: 'readonly' }),
+      when,
+    );
+    const plain = html(field({ type: 'datetime' }), when);
+    expect(system.length).toBeGreaterThan(plain.length);
+  });
 });

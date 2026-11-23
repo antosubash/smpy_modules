@@ -5,6 +5,139 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+### Added
+
+- **events: external calendar subscriptions** (PR 10 of the events module, the last). A calendar
+  shows an external `.ics` feed read-only (marked External, plain text, never re-published or
+  reminded), added in a Subscriptions dialog. The address is stored encrypted (`enc:v2:`, a fifth
+  copy of the stored-secret crypto, rewritten by `scripts/reencrypt_secrets.py`) and shown only as
+  `https://host/…`; a worker fetches it through a pinned, bounded client that resolves and checks
+  every address and every redirect and never lets an exception or log carry the address. New
+  settings `subscription_refresh_minutes` and `allow_private_subscription_urls`, new migration
+  `d1847b1d68bb`, and the `events.refresh_subscriptions` beat task (worker needs a secret key).
+  events joins images and ai in keeping a parity-checked SSRF guard.
+
+- **events and records: event registration** (PR 9 of the events module). An event can offer
+  registration on this site: the editor's Registration section sets the seats, a window, whether the
+  remaining seats show and a reminder lead, and picks (or creates) a records registration form; the
+  public event page shows a panel that registers a visitor and says what the occurrence offers now
+  (open, few seats left, full, closed); "My registrations" lists a signed-in user's own and cancels
+  them. Events owns the seats (an atomic counter per occurrence that never oversells) and records owns
+  the person (the registration is a record of kind `registration`); `sm_events.contracts.registration`
+  is the seam. Hosts run the `events` migration `00a990d5c813`; records' `events` extra needs events
+  `>=0.0.16`. Limits to know: **a seat is taken when the address is confirmed** on a double opt-in form
+  (the default) and at submit on a single opt-in form, where anyone can take seats without confirming
+  an address (the editor warns, and a captcha is recommended); **there is no waitlist** (a confirmation
+  that finds the event full is refused and the record stays pending until it expires, one hour by
+  default); a submit always answers the same neutral 202 whether or not the address already
+  registered, and what happened is told only by mail; the public submit is bounded **per event** by
+  the form's total (`public_submissions_type_rate`, charged after the captcha), a higher per-event
+  attempts bucket, per IP (IPv6 by /64, now for every submission form) and per address (3 mails a
+  day), so raise the total before a large event opens; **the registration token and the panel carry
+  the event's internal id** (signed, not secret; it leaks nothing today, and slug-based public
+  surfaces are a tracked follow-up); the confirm and cancel links are the same signed pages as
+  records' other tokens and their `?t=` is redacted from logs (a proxy must do the same). A moved
+  event's registrations follow its new date; trashing an event keeps its registrations. See
+  `modules/records/docs/registration.md`.
+
+- **events: reminders** (PR 8 of the events module). A signed-in user follows a published event
+  with lead times of 15 minutes, 1 hour, 1 day or 1 week and gets one email per occurrence and lead
+  from the new `events.reminders` beat (every minute, `events` queue): at most once (a claim row is
+  committed before any send, a failed or unfinished send is never retried), re-checked at send time,
+  never for a cancelled, skipped, unpublished or invisible occurrence, times in the event's zone. The
+  Reminders page lists a user's follows (an event they can no longer see is an opaque row they can
+  remove) and gives managers counts only; calendars can suggest their own lead times. Hosts run the
+  `events` migration `19adf24acec2`, add `events.reminders` to the worker's tasks (the `events` queue
+  is already served) and need a mail transport that delivers and `public_base_url`. The worker builds
+  the host app headless (about 16 s and 200 MB once per process, never provisioning a secret key) and
+  grants no more access than a request would. Events now depends on `babel` and `jinja2`.
+
+- **events and newsletter: the pagebuilder blocks and the event card** (PR 7 of the events module).
+  Events contributes `UpcomingEvents` and `EventsCalendar` to pagebuilder's palette (the optional
+  `pagebuilder` extra), reading three anonymous routes under `/api/events/public/`; they show only
+  published events of public calendars, fetched at request time. `sm_events.contracts.cards` gives a
+  sibling the public projection of an event, and newsletter gains an Event card (the `events` extra,
+  snapshotted when inserted and refreshed on request, dates in the event's own timezone and a link
+  to its `.ics`). Newsletter now depends on `babel`. Pagebuilder is unchanged: a page holding an
+  events block still renders where events is not installed.
+
+- **events: private feed links and `.ics` import** (PR 5 of the events module). A signed-in user
+  gets a private subscription link for any calendar they may view (`/events/feed/<token>.ics`,
+  token stored only as a SHA-256, shown once, revocable, one `404` for every refusal), and the
+  Import events screen reads an `.ics` file through a bounded parser, shows a preview and
+  creates drafts, idempotently by `UID`. Hosts run the `events` migration `6dedd89ae3a8`
+  and add `events.run_import` and `events.janitor` to the worker's tasks. Imported
+  repeating UTC events keep UTC.
+  An import publishes nothing on the bus, in process or durable (documented in the plugin guide).
+
+- **events: a new module** (`simple_module_events`, #400): calendars with private,
+  internal and public visibility, shared through the sharing module, the
+  Calendars and Categories screens and their API. Hosts add the dependency
+  and run the `events` migration. Calendars carry a nullable `owner_name` (an
+  active member's display name, never an address; a failing directory or
+  membership lookup, a failed query included, leaves it blank without failing
+  the request). Names are single line (control and direction characters are
+  a 422), and a name with no slug-able characters gets the slug `calendar` or
+  `category`.
+- **events: events, recurrence, occurrences and workflow** (PR 2 of the events
+  module). Events have a text in each content language (a rich-text
+  description cleaned by an allow-list), one-off, all-day and recurring
+  schedules on the event's own wall clock and timezone, overrides that skip,
+  cancel or move one occurrence, and revisions. `GET /api/events/occurrences`
+  and `sm_events.contracts.occurrences` read any range within fixed bounds
+  (366 days, 2,000 items). Events move draft, in review, published, directly or
+  on a schedule; a published or scheduled event can be changed only with
+  `events.publish`; every write carries `expected_revision` (409 `stale`). The
+  console gets an Events list and an editor with a conflict panel and the
+  revision history. **Upgrading:** run the host's new migration (a `note`
+  column on `events_revision`), and start Celery beat and a worker for the
+  `events` queue (`events.publish_due`) or scheduled events never publish.
+
+- **events: the calendar** (PR 3 of the events module). `/admin/events/` is now
+  a calendar (it used to redirect to Calendars): month, week, day and list views
+  with calendar and category filters, a calendar-time or my-time toggle, state in
+  the URL, create by click or drag-select, drag and resize with a "this one or
+  all" prompt for series, and a Move dialog as the keyboard path. A drag writes
+  the event's own wall clock and never rewrites a rule. The reusable `Calendar`
+  component (`@simple-module-py/events`) takes a fetcher, calendars, optional
+  `editing` and render slots. **New dependency:** FullCalendar 7 (MIT, `^7.1.5`; the lockfile holds the resolved version)
+  and `temporal-polyfill`; the grid is a lazy chunk of about 295 kB (81 kB gzipped) plus 17 kB (4 kB gzipped) of CSS; the Temporal polyfill is a shared 65 kB (22 kB gzipped) chunk that the calendar, list and editor pages load. No
+  migration.
+
+- **events: the public site** (PR 4 of the events module). A public calendar's
+  published events are served to anonymous visitors under `public_prefix` (default
+  `/events`, restart-only) with `/{locale}` prefixes: an upcoming list with a
+  read-only calendar tab, calendar pages, event pages (`?date=` selects one occurrence
+  of a series; moved and cancelled ones are shown), `.ics` files and subscription feeds
+  (`RRULE`, `EXDATE`, `RECURRENCE-ID` with `TZID`), `Event` JSON-LD and a sitemap at
+  `{prefix}/sitemap.xml`. Drafts, internal and private calendars, trash and other
+  tenants answer one identical `no-store` 404. Renaming a calendar's slug records a
+  redirect (`301`, the `.ics` too). `calendar`, `c`, `api`, `feed` and `sitemap` are
+  reserved slugs. **New settings:** `public_prefix`, `public_title`,
+  `public_cache_seconds`. **New dependency:** `icalendar` (BSD-2-Clause, `>=7,<8`).
+  **Upgrading:** run the host's new migration (`events_calendar_redirect`). Add
+  `Sitemap: https://<site>/events/sitemap.xml` to `robots.txt`. Feeds carry time zone
+  definitions for the next 20 years.
+
+- **events: extensions, a plugin registry and the final bus events** (PR 6 of the events
+  module). A second package can add its own dates to a calendar (a source), add an event type
+  with its own validated `extra` and contribute UI, from `events_extensions.py` and
+  `events-extensions.ts` (`sm_events.contracts.extensions`, `@simple-module-py/events`). Plugins
+  load in the web process and on a worker's first registry read, then the registry freezes;
+  install them identically in every image. A plugin call runs on its own database connection
+  with a time budget, a call and item cap and validated output; a failing source is a status in
+  the calendar. Admins enable sources per calendar in the Sources dialog (`PUT
+  /api/events/calendars/{id}/sources` needs the `sources_version` a GET returned). The occurrences
+  read answers `sources`, the public API and feeds call only `public` sources, and a failed public
+  answer is not cached. An event of an uninstalled type keeps its `extra` untouched. Bus events:
+  `EventUnpublished`, `EventReinstated`, `OccurrenceSkipped`, `EventRestored` and `EventUpdated`
+  join the four from PR 2, are also published durably (outbox, at least once, no ordering) and the
+  scheduled publish now announces `EventPublished` through the worker's bus. Guide:
+  `modules/events/docs/extensions.md`.
+- **records: dates on events calendars** (the optional `events` extra, floor 0.0.16): the source
+  `records:dates`, `sm_records.contracts.dated` (published records of a type the caller may read,
+  in a date window, tenant pinned) and the calendar's settings section and detail.
+
 ### Security
 
 - **pagebuilder's admin reads need a pagebuilder permission** (#346). Signing in
@@ -173,6 +306,27 @@ name the module they affect.
 
 ### Changed
 
+- **The demo host runs framework 0.0.47** (was 0.0.44). The host ports the
+  one new framework revision, `e480d7dd348f` (`users_oauth_account` profile
+  columns), and adds `c7a41e9d2b60` of its own, which retypes
+  `users_access_token.expires_at` on SQLite only (Postgres is unaffected), so
+  `alembic check` is clean on both for a fresh database and one built before the
+  bump. The flat import paths
+  0.0.44 deprecated are removed by the framework in 0.0.46; no module imports one.
+  **Upgrading:** since 0.0.45 a response's own `Content-Security-Policy` is kept beside the
+  app policy and both are enforced (framework #870), where the app policy used to
+  replace it. pagebuilder's `public_csp` now defaults to `frame-ancestors 'none'` alone
+  (was a full policy with `script-src`, `style-src` and the rest; news' is empty), so
+  a host that stored no value sends only that: the app policy governs scripts,
+  styles and fonts, and public pages are not framed, not even by the same origin.
+  Under 0.0.44 the module's header had *replaced* the app policy, so its
+  `frame-ancestors 'none'` was the one in force; the new default keeps that. A host
+  that saved a value, the old default included, keeps sending exactly it beside the
+  app policy; check it against that policy, since it can only restrict further and
+  cannot carry the per-request nonce (a `script-src` in it blocks the host's own
+  scripts). Reset the field to its default, or set it to `frame-ancestors 'none'`, to
+  adopt the new default; a host that stored an empty value keeps sending no header.
+
 - **news, pagebuilder, analytics and records settings use the framework's
   `DbBackedSettings`** (#345), as ai, billing, images and newsletter already
   did, instead of each carrying its own `settings_customise_sources` (records'
@@ -295,7 +449,8 @@ name the module they affect.
   contract module or name its dependant imports.
 - pagebuilder and news no longer send `public_csp` on a `304 Not Modified`
   (#322). The browser merges a 304's headers into the cached page, so the
-  module's strict policy replaced the page's nonce-based one, and after
+  module's policy replaced the page's nonce-based one (before framework 0.0.45;
+  since then it sits beside it and blocks the nonce'd scripts), and after
   revalidation every script was blocked: a blank page in development, and in
   production the nonce'd scripts and any `register_csp_sources` allowance. A
   browser that already merged the old header keeps it until it next fetches

@@ -50,7 +50,7 @@ const CI = !!process.env.CI;
 // ignores the other's files (CI's `E2E (billing per user)` job).
 const BILLING_USER = process.env.E2E_BILLING_USER === '1';
 
-// E2E_NEWSLETTER=1 runs newsletter.spec.ts alone (CI's `E2E (newsletter)`
+// E2E_NEWSLETTER=1 runs newsletter.spec.ts and newsletter-events.spec.ts alone (CI's `E2E (newsletter)`
 // job). The spec sends its campaign through the e2e-only dispatch hook (R17),
 // which exists only on a `development` or `testing` host with Celery eager
 // and the console transport. It is a 404 on the production bundle by design,
@@ -75,9 +75,9 @@ if (NEWSLETTER) {
 }
 
 function specSelection() {
-  if (NEWSLETTER) return { testMatch: /newsletter\.spec\.ts$/ };
+  if (NEWSLETTER) return { testMatch: /newsletter(-events)?\.spec\.ts$/ };
   if (BILLING_USER) return { testMatch: /billing-user\.spec\.ts$/ };
-  return { testIgnore: /(billing-user|newsletter)\.spec\.ts$/ };
+  return { testIgnore: /(billing-user|newsletter(-events)?)\.spec\.ts$/ };
 }
 
 export default defineConfig({

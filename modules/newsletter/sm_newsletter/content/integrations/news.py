@@ -5,42 +5,27 @@ The tenant is the caller's bound one, passed explicitly; the contract pins it.
 
 from __future__ import annotations
 
-import importlib
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sm_newsletter.content.integrations._guard import Guard
 from sm_newsletter.content.integrations.hits import (
     MAX_SOURCE_ID,
     SEARCH_LIMIT,
     CardHit,
     like_pattern,
 )
-from sm_newsletter.core.errors import IntegrationUnavailable
 
-_CONTRACT = "news.contracts.articles"
-
-
-def _contract() -> Any | None:
-    # `import_module`, not `from news.contracts import articles`: the latter
-    # finds an attribute left on the package and would ignore a blocked import.
-    try:
-        return importlib.import_module(_CONTRACT)
-    except ImportError:
-        return None
+_GUARD = Guard("news.contracts.articles")
 
 
 def available(app: Any) -> bool:
     """The contract imports and news is mounted on ``app``."""
-    contract = _contract()
-    return contract is not None and contract.mounted(app)
+    return _GUARD.available(app)
 
 
-def _require(app: Any) -> Any:
-    contract = _contract()
-    if contract is None or not contract.mounted(app):
-        raise IntegrationUnavailable()
-    return contract
+_require = _GUARD.require
 
 
 def _hit(card: Any) -> CardHit:

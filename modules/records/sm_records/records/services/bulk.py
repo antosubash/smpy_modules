@@ -62,6 +62,7 @@ from sm_records.models import RecordType
 
 # Re-exported: one record's turn is the same single-record call the endpoint
 # would have made, and lives next door for the file cap — see that module.
+from sm_records.public_submissions.registration import seats
 from sm_records.records.services._bulk_turn import Change, apply_one
 from sm_records.records.services.claims._claims import lock_type
 from sm_records.records.services.delete._delete_locks import lock_delete_graph
@@ -159,38 +160,44 @@ async def apply_bulk(
         await lock_delete_graph(db, rtype)
     else:
         await lock_type(db, rtype)
-    with events.muted(db):
-        for uuid in wanted:
-            try:
-                # See the module docstring: the savepoint is what lets the pass
-                # continue after a refusal so the report can name all of them.
-                async with db.begin_nested():
-                    changes.append(
-                        await apply_one(
-                            db,
-                            rtype,
-                            uuid,
-                            action=action,
-                            expected=versions.get(uuid),
-                            settings=settings,
-                            actor=actor,
-                            roles=roles,
-                            named=named,
-                            trashed=trashed,
+    # One seat release for the whole turn (not one per record): see ``seats.batched``.
+    async with seats.batched(db):
+        with events.muted(db):
+            for uuid in wanted:
+                mark = seats.batch_mark(db)
+                try:
+                    # See the module docstring: the savepoint is what lets the pass
+                    # continue after a refusal so the report can name all of them.
+                    async with db.begin_nested():
+                        changes.append(
+                            await apply_one(
+                                db,
+                                rtype,
+                                uuid,
+                                action=action,
+                                expected=versions.get(uuid),
+                                settings=settings,
+                                actor=actor,
+                                roles=roles,
+                                named=named,
+                                trashed=trashed,
+                            )
                         )
-                    )
-            except RecordsError as exc:
-                failures.append(_failure(uuid, exc))
-                # Rolling the savepoint back expires whatever the refused
-                # record's attempt touched inside it — on SQLite that includes
-                # the type row, which ``_prepare``'s own ``lock_type`` writes
-                # to. Reload it here, inside the greenlet, rather than leave the
-                # next record's turn (or the events below, which read
-                # ``rtype.key``) to a lazy load that has none.
-                # ``services.import_`` does the same after its own per-row
-                # savepoint, for the same reason.
-                if inspect(rtype).expired_attributes:
-                    await db.refresh(rtype)
+                except RecordsError as exc:
+                    seats.batch_truncate(
+                        db, mark
+                    )  # the turn's savepoint rolled back: its seats stay
+                    failures.append(_failure(uuid, exc))
+                    # Rolling the savepoint back expires whatever the refused
+                    # record's attempt touched inside it — on SQLite that includes
+                    # the type row, which ``_prepare``'s own ``lock_type`` writes
+                    # to. Reload it here, inside the greenlet, rather than leave the
+                    # next record's turn (or the events below, which read
+                    # ``rtype.key``) to a lazy load that has none.
+                    # ``services.import_`` does the same after its own per-row
+                    # savepoint, for the same reason.
+                    if inspect(rtype).expired_attributes:
+                        await db.refresh(rtype)
     if failures:
         raise BulkRefused(
             BulkReport(action=action, requested=len(wanted), failed=failures),

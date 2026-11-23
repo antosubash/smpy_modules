@@ -1,0 +1,31 @@
+{
+  "name": "@simple-module-py/events",
+  "version": "0.0.15",
+  "private": true,
+  "exports": {
+    ".": "./sm_events/index.ts"
+  },
+  "description": "Frontend assets for the Events module",
+  "peerDependencies": {
+    "@inertiajs/react": "^3.9.1",
+    "@puckeditor/core": "^0.24.0",
+    "@simple-module-py/i18n": "*",
+    "@simple-module-py/pagebuilder": "*",
+    "@simple-module-py/ui": ">=0.0.38",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sonner": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@simple-module-py/pagebuilder": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@simple-module-py/tsconfig": "*"
+  },
+  "dependencies": {
+    "@fullcalendar/react": "^7.1.5",
+    "temporal-polyfill": "^1.0.8"
+  }
+}

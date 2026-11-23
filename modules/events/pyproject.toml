@@ -1,0 +1,88 @@
+[project]
+name = "simple_module_events"
+version = "0.0.15"
+description = "Calendars and events for SimpleModule hosts: timezone-aware and recurring events, shareable calendars, public pages and ICS feeds"
+requires-python = ">=3.12"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Anto Subash", email = "antosubash@live.com" }]
+keywords = ["simple-module", "events", "calendar"]
+# Ranges, never `==`: an exact framework pin makes a published module
+# uninstallable in any host running a newer framework build.
+dependencies = [
+    "simple_module_core>=0.0.44,<0.1",
+    "simple_module_db>=0.0.44,<0.1",
+    "simple_module_hosting>=0.0.44,<0.1",
+    "simple_module_inertia>=0.0.44,<0.1",
+    "simple_module_settings>=0.0.44,<0.1",  # floor: settings.core and settings.module_settings paths first shipped in 0.0.44
+    "simple_module_sharing>=0.0.44,<0.1",  # floor: sharing.core.policy path first shipped in 0.0.44
+    "simple_module_background_tasks>=0.0.44,<0.1",  # floor: background_tasks.core and .worker paths first shipped in 0.0.44
+    "python-dateutil>=2.9,<4",
+    "babel>=2.12,<3",  # reminders format dates in the follower's language (format_date, format_time, Locale: all in 2.12)
+    "jinja2>=3.1,<4",  # the reminder mail's HTML part (autoescaped)
+    "pydantic-settings>=2.0",
+    "cryptography>=42",  # floor: the stored-secret crypto (Fernet, HKDF) the subscription address is sealed with
+    "anyio>=4,<5",  # floor: the netsafe copy shields a TLS handshake from cancellation (anyio.CancelScope)
+    "httpcore>=1,<2",  # floor: netsafe wraps httpcore's network backend
+    "httpx>=0.27,<1",  # floor: the pinned transport drives httpx.AsyncBaseTransport with the sni_hostname extension
+    "idna>=3,<4",  # floor: the A-label check of a subscription address (a dependency of httpx)
+    "icalendar>=7,<8",  # floor: 7.x is the first major checked for RRULE/EXDATE/RECURRENCE-ID/VTIMEZONE round-trip (feeds)
+]
+
+[project.urls]
+Repository = "https://github.com/antosubash/simple_module_python_modules"
+
+[project.entry-points.simple_module]
+events = "sm_events.module:EventsModule"
+
+[project.optional-dependencies]
+# floor: 0.0.16 - events imports no pagebuilder Python for its blocks. It ships
+# ``pagebuilder-blocks.ts``, which imports ``registerPuckBlocks`` and ``lazyBlock`` from the
+# ``@simple-module-py/pagebuilder`` entry point (``index.ts``, first released in 0.0.16) and which
+# pagebuilder's ``puck-blocks.ts`` globs in from sibling packages.
+pagebuilder = ["simple_module_pagebuilder>=0.0.16,<0.1"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "simple_module_test>=0.0.44,<0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sm_events"]
+# Frontend test files and their helpers sit beside the source they test, so
+# `packages` would ship them. A host's Vite scans installed module source and
+# skips dependency pre-bundling when it meets an import it cannot resolve
+# (`vitest`), so none of them may reach the wheel (#63).
+exclude = [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**",
+    "**/test-dom.tsx",
+    "**/*-test-support.ts",
+    "**/*-test-support.tsx",
+    "**/page-tests/**",
+]
+artifacts = ["sm_events/static/dist/**"]
+
+# package.json lives at the module root so npm workspaces see it; copying it
+# into the package lets the host discover JS deps after a pip install.
+[tool.hatch.build.targets.wheel.force-include]
+"package.json" = "sm_events/package.json"
+
+[tool.hatch.build.targets.sdist]
+artifacts = ["sm_events/static/dist/**"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "unbound_tenant: run with no events tenant bound (tests/conftest.py binds 'default' otherwise)",
+]
+
+# Resolve the sibling module from the workspace during development. Tool config only: the
+# published wheel still carries the ranges above.
+[tool.uv.sources]
+simple_module_pagebuilder = { workspace = true }

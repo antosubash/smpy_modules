@@ -64,7 +64,9 @@ export async function moduleCsrfHeader(
     | '/pagebuilder/'
     | '/ai/'
     | '/admin/billing/usage'
-    | '/admin/newsletter/' = '/admin/news/',
+    | '/admin/newsletter/'
+    | '/admin/events/calendars'
+    | '/admin/events/list' = '/admin/news/',
 ): Promise<Record<string, string>> {
   const html = await (await page.request.get(view)).text();
   const json = html.match(/<script data-page="app" type="application\/json">([^<]*)<\/script>/);
@@ -129,16 +131,16 @@ export function uniqueSlug(prefix = 'e2e-page') {
 /** Create a pagebuilder page through the API (optionally published) and return its id. */
 export async function makePage(
   page: Page,
-  { slug, publish = false, blocks = [] as unknown[] },
+  { slug, publish = false, blocks = [] as unknown[], name = '' },
 ): Promise<number> {
   const headers = await moduleCsrfHeader(page, '/pagebuilder/');
   const created = await page.request.post('/api/pagebuilder/pages', {
     headers,
     data: {
-      title: `QA ${slug}`,
+      title: name || `QA ${slug}`,
       slug,
       draft_data: {
-        root: { props: { title: `QA ${slug}`, width: 'full' } },
+        root: { props: { title: name || `QA ${slug}`, width: 'full' } },
         content: blocks,
         zones: {},
       },

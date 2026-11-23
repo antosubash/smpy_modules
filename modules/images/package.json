@@ -7,7 +7,7 @@
   },
   "description": "Frontend assets for the Images module",
   "dependencies": {
-    "maplibre-gl": "^6.16.0",
+    "maplibre-gl": "^6.19.0",
     "pmtiles": "^4.5.0"
   },
   "peerDependencies": {

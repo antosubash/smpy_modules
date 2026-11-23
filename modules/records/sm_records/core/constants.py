@@ -47,6 +47,9 @@ first), labelled to say what it is now that it shares a heading with its
 children rather than living apart from them."""
 
 MENU_ORDER_TYPE: Final = MENU_ORDER + 1
+MENU_MINE_URL: Final = f"{VIEW_PREFIX}/registrations/mine"
+MENU_MINE_LABEL: Final = "My registrations"
+MENU_MINE_LABEL_KEY: Final = "records.menu.my_registrations"
 """Order of a per-type sidebar entry — one past the hub, so every type a host
 opts in sits directly under "Records". The registry sorts by ``order`` alone
 and stably, which is what makes :mod:`sm_records.web.menu`'s alphabetical
@@ -98,6 +101,7 @@ _PAGE_RECORD_LIST: Final = f"{MODULE_NAME}/RecordList"
 _PAGE_RECORD_EDITOR: Final = f"{MODULE_NAME}/RecordEditor"
 _PAGE_TYPE_EDITOR: Final = f"{MODULE_NAME}/TypeEditor"
 _PAGE_SUBMISSION_ACTION: Final = f"{MODULE_NAME}/SubmissionAction"
+_PAGE_MY_REGISTRATIONS: Final = f"{MODULE_NAME}/MyRegistrations"
 
 TYPE_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]*$"
 """A type key or field key: lowercase identifier, URL- and JSON-safe."""

@@ -16,6 +16,7 @@ keys namespaced by tenant, and answer ``429`` with ``Retry-After``.
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from typing import Any, Final
 from urllib.parse import urlsplit
@@ -59,6 +60,21 @@ def client_ip(request: Request) -> str:
     """The sender's address as the host resolved it — ``ProxyHeaders`` has
     rewritten it by now when ``SM_TRUSTED_PROXY`` is set."""
     return request.client.host if request.client else "unknown"
+
+
+def ip_bucket(ip: str) -> str:
+    """The key a client's address is limited under: an IPv6 address by its ``/64`` (one subscriber
+    holds billions of addresses, so a per-address limit would be no limit), a mapped IPv4 as the
+    IPv4, anything else as it is."""
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+    if isinstance(address, ipaddress.IPv6Address):
+        if address.ipv4_mapped is not None:
+            return str(address.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{address}/64", strict=False))
+    return str(address)
 
 
 def _sent_origin(request: Request) -> str | None:
@@ -172,6 +188,17 @@ async def wait(request: Request, key: str, rate: str) -> int:
         return 0
     result = await rate_store(request.app).hit(key, spec)
     return 0 if result.allowed else max(1, int(result.retry_after))
+
+
+ATTEMPTS_MULTIPLE = 10
+"""A registration's attempts bucket is this many times the form's strict total: charged before the
+captcha provider is called, so a flood of wrong answers stops there without touching the total."""
+
+
+def scaled(rate: str, factor: int) -> str:
+    """``<count>/<period>`` with the count multiplied (``off``, or anything unparsed, as given)."""
+    count, sep, period = rate.partition("/")
+    return f"{int(count) * factor}{sep}{period}" if sep and count.strip().isdigit() else rate
 
 
 async def hit(request: Request, key: str, rate: str) -> None:

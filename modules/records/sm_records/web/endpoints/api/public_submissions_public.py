@@ -29,6 +29,7 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sm_records.contracts.public_submissions_api import (
+    RegistrationView,
     SubmissionAccepted,
     SubmissionDefinition,
     SubmitBody,
@@ -37,6 +38,7 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import bind_public, bound_tenant
 from sm_records.public_submissions import abuse
 from sm_records.public_submissions.definition import accepting_type, definition
+from sm_records.public_submissions.registration.view import registration_view
 from sm_records.public_submissions.submit import submit
 from sm_records.public_submissions.tokens import host_secret
 from sm_records.web.deps import get_settings, request_db
@@ -82,6 +84,21 @@ async def get_submission_form(
     rtype = await accepting_type(db, type_key)
     secret = host_secret(request.app)
     return definition(rtype, settings, secret=secret, tenant=bound_tenant(), locale=locale)
+
+
+@router.get("/{type_key}/registration", response_model=RegistrationView)
+async def get_registration(
+    type_key: str,
+    request: Request,
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
+    event: str = Query(default="", max_length=200),
+    occurrence: str = Query(default="", max_length=200),
+    locale: str | None = Query(default=None, max_length=16),
+) -> RegistrationView:
+    """One occurrence's availability and, while it is open, the form with a token bound to that
+    event and occurrence. Anything not public, or not this type's, is the shared 404."""
+    return await registration_view(request.app, db, type_key, event, occurrence, locale, settings)
 
 
 @router.post(

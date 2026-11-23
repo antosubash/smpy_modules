@@ -1,0 +1,30 @@
+[
+  {
+    "html": "<p><ul><li>One</li><li>Two<br></li></ul></p>",
+    "expected": "<ul><li>One</li><li>Two</li></ul>"
+  },
+  {
+    "html": "<p>one<ul><li>x</li></ul>two</p>",
+    "expected": "<p>one</p><ul><li>x</li></ul><p>two</p>"
+  },
+  { "html": "<p>a<br></p>", "expected": "<p>a</p>" },
+  { "html": "<p>a<br>b</p>", "expected": "<p>a<br>b</p>" },
+  { "html": "<p></p><p><br></p><p>x</p>", "expected": "<p>x</p>" },
+  { "html": "<ul><li></li><li>a</li></ul>", "expected": "<ul><li>a</li></ul>" },
+  {
+    "html": "<h2>t<ol><li>q</li></ol></h2>",
+    "expected": "<h2>t</h2><ol><li>q</li></ol>"
+  },
+  {
+    "html": "<blockquote><p>q<br></p></blockquote>",
+    "expected": "<blockquote><p>q</p></blockquote>"
+  },
+  {
+    "html": "<p><blockquote>q</blockquote></p>",
+    "expected": "<blockquote>q</blockquote>"
+  },
+  {
+    "html": "<p>a<ol><li>b<ul><li>c</li></ul></li></ol></p>",
+    "expected": "<p>a</p><ol><li>b<ul><li>c</li></ul></li></ol>"
+  }
+]

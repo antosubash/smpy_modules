@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import date
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
     AfterValidator,
@@ -14,11 +16,18 @@ from pydantic import (
     Field,
     TypeAdapter,
     ValidationError,
+    model_validator,
 )
 
+from sm_newsletter.content.card_text import EXCERPT_MAX, LOCALE_MAX, PLACE_MAX, TITLE_MAX
 from sm_newsletter.content.merge import MAX_FALLBACK, check_merge
 from sm_newsletter.content.richtext import clean
-from sm_newsletter.content.urls import check_image, check_link
+from sm_newsletter.content.urls import (
+    check_image,
+    check_link,
+    check_site_image,
+    check_site_path,
+)
 from sm_newsletter.core.errors import InvalidBody
 from sm_newsletter.core.headers import check_header_text
 
@@ -31,6 +40,7 @@ BLOCK_TYPES = (
     "Spacer",
     "ArticleCard",
     "PageCard",
+    "EventCard",
 )
 MAX_BLOCKS = 200
 
@@ -66,6 +76,10 @@ Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")]
 Link = Annotated[str, AfterValidator(check_link)]
 ImageUrl = Annotated[str, AfterValidator(check_image)]
 Merged = AfterValidator(_merge)
+# An event card links only into the site (its snapshot is always site-relative), so a forged body
+# cannot make a card that looks like an event of this site point anywhere else.
+SitePath = Annotated[str, AfterValidator(check_site_path)]
+SiteImage = Annotated[str, AfterValidator(check_site_image)]
 
 
 class _Props(BaseModel):
@@ -106,12 +120,55 @@ class SpacerProps(_Props):
 
 class CardProps(_Props):
     source_id: Annotated[int, Field(gt=0)]
-    title: Annotated[str, Field(max_length=300)] = ""
-    excerpt: Annotated[str, Field(max_length=1000)] = ""
+    title: Annotated[str, Field(max_length=TITLE_MAX)] = ""
+    excerpt: Annotated[str, Field(max_length=EXCERPT_MAX)] = ""
     image_url: ImageUrl = ""
     url: Link
-    locale: Annotated[str, Field(max_length=16)] = ""
+    locale: Annotated[str, Field(max_length=LOCALE_MAX)] = ""
     snapshot_at: AwareDatetime
+
+
+UUID_RE = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
+def _zone(value: str) -> str:
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        raise ValueError("unknown timezone") from None
+    return value
+
+
+class EventCardProps(_Props):
+    """An event card's snapshot. ``source_id`` is the event's id, kept so Refresh can read it
+    again; the renderer never prints it."""
+
+    source_id: Annotated[str, Field(pattern=UUID_RE)]
+    title: Annotated[str, Field(max_length=TITLE_MAX)] = ""
+    excerpt: Annotated[str, Field(max_length=EXCERPT_MAX)] = ""
+    image_url: SiteImage = ""
+    url: SitePath
+    ics_url: SitePath
+    locale: Annotated[str, Field(max_length=LOCALE_MAX)] = ""
+    starts_at: AwareDatetime
+    ends_at: AwareDatetime
+    all_day: bool = False
+    start_date: date | None = None
+    end_date: date | None = None
+    timezone: Annotated[str, Field(min_length=1, max_length=64), AfterValidator(_zone)]
+    attendance_mode: Literal["in_person", "online", "hybrid"] = "in_person"
+    place: Annotated[str, Field(max_length=PLACE_MAX)] = ""
+    cancelled: bool = False
+    snapshot_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def _consistent(self) -> EventCardProps:
+        if self.ends_at <= self.starts_at:
+            raise ValueError("an event ends after it starts")
+        dated = self.start_date is not None and self.end_date is not None
+        if self.all_day != dated or (dated and self.start_date >= self.end_date):  # type: ignore[operator]
+            raise ValueError("all-day events carry their dates, and no other does")
+        return self
 
 
 class _Block(BaseModel):
@@ -158,6 +215,11 @@ class PageCardBlock(_Block):
     props: CardProps
 
 
+class EventCardBlock(_Block):
+    type: Literal["EventCard"]
+    props: EventCardProps
+
+
 Block = Annotated[
     HeadingBlock
     | RichTextBlock
@@ -166,7 +228,8 @@ Block = Annotated[
     | DividerBlock
     | SpacerBlock
     | ArticleCardBlock
-    | PageCardBlock,
+    | PageCardBlock
+    | EventCardBlock,
     Field(discriminator="type"),
 ]
 _ADAPTER: TypeAdapter[list[Block]] = TypeAdapter(list[Block])

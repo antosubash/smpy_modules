@@ -121,6 +121,15 @@ describe('formatDateTime', () => {
   });
 });
 
+describe('formatDateTime with the zone', () => {
+  it('labels the zone it was worded in, for a value whose own zone the list does not know', () => {
+    const plain = formatDateTime('2026-09-21T12:00:00+00:00', 'en-US');
+    const labelled = formatDateTime('2026-09-21T12:00:00+00:00', 'en-US', true);
+    expect(labelled).toMatch(/(UTC|GMT[+-]?\d*|[A-Z]{3,5})$/); // the zone label follows the time
+    expect(plain).not.toMatch(/(UTC|GMT)$/);
+  });
+});
+
 describe('formatCalendarDate', () => {
   it('formats a calendar day in the locale it is handed (#189)', () => {
     expect(formatCalendarDate('2026-09-21', 'de')).toBe('21.09.2026');

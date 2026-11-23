@@ -3,7 +3,7 @@
 Split out of ``parity_families.py``, which appends these to ``FAMILIES``; the
 rules there apply here — an allowance is a decision, and says why.
 
-ai, billing, newsletter and records each keep a copy of one ``core/crypto.py``
+ai, billing, newsletter, records and events each keep a copy of one ``core/crypto.py``
 (a published module must not import a sibling): the same formats (``enc:v1:``
 read, ``enc:v2:`` written), the same HKDF derivation with the module's own
 ``info``, the same ``SM_SECRET_KEY_PREVIOUS`` parsing and the same
@@ -19,6 +19,7 @@ AI = "modules/ai/sm_ai/core/crypto.py"
 BILLING = "modules/billing/sm_billing/core/crypto.py"
 NEWSLETTER = "modules/newsletter/sm_newsletter/core/crypto.py"
 RECORDS = "modules/records/sm_records/core/crypto.py"
+EVENTS = "modules/events/sm_events/core/crypto.py"
 
 _AI_MESSAGES = (
     "SM_SECRET_KEY is not set — the AI module needs it to encrypt stored provider keys.",
@@ -32,6 +33,13 @@ _NEWSLETTER_MESSAGES = (
     "scripts/reencrypt_secrets.py or re-save it through the password endpoint.",
     "Newsletter setting %r is stored unencrypted; re-save it through "
     "the password endpoint to encrypt it.",
+)
+
+_EVENTS_MESSAGES = (
+    "SM_SECRET_KEY is not set — the events module needs it to encrypt subscription URLs.",
+    "Events secret %r is stored in the v1 format; run "
+    "scripts/reencrypt_secrets.py or re-enter the subscription URL.",
+    "Events secret %r is stored unencrypted; re-enter the subscription URL to encrypt it.",
 )
 
 CRYPTO_FAMILIES: tuple[Family, ...] = (
@@ -56,13 +64,12 @@ CRYPTO_FAMILIES: tuple[Family, ...] = (
                 ),
             ),
             Copy(NEWSLETTER, messages=_NEWSLETTER_MESSAGES),
+            Copy(EVENTS, messages=_EVENTS_MESSAGES),
             Copy(
                 RECORDS,
                 own={
                     "CaptchaSecretUnreadableError": "See billing's BillingKeyUnreadableError.",
                     "CaptchaSecretUnreadableError.__init__": "See CaptchaSecretUnreadableError.",
-                    "has_secret_provider": "SealedSecret dumps unsealed in a process with no "
-                    "app (newsletter's worker); only records has a sealed field.",
                 },
                 messages=(
                     "The app has no secret_key — the records module needs it to encrypt "
@@ -96,18 +103,34 @@ CRYPTO_FAMILIES: tuple[Family, ...] = (
             "reencrypt_value",
         ),
         differ={
-            "_current_secret": "ai and newsletter also run in workers with no app, so they "
-            "fall back to SM_SECRET_KEY from the environment and .env; billing and records "
-            "take the app's secret only.",
+            "_current_secret": "ai, newsletter and events also run in workers with no app, so "
+            "they fall back to SM_SECRET_KEY from the environment and .env; billing and "
+            "records take the app's secret only.",
             "_unreadable": "Each module raises its own unreadable-secret error.",
         },
+    ),
+    Family(
+        "stored-secret crypto: sealed-field provider liveness",
+        (Copy(BILLING), Copy(RECORDS)),
+        shared=("_attached", "attach_app", "has_secret_provider"),
     ),
     Family(
         "stored-secret crypto: worker fallback",
         (
             Copy(AI, messages=_AI_MESSAGES),
             Copy(NEWSLETTER, messages=_NEWSLETTER_MESSAGES),
+            Copy(EVENTS, messages=_EVENTS_MESSAGES),
         ),
         shared=("_current_secret", "_dotenv_secret", "explicit_secret"),
+    ),
+    Family(
+        "stored-secret crypto: worker secret",
+        (
+            Copy("modules/newsletter/sm_newsletter/core/secret.py", {"sm_newsletter": "MODULE"}),
+            Copy("modules/events/sm_events/core/secret.py", {"sm_events": "MODULE"}),
+        ),
+        # A worker builds no app: the secret comes from the environment, the located `.env`,
+        # then the stored `host.secret_key` row, and a worker never creates one.
+        shared=None,
     ),
 )

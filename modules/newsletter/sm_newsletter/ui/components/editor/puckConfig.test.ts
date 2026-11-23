@@ -14,9 +14,10 @@ const ALL = [
   'Spacer',
   'ArticleCard',
   'PageCard',
+  'EventCard',
 ];
 
-type Caps = { news: boolean; pagebuilder: boolean };
+type Caps = { news: boolean; pagebuilder: boolean; events: boolean };
 
 function categories(caps: Caps) {
   const config = buildConfig(caps);
@@ -24,50 +25,61 @@ function categories(caps: Caps) {
 }
 
 describe('buildConfig', () => {
-  it('defines all eight blocks always', () => {
+  it('defines all nine blocks always', () => {
     for (const news of [true, false]) {
       for (const pagebuilder of [true, false]) {
-        const config = buildConfig({ news, pagebuilder });
-        expect(Object.keys(config.components).sort()).toEqual([...ALL].sort());
+        for (const events of [true, false]) {
+          const config = buildConfig({ news, pagebuilder, events });
+          expect(Object.keys(config.components).sort()).toEqual([...ALL].sort());
+        }
       }
     }
   });
 
   it('puts content and layout blocks in their categories and hides "other"', () => {
-    const cats = categories({ news: true, pagebuilder: true });
+    const cats = categories({ news: true, pagebuilder: true, events: true });
     expect(cats.content.components).toEqual(['Heading', 'RichText', 'Image', 'Button']);
     expect(cats.layout.components).toEqual(['Divider', 'Spacer']);
     expect(cats.other).toEqual({ visible: false });
   });
 
   it('lists both cards when both integrations are available', () => {
-    const cats = categories({ news: true, pagebuilder: true });
-    expect(cats.cards.components).toEqual(['ArticleCard', 'PageCard']);
+    const cats = categories({ news: true, pagebuilder: true, events: true });
+    expect(cats.cards.components).toEqual(['ArticleCard', 'PageCard', 'EventCard']);
     expect(cats.cards.visible).not.toBe(false);
     expect(cats.hidden).toEqual({ components: [], visible: false });
   });
 
   it('hides ArticleCard when news is absent', () => {
-    const cats = categories({ news: false, pagebuilder: true });
-    expect(cats.cards.components).toEqual(['PageCard']);
+    const cats = categories({ news: false, pagebuilder: true, events: true });
+    expect(cats.cards.components).toEqual(['PageCard', 'EventCard']);
     expect(cats.hidden).toEqual({ components: ['ArticleCard'], visible: false });
   });
 
   it('hides PageCard when pagebuilder is absent', () => {
-    const cats = categories({ news: true, pagebuilder: false });
-    expect(cats.cards.components).toEqual(['ArticleCard']);
+    const cats = categories({ news: true, pagebuilder: false, events: true });
+    expect(cats.cards.components).toEqual(['ArticleCard', 'EventCard']);
     expect(cats.hidden).toEqual({ components: ['PageCard'], visible: false });
   });
 
   it('hides the cards category when neither integration is available', () => {
-    const cats = categories({ news: false, pagebuilder: false });
+    const cats = categories({ news: false, pagebuilder: false, events: false });
     expect(cats.cards.visible).toBe(false);
     expect(cats.cards.components).toEqual([]);
-    expect(cats.hidden).toEqual({ components: ['ArticleCard', 'PageCard'], visible: false });
+    expect(cats.hidden).toEqual({
+      components: ['ArticleCard', 'PageCard', 'EventCard'],
+      visible: false,
+    });
+  });
+
+  it('hides EventCard when events is absent, whatever else is', () => {
+    const cats = categories({ news: true, pagebuilder: true, events: false });
+    expect(cats.cards.components).toEqual(['ArticleCard', 'PageCard']);
+    expect(cats.hidden).toEqual({ components: ['EventCard'], visible: false });
   });
 
   it('no slot or dropzone fields', () => {
-    const config = buildConfig({ news: true, pagebuilder: true });
+    const config = buildConfig({ news: true, pagebuilder: true, events: true });
     const blocks = { ...config.components, root: config.root ?? {} } as Record<
       string,
       { fields?: Record<string, { type: string }> }
@@ -81,7 +93,7 @@ describe('buildConfig', () => {
   });
 
   it('uses Puck richtext for RichText, without formatting the sanitiser drops', () => {
-    const config = buildConfig({ news: false, pagebuilder: false });
+    const config = buildConfig({ news: false, pagebuilder: false, events: false });
     const field = (
       config.components.RichText.fields as unknown as Record<string, Record<string, unknown>>
     ).html;

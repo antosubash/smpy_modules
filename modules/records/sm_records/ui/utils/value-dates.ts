@@ -51,10 +51,25 @@ export function localInputToIso(local: string): string {
  * own fallback — the point is never to substitute a value for one the
  * browser's `Date` rejects.
  */
-export function formatDateTime(value: string, locale: string | undefined): string {
+export function formatDateTime(
+  value: string,
+  locale: string | undefined,
+  withZone = false,
+): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  const options = { dateStyle: 'medium', timeStyle: 'short' } as const;
+  // `withZone`: for a value whose own zone the list does not know (a registration's event date),
+  // so the viewer's zone is at least named instead of silently assumed.
+  const options = withZone
+    ? ({
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      } as const)
+    : ({ dateStyle: 'medium', timeStyle: 'short' } as const);
   return new Intl.DateTimeFormat(intlLocale(locale), options).format(parsed);
 }
 

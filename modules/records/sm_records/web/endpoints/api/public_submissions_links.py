@@ -37,6 +37,7 @@ from sm_records.core.settings import RecordsSettings
 from sm_records.core.tenancy import _resolved, tenant_scope
 from sm_records.public_submissions import abuse, links, opt_in
 from sm_records.public_submissions.errors import SubmissionRefused
+from sm_records.public_submissions.registration import cancel as registration_cancel
 from sm_records.public_submissions.tokens import host_secret
 from sm_records.web.deps import get_settings, request_db
 from sm_records.web.endpoints.api._responses import SUBMISSION_LINK, responses
@@ -85,6 +86,7 @@ def _bind(action: links.Action) -> Callable[[Request], AsyncIterator[links.Link 
 
 _confirm_link = _bind(links.CONFIRM)
 _unsubscribe_link = _bind(links.UNSUBSCRIBE)
+_cancel_link = _bind(links.CANCEL)
 
 
 @router.post(
@@ -124,3 +126,23 @@ async def unsubscribe(
         await opt_in.unsubscribe(db, host_secret(request.app), link, settings)
         await db.flush()
     return LinkResult(status="unsubscribed")
+
+
+@router.post(
+    "/cancel",
+    response_model=LinkResult,
+    dependencies=[Depends(_cancel_link)],
+)
+async def cancel_registration(
+    request: Request,
+    link: Any = Depends(_cancel_link),
+    db: AsyncSession = Depends(request_db),
+    settings: RecordsSettings = Depends(get_settings),
+) -> LinkResult:
+    """Cancel a registration. Always ``200 {"status": "cancelled"}``: a forged, foreign, used or
+    late link is told nothing different, so it is no oracle for who is registered. Ignores the
+    master switch, like an unsubscribe: a mail already sent keeps its way out."""
+    if link is not None:
+        await registration_cancel.cancel_by_link(db, host_secret(request.app), link, settings)
+        await db.flush()
+    return LinkResult(status="cancelled")

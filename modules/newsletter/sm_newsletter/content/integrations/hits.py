@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Literal
 
 from simple_module_db import like_contains_pattern
@@ -24,6 +25,32 @@ class CardHit:
     url: str
     """Site-relative, as the contract returns it (ruling R6)."""
     locale: str
+
+
+@dataclass(frozen=True)
+class EventHit:
+    """An event card, renamed from ``sm_events.contracts.cards.EventCard``."""
+
+    kind: Literal["event"]
+    source_id: str
+    """The event's id as canonical UUID text. Stored in the draft only: never rendered."""
+    title: str
+    excerpt: str
+    image_url: str
+    url: str
+    """Site-relative, as the contract returns it; the renderer makes it absolute."""
+    ics_url: str
+    locale: str
+    starts_at: datetime
+    ends_at: datetime
+    all_day: bool
+    start_date: date | None
+    end_date: date | None
+    timezone: str
+    attendance_mode: str
+    place: str
+    """``"venue, address"`` or ``""``."""
+    cancelled: bool
 
 
 @dataclass(frozen=True)

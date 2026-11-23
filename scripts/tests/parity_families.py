@@ -13,6 +13,8 @@ crypto families in ``parity_crypto.py``; both are appended below.
 from __future__ import annotations
 
 from parity_crypto import CRYPTO_FAMILIES
+from parity_public import PUBLIC_FAMILIES
+from parity_ssrf import SSRF_FAMILIES
 from parity_support import Copy, Family
 from parity_tenancy import TENANCY_FAMILIES
 
@@ -20,6 +22,7 @@ PB = "modules/pagebuilder/pagebuilder"
 NEWS = "modules/news/news"
 AI = "modules/ai/sm_ai"
 RECORDS = "modules/records/sm_records"
+EVENTS = "modules/events/sm_events"
 
 _AS_MODULE = {"pagebuilder": "MODULE", "news": "MODULE", "sm_ai": "MODULE", "sm_records": "MODULE"}
 
@@ -29,12 +32,9 @@ FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{PB}/web/public_cache.py", {"PagebuilderSettings": "Settings"}),
             Copy(f"{NEWS}/web/endpoints/public/_urls.py", {"NewsSettings": "Settings"}),
+            Copy(f"{EVENTS}/web/endpoints/public/_cache.py"),
         ),
-        shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key", "cache_control"),
-        differ={
-            "etag_for": "A page's chrome also changes with the site layout and the nav list, "
-            "so pagebuilder digests layout_updated_at and nav as well; an article has neither.",
-        },
+        shared=("SIGNED_IN_CACHE_CONTROL", "signed_in", "_user_key", "viewer_key"),
     ),
     Family(
         "slug redirects",
@@ -63,8 +63,12 @@ FAMILIES: tuple[Family, ...] = (
     ),
     Family(
         "content locales",
-        (Copy(f"{PB}/core/locales.py"), Copy(f"{NEWS}/core/locales.py")),
-        shared=("is_default", "resolve", "path_prefix"),
+        (
+            Copy(f"{PB}/core/locales.py"),
+            Copy(f"{NEWS}/core/locales.py"),
+            Copy(f"{EVENTS}/core/locales.py"),
+        ),
+        shared=("is_default", "path_prefix"),
         differ={
             "use": "Pagebuilder publishes its settings object; news publishes a vocabulary, "
             "because it may run without pagebuilder and borrows its list when it does not.",
@@ -91,7 +95,20 @@ FAMILIES: tuple[Family, ...] = (
         (
             Copy(f"{NEWS}/ui/utils/jsonLd.ts"),
             Copy(f"{PB}/ui/utils/jsonLd.ts"),
+            Copy(
+                f"{EVENTS}/ui/utils/jsonLd.ts",
+                own={
+                    "LINE_SEPARATOR": "Events also escapes `>`, `&` and the two JavaScript line "
+                    "separators (the server's `safe_json_ld` does too).",
+                    "PARAGRAPH_SEPARATOR": "See LINE_SEPARATOR.",
+                    "ESCAPES": "See LINE_SEPARATOR.",
+                    "DANGEROUS": "See LINE_SEPARATOR.",
+                },
+            ),
         ),
+        differ={
+            "safeJsonLd": "Events' serialiser escapes more characters than the other two.",
+        },
     ),
     Family(
         "CSRF token sharing (Python)",
@@ -200,37 +217,46 @@ FAMILIES: tuple[Family, ...] = (
             Copy("modules/records/tests/pg_support.py"),
             Copy("modules/images/tests/pg_support.py"),
             Copy("modules/newsletter/tests/pg_support.py"),
+            Copy("modules/events/tests/pg_support.py"),
         ),
         shared=("_shared", "_pg", "arm_reset", "USING_POSTGRES"),
     ),
     Family(
-        "SSRF address guard",
+        "request context",
         (
-            Copy("modules/images/sm_images/ingest/imports/url_safety.py"),
-            Copy(f"{AI}/core/url_safety.py", {"httpx2": "httpx"}),
+            Copy(
+                "modules/images/sm_images/core/tenancy/request_context.py", {"sm_images": "MODULE"}
+            ),
+            Copy(
+                "modules/events/sm_events/core/tenancy/request_context.py", {"sm_events": "MODULE"}
+            ),
         ),
-        # The address rules are the guard; `check_url` and `resolve_public`
-        # are allowed to differ below.
-        shared=(
-            "IPAddress",
-            "ALLOWED_SCHEMES",
-            "_DEFAULT_PORTS",
-            "_BLOCKED_NETWORKS",
-            "_METADATA",
-            "_NAT64",
-            "_V4_COMPATIBLE",
-            "UnsafeURLError",
-            "UnsafeURLError.__init__",
-            "_embedded_ipv4",
-            "is_public_address",
-            "_parse_ip",
-        ),
-        differ={
-            "check_url": "A provider endpoint may listen on any port (vLLM on 8000), so ai's "
-            "copy has no port allow-list; images fetches arbitrary URLs and keeps 80/443.",
-            "resolve_public": "See check_url: images passes its port allow-list through.",
-        },
+        shared=("RequestContextMiddleware", "current_request"),
     ),
+    Family(
+        "worker runtime",
+        (
+            Copy(
+                "modules/events/sm_events/core/worker.py",
+                {"sm_events": "MODULE"},
+                messages=(
+                    "events task bodies start their own event loop and cannot run on a running "
+                    "one; from async code await the coroutine (e.g. publish_due_async) directly",
+                ),
+            ),
+            Copy(
+                "modules/newsletter/sm_newsletter/core/worker.py",
+                {"sm_newsletter": "MODULE"},
+                messages=(
+                    "newsletter task bodies start their own event loop and cannot run on a "
+                    "running one; from async code await the coroutine (e.g. reconcile_async) "
+                    "directly",
+                ),
+            ),
+        ),
+    ),
+    *SSRF_FAMILIES,
     *CRYPTO_FAMILIES,
+    *PUBLIC_FAMILIES,
     *TENANCY_FAMILIES,
 )

@@ -11,11 +11,11 @@ binding outside a request in ``_scope.py`` and request binding in
 copies are compared declaration by declaration for what they share; its other
 binding entry points are listed to pin that the difference is deliberate.
 
-The fail-closed ORM guard (#335) is one file in five modules — ``_guard.py``,
+The fail-closed ORM guard (#335) is one file in six modules — ``_guard.py``,
 records' ``_tenant_guard.py`` — copied whole, and the names it imports
 (``ALL_TENANTS``, ``TenantUnbound``) and the two entry points beside it
 (``all_tenants``, ``install_guard``) are compared wherever each module keeps
-them: the package ``__init__`` in records, images and newsletter, ``_scope.py``
+them: the package ``__init__`` in records, images, newsletter and events, ``_scope.py``
 in pagebuilder and news.
 """
 
@@ -28,6 +28,7 @@ NEWS = "modules/news/news"
 RECORDS = "modules/records/sm_records"
 IMAGES = "modules/images/sm_images"
 NEWSLETTER = "modules/newsletter/sm_newsletter"
+EVENTS = "modules/events/sm_events"
 
 _RECORDS_ADMIN = (
     "Records' admin rule (#112): on a multi-tenant host an anonymous request is "
@@ -53,6 +54,7 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
             ),
             Copy(f"{IMAGES}/core/tenancy/_mode.py", {"logger": "_log"}),
             Copy(f"{NEWSLETTER}/core/tenancy/_mode.py", {"logger": "_log"}),
+            Copy(f"{EVENTS}/core/tenancy/_mode.py", {"logger": "_log"}),
         ),
         shared=(
             "TenancyMode",
@@ -151,6 +153,10 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
                     "_sm_newsletter_tenant_guard": "_MODULE_tenant_guard",
                 },
             ),
+            Copy(
+                f"{EVENTS}/core/tenancy/_guard.py",
+                {"sm_events": "MODULE", "_sm_events_tenant_guard": "_MODULE_tenant_guard"},
+            ),
         ),
     ),
     Family(
@@ -180,6 +186,10 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
                 f"{NEWSLETTER}/core/tenancy/__init__.py",
                 {"sm_newsletter": "MODULE", "newsletter_all_tenants": "MODULE_all_tenants"},
             ),
+            Copy(
+                f"{EVENTS}/core/tenancy/__init__.py",
+                {"sm_events": "MODULE", "events_all_tenants": "MODULE_all_tenants"},
+            ),
         ),
         shared=("ALL_TENANTS", "TenantUnbound", "all_tenants", "install_guard"),
     ),
@@ -190,14 +200,15 @@ TENANCY_FAMILIES: tuple[Family, ...] = (
             Copy(f"{RECORDS}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
             Copy(f"{IMAGES}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
             Copy(f"{NEWSLETTER}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
+            Copy(f"{EVENTS}/core/tenancy/__init__.py", {"_resolved": "upstream_tenant"}),
         ),
         shared=("resolve_public",),
         differ={
             "resolve_admin": _RECORDS_ADMIN,
             "bind_admin": "Records binds through its own tenant_scope, which refuses to "
             "rebind a different tenant inside a bound scope (TenantIsolationError).",
-            "bind_public": "Records', images' and newsletter's public 404 is their NotFound error, "
-            "rendered by their own error handlers.",
+            "bind_public": "Records', images', newsletter's and events' public 404 is their "
+            "NotFound error, rendered by their own error handlers.",
         },
     ),
 )
