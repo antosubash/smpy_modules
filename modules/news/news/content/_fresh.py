@@ -18,13 +18,10 @@ from fastapi import HTTPException
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news.core.errors import STALE_DETAIL as STALE_DETAIL
+from news.core.errors import ArticleConflict
 from news.core.naive_utc import as_utc
 from news.models import ArticleStatus, NewsArticle
-
-STALE_DETAIL = (
-    "This article was changed somewhere else. Reload to get the latest version, "
-    "then make your change again."
-)
 
 
 def ensure_fresh(article: NewsArticle, expected: datetime | None) -> None:
@@ -35,7 +32,7 @@ def ensure_fresh(article: NewsArticle, expected: datetime | None) -> None:
     back a naive instant.
     """
     if expected is not None and as_utc(expected) != as_utc(article.updated_at):
-        raise HTTPException(status_code=409, detail=STALE_DETAIL)
+        raise ArticleConflict()
 
 
 async def ensure_fresh_for_write(

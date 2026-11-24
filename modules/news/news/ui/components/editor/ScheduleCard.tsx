@@ -3,8 +3,8 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
-import { type ArticleRead, getArticleDetail, scheduleArticle } from '../../utils/api';
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { getArticleDetail, scheduleArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
 const GO_LIVE_ID = 'article-publish-at';
@@ -24,12 +24,10 @@ const COME_DOWN_ID = 'article-unpublish-at';
  */
 export function ScheduleCard({
   articleId,
-  expectedUpdatedAt,
-  onChanged,
+  writeArticle,
 }: {
   articleId: number;
-  expectedUpdatedAt: string | null;
-  onChanged: (article: ArticleRead) => void;
+  writeArticle: ArticleWrite;
 }) {
   const { t } = useT();
   const copy = keys.news.schedule;
@@ -57,14 +55,16 @@ export function ScheduleCard({
   const save = async () => {
     setBusy(true);
     try {
-      const updated = await scheduleArticle(articleId, {
-        // Empty clears it, which is a real instruction — an explicit null
-        // rather than an omitted field, or cancelling would be unspellable.
-        expected_updated_at: expectedUpdatedAt,
-        publish_at: publishAt ? new Date(publishAt).toISOString() : null,
-        unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
-      });
-      if (updated) onChanged(updated);
+      const ok = await writeArticle((version) =>
+        scheduleArticle(articleId, {
+          // Empty clears it, which is a real instruction — an explicit null
+          // rather than an omitted field, or cancelling would be unspellable.
+          expected_updated_at: version,
+          publish_at: publishAt ? new Date(publishAt).toISOString() : null,
+          unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
+        }),
+      );
+      if (!ok) return;
       setSaved(true);
       toast.success(t(copy.saved_toast));
     } catch (e) {

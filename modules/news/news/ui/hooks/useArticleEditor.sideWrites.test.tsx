@@ -61,10 +61,11 @@ it.each(actions)('%s refuses a stale base without advancing the form version', a
   if (action === 'Publish') expect(editor.error).toBe(STALE);
   else expect(error).toHaveBeenCalledWith(STALE);
   error.mockRestore();
+  const writes = requests.filter((r) => r.method !== 'GET').length;
   await act(async () => {
     await editor.save();
   });
-  expect(lastSave()?.body.expected_updated_at).toBe(FIRST);
+  expect(requests.filter((r) => r.method !== 'GET')).toHaveLength(writes);
   expect(editor.conflict).toBe(true);
   expect(editor.error).toBe(STALE);
 });

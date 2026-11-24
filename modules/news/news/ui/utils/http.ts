@@ -48,7 +48,10 @@ export async function errorFrom(response: Response): Promise<HttpError> {
   if (!body) return new HttpError(fallback, response.status);
 
   try {
-    const detail = (JSON.parse(body) as { detail?: unknown }).detail;
+    const { detail, code } = JSON.parse(body) as { detail?: unknown; code?: unknown };
+    if (response.status === 409 && code === 'article_conflict') {
+      return new HttpError(translate(keys.news.errors.article_conflict), response.status);
+    }
     if (isCsrfRefusal(response.status, detail)) {
       return new HttpError(translate(keys.news.errors.csrf_failed), response.status);
     }

@@ -1,8 +1,8 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
 import {
-  type ArticleRead,
   formatTimestamp,
   listArticleRevisions,
   type RevisionRead,
@@ -38,12 +38,10 @@ const EVENTS: Record<RevisionRead['event'], string> = {
  */
 export function HistoryCard({
   articleId,
-  expectedUpdatedAt,
-  onChanged,
+  writeArticle,
 }: {
   articleId: number;
-  expectedUpdatedAt: string | null;
-  onChanged: (article: ArticleRead) => void;
+  writeArticle: ArticleWrite;
 }) {
   const { t, locale } = useT();
   const copy = keys.news.history;
@@ -69,8 +67,11 @@ export function HistoryCard({
   const restore = async (revision: RevisionRead) => {
     setBusy(true);
     try {
-      const updated = await restoreArticleRevision(articleId, revision.id, expectedUpdatedAt);
-      if (updated) onChanged(updated);
+      const ok = await writeArticle(
+        (version) => restoreArticleRevision(articleId, revision.id, version),
+        true,
+      );
+      if (!ok) return;
       await load();
       toast.success(t(copy.restored_toast));
     } catch (e) {

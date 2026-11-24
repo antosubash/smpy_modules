@@ -5,8 +5,8 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
-import { type ArticleRead, getArticleDetail, updateArticle } from '../../utils/api';
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { getArticleDetail, updateArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
 const DESC_ID = 'article-meta-description';
@@ -28,12 +28,10 @@ const INDEX_ID = 'article-index-in-search';
  */
 export function SeoCard({
   articleId,
-  expectedUpdatedAt,
-  onChanged,
+  writeArticle,
 }: {
   articleId: number;
-  expectedUpdatedAt: string | null;
-  onChanged: (article: ArticleRead) => void;
+  writeArticle: ArticleWrite;
 }) {
   const { t } = useT();
   const copy = keys.news.seo;
@@ -60,14 +58,16 @@ export function SeoCard({
   const save = async () => {
     setBusy(true);
     try {
-      const updated = await updateArticle(articleId, {
-        expected_updated_at: expectedUpdatedAt,
-        meta_description: description,
-        og_image: image,
-        canonical_url: canonical,
-        index_in_search: indexed,
-      });
-      if (updated) onChanged(updated);
+      const ok = await writeArticle((version) =>
+        updateArticle(articleId, {
+          expected_updated_at: version,
+          meta_description: description,
+          og_image: image,
+          canonical_url: canonical,
+          index_in_search: indexed,
+        }),
+      );
+      if (!ok) return;
       setSaved(true);
       toast.success(t(copy.saved_toast));
     } catch (e) {

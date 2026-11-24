@@ -55,7 +55,7 @@ export default function ArticleEditor() {
     conflict,
     gone,
     setError,
-    acceptWrite,
+    writeArticle,
     saved,
     load,
     patch,
@@ -162,8 +162,7 @@ export default function ArticleEditor() {
             isPublished={isPublished}
             busy={busy}
             onTrash={async () => {
-              await trash();
-              router.visit('/admin/news/');
+              if (await trash()) router.visit('/admin/news/');
             }}
           />
         </section>
@@ -197,7 +196,7 @@ export default function ArticleEditor() {
             </Button>
           )}
 
-          <ReviewCard article={article} canPublish={canPublish} onChanged={acceptWrite} />
+          <ReviewCard article={article} canPublish={canPublish} writeArticle={writeArticle} />
 
           {/* Only on a multilingual site: a panel listing one language is a
               panel that answers a question nobody asked. */}
@@ -208,24 +207,10 @@ export default function ArticleEditor() {
           {/* Only for someone who may actually publish. The route is behind
               `news.publish`, so showing it to an author who may write but not
               publish would be offering a control that answers 403. */}
-          {canPublish && (
-            <ScheduleCard
-              articleId={article_id}
-              expectedUpdatedAt={article.updated_at}
-              onChanged={acceptWrite}
-            />
-          )}
+          {canPublish && <ScheduleCard articleId={article_id} writeArticle={writeArticle} />}
 
-          <SeoCard
-            articleId={article_id}
-            expectedUpdatedAt={article.updated_at}
-            onChanged={acceptWrite}
-          />
-          <HistoryCard
-            articleId={article_id}
-            expectedUpdatedAt={article.updated_at}
-            onChanged={(updated) => acceptWrite(updated, true)}
-          />
+          <SeoCard articleId={article_id} writeArticle={writeArticle} />
+          <HistoryCard articleId={article_id} writeArticle={writeArticle} />
         </aside>
       </div>
     </PageShell>

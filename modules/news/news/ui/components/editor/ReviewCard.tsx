@@ -10,7 +10,7 @@ import {
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useState } from 'react';
 import { toast } from 'sonner';
-
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
 import { useInFlight } from '../../hooks/useInFlight';
 import {
   type ArticleRead,
@@ -55,11 +55,11 @@ const MAX_NOTE_LEN = 2000;
 export function ReviewCard({
   article,
   canPublish,
-  onChanged,
+  writeArticle,
 }: {
   article: ArticleRead;
   canPublish: boolean;
-  onChanged: (article: ArticleRead) => void;
+  writeArticle: ArticleWrite;
 }) {
   const { t } = useT();
   const copy = keys.news.review;
@@ -69,11 +69,13 @@ export function ReviewCard({
 
   /** Resolves `true` only when the transition went through, so a caller can
    *  keep its dialog and its typed note open on failure. */
-  const run = async (action: () => Promise<ArticleRead | null>, done: string): Promise<boolean> => {
+  const run = async (
+    action: (version: string | null) => Promise<ArticleRead | null>,
+    done: string,
+  ): Promise<boolean> => {
     const ok = await guard(async () => {
       try {
-        const updated = await action();
-        if (updated) onChanged(updated);
+        if (!(await writeArticle(action))) return false;
         toast.success(done);
         return true;
       } catch (e) {
@@ -102,7 +104,7 @@ export function ReviewCard({
           confirmLabel={t(copy.unpublish)}
           onConfirm={async () => {
             const ok = await run(
-              () => unpublishArticle(article.id, article.updated_at),
+              (version) => unpublishArticle(article.id, version),
               t(copy.unpublished_toast),
             );
             // The toast has already said why; throwing keeps the dialog open.
@@ -139,10 +141,7 @@ export function ReviewCard({
               size="sm"
               disabled={busy}
               onClick={() =>
-                void run(
-                  () => approveArticle(article.id, article.updated_at),
-                  t(copy.approved_toast),
-                )
+                void run((version) => approveArticle(article.id, version), t(copy.approved_toast))
               }
             >
               {t(copy.approve)}
@@ -163,10 +162,7 @@ export function ReviewCard({
               variant="outline"
               disabled={busy}
               onClick={() =>
-                void run(
-                  () => submitArticle(article.id, article.updated_at),
-                  t(copy.submitted_toast),
-                )
+                void run((version) => submitArticle(article.id, version), t(copy.submitted_toast))
               }
             >
               {t(copy.submit)}
@@ -201,7 +197,7 @@ export function ReviewCard({
               disabled={busy}
               onClick={() =>
                 void run(
-                  () => rejectArticle(article.id, note, article.updated_at),
+                  (version) => rejectArticle(article.id, note, version),
                   t(copy.sent_back_toast),
                 ).then((ok) => {
                   // Only on success: a failed send-back keeps the dialog and

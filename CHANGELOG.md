@@ -8,13 +8,15 @@ name the module they affect.
 - News admin removal now moves articles to Trash for authors and publishers,
   with recovery wording and a confirmation toast; permanent deletion remains
   on the Trash screen. Categories explain how to enable management for a
-  category entered on an article (#445).
+  category entered on an article and translate the system category label. Lists
+  refresh stale rows and clear filters whose options disappear (#445).
 
-- News keeps the article form version current after search settings, scheduling,
-  workflow and revision restores; rejected saves can be corrected and retried
+- News serializes article editor writes and keeps the form version current after
+  search settings, scheduling, workflow and revision restores; rejected saves can be corrected and retried
   without a false concurrent-edit conflict. Side writes check the form’s base
   version under the article lock, so side writes cannot mask concurrent edits
-  to inspector fields (#444).
+  to inspector fields; conflicts use the console language and cancel queued writes
+  until Reload (#444).
 
 - News registers its content-bundle section once per registry, so restarting the
   same app lifespan works and rebuilding the registry registers it again, while

@@ -8,6 +8,7 @@ import {
   trashArticle,
   updateArticle,
 } from '../utils/api';
+import { toDraft } from '../utils/articleDraft';
 import { isHttpStatus } from '../utils/http';
 import { keys, useT } from '../utils/i18n';
 import { SLUG_PATTERN } from '../utils/slugify';
@@ -18,32 +19,12 @@ import {
   setArticleTags,
 } from '../utils/taxonomyApi';
 import { useInFlight } from './useInFlight';
+import { useWriteQueue } from './useWriteQueue';
 
-/** Split a stored instant into the two controls the inspector shows.
- *
- * Read in UTC, because `published_at` is a display date stored at midnight UTC
- * — reading it in the viewer's own timezone shifts the date a day for everyone
- * west of UTC, which is the bug `formatArticleDate` already documents.
- */
-function splitInstant(iso: string | null): { date: string; time: string } {
-  if (!iso) return { date: '', time: '' };
-  return { date: iso.slice(0, 10), time: iso.slice(11, 16) || '00:00' };
-}
-
-function toDraft(article: ArticleRead): ArticleDraft {
-  const { date, time } = splitInstant(article.published_at);
-  return {
-    title: article.title,
-    slug: article.slug,
-    category: article.category,
-    tags: article.tags ?? [],
-    date,
-    time,
-    author: article.author ?? '',
-    pinned: article.pinned ?? false,
-    showInFeed: article.show_in_feed ?? true,
-  };
-}
+export type ArticleWrite = (
+  action: (version: string | null) => Promise<ArticleRead | null>,
+  restoreTitle?: boolean,
+) => Promise<boolean>;
 
 /** Server versions are UTC and retain Python's microsecond precision. */
 function versionKey(iso: string): string {
@@ -65,13 +46,17 @@ export function useArticleEditor(articleId: number) {
   const [draft, setDraft] = useState<ArticleDraft | null>(null);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  const { busy, run: guard } = useInFlight();
+  const { busy: saving, run: guardSave } = useInFlight();
+  const { busy: publishing, run: guardPublish } = useInFlight();
+  const busy = saving || publishing;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Someone else changed the article since this copy was loaded. The edits on
    *  screen are kept; Save stays available only through Reload. */
   const [conflict, setConflict] = useState(false);
+  const blocked = useRef(false);
+  const queue = useWriteQueue();
   /** The article was trashed or deleted elsewhere: nothing left to save to. */
   const [gone, setGone] = useState(false);
 
@@ -89,6 +74,7 @@ export function useArticleEditor(articleId: number) {
         setDraft(toDraft(found));
         setDirty(false);
         setError(null);
+        blocked.current = false;
         setConflict(false);
         setGone(false);
       } catch (e) {
@@ -142,7 +128,10 @@ export function useArticleEditor(articleId: number) {
    *  anything else is just the banner. */
   const fail = useCallback(
     (e: unknown) => {
-      if (isHttpStatus(e, 409)) setConflict(true);
+      if (isHttpStatus(e, 409)) {
+        blocked.current = true;
+        setConflict(true);
+      }
       if (isHttpStatus(e, 404)) {
         setGone(true);
         setError(t(keys.news.errors.gone));
@@ -153,20 +142,45 @@ export function useArticleEditor(articleId: number) {
     [t],
   );
 
+  /** A conflict stops this queue until Reload. Dropped callbacks report nothing:
+   * the predecessor already explained the conflict and kept the pending edits. */
+  const runWrite = useCallback(
+    (action: () => Promise<void>, notify = false) =>
+      queue(async () => {
+        if (blocked.current) return false;
+        setError(null);
+        try {
+          await action();
+          return true;
+        } catch (e) {
+          fail(e);
+          if (notify) toast.error((e as Error).message);
+          return false;
+        }
+      }),
+    [fail, queue],
+  );
+
+  const writeArticle: ArticleWrite = useCallback(
+    (action, restoreTitle = false) =>
+      runWrite(async () => {
+        const updated = await action(articleRef.current?.updated_at ?? null);
+        if (updated) acceptWrite(updated, restoreTitle);
+      }, true),
+    [acceptWrite, runWrite],
+  );
+
   const save = useCallback(
     () =>
-      guard(async () => {
-        if (!draft || !article) return;
-        setError(null);
-        // An empty date is a real value — it undates the article — so it is sent
-        // as null rather than omitted.
-        const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
-        // In sequence: the metadata PUT carries `expected_updated_at` and the
-        // tags PUT uses its returned version, so the tags wait for it. A stale
-        // tab is refused before it can overwrite the other writer's tags.
-        let updated: ArticleRead | null;
-        try {
-          updated = await updateArticle(articleId, {
+      guardSave(() =>
+        runWrite(async () => {
+          if (!draft || !articleRef.current) return;
+          // An empty date is a real value — it undates the article — so it is sent
+          // as null rather than omitted.
+          const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
+          // Metadata and tags form one queued write: no card can slip between
+          // them and invalidate the stamp the metadata response just returned.
+          const updated = await updateArticle(articleId, {
             // Sent every time rather than only when changed: the server compares
             // the incoming slug against the stored one and records a redirect only
             // for a real move, so an unchanged value costs nothing and diffing here
@@ -178,50 +192,40 @@ export function useArticleEditor(articleId: number) {
             pinned: draft.pinned,
             show_in_feed: draft.showInFeed,
             author: draft.author,
-            expected_updated_at: article.updated_at,
+            expected_updated_at: articleRef.current.updated_at,
           });
-        } catch (e) {
-          fail(e);
-          return;
-        }
-        // Every write response refreshes the copy, so the next save is made
-        // against what the server now holds.
-        if (updated) acceptWrite(updated);
-        try {
-          const tags = await setArticleTags(
-            articleId,
-            draft.tags,
-            updated?.updated_at ?? article.updated_at,
-          );
-          if (updated)
-            acceptWrite({ ...(articleRef.current ?? updated), tags: tags ?? article.tags });
-        } catch (e) {
-          fail(e);
-          return;
-        }
-        setDirty(false);
-        setSaved(true);
-        toast.success(t(keys.news.editor.saved_toast));
-      }).catch(fail),
-    [acceptWrite, article, articleId, draft, fail, guard, t],
+          // Adopt immediately: even if tags fail, retry against the saved metadata.
+          if (updated) acceptWrite(updated);
+          const tags = await setArticleTags(articleId, draft.tags, articleRef.current.updated_at);
+          acceptWrite({ ...articleRef.current, tags: tags ?? articleRef.current.tags });
+          setDirty(false);
+          setSaved(true);
+          toast.success(t(keys.news.editor.saved_toast));
+        }),
+      ),
+    [acceptWrite, articleId, draft, guardSave, runWrite, t],
   );
 
   const publish = useCallback(
     () =>
-      guard(async () => {
-        if (!article) return;
-        setError(null);
-        const updated = await publishArticle(article.id, article.updated_at);
-        if (updated) acceptWrite(updated);
-        toast.success(t(keys.news.editor.published_toast));
-      }).catch(fail),
-    [acceptWrite, article, fail, guard, t],
+      guardPublish(() =>
+        runWrite(async () => {
+          const updated = await publishArticle(articleId, articleRef.current?.updated_at);
+          if (updated) acceptWrite(updated);
+          toast.success(t(keys.news.editor.published_toast));
+        }),
+      ),
+    [acceptWrite, articleId, guardPublish, runWrite, t],
   );
 
-  const trash = useCallback(async () => {
-    await trashArticle(articleId);
-    toast.success(t(keys.news.trash.moved_toast));
-  }, [articleId, t]);
+  const trash = useCallback(
+    () =>
+      runWrite(async () => {
+        await trashArticle(articleId);
+        toast.success(t(keys.news.trash.moved_toast));
+      }),
+    [articleId, runWrite, t],
+  );
 
   /** Whether Save would be accepted.
    *
@@ -250,6 +254,7 @@ export function useArticleEditor(articleId: number) {
      *  same banner rather than growing an error surface of its own. */
     setError,
     acceptWrite,
+    writeArticle,
     load,
     patch,
     save,

@@ -65,23 +65,11 @@ function Harness() {
   editor = useArticleEditor(7);
   return (
     <>
-      <SeoCard
-        articleId={7}
-        expectedUpdatedAt={editor.article?.updated_at ?? null}
-        onChanged={editor.acceptWrite}
-      />
-      <ScheduleCard
-        articleId={7}
-        expectedUpdatedAt={editor.article?.updated_at ?? null}
-        onChanged={editor.acceptWrite}
-      />
-      <HistoryCard
-        expectedUpdatedAt={editor.article?.updated_at ?? null}
-        articleId={7}
-        onChanged={(updated) => editor.acceptWrite(updated, true)}
-      />
+      <SeoCard articleId={7} writeArticle={editor.writeArticle} />
+      <ScheduleCard articleId={7} writeArticle={editor.writeArticle} />
+      <HistoryCard articleId={7} writeArticle={editor.writeArticle} />
       {editor.article && (
-        <ReviewCard article={editor.article} canPublish onChanged={editor.acceptWrite} />
+        <ReviewCard article={editor.article} canPublish writeArticle={editor.writeArticle} />
       )}
     </>
   );
@@ -118,7 +106,7 @@ beforeEach(async () => {
         return json({ detail: 'Invalid title' }, 422);
       if (reject === 'tags' && url.endsWith('/tags')) return json({ detail: 'Invalid tag' }, 422);
       if (body.expected_updated_at && body.expected_updated_at !== version)
-        return json({ detail: STALE }, 409);
+        return json({ detail: STALE, code: 'article_conflict' }, 409);
       if (url.endsWith('/tags')) return json([]);
       if (url.endsWith('/publish')) status = 'published';
       if (url.endsWith('/unpublish')) status = 'draft';

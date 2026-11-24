@@ -14,6 +14,7 @@ import {
   purgeArticle,
   restoreArticle,
 } from '../ui/utils/api';
+import { isHttpStatus } from '../ui/utils/http';
 import { keys, useT } from '../ui/utils/i18n';
 
 /** Binned articles, and the two things you can do with them.
@@ -63,6 +64,7 @@ export default function Trash() {
       await load();
       toast.success(done);
     } catch (e) {
+      if (isHttpStatus(e, 404)) await load();
       toast.error((e as Error).message);
     } finally {
       setBusyId(null);

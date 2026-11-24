@@ -28,6 +28,8 @@ let host: HTMLDivElement;
 let root: Root;
 let calls: { url: string; method: string }[];
 let trashed: boolean;
+let staleAction: boolean;
+let missing: boolean;
 const article = {
   id: 7,
   title: 'Subject',
@@ -58,8 +60,11 @@ const article = {
   url: '/news/subject',
   edit_url: '/admin/news/articles/7/body',
 };
-function json(body: unknown) {
-  return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
 }
 async function click(label: string) {
   const button = Array.from(document.querySelectorAll('button'))
@@ -71,6 +76,8 @@ async function click(label: string) {
 beforeEach(() => {
   calls = [];
   trashed = false;
+  staleAction = false;
+  missing = false;
   vi.spyOn(toast, 'success');
   vi.stubGlobal(
     'fetch',
@@ -78,6 +85,10 @@ beforeEach(() => {
       const method = init?.method ?? 'GET';
       calls.push({ url, method });
       if (method !== 'GET') {
+        if (staleAction) {
+          missing = true;
+          return json({ detail: 'Article not found.' }, 404);
+        }
         if (url.endsWith('/trash')) trashed = true;
         return new Response(null, { status: 204 });
       }
@@ -85,7 +96,7 @@ beforeEach(() => {
       if (url.includes('/categories') || url.includes('/taxonomy/')) return json({ items: [] });
       if (url.includes('/detail')) return json(article);
       const bin = url.includes('trashed=true');
-      const items = trashed === bin ? [article] : [];
+      const items = !missing && trashed === bin ? [article] : [];
       return json({ items, total: items.length });
     }),
   );
@@ -126,3 +137,18 @@ it('Trash keeps the permanent purge wording and endpoint', async () => {
     { url: '/api/news/articles/7/purge', method: 'DELETE' },
   ]);
 });
+
+it.each(['Restore', 'Delete for good'])(
+  'Trash refetches after stale %s answers 404',
+  async (action) => {
+    trashed = true;
+    staleAction = true;
+    vi.spyOn(toast, 'error');
+    await act(async () => root.render(<Trash />));
+    expect(document.querySelector('[data-testid="trashed-row"]')).not.toBeNull();
+    await click(action);
+    if (action === 'Delete for good') await click(action);
+    expect(document.querySelector('[data-testid="trashed-row"]')).toBeNull();
+    expect(toast.error).toHaveBeenCalledWith('Article not found.');
+  },
+);

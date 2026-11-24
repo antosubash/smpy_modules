@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
+import { updateI18n } from '@simple-module-py/i18n';
 import * as React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import de from '../../../locales/de.json';
 
 import type { CategoryRead } from '../../utils/taxonomyApi';
 import { CategoryRow } from './CategoryRow';
@@ -31,9 +33,13 @@ describe('CategoryRow — rename', () => {
   afterEach(() => {
     act(() => root?.unmount());
     host?.remove();
+    act(() => updateI18n({ locale: 'en', messages: {} }));
   });
 
-  async function mount(onSave: (id: number, name: string, slug: string) => Promise<boolean>) {
+  async function mount(
+    onSave: (id: number, name: string, slug: string) => Promise<boolean>,
+    row = category,
+  ) {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -41,7 +47,7 @@ describe('CategoryRow — rename', () => {
       root?.render(
         <ul>
           <CategoryRow
-            category={category}
+            category={row}
             busy={false}
             dragging={false}
             onSave={onSave}
@@ -67,6 +73,17 @@ describe('CategoryRow — rename', () => {
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
   }
+
+  it('uses the translated system category name in German', async () => {
+    updateI18n({
+      locale: 'de',
+      messages: Object.fromEntries(
+        Object.entries(de.categories).map(([key, value]) => [`news.categories.${key}`, value]),
+      ),
+    });
+    await mount(async () => true, { ...category, name: 'Uncategorised', is_system: true });
+    expect(host?.querySelector('.font-medium')?.textContent).toBe('Ohne Kategorie');
+  });
 
   it('stays in edit mode with the typed name when the rename is refused', async () => {
     const onSave = vi.fn(async () => false);

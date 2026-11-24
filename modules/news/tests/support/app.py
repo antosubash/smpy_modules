@@ -53,6 +53,7 @@ async def _build_app(
 ) -> tuple[FastAPI, Any]:
     module = NewsModule()
     app = FastAPI()
+    module.register_exception_handlers(app)
 
     api_router = APIRouter(prefix=module.meta.route_prefix, tags=[module.meta.name])
     view_router = APIRouter(prefix=module.meta.view_prefix, tags=[module.meta.name])

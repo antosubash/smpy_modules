@@ -7,6 +7,7 @@ import {
   listArticles,
   listCategories,
 } from '../utils/api';
+import { isHttpStatus } from '../utils/http';
 import { useUrlFilters } from './useUrlFilters';
 
 export const PAGE_SIZE = 20;
@@ -89,6 +90,9 @@ export function useArticleList() {
         .then((response) => {
           if (superseded()) return;
           setCategories(response.items);
+          if (filters.category && !response.items.some((c) => c.category === filters.category)) {
+            setFilters({ category: '', offset: 0 });
+          }
         })
         .catch(() => {
           // Deliberately keep the last known list: emptying it unmounts the
@@ -98,7 +102,7 @@ export function useArticleList() {
 
       await Promise.all([rows, cats]);
     },
-    [filters.category, filters.status, filters.locale, debouncedQ],
+    [filters.category, filters.status, filters.locale, debouncedQ, setFilters],
   );
 
   /** Reload from the top. Called on mount and whenever a filter changes. */
@@ -126,6 +130,7 @@ export function useArticleList() {
         // that is about to disappear, and a second action on it answers 404.
         await fetchPage(0, false);
       } catch (e) {
+        if (isHttpStatus(e, 404)) await fetchPage(0, false);
         setError((e as Error).message);
       } finally {
         setBusyId(null);

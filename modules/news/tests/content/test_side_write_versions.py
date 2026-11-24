@@ -53,6 +53,7 @@ async def test_stale_side_write_changes_neither_article_nor_history(editor_clien
     )
     assert response.status_code == 409, response.text
     assert response.json()["detail"] == STALE_DETAIL
+    assert response.json()["code"] == "article_conflict"
     assert (await editor_client.get(f"{url}/detail")).json() == before
     assert (await editor_client.get(f"{url}/revisions")).json() == history
 

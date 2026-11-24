@@ -557,6 +557,7 @@
     "item_language_all": "All languages"
   },
   "errors": {
+    "article_conflict": "This article was changed somewhere else. Reload to get the latest version, then make your change again.",
     "request_failed": "Request failed ({status} {statusText})",
     "request_failed_snippet": "{message}: {snippet}",
     "field_message": "{field}: {message}",
