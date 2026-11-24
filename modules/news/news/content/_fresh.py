@@ -49,12 +49,14 @@ async def ensure_fresh_for_write(
     """
     if expected is None:
         return
-    await db.execute(
+    result = await db.execute(
         update(NewsArticle)
         .where(NewsArticle.id == article.id)
         .values(updated_at=NewsArticle.updated_at)
         .execution_options(synchronize_session=False)
     )
+    if result.rowcount != 1:
+        raise HTTPException(status_code=404, detail="Article not found")
     await db.refresh(article)
     ensure_fresh(article, expected)
 

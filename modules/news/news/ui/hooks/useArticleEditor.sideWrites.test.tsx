@@ -14,7 +14,7 @@ import {
   STALE,
   setStatus,
   setVersion,
-} from './articleEditorTestSupport';
+} from './articleEditor-test-support';
 
 const actions = [
   'Save search settings',

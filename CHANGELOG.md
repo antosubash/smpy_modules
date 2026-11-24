@@ -16,8 +16,9 @@ name the module they affect.
   version under the article lock, so side writes cannot mask concurrent edits
   to inspector fields (#444).
 
-- News registers its content-bundle section once per app, so restarting the same
-  app lifespan works while conflicting section names still fail loudly (#447).
+- News registers its content-bundle section once per registry, so restarting the
+  same app lifespan works and rebuilding the registry registers it again, while
+  conflicting section names still fail loudly (#447).
 
 ### Added
 

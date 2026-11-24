@@ -91,7 +91,16 @@ class ArticleTranslationCreate(NoNul):
     _title = field_validator("title")(_guards.clean_title)
 
 
-class ArticleUpdate(NoNul):
+class ArticleWriteVersion(NoNul):
+    """Optional base for article writes; omitted keeps legacy clients working."""
+
+    expected_updated_at: datetime | None = None
+    """The ``updated_at`` this edit was made against. When sent and it differs
+    from the stored one the write is refused with a 409; omitted, the write
+    goes through as before."""
+
+
+class ArticleUpdate(ArticleWriteVersion):
     """The listing metadata, and the article's identity and SEO.
 
     Every field is optional and only the ones actually sent are applied, so the
@@ -120,11 +129,6 @@ class ArticleUpdate(NoNul):
     index_in_search: bool | None = None
     json_ld: dict[str, Any] | None = None
 
-    expected_updated_at: datetime | None = None
-    """The ``updated_at`` this edit was made against. When sent and it differs
-    from the stored one the write is refused with a 409; omitted, the write
-    goes through as before."""
-
     _display_date = field_validator("published_at")(as_display_date)
     """Truncate to the calendar day as sent — see ``news.content.display_date``."""
     _title = field_validator("title")(_guards.clean_title)
@@ -144,7 +148,7 @@ class ArticleUpdate(NoNul):
         return self
 
 
-class ArticleBodyUpdate(NoNul):
+class ArticleBodyUpdate(ArticleWriteVersion):
     """An autosave from the block canvas.
 
     Its own DTO, and its own endpoint, because it fires on a timer rather than
@@ -153,15 +157,6 @@ class ArticleBodyUpdate(NoNul):
     """
 
     draft_data: dict[str, Any] = Field(default_factory=dict)
-    expected_updated_at: datetime | None = None
-    """See ``ArticleUpdate.expected_updated_at``."""
-
-
-class ArticleWriteVersion(NoNul):
-    """Optional base for workflow and revision writes; omitted keeps legacy behaviour."""
-
-    expected_updated_at: datetime | None = None
-    """See ``ArticleUpdate.expected_updated_at``."""
 
 
 class RejectRequest(ArticleWriteVersion):

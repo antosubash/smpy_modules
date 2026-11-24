@@ -13,7 +13,7 @@ import {
   save,
   setReject,
   setVersion,
-} from './articleEditorTestSupport';
+} from './articleEditor-test-support';
 
 it.each(['Save search settings', 'Save schedule'])(
   '%s then main Save sends the returned version and keeps unsaved edits',

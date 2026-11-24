@@ -3,7 +3,9 @@
 import asyncio
 
 import pytest
-from news.content._fresh import STALE_DETAIL
+from fastapi import HTTPException
+from news.content._fresh import STALE_DETAIL, ensure_fresh_for_write
+from news.content.articles import ArticlesService
 
 from tests.content.test_article_write_races import racing_client as racing_client
 from tests.content.test_side_write_versions import CASES, prepare
@@ -29,3 +31,17 @@ async def test_only_one_writer_can_use_a_base_version(racing_client, action):
         assert detail["status"] == base["status"]
     else:
         assert detail["title"] == ("Headline A" if action == "revision" else base["title"])
+
+
+async def test_deleted_article_before_version_lock_returns_404(racing_client):
+    url, _, _, _, base = await prepare(racing_client, "seo")
+    article_id = base["id"]
+    factory = racing_client.db_state.session_factory
+    async with factory() as writer, factory() as remover:
+        article = await ArticlesService(writer).get_article(article_id)
+        await ArticlesService(remover).purge(article_id)
+        await remover.commit()
+        with pytest.raises(HTTPException) as missing:
+            await ensure_fresh_for_write(writer, article, article.updated_at)
+        assert missing.value.status_code == 404
+    assert (await racing_client.get(f"{url}/detail")).status_code == 404
