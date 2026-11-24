@@ -32,12 +32,10 @@ from simple_module_db import is_valid_tenant_id, tenant_context
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder.content import site_nav
-from pagebuilder.content.layout_service import LayoutService, public_layout_props
 from pagebuilder.core.settings import PagebuilderSettings
+from pagebuilder.web._public_frame import public_frame
 from pagebuilder.web.endpoints.public_not_found import NOT_FOUND_DETAIL
 from pagebuilder.web.endpoints.public_not_found import render_not_found as _render
-from pagebuilder.web.public_copy import public_copy
 
 __all__ = ["NOT_FOUND_DETAIL", "TenantMismatchError", "layout_props", "render_not_found"]
 
@@ -110,8 +108,4 @@ async def layout_props(
     if not isinstance(settings, PagebuilderSettings) or tenant_id is None:
         return {}
     with tenant_context(tenant_id):
-        return {
-            **public_layout_props(await LayoutService(db).get()),
-            "site_nav": await site_nav.site_nav(db, settings.public_route_prefix, locale),
-            "copy": public_copy(locale),
-        }
+        return await public_frame(db, settings, locale)
