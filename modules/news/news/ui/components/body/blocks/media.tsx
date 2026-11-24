@@ -1,10 +1,9 @@
 /**
  * Pictures and embeds.
  *
- * Every image here is addressed by URL rather than picked from a library: the
- * library belongs to pagebuilder, and these have to render on a host that never
- * installed it. Where that module *is* installed, its picker hands out exactly
- * this — a URL to paste.
+ * Every image is stored as a URL so these blocks render on a host without
+ * pagebuilder. The article editor adds its optional library picker to Image's
+ * URL field in `../mediaPickerConfig.tsx`; this shared config stays standalone.
  *
  * The single-URL fields show what the address points at as it is typed (see
  * `./imageUrlField.tsx`). That is not the picker and does not close the gap;
@@ -31,7 +30,7 @@ export interface ImageProps {
 export const ImageBlock: ComponentConfig<ImageProps> = {
   label: keys.news.blocks.image.label,
   fields: {
-    // A URL, still — see `./imageUrlField.tsx` and the README's known gaps.
+    // A URL, still — the editor's optional picker stores the same value.
     // The field shows what the address points at, so a typo is caught where it
     // was made rather than on the published page.
     url: imageUrlField(keys.news.blocks.image.url),

@@ -173,6 +173,9 @@
     "save": "Save schedule",
     "saved_toast": "Schedule saved"
   },
+  "media_picker": {
+    "browse": "Choose from media library"
+  },
   "seo": {
     "heading": "Search & sharing",
     "saving": "Saving…",

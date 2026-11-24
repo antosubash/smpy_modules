@@ -17,8 +17,10 @@ from news.core.settings import active, public_article_path
 from news.core.tenancy import bind_admin
 from news.integrations.pagebuilder import public_layout_props
 from news.models import ArticleStatus, NewsArticle
+from news.web.endpoints._media_picker import media_picker_allowed
 from news.web.endpoints.api._deps import may_see_drafts
 from news.web.endpoints.public._render import render_article
+from news.web.endpoints.public._urls import public_base_url
 
 # The token the API's CSRF check wants (#110) is the framework's ``csrfToken``
 # shared prop, on every signed-in page (#342).
@@ -121,7 +123,7 @@ async def category_list(inertia: InertiaDep) -> InertiaResponse:
     response_model=None,
     dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
 )
-async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaResponse:
+async def article_editor(article_id: int, inertia: InertiaDep, request: Request) -> InertiaResponse:
     """Everything about an article except its body.
 
     The body has a canvas of its own next door, because the two are edited in
@@ -137,12 +139,11 @@ async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaRespons
         constants._PAGE_ARTICLE_EDITOR,
         {
             "article_id": article_id,
+            "media_picker": await media_picker_allowed(request),
             # Served rather than assembled in the browser, for the same reason
             # ``edit_url`` is on the listing DTO: this screen holds no opinion
             # about how the module routes its own screens.
-            "preview_url": constants.ARTICLE_PREVIEW_URL.format(
-                article_id=article_id
-            ),
+            "preview_url": constants.ARTICLE_PREVIEW_URL.format(article_id=article_id),
             **_locale_props(),
         },
     )
@@ -153,7 +154,7 @@ async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaRespons
     response_model=None,
     dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
 )
-async def article_body(article_id: int, inertia: InertiaDep) -> InertiaResponse:
+async def article_body(article_id: int, inertia: InertiaDep, request: Request) -> InertiaResponse:
     """The block canvas an article's body is composed in.
 
     This route is the visible half of the split: it used to be a pagebuilder
@@ -165,7 +166,8 @@ async def article_body(article_id: int, inertia: InertiaDep) -> InertiaResponse:
     document twice on every load.
     """
     return await inertia.render(
-        constants._PAGE_ARTICLE_BODY, {"article_id": article_id}
+        constants._PAGE_ARTICLE_BODY,
+        {"article_id": article_id, "media_picker": await media_picker_allowed(request)},
     )
 
 
@@ -206,16 +208,11 @@ def _preview_state(article: NewsArticle) -> dict[str, Any]:
     timestamp, too: an autosave that restored the previous text moves
     ``updated_at`` and leaves the document identical.
     """
-    live = (
-        article.status is ArticleStatus.PUBLISHED and article.published_data is not None
-    )
+    live = article.status is ArticleStatus.PUBLISHED and article.published_data is not None
     return {
         "status": article.status.value,
-        "has_unpublished_changes": live
-        and article.draft_data != article.published_data,
-        "live_url": (
-            public_article_path(article.slug, article.locale) if live else None
-        ),
+        "has_unpublished_changes": live and article.draft_data != article.published_data,
+        "live_url": (public_article_path(article.slug, article.locale) if live else None),
         "editor_url": constants.ARTICLE_EDITOR_URL.format(article_id=article.id),
     }
 
@@ -251,12 +248,14 @@ async def article_preview(
     German article could be requested through an English prefix on.
     """
     article = await ArticlesService(db).get_article(article_id)
+    settings = active()
     response = await render_article(
         inertia,
+        base=public_base_url(request, settings),
         article=article,
         data=article.draft_data or {},
         locale=article.locale,
-        settings=active(),
+        settings=settings,
         # No canonical link and no ``hreflang``: a permission-gated URL should
         # claim to be the canonical version of nothing, and every translation
         # it could advertise is an address it is not reachable at. See

@@ -55,6 +55,7 @@ __all__ = [
     "available",
     "may_read",
     "media_library_path",
+    "mounted",
     "page_editor_path",
     "page_search_path",
     "public_layout_props",
@@ -125,6 +126,19 @@ def page_search_path(query: str) -> str:
 
 
 # ── The two optional search sections ──────────────────────────────────
+
+
+def mounted(app: Any) -> bool:
+    """Whether pagebuilder is mounted on *app*, not merely installed beside it.
+
+    An installed package the host never mounted has no media API to browse, so
+    a picker offered on the strength of :func:`available` alone opens onto a 404.
+    """
+    if not available():
+        return False
+    from pagebuilder.contracts import cards
+
+    return cards.mounted(app)
 
 
 def may_read(held: Collection[str]) -> bool:

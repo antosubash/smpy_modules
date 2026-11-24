@@ -5,6 +5,8 @@ export interface FileItem {
   url: string;
   /** What the picker shows and announces for the file (its original name). */
   name?: string;
+  /** Description carried by the library, for an empty image alt field. */
+  altText?: string;
 }
 
 export interface FilePickerAdapter {

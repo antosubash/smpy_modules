@@ -2,8 +2,8 @@
  * Registers the news blocks (`NewsFeed`, `NewsStats`) into pagebuilder's
  * palette — where pagebuilder is there to have one.
  *
- * This file, and the `NewsFeed` and `NewsStats` components it pulls in, are the
- * *only* three places in this module's frontend allowed to import `@simple-module-py/
+ * This file, and the contributed blocks it pulls in, are the only entry into
+ * optional pagebuilder UI (including the article media picker). They import `@simple-module-py/
  * pagebuilder`. Everything else — the admin list, the editors, the public
  * article viewer — has to work on a host that never installed it, which is what
  * the split was for. `test_module.py` guards the equivalent rule on the Python
@@ -29,14 +29,32 @@
  * not demand it of a host that never installs it.
  */
 
-import { PublicSiteLayout, registerPuckBlocks } from '@simple-module-py/pagebuilder';
+import {
+  FileGallery,
+  mediaLibraryAdapter,
+  PublicSiteLayout,
+  registerPuckBlocks,
+} from '@simple-module-py/pagebuilder';
 
+import { createElement } from 'react';
+
+import { registerMediaPicker } from './ui/components/media/MediaPicker';
 import { NewsFeedBlock } from './ui/components/NewsFeed';
 import { NewsStatsBlock } from './ui/components/NewsStats';
 import { registerPublicLayout } from './ui/components/PublicLayout';
 import { keys } from './ui/utils/i18n';
 
 registerPublicLayout(PublicSiteLayout);
+
+// Browsing needs only pagebuilder read access; uploads keep their own stricter gate.
+registerMediaPicker(({ open, onClose, onSelect }) =>
+  createElement(FileGallery, {
+    adapter: mediaLibraryAdapter,
+    open,
+    onClose,
+    onSelect: (url, item) => onSelect({ url, altText: item.altText }),
+  }),
+);
 
 try {
   registerPuckBlocks({

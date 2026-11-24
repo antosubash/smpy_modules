@@ -30,13 +30,12 @@ from news.content import redirects, service
 from news.content.articles import ArticlesService
 from news.core import locales, tenancy
 from news.core.safe_url import canonical_or_none
-from news.core.settings import NewsSettings, active, public_article_path
+from news.core.settings import active, public_article_path
 from news.core.tenancy import bind_public_viewer
 from news.integrations.pagebuilder import public_layout_props
 from news.web.endpoints.public._not_found import not_found
 from news.web.endpoints.public._render import render_article
 from news.web.endpoints.public._urls import (
-    absolute_article,
     apply_cache,
     etag_for,
     public_base_url,
@@ -45,9 +44,7 @@ from news.web.endpoints.public._urls import (
 )
 
 
-async def alternates(
-    db: AsyncSession, request: Request, settings: NewsSettings, group: str | None
-) -> list[dict[str, str]]:
+async def alternates(db: AsyncSession, base: str, group: str | None) -> list[dict[str, str]]:
     """``hreflang`` entries for every *published* article in the group.
 
     Only published ones — ``list_articles`` without ``include_drafts`` is
@@ -80,7 +77,6 @@ async def alternates(
     )
     if len(siblings) < 2:
         return []
-    base = public_base_url(request, settings)
     entries = [{"locale": item.locale, "url": f"{base}{item.url}"} for item in siblings]
     # x-default names the version to serve someone whose language nobody
     # matched. The site's own default is the only defensible answer.
@@ -141,11 +137,16 @@ def article_router(locale: str) -> APIRouter:
             return await not_found(request, inertia, db, locale=locale, tenant=tenant)
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
+        base = public_base_url(request, settings)
         layout = await public_layout_props(request, db, locale=locale, tenant_id=tenant)
         # Chrome and flagged nav pages change independently of the article.
         frame_key = json.dumps(layout, sort_keys=True) if layout else ""
+        # Relative share images follow this origin even with a syndicated canonical.
         etag = etag_for(
-            article.id or 0, article.updated_at, variant, viewer_key(request) + frame_key
+            article.id or 0,
+            article.updated_at,
+            f"{variant}:{base}",
+            viewer_key(request) + frame_key,
         )
         # A signed-in copy is never kept, so it gets no validator and no 304.
         reader_signed_in = signed_in(request)
@@ -167,10 +168,10 @@ def article_router(locale: str) -> APIRouter:
         if not reader_signed_in and request.headers.get("if-none-match") == etag:
             return apply_headers(Response(status_code=304))
 
-        canonical = canonical_or_none(article.canonical_url) or absolute_article(
-            request, settings, slug, locale
+        canonical = canonical_or_none(article.canonical_url) or (
+            f"{base}{public_article_path(slug, locale)}"
         )
-        siblings = await alternates(db, request, settings, article.translation_group)
+        siblings = await alternates(db, base, article.translation_group)
         # Everything from here is shared with the authenticated preview — see
         # `_render`. The one thing that is not shared is the argument below:
         # this route serves the published snapshot, never the draft, which is
@@ -178,6 +179,7 @@ def article_router(locale: str) -> APIRouter:
         return apply_headers(
             await render_article(
                 inertia,
+                base=base,
                 article=article,
                 data=article.published_data,
                 locale=locale,
