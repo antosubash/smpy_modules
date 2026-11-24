@@ -14,6 +14,10 @@ name the module they affect.
 
 ### Added
 
+- **news: reusable public metadata** (#446). `ArticleHead`, `ArchiveHead`, their
+  prop types and `safeJsonLd` are exported from `@simple-module-py/news` so host
+  page replacements keep the stock metadata and JSON-LD escaping.
+
 - **pagebuilder: reusable public layout** (#443). A tenant-bound
   `contracts.public.layout_props` and lazy `PublicSiteLayout` package-root export
   let sibling reader pages reuse the site's header, navigation and footer.

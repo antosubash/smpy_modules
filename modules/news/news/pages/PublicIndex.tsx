@@ -1,5 +1,4 @@
-import { Head } from '@inertiajs/react';
-
+import { ArchiveHead } from '../ui/components/ArchiveHead';
 import { ArchiveSearch } from '../ui/components/ArchiveSearch';
 import { PublicLayout, type PublicLayoutProps } from '../ui/components/PublicLayout';
 import { useDocumentLang } from '../ui/hooks/useDocumentLang';
@@ -69,16 +68,7 @@ export default function PublicIndex({
       site_nav={site_nav}
       copy={layoutCopy}
     >
-      <Head title={query ? t(copy.title_with_query, { query, heading }) : heading}>
-        {/* Results pages stay out of the index: the input space is unbounded,
-            so one indexed `?q=` link invites a crawler to enumerate query
-            strings forever, and every result page is a rearrangement of
-            articles already indexed at their own addresses. `follow`, though —
-            the links out of it are the real documents. The server writes the
-            same tag into the head for the crawler that never runs this script;
-            see `endpoints/public/_head.py`. */}
-        {query && <meta name="robots" content="noindex,follow" />}
-      </Head>
+      <ArchiveHead heading={heading} query={query} />
 
       <div className="mx-auto max-w-2xl px-4 py-12">
         <header className="mb-10">

@@ -298,3 +298,40 @@ Frame queries bind the request's resolved tenant through
 response's tenant/cache policy; article ETags include the layout and nav so
 editing either invalidates a cached article. Related stories stay in the
 article's content locale and exclude its slug and translation group.
+
+The same package root exports the stock metadata components and their types:
+
+| Export | Props / behavior |
+|---|---|
+| `ArticleHead`, `ArticleHeadProps` | `title`, nullable `meta_description` and `og_image`; optional `canonical_url`, `og_url`, `site_name`, `twitter_handle`, `published_at`, `author`, `category`, `index_in_search` (defaults to `true`), and `json_ld`. Keeps the stock title, description, article OG/Twitter tags, canonical, robots and escaped JSON-LD. |
+| `ArchiveHead`, `ArchiveHeadProps` | `heading`, optional `query` (defaults to `''`). Keeps the stock title; a search emits `noindex,follow`. |
+| `safeJsonLd(document)` | Serializes a JSON object and escapes every `<` as `\u003c`, preventing script termination while preserving the original JSON values. `ArticleHead` already uses it. |
+
+For example, a replacement for `News/PublicArticle` keeps its head and frame
+while drawing its own reading column:
+
+```tsx
+import {
+  ArticleHead, type ArticleHeadProps,
+  PublicLayout, type PublicLayoutProps,
+} from '@simple-module-py/news';
+
+type Props = ArticleHeadProps & PublicLayoutProps;
+
+export default function BrandedArticle(props: Props) {
+  return (
+    <PublicLayout {...props}>
+      <ArticleHead {...props} />
+      <article className="my-reading-column">
+        <h1>{props.title}</h1>
+        {/* Render the server's `data` with your host's article body here. */}
+      </article>
+    </PublicLayout>
+  );
+}
+```
+
+A replaced index can likewise render `<ArchiveHead heading={heading}
+query={query} />` inside `<PublicLayout {...props}>`. The stock pages use these
+same components; replacing a page no longer requires copying its metadata
+implementation. The server's HTML head remains unchanged.
