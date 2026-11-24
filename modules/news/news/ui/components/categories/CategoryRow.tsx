@@ -115,6 +115,11 @@ export function CategoryRow({
                 ? t(keys.news.categories.system)
                 : `/admin/news/?category=${category.slug}`}
             </p>
+            {!managed && !category.is_system && (
+              <p className="text-xs text-muted-foreground">
+                {t(keys.news.categories.unmanaged_help)}
+              </p>
+            )}
           </>
         )}
       </div>

@@ -181,7 +181,7 @@ Slugs, categories, tags and redirects are unique per tenant.
 
 **Move to trash** is a soft delete (`deleted_at`); the URL stays claimed and
 **Restore** brings the article back as it was. **Delete for good** (purge)
-and **Delete** remove the row together with its revisions, redirects and tag
+and the API-only `DELETE /api/news/articles/{id}` remove the row together with its revisions, redirects and tag
 links.
 Trash is never emptied automatically. Deleting a category moves its articles,
 it never deletes them.

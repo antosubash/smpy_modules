@@ -38,8 +38,8 @@ article whose draft has moved on since it was published is also marked
 Click the category/date value to edit both inline (**Save** / **Cancel**).
 **Edit** opens the article screen; the **···** menu offers **Publish now**
 (drafts), **View on the site** (published), **Edit the body**, **Edit category
-and date**, and either **Move to trash** or, if you hold `news.publish`,
-**Delete** (permanent).
+and date**, and **Move to trash**. Trashed articles can be restored from
+**News → Trash**.
 
 ### Creating an article
 
@@ -139,8 +139,9 @@ into the draft. It does not publish.
 
 ### Deleting
 
-At the bottom: **Move article to trash** if you hold `news.edit` only, or
-**Delete article** (permanent) instead if you also hold `news.publish`.
+At the bottom, **Move article to trash** takes the article off the public site
+and moves it to **News → Trash**, where it can be restored. This is the same
+recoverable action for authors and publishers.
 
 ## The body canvas (`/admin/news/articles/{id}/body`)
 
@@ -173,7 +174,9 @@ be **Rename**d (name and slug; renaming carries its articles with it) and
 dragged to set the order of the public filter. **Delete** asks **Move its
 articles to** another category or **Uncategorised**; no article is deleted.
 **Uncategorised** is a system row that cannot be renamed or deleted. A
-category typed on an article but never added here shows with **Add to list**.
+category typed on an article but never added here shows **Manage category**.
+Click it to enable Rename, Delete and ordering for that category; its articles
+are kept. Article counts do not hide these controls on a managed category.
 
 **Tags** on the same screen: **Find or create a tag**, or select two chips and
 **Merge** (the second one selected is folded into the first and removed).
@@ -184,7 +187,10 @@ Renaming and deleting a tag are API-only (see the API reference).
 Binned articles are off the public site and out of every list, but keep their
 URL claimed so nothing else can take it. **Restore** puts one back exactly as
 it was, status included. **Delete for good** (`news.publish` only) removes the
-article, its body, tags and redirects permanently and frees its URL.
+article, its body, tags and redirects permanently and frees its URL. This cannot
+be undone. While an article is trashed the scheduler skips it. Restore clears
+schedule times that have elapsed and retains future times; restoring a
+previously published article makes it public again.
 
 ## Search everything (`/admin/search`)
 

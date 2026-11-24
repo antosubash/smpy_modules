@@ -5,12 +5,13 @@ import { Skeleton } from '@simple-module-py/ui/components/ui/skeleton';
 import { AuthenticatedLayout } from '@simple-module-py/ui/layouts/AuthenticatedLayout';
 import type { SharedProps } from '@simple-module-py/ui/types';
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 import { ArticleFilters } from '../ui/components/ArticleFilters';
 import { ArticleRow } from '../ui/components/ArticleRow';
 import { NewArticleDialog } from '../ui/components/NewArticleDialog';
 import { useArticleList } from '../ui/hooks/useArticleList';
-import { deleteArticle, publishArticle, trashArticle, updateArticle } from '../ui/utils/api';
+import { publishArticle, trashArticle, updateArticle } from '../ui/utils/api';
 import { keys, useT } from '../ui/utils/i18n';
 
 const CATEGORY_SUGGESTIONS_ID = 'news-category-suggestions';
@@ -61,9 +62,6 @@ export default function NewsList() {
     LocaleProps;
   const { auth } = props;
   const canEdit = auth?.permissions?.includes('news.edit');
-  // Hard delete needs `news.publish` too — see `ArticleRow`. Without it a
-  // row offers the recoverable trash instead.
-  const canPublish = auth?.permissions?.includes('news.publish') ?? false;
   const locales = props.locales ?? [];
   const defaultLocale = props.default_locale ?? 'en';
 
@@ -179,12 +177,15 @@ export default function NewsList() {
               article={article}
               busy={busyId === article.id || busy || !canEdit}
               suggestionsId={CATEGORY_SUGGESTIONS_ID}
-              canPublish={canPublish}
               onSave={(id, category, publishedAt) =>
                 runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
               }
-              onDelete={(id) => runRow(id, () => deleteArticle(id))}
-              onTrash={(id) => runRow(id, () => trashArticle(id))}
+              onTrash={(id) =>
+                runRow(id, async () => {
+                  await trashArticle(id);
+                  toast.success(t(keys.news.trash.moved_toast));
+                })
+              }
               onPublish={(target) => runRow(target.id, () => publishArticle(target.id))}
             />
           ))}

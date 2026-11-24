@@ -21,12 +21,7 @@ interface Props {
   busy: boolean;
   /** id of a <datalist> of existing category names, offered while typing. */
   suggestionsId?: string;
-  /** Whether the viewer holds `news.publish`. Hard delete needs it — the
-   *  same pair the backend requires for `purge` — so a `news.edit`-only
-   *  author gets the recoverable `onTrash` instead of a button that 403s. */
-  canPublish: boolean;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
-  onDelete: (id: number) => Promise<unknown>;
   onTrash: (id: number) => Promise<unknown>;
   onPublish: (article: ArticleRead) => Promise<unknown>;
 }
@@ -38,16 +33,7 @@ interface Props {
  *  the thing this list exists to avoid — the body is edited in pagebuilder, so
  *  if these two fields also needed a round trip the list would have no job.
  */
-export function ArticleRow({
-  article,
-  busy,
-  suggestionsId,
-  canPublish,
-  onSave,
-  onDelete,
-  onTrash,
-  onPublish,
-}: Props) {
+export function ArticleRow({ article, busy, suggestionsId, onSave, onTrash, onPublish }: Props) {
   const { t, locale } = useT();
   const row = keys.news.row;
   const [editing, setEditing] = useState(false);
@@ -225,13 +211,7 @@ export function ArticleRow({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <ArticleRowDelete
-          article={article}
-          busy={busy}
-          canPublish={canPublish}
-          onDelete={onDelete}
-          onTrash={onTrash}
-        />
+        <ArticleRowDelete article={article} busy={busy} onTrash={onTrash} />
       </div>
     </li>
   );

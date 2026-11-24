@@ -56,9 +56,6 @@
     "view_on_site": "View on the site",
     "edit_body": "Edit the body",
     "edit_category_date_action": "Edit category and date",
-    "delete_title": "Delete \"{title}\"?",
-    "delete_description": "The article and its body are removed, and its public URL stops working. This cannot be undone from here.",
-    "delete_confirm": "Delete",
     "trash_title": "Move \"{title}\" to trash?",
     "trash_description": "It comes off the public site and out of this list. Restore it from Trash to put it back exactly as it was — trashing does not free its URL for reuse.",
     "trash_confirm": "Move to trash"
@@ -101,10 +98,6 @@
     "body_card_title": "The body has its own canvas",
     "body_card_description": "Blocks, autosave and revision history live there. This screen owns everything else — category, tags, display date, byline and how the article behaves in feeds.",
     "edit_body": "Edit the body",
-    "delete_title": "Delete “{title}”?",
-    "delete_description": "The article, its body and its tags are removed, and its public URL stops working. This cannot be undone from here.",
-    "delete_confirm": "Delete",
-    "delete_trigger": "Delete article",
     "trash_title": "Move “{title}” to trash?",
     "trash_description": "It comes off the public site and out of the list. Restore it from Trash to put it back exactly as it was — trashing does not free its URL for reuse.",
     "trash_confirm": "Move to trash",
@@ -256,7 +249,8 @@
     "save": "Save",
     "cancel": "Cancel",
     "rename": "Rename",
-    "adopt": "Add to list",
+    "adopt": "Manage category",
+    "unmanaged_help": "This category was entered on an article. Enable category management to rename, delete or reorder it.",
     "delete_title": "Delete \"{name}\"?",
     "delete_empty": "The category is empty, so nothing moves. The public filter loses one entry.",
     "delete_moving_one": "{count} article will move to {destination}. Nothing is deleted with the category — the articles keep their body, slug and date.",
@@ -288,6 +282,7 @@
     "delete_confirm": "Delete tag"
   },
   "trash": {
+    "moved_toast": "Article moved to Trash. You can restore it there.",
     "title": "Trash",
     "description": "Articles you have deleted. Restoring puts one back exactly as it was.",
     "back_to_list": "News / Articles",

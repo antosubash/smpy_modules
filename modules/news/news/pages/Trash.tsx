@@ -32,9 +32,7 @@ export default function Trash() {
   const { t, locale } = useT();
   const copy = keys.news.trash;
   const { auth } = usePage<{ props: SharedProps }>().props as unknown as SharedProps;
-  // Purge needs `news.publish` on the backend, the same pair a hard delete
-  // needs — see ArticleRow and ArticleEditor. Restore does not: it is
-  // `news.edit` alone, so it stays available below with no gate of its own.
+  // Permanent purge needs `news.publish`; recoverable restore needs `news.edit`.
   const canPublish = auth?.permissions?.includes('news.publish') ?? false;
 
   const [items, setItems] = useState<ArticleRead[] | null>(null);

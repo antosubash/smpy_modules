@@ -56,9 +56,6 @@
     "view_on_site": "Auf der Website ansehen",
     "edit_body": "Inhalt bearbeiten",
     "edit_category_date_action": "Kategorie und Datum bearbeiten",
-    "delete_title": "„{title}“ löschen?",
-    "delete_description": "Der Artikel und sein Inhalt werden entfernt, und seine öffentliche URL funktioniert nicht mehr. Das lässt sich hier nicht rückgängig machen.",
-    "delete_confirm": "Löschen",
     "trash_title": "„{title}“ in den Papierkorb verschieben?",
     "trash_description": "Der Artikel verschwindet von der öffentlichen Website und aus dieser Liste. Stellen Sie ihn aus dem Papierkorb wieder her, um ihn genau so zurückzuholen, wie er war – das Verschieben in den Papierkorb gibt seine URL nicht zur Wiederverwendung frei.",
     "trash_confirm": "In den Papierkorb verschieben"
@@ -101,10 +98,6 @@
     "body_card_title": "Der Inhalt hat eine eigene Arbeitsfläche",
     "body_card_description": "Blöcke, Autospeichern und Versionsverlauf finden Sie dort. Diese Ansicht verwaltet alles andere – Kategorie, Schlagwörter, Anzeigedatum, Autorenzeile und das Verhalten des Artikels in Feeds.",
     "edit_body": "Inhalt bearbeiten",
-    "delete_title": "„{title}“ löschen?",
-    "delete_description": "Der Artikel, sein Inhalt und seine Schlagwörter werden entfernt, und seine öffentliche URL funktioniert nicht mehr. Das lässt sich hier nicht rückgängig machen.",
-    "delete_confirm": "Löschen",
-    "delete_trigger": "Artikel löschen",
     "trash_title": "„{title}“ in den Papierkorb verschieben?",
     "trash_description": "Der Artikel verschwindet von der öffentlichen Website und aus der Liste. Stellen Sie ihn aus dem Papierkorb wieder her, um ihn genau so zurückzuholen, wie er war – das Verschieben in den Papierkorb gibt seine URL nicht zur Wiederverwendung frei.",
     "trash_confirm": "In den Papierkorb verschieben",
@@ -256,7 +249,8 @@
     "save": "Speichern",
     "cancel": "Abbrechen",
     "rename": "Umbenennen",
-    "adopt": "Zur Liste hinzufügen",
+    "adopt": "Kategorie verwalten",
+    "unmanaged_help": "Diese Kategorie wurde in einem Artikel eingegeben. Aktivieren Sie die Kategorieverwaltung, um sie umzubenennen, zu löschen oder neu zu ordnen.",
     "delete_title": "„{name}“ löschen?",
     "delete_empty": "Die Kategorie ist leer, daher wird nichts verschoben. Im öffentlichen Filter entfällt ein Eintrag.",
     "delete_moving_one": "{count} Artikel wird nach {destination} verschoben. Mit der Kategorie wird nichts gelöscht – die Artikel behalten Inhalt, Slug und Datum.",
@@ -288,6 +282,7 @@
     "delete_confirm": "Schlagwort löschen"
   },
   "trash": {
+    "moved_toast": "Artikel in den Papierkorb verschoben. Sie können ihn dort wiederherstellen.",
     "title": "Papierkorb",
     "description": "Artikel, die Sie gelöscht haben. Beim Wiederherstellen kommt ein Artikel genau so zurück, wie er war.",
     "back_to_list": "News / Artikel",

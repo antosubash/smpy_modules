@@ -61,7 +61,6 @@ export default function ArticleEditor() {
     patch,
     save,
     publish,
-    remove,
     trash,
   } = useArticleEditor(article_id);
 
@@ -162,11 +161,6 @@ export default function ArticleEditor() {
             title={article.title}
             isPublished={isPublished}
             busy={busy}
-            canPublish={canPublish}
-            onDelete={async () => {
-              await remove();
-              router.visit('/admin/news/');
-            }}
             onTrash={async () => {
               await trash();
               router.visit('/admin/news/');

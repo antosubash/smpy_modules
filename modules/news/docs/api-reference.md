@@ -141,8 +141,14 @@ change the slug, the status or the published snapshot.
 `approve` or `reject`. Restoring copies the revision's body, title, summary
 and image into the draft and does not publish.
 
-**Trash** keeps the slug claimed. **Restore** leaves the status as it was and
-clears any schedule time that elapsed while trashed.
+**Trash** (`POST /articles/{id}/trash`, `news.edit`) is the admin list and
+editor's removal action. It hides the article immediately, keeps the slug
+claimed and preserves redirects. The scheduler skips trashed articles.
+**Restore** leaves the status as it was (a previously published article is live
+again), clears elapsed schedule times and keeps future times. **Delete for good**
+on the Trash screen uses `DELETE /articles/{id}/purge` with both permissions.
+The existing `DELETE /articles/{id}` remains a permanent delete for API clients;
+its meaning and permissions are unchanged.
 
 ## Publishing — `news.edit` + `news.publish`
 

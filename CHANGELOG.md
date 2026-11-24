@@ -5,6 +5,11 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+- News admin removal now moves articles to Trash for authors and publishers,
+  with recovery wording and a confirmation toast; permanent deletion remains
+  on the Trash screen. Categories explain how to enable management for a
+  category entered on an article (#445).
+
 - News keeps the article form version current after search settings, scheduling,
   workflow and revision restores; rejected saves can be corrected and retried
   without a false concurrent-edit conflict (#444).

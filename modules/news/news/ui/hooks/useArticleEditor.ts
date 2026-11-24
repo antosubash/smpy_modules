@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
   type ArticleRead,
-  deleteArticle,
   getArticleDetail,
   publishArticle,
   trashArticle,
@@ -193,13 +192,10 @@ export function useArticleEditor(articleId: number) {
     [acceptWrite, article, fail, guard, t],
   );
 
-  // Hard delete. Requires `news.publish` on the server — see `deleteArticle`
-  // — so the editor screen only offers it to a viewer who has it.
-  const remove = useCallback(() => deleteArticle(articleId), [articleId]);
-
-  // The recoverable door `news.edit` alone keeps open, for a viewer who
-  // cannot hard-delete.
-  const trash = useCallback(() => trashArticle(articleId), [articleId]);
+  const trash = useCallback(async () => {
+    await trashArticle(articleId);
+    toast.success(t(keys.news.trash.moved_toast));
+  }, [articleId, t]);
 
   /** Whether Save would be accepted.
    *
@@ -232,7 +228,6 @@ export function useArticleEditor(articleId: number) {
     patch,
     save,
     publish,
-    remove,
     trash,
   };
 }

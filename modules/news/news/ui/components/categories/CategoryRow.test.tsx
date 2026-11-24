@@ -85,3 +85,43 @@ describe('CategoryRow — rename', () => {
     expect(view.inputs()).toHaveLength(0);
   });
 });
+
+it('explains free-text category management and exposes Rename and Delete once adopted', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const adopt = vi.fn();
+  const render = (managed: boolean) =>
+    root.render(
+      <ul>
+        <CategoryRow
+          category={{ ...category, id: managed ? 3 : 0 }}
+          busy={false}
+          dragging={false}
+          onSave={async () => true}
+          onAdopt={adopt}
+          deleteSlot={<button type="button">Delete category</button>}
+          onDragStart={() => {}}
+          onDragOver={() => {}}
+          onDrop={() => {}}
+          onDragEnd={() => {}}
+        />
+      </ul>,
+    );
+  try {
+    await act(async () => render(false));
+    const manage = Array.from(host.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Manage category',
+    );
+    expect(manage).toBeDefined();
+    expect(host.textContent).toContain('rename, delete or reorder');
+    await act(async () => manage?.click());
+    expect(adopt).toHaveBeenCalledWith('Politics');
+    await act(async () => render(true));
+    expect(host.textContent).toContain('Rename');
+    expect(host.textContent).toContain('Delete category');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
