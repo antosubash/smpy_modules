@@ -15,6 +15,7 @@ describe('the package entry', () => {
       'createImageField',
       'isSafeHref',
       'lazyBlock',
+      'localizeFields',
       'mediaLibraryAdapter',
       'registerPuckBlocks',
       'registeredBlocks',
