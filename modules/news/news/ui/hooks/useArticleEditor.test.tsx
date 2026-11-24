@@ -235,3 +235,42 @@ it.each(['Approve', 'Send back'])('review %s refreshes the main form version', a
   });
   expect(lastSave()?.body.expected_updated_at).toBe(SECOND);
 });
+
+it.each([
+  [FIRST, SECOND, 'Newer headline', 'Pending headline'],
+  [FIRST, SECOND, 'Original', 'Original'],
+  ['2026-01-01T00:00:00.000001Z', '2026-01-01T00:00:00.000002Z', 'Newer', 'Pending headline'],
+])(
+  'delayed restore %s after %s with headline %s keeps %s',
+  async (older, newer, title, expected) => {
+    await act(async () => editor.patch({ title: 'Pending headline' }));
+    await act(async () => editor.acceptWrite({ ...article(), updated_at: newer, title }));
+    await act(async () => editor.acceptWrite({ ...article(), updated_at: older }, true));
+    expect(editor.article?.updated_at).toBe(newer);
+    expect(editor.draft?.title).toBe(expected);
+  },
+);
+
+it('tags finishing after a side-card save do not roll the metadata version back', async () => {
+  let finishTags!: (response: Response) => void;
+  vi.mocked(fetch)
+    .mockResolvedValueOnce(json({ ...article(), updated_at: SECOND }))
+    .mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishTags = resolve;
+      }),
+    );
+  await act(async () => editor.patch({ title: 'Pending headline' }));
+  let saving!: Promise<unknown>;
+  await act(async () => {
+    saving = editor.save();
+  });
+  const third = '2026-01-01T00:00:10Z';
+  await act(async () => editor.acceptWrite({ ...article(), updated_at: third }));
+  await act(async () => {
+    finishTags(json(['Saved tag']));
+    await saving;
+  });
+  expect(editor.article?.updated_at).toBe(third);
+  expect(editor.article?.tags).toEqual(['Saved tag']);
+});

@@ -203,10 +203,13 @@ def register_bundle_section(app: Any) -> bool:
     section registry while the app is built, before any ``on_startup``, so
     the order the two modules start in does not matter.
     """
-    if getattr(app.state, "_news_bundle_registered", False):
-        return True
     if not available():
         return False
+    services = getattr(app.state, "pagebuilder", None)
+    registry = getattr(services, "bundle_sections", None)
+    previous = getattr(app.state, "_news_bundle_registered", None)
+    if previous is not None and registry is not None and registry.get(previous.name) is previous:
+        return True
     try:
         from pagebuilder.contracts import bundle
     except ImportError:  # a pagebuilder older than the extra's floor: no bundle contract
@@ -214,8 +217,10 @@ def register_bundle_section(app: Any) -> bool:
 
     from news.integrations.bundle import NewsBundleSection
 
-    registered = bundle.register_section(app, NewsBundleSection())
-    # The registry lives for the app, beyond any single lifespan. Mark only a
-    # successful registration; a different contributor still raises above.
-    app.state._news_bundle_registered = registered
+    section = NewsBundleSection()
+    registered = bundle.register_section(app, section)
+    # Skip only while our own section is still present. A rebuilt registry
+    # needs registration again, including its duplicate-name validation.
+    if registered:
+        app.state._news_bundle_registered = section
     return registered

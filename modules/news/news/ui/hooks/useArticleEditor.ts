@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
@@ -45,6 +45,12 @@ function toDraft(article: ArticleRead): ArticleDraft {
   };
 }
 
+/** Server versions are UTC and retain Python's microsecond precision. */
+function versionKey(iso: string): string {
+  const [seconds, fraction = ''] = iso.replace(/(?:Z|\+00:00)$/, '').split('.');
+  return `${seconds}.${fraction.padEnd(6, '0')}`;
+}
+
 /** Loads one article and saves the whole inspector in a single round trip.
  *
  * The draft is held here rather than per-control so a save is one request. Tags
@@ -55,6 +61,7 @@ function toDraft(article: ArticleRead): ArticleDraft {
 export function useArticleEditor(articleId: number) {
   const { t } = useT();
   const [article, setArticle] = useState<ArticleRead | null>(null);
+  const articleRef = useRef<ArticleRead | null>(null);
   const [draft, setDraft] = useState<ArticleDraft | null>(null);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
@@ -77,6 +84,7 @@ export function useArticleEditor(articleId: number) {
         // missing article answers 404 with its own message.
         const found = await getArticleDetail(articleId, signal);
         if (signal?.aborted) return;
+        articleRef.current = found;
         setArticle(found);
         setDraft(toDraft(found));
         setDirty(false);
@@ -104,10 +112,23 @@ export function useArticleEditor(articleId: number) {
   /** Adopt a write response without discarding unsaved inspector fields.
    * Revision restore deliberately replaces the headline it restored. */
   const acceptWrite = useCallback((updated: ArticleRead, restoreTitle = false) => {
-    setArticle((current) => ({ ...updated, tags: updated.tags ?? current?.tags }));
-    if (restoreTitle) {
+    const current = articleRef.current;
+    // Separate cards can finish out of order; an older response cannot undo a
+    // later write or move the optimistic-concurrency stamp backwards.
+    const older = Boolean(
+      current?.updated_at &&
+        updated.updated_at &&
+        versionKey(updated.updated_at) < versionKey(current.updated_at),
+    );
+    // A later SEO/schedule write can already include this restore's title.
+    // Honor that restore, but never replace a title saved after it.
+    if (restoreTitle && (!older || current?.title === updated.title)) {
       setDraft((current) => (current ? { ...current, title: updated.title } : toDraft(updated)));
     }
+    if (older) return;
+    const next = { ...updated, tags: updated.tags ?? current?.tags ?? [] };
+    articleRef.current = next;
+    setArticle(next);
   }, []);
 
   const patch = useCallback((next: Partial<ArticleDraft>) => {
@@ -165,10 +186,11 @@ export function useArticleEditor(articleId: number) {
         }
         // Every write response refreshes the copy, so the next save is made
         // against what the server now holds.
-        if (updated) setArticle({ ...updated, tags: article.tags });
+        if (updated) acceptWrite(updated);
         try {
           const tags = await setArticleTags(articleId, draft.tags);
-          if (updated) setArticle({ ...updated, tags: tags ?? article.tags });
+          if (updated)
+            acceptWrite({ ...(articleRef.current ?? updated), tags: tags ?? article.tags });
         } catch (e) {
           fail(e);
           return;
@@ -177,7 +199,7 @@ export function useArticleEditor(articleId: number) {
         setSaved(true);
         toast.success(t(keys.news.editor.saved_toast));
       }).catch(fail),
-    [article, articleId, draft, fail, guard, t],
+    [acceptWrite, article, articleId, draft, fail, guard, t],
   );
 
   const publish = useCallback(
