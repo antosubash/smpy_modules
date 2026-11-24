@@ -7,6 +7,10 @@ name the module they affect.
 
 ### Added
 
+- **pagebuilder: reusable public layout** (#443). A tenant-bound
+  `contracts.public.layout_props` and lazy `PublicSiteLayout` package-root export
+  let sibling reader pages reuse the site's header, navigation and footer.
+
 - **events: external calendar subscriptions** (PR 10 of the events module, the last). A calendar
   shows an external `.ics` feed read-only (marked External, plain text, never re-published or
   reminded), added in a Subscriptions dialog. The address is stored encrypted (`enc:v2:`, a fifth

@@ -25,16 +25,21 @@ serving the request. Then there is no site frame to render and this answers
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import Request, Response
 from simple_module_db import is_valid_tenant_id, tenant_context
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder.content import site_nav
+from pagebuilder.content.layout_service import LayoutService, public_layout_props
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.web.endpoints.public_not_found import NOT_FOUND_DETAIL
 from pagebuilder.web.endpoints.public_not_found import render_not_found as _render
+from pagebuilder.web.public_copy import public_copy
 
-__all__ = ["NOT_FOUND_DETAIL", "TenantMismatchError", "render_not_found"]
+__all__ = ["NOT_FOUND_DETAIL", "TenantMismatchError", "layout_props", "render_not_found"]
 
 
 class TenantMismatchError(RuntimeError):
@@ -83,3 +88,30 @@ async def render_not_found(
         return await _render(request, inertia, settings, locale=locale, db=None, detail=detail)
     with tenant_context(tenant_id):
         return await _render(request, inertia, settings, locale=locale, db=db, detail=detail)
+
+
+async def layout_props(
+    request: Request,
+    db: AsyncSession,
+    *,
+    locale: str,
+    tenant_id: str | None,
+) -> dict[str, Any]:
+    """The same public frame as ``/p/*``, for another module's reader pages.
+
+    The caller names the framework-resolved tenant. Bind it here, including
+    layout creation on an empty site; never commit the caller's transaction.
+    No mounted site or no tenant means no props and no database access.
+    ``copy`` is in the content language, independent of the viewer's UI locale.
+    """
+    _check_tenant(request, tenant_id)
+    services = getattr(request.app.state, "pagebuilder", None)
+    settings = getattr(services, "settings", None)
+    if not isinstance(settings, PagebuilderSettings) or tenant_id is None:
+        return {}
+    with tenant_context(tenant_id):
+        return {
+            **public_layout_props(await LayoutService(db).get()),
+            "site_nav": await site_nav.site_nav(db, settings.public_route_prefix, locale),
+            "copy": public_copy(locale),
+        }

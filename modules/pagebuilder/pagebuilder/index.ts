@@ -35,3 +35,6 @@ export type { FileItem, FilePickerAdapter } from './ui/fields';
 export { createImageField, mediaLibraryAdapter } from './ui/fields';
 // Link sanitising, so a contributed block treats URLs as pagebuilder's do.
 export { isSafeHref, safeHref } from './ui/utils/markdown-links';
+// The public frame loads its shared layout palette only when rendered.
+export type { PublicSiteLayoutProps } from './ui/components/public/PublicSiteLayout';
+export { PublicSiteLayout } from './ui/components/public/PublicSiteLayout';
