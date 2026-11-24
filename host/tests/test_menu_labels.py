@@ -9,34 +9,35 @@ registry for German notices that.
 
 from __future__ import annotations
 
+import tomllib
+from pathlib import Path
+
 import pytest
 from simple_module_core.i18n import Translator
 from simple_module_core.menu import MenuItem, MenuRegistry
 from simple_module_hosting import Settings, create_app
 from starlette.requests import Request
 
-# This repo's modules, by the package that defines them — the framework's own
-# entries (Users, Settings, …) are its business, not this test's.
-_OUR_PACKAGES = {
-    "pagebuilder",
-    "news",
-    "sm_records",
-    "sm_ai",
-    "sm_billing",
-    "sm_images",
-    "sm_analytics",
-    "sm_events",
-}
-_OUR_NAMESPACES = (
-    "pagebuilder.",
-    "news.",
-    "records.",
-    "ai.",
-    "billing.",
-    "images.",
-    "analytics.",
-    "events.",
-)
+REPO = Path(__file__).resolve().parents[2]
+
+
+def _repo_entry_points() -> tuple[set[str], tuple[str, ...]]:
+    """Derive package roots and i18n namespaces from ``modules/*/pyproject.toml``."""
+    packages: set[str] = set()
+    namespaces: list[str] = []
+    for path in sorted((REPO / "modules").glob("*/pyproject.toml")):
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        entries = data.get("project", {}).get("entry-points", {}).get("simple_module", {})
+        for ep_name, spec in entries.items():
+            packages.add(spec.split(":", 1)[0].split(".", 1)[0])
+            namespaces.append(f"{ep_name}.")
+    assert packages and namespaces
+    return packages, tuple(sorted(namespaces))
+
+
+# This repo's modules, derived from ``modules/*/pyproject.toml`` entry points —
+# the framework's own entries (Users, Settings, …) are its business, not this test's.
+_OUR_PACKAGES, _OUR_NAMESPACES = _repo_entry_points()
 
 
 @pytest.fixture(scope="module")
@@ -77,7 +78,8 @@ async def _menu(app, locale: str) -> list[dict]:
 
 async def test_every_entry_has_a_label_key(app):
     items = await _ours(app)
-    assert len(items) == 21  # 20 + records' "My registrations", present because events is installed
+    # 20 + records' "My registrations" (events installed) + newsletter's 6 entries.
+    assert len(items) == 27
     missing = [i.label for i in items if not i.label_key.startswith(_OUR_NAMESPACES)]
     assert not missing, f"menu items without a module label_key: {missing}"
     no_group_key = [i.label for i in items if i.group and not i.group_key]
@@ -101,7 +103,10 @@ async def test_german_sidebar(app):
     assert ("/ai/", "KI") in labels
     assert ("/analytics/", "Analysen") in labels
     assert ("/admin/images/", "Bildersammlungen") in labels
-    assert {"Website", "Datensätze", "Zugriff", "Bilder"} <= {e["group"] for e in menu}
+    assert ("/admin/newsletter/", "Kampagnen") in labels
+    assert {"Website", "Datensätze", "Zugriff", "Bilder", "Newsletter"} <= {
+        e["group"] for e in menu
+    }
 
 
 async def test_english_sidebar_is_unchanged(app):

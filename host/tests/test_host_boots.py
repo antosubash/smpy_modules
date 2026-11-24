@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from importlib.metadata import entry_points
 from importlib.util import find_spec
 from pathlib import Path
@@ -89,9 +90,23 @@ def test_ai_routes_mounted(app):
     assert "/api/ai/test" in paths
 
 
+def _repo_module_names() -> set[str]:
+    """Every repo module's ``ModuleMeta.name``, discovered from ``modules/*/pyproject.toml``."""
+    names: set[str] = set()
+    for path in sorted((REPO / "modules").glob("*/pyproject.toml")):
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        entries = data.get("project", {}).get("entry-points", {}).get("simple_module", {})
+        for spec in entries.values():
+            mod_path, cls_name = spec.split(":", 1)
+            cls = getattr(importlib.import_module(mod_path), cls_name)
+            names.add(cls.meta.name)
+    assert names
+    return names
+
+
 # Every distributable module in this repo. The subscriber check below is only
 # evidence if each of them is booted, so it asserts that first.
-REPO_MODULES = {"Events", "Analytics", "Ai", "Billing", "Images", "News", "PageBuilder", "Records"}
+REPO_MODULES = _repo_module_names()
 
 
 def _migrate(url: str) -> None:
