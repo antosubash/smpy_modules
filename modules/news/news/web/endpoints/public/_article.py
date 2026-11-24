@@ -138,7 +138,13 @@ def article_router(locale: str) -> APIRouter:
             return await not_found(request, inertia, db, locale=locale, tenant=tenant)
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
-        etag = etag_for(article.id or 0, article.updated_at, variant, viewer_key(request))
+        # Relative share images follow this origin even with a syndicated canonical.
+        etag = etag_for(
+            article.id or 0,
+            article.updated_at,
+            f"{variant}:{public_base_url(request, settings)}",
+            viewer_key(request),
+        )
         # A signed-in copy is never kept, so it gets no validator and no 304.
         reader_signed_in = signed_in(request)
 

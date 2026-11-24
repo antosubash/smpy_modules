@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape
+
 import pytest
 from news.core import settings as news_settings
 from news.core.settings import NewsSettings
@@ -34,6 +36,21 @@ pytestmark = pytest.mark.asyncio
         ("https://news.example", "//other.example/cover.webp", None),
         ("https://news.example", "/\\other.example/cover.webp", None),
         ("https://news.example", "javascript:alert(1)", None),
+        ("https://news.example", "data:image/png;base64,AA==", None),
+        ("https://news.example", "mailto:editor@example.com", None),
+        ("https://news.example", "", None),
+        ("https://news.example", None, None),
+        (
+            "https://news.example",
+            "/media/cover.webp?width=800&fit=cover#hero",
+            "https://news.example/media/cover.webp?width=800&fit=cover#hero",
+        ),
+        (
+            "https://news.example",
+            "/media/caf%C3%A9.webp",
+            "https://news.example/media/caf%C3%A9.webp",
+        ),
+        ("https://news.example", "/media/café.webp", "https://news.example/media/café.webp"),
     ],
 )
 async def test_both_heads_receive_the_same_safe_absolute_image(
@@ -59,8 +76,8 @@ async def test_both_heads_receive_the_same_safe_absolute_image(
         assert 'property="og:image"' not in head
         assert 'name="twitter:image"' not in head
     else:
-        assert f'<meta property="og:image" content="{expected}">' in head
-        assert f'<meta name="twitter:image" content="{expected}">' in head
+        assert f'<meta property="og:image" content="{escape(expected)}">' in head
+        assert f'<meta name="twitter:image" content="{escape(expected)}">' in head
 
     page = await anon_client.get(
         "/news/cover", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
@@ -72,3 +89,35 @@ async def test_both_heads_receive_the_same_safe_absolute_image(
         stored = await db.get(NewsArticle, article_id)
         assert stored is not None
         assert stored.og_image == reference
+
+
+@pytest.mark.parametrize("configured", [True, False])
+async def test_changed_image_origin_invalidates_the_article_etag(anon_client, configured) -> None:
+    news_settings.use(NewsSettings(public_base_url="https://old.example" if configured else ""))
+    async with anon_client.db_state.session_factory() as db:
+        article = await make_article(
+            db,
+            slug="cover",
+            og_image="/media/cover.webp",
+        )
+        article.canonical_url = "https://syndicated.example/story"
+        db.add(article)
+        await db.commit()
+
+    first = await anon_client.get("/news/cover" if configured else "https://old.example/news/cover")
+    assert first.status_code == 200
+    assert 'content="https://old.example/media/cover.webp"' in first.text
+
+    news_settings.use(NewsSettings(public_base_url="https://new.example" if configured else ""))
+    changed = await anon_client.get(
+        "/news/cover" if configured else "https://new.example/news/cover",
+        headers={"If-None-Match": first.headers["etag"]},
+    )
+    assert changed.status_code == 200
+    assert 'content="https://new.example/media/cover.webp"' in changed.text
+    assert changed.headers["etag"] != first.headers["etag"]
+    unchanged = await anon_client.get(
+        "/news/cover" if configured else "https://new.example/news/cover",
+        headers={"If-None-Match": changed.headers["etag"]},
+    )
+    assert unchanged.status_code == 304
