@@ -14,6 +14,12 @@ address. A query shorter than :data:`MIN_QUERY` characters (after trimming)
 answers ``[]`` without asking the directory, and the route has its own per-user
 rate (:data:`RATE`, registered by ``ImagesModule.register_rate_limits``) so the
 remaining three-letter space cannot be walked quickly either.
+
+**Not an email oracle (#407).** The directory matches on email substrings, so the
+answer is filtered (:func:`matches_query`) before the limit: a user is offered
+only when the query is part of their display name, or is their whole address.
+Email addresses (and labels carrying one) are masked unless the query equals
+the full address.
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ from sm_images.core.errors import ServiceUnavailable
 from sm_images.core.tenancy import DEFAULT_TENANT, TenancyMode, bound_tenant, mode_of, request_mode
 from sm_images.web.endpoints.deps import require_view
 from sm_images.web.schemas.collection import ShareCandidate
+from sm_images.web.services.masking import matches_query, safe_display_name, visible_email
 
 
 def _unscoped_single(request: Request) -> bool:
@@ -69,12 +76,20 @@ async def share_candidates(
     if len(term) < MIN_QUERY:
         return []
     found = await directory.search(db, term, limit=constants.CANDIDATES_SCAN)
-    users = [u for u in found if u.is_active and u.id != collection.owner_id]
+    users = [
+        u
+        for u in found
+        if u.is_active and u.id != collection.owner_id and matches_query(u.label, u.email, term)
+    ]
     if not _unscoped_single(request):
         # Fail closed: no membership store means nobody can be vouched for.
         members = await tenant_member_ids(request.app, db, bound_tenant(), [u.id for u in users])
         users = [u for u in users if u.id in (members or set())]
     return [
-        ShareCandidate(id=u.id, display_name=u.label, email=u.email)
+        ShareCandidate(
+            id=u.id,
+            display_name=safe_display_name(u.label, u.email, term),
+            email=visible_email(u.email, term),
+        )
         for u in users[: constants.CANDIDATES_MAX]
     ]

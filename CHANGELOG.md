@@ -427,6 +427,10 @@ name the module they affect.
 
 ### Fixed
 
+- **images' share picker masks email addresses and filters substring matches** (#407).
+  `GET /api/images/collections/{id}/share-candidates` now shares events' masking and filtering
+  rules: partial-address queries no longer match, nameless or address-shaped labels are masked, and
+  an address is shown in full only when `q` equals it (case-insensitive).
 - **images, ai and events reject cloud metadata and control endpoints in the shared SSRF guard**
   (#426). `url_safety.is_public_address` now checks `ALWAYS_DENIED` (moved from events'
   `policy.py` into all three parity copies), refusing Azure's wireserver (`168.63.129.16`),

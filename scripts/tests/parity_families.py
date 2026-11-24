@@ -255,6 +255,13 @@ FAMILIES: tuple[Family, ...] = (
             ),
         ),
     ),
+    Family(
+        "share picker email masking",
+        (
+            Copy("modules/events/sm_events/web/services/masking.py"),
+            Copy("modules/images/sm_images/web/services/masking.py"),
+        ),
+    ),
     *SSRF_FAMILIES,
     *CRYPTO_FAMILIES,
     *PUBLIC_FAMILIES,
