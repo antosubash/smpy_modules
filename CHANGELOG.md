@@ -7,6 +7,10 @@ name the module they affect.
 
 ### Added
 
+- **news: media-library image picker** (#441). With PageBuilder and media read
+  access, choose an article's share/cover image or body Image from its library;
+  an empty Image alt text is filled from the asset. URL entry remains available.
+
 - **events: external calendar subscriptions** (PR 10 of the events module, the last). A calendar
   shows an external `.ics` feed read-only (marked External, plain text, never re-published or
   reminded), added in a Subscriptions dialog. The address is stored encrypted (`enc:v2:`, a fifth
@@ -426,6 +430,10 @@ name the module they affect.
   the probe routes that read `error` should read `code`.
 
 ### Fixed
+
+- **news: gallery share images work in social previews** (#441). Public article
+  metadata now makes relative image paths absolute using the configured public
+  base URL (or request origin), while stored media references stay relative.
 
 - Every package's `Repository` URL, and images' import User-Agent, name the
   repository by its current name, `antosubash/smpy_modules`; they still named

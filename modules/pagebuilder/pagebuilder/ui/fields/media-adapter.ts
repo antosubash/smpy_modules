@@ -16,6 +16,7 @@ function toFileItem(asset: MediaAssetRead): FileItem {
     fileSize: asset.size_bytes,
     url: asset.url,
     name: asset.original_filename,
+    altText: asset.alt_text,
   };
 }
 

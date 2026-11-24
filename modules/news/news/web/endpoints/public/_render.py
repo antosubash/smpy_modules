@@ -34,6 +34,7 @@ from news.web.endpoints.public._lang import set_html_lang
 async def render_article(
     inertia: InertiaDep,
     *,
+    base: str,
     article: NewsArticle,
     data: dict[str, Any],
     locale: str,
@@ -60,9 +61,7 @@ async def render_article(
     for the same reason — the preview forces it False regardless of what the
     article says, which is what puts ``noindex`` in both heads.
     """
-    published_at = (
-        article.published_at.isoformat() if article.published_at is not None else None
-    )
+    published_at = article.published_at.isoformat() if article.published_at is not None else None
     # The byline's archive, where it has one. It was a dead end before: rendered
     # on the page and emitted as ``article:author``, with nowhere for a reader
     # who liked the writer to go, while a category and a tag each had a page.
@@ -83,6 +82,9 @@ async def render_article(
     # working link from that other article.
     listed = article.status == ArticleStatus.PUBLISHED and article.show_in_feed
     byline_slug = author_slug(article.author) if listed else ""
+    image = image_or_none(article.og_image)
+    if image and image.startswith("/"):
+        image = f"{base}{image}"
     props: dict[str, Any] = {
         "title": article.title,
         # Which article this is, for the blocks in its own body that need to
@@ -92,7 +94,7 @@ async def render_article(
         "slug": article.slug,
         "data": data,
         "meta_description": article.meta_description,
-        "og_image": image_or_none(article.og_image),
+        "og_image": image,
         "canonical_url": canonical,
         "og_url": canonical,
         "index_in_search": index_in_search,
@@ -122,7 +124,7 @@ async def render_article(
             title=article.title,
             description=article.meta_description or None,
             canonical=canonical,
-            image=image_or_none(article.og_image),
+            image=image,
             site_name=settings.site_name or None,
             twitter_handle=settings.twitter_handle or None,
             published_at=published_at,

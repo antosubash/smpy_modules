@@ -11,6 +11,7 @@ import {
   emptyArticleData,
 } from '../ui/components/body/articlePuckConfig';
 import { localizeConfig, localizeViewports } from '../ui/components/body/localizeConfig';
+import { withMediaPicker } from '../ui/components/body/mediaPickerConfig';
 import { useArticleBody } from '../ui/hooks/useArticleBody';
 import { useArticleOutline } from '../ui/hooks/useArticleOutline';
 import { usePuckA11y } from '../ui/hooks/usePuckA11y';
@@ -31,8 +32,10 @@ export default function ArticleBody() {
   const { t } = useT();
   const copy = keys.news.body;
   usePuckA11y();
-  const { article_id } = usePage<{ props: { article_id: number } }>().props as unknown as {
+  const { article_id, media_picker } = usePage<{ props: { article_id: number } }>()
+    .props as unknown as {
     article_id: number;
+    media_picker?: boolean;
   };
 
   const {
@@ -60,7 +63,10 @@ export default function ArticleBody() {
 
   // The block configs hold catalogue keys where their labels go — see
   // `localizeConfig` for why they cannot resolve them where they are written.
-  const config = useMemo(() => localizeConfig(articlePuckConfig, t), [t]);
+  const config = useMemo(
+    () => localizeConfig(withMediaPicker(articlePuckConfig, media_picker ?? false), t),
+    [t, media_picker],
+  );
   const viewports = useMemo(() => localizeViewports(articleViewports, t), [t]);
 
   // Stable across renders. Puck treats a new override as a new component
