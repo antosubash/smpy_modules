@@ -21,6 +21,9 @@ NOT_PUBLIC = [
     "172.16.3.4",
     "192.168.1.10",
     "169.254.169.254",  # cloud metadata
+    "168.63.129.16",  # Azure wireserver
+    "100.100.100.200",  # Alibaba metadata
+    "192.0.0.192",  # Oracle metadata
     "100.64.0.1",  # CGNAT
     "0.0.0.0",
     "224.0.0.1",  # multicast
@@ -30,10 +33,14 @@ NOT_PUBLIC = [
     "::",
     "fc00::1",
     "fd00:ec2::254",  # metadata over IPv6
+    "fd00:c1::a9fe:a9fe",  # Oracle IPv6 metadata
+    "fd20:ce::254",  # GCP IPv6 metadata
     "fe80::1",
     "ff02::1",
     "::ffff:10.0.0.1",  # IPv4-mapped
+    "::ffff:168.63.129.16",  # IPv4-mapped Azure wireserver
     "64:ff9b::7f00:1",  # NAT64 of 127.0.0.1
+    "64:ff9b::a83f:8110",  # NAT64 of 168.63.129.16
     "2002:7f00:1::",  # 6to4 of 127.0.0.1
     "2001:0:4136:e378:8000:63bf:f5ff:fffe",  # Teredo, client 10.0.0.1
 ]

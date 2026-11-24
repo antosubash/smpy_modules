@@ -35,6 +35,7 @@ import idna
 from sm_events.core import constants
 from sm_events.feeds.subscriptions import url_safety
 from sm_events.feeds.subscriptions.url_safety import (
+    ALWAYS_DENIED,
     IPAddress,
     UnsafeURLError,
     _embedded_ipv4,
@@ -63,37 +64,9 @@ _NUMERIC_HOST: Final = re.compile(r"^(?:0x[0-9a-f]+|\d+)(?:\.(?:0x[0-9a-f]+|\d+)
 """A host made only of numbers: a resolver reads ``2130706433``, ``0x7f.1`` and ``127.1`` as
 127.0.0.1 although no parser here does, so anything but a canonical dotted quad is refused."""
 
-ALWAYS_DENIED: Final = tuple(
-    ipaddress.ip_network(n)
-    for n in (
-        "127.0.0.0/8",  # loopback: this server's own services
-        "::1/128",  # loopback (IPv6)
-        "0.0.0.0/8",  # "this network", including the unspecified address
-        "::/128",  # unspecified (IPv6)
-        # link-local: AWS, GCP, Azure, OpenStack and DigitalOcean metadata (169.254.169.254),
-        # the AWS ECS task-role endpoint (169.254.170.2), Tencent (169.254.0.23)
-        "169.254.0.0/16",
-        "fe80::/10",  # link-local (IPv6)
-        "224.0.0.0/4",  # multicast
-        "ff00::/8",  # multicast (IPv6)
-        "255.255.255.255/32",  # broadcast
-        "100.100.100.200/32",  # Alibaba Cloud metadata, inside CGNAT
-        "168.63.129.16/32",  # Azure wireserver and host agent (a public-looking address)
-        "192.0.0.192/32",  # Oracle Cloud metadata
-        "fd00:c1::/32",  # Oracle Cloud IPv6 metadata (fd00:c1::a9fe:a9fe), inside fc00::/7
-        "fd20:ce::254/128",  # Google Cloud IPv6 metadata server, inside fc00::/7
-        "fd00:ec2::/32",  # AWS IPv6 metadata (fd00:ec2::254) and its service range, inside fc00::/7
-    )
-)
-"""Never reachable: not publicly, not with the intranet switch. Best-effort: providers add
-endpoints, so :func:`address_allowed` also refuses a unique-local address that embeds one of the
-IPv4 metadata addresses, and the operations docs tell operators the switch is for trusted
-networks only. Loopback, link-local, multicast
-and the cloud providers' metadata and control endpoints, including those that sit inside the
-ranges the switch opens. Embedded IPv4 forms of these are refused too (:func:`address_allowed`).
-The server's *own* addresses on its private interfaces are not listed: the plan does not rule
-them out, so with the switch on a subscription can reach a service on this host's private
-address, like any other internal host (see the setting's description)."""
+# ``ALWAYS_DENIED`` lives in ``url_safety`` so images, ai and events reject the same
+# loopback, link-local, multicast and cloud metadata/control endpoints even when the
+# intranet switch is on. Embedded IPv4 forms are checked in ``address_allowed`` too.
 
 _EMBEDDED_DENIED: Final = tuple(
     ipaddress.ip_network(n)

@@ -427,6 +427,11 @@ name the module they affect.
 
 ### Fixed
 
+- **images, ai and events reject cloud metadata and control endpoints in the shared SSRF guard**
+  (#426). `url_safety.is_public_address` now checks `ALWAYS_DENIED` (moved from events'
+  `policy.py` into all three parity copies), refusing Azure's wireserver (`168.63.129.16`),
+  Alibaba (`100.100.100.200`), Oracle (`192.0.0.192`), and IPv6 metadata/control ranges plus
+  their IPv6-embedded forms.
 - Every package's `Repository` URL, and images' import User-Agent, name the
   repository by its current name, `antosubash/smpy_modules`; they still named
   the old `simple_module_python_modules`.
