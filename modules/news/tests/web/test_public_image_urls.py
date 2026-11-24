@@ -1,0 +1,74 @@
+"""Share images use the canonical origin without changing stored media paths."""
+
+from __future__ import annotations
+
+import pytest
+from news.core import settings as news_settings
+from news.core.settings import NewsSettings
+from news.models import NewsArticle
+
+from tests.support.factories import make_article
+
+pytestmark = pytest.mark.asyncio
+
+
+@pytest.mark.parametrize(
+    ("base", "reference", "expected"),
+    [
+        (
+            "",
+            "/media/pagebuilder/default/cover.webp",
+            "http://test/media/pagebuilder/default/cover.webp",
+        ),
+        (
+            "https://news.example/",
+            "/media/pagebuilder/default/cover.webp",
+            "https://news.example/media/pagebuilder/default/cover.webp",
+        ),
+        ("", "https://cdn.example/cover.webp", "https://cdn.example/cover.webp"),
+        (
+            "https://news.example/",
+            "https://cdn.example/cover.webp",
+            "https://cdn.example/cover.webp",
+        ),
+        ("https://news.example", "//other.example/cover.webp", None),
+        ("https://news.example", "/\\other.example/cover.webp", None),
+        ("https://news.example", "javascript:alert(1)", None),
+    ],
+)
+async def test_both_heads_receive_the_same_safe_absolute_image(
+    anon_client, base, reference, expected
+) -> None:
+    news_settings.use(NewsSettings(public_base_url=base))
+    async with anon_client.db_state.session_factory() as db:
+        article = await make_article(
+            db,
+            slug="cover",
+            og_image=reference,
+        )
+        # A syndicated canonical is not the origin that hosts our media.
+        article.canonical_url = "https://syndicated.example/story"
+        db.add(article)
+        await db.commit()
+        article_id = article.id
+
+    response = await anon_client.get("/news/cover")
+    assert response.status_code == 200
+    head = response.text.split("</head>", 1)[0]
+    if expected is None:
+        assert 'property="og:image"' not in head
+        assert 'name="twitter:image"' not in head
+    else:
+        assert f'<meta property="og:image" content="{expected}">' in head
+        assert f'<meta name="twitter:image" content="{expected}">' in head
+
+    page = await anon_client.get(
+        "/news/cover", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
+    )
+    assert page.status_code == 200
+    assert page.json()["props"]["og_image"] == expected
+
+    async with anon_client.db_state.session_factory() as db:
+        stored = await db.get(NewsArticle, article_id)
+        assert stored is not None
+        assert stored.og_image == reference

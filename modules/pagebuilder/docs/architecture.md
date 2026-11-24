@@ -14,7 +14,7 @@ else. Other modules reach it only through:
 |---|---|
 | `pagebuilder.contracts` | DTOs; everything else is internal |
 | `PageDeleted` event | dropping rows keyed to a purged page |
-| `@simple-module-py/pagebuilder` package root (frontend) | adding blocks to the palette (`registerPuckBlocks`), and the media-library field, gallery and adapter (`createImageField`, `FileGallery`, `mediaLibraryAdapter`); `pagebuilder/index.ts` is the full list |
+| `@simple-module-py/pagebuilder` package root (frontend) | adding blocks to the palette (`registerPuckBlocks`), and the media-library field, lazy gallery and adapter (`createImageField`, `FileGallery`, `mediaLibraryAdapter`); `FileGallery` loads on first open; `pagebuilder/index.ts` is the full list |
 
 A module that only *might* have pagebuilder installed (news does this) imports it
 lazily behind a guard.

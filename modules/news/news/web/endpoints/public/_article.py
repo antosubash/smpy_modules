@@ -170,6 +170,7 @@ def article_router(locale: str) -> APIRouter:
         return apply_headers(
             await render_article(
                 inertia,
+                request=request,
                 article=article,
                 data=article.published_data,
                 locale=locale,

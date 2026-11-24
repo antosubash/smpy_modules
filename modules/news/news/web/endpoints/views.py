@@ -222,6 +222,7 @@ def _preview_state(article: NewsArticle) -> dict[str, Any]:
 )
 async def article_preview(
     article_id: int,
+    request: Request,
     inertia: InertiaDep,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
@@ -246,6 +247,7 @@ async def article_preview(
     article = await ArticlesService(db).get_article(article_id)
     response = await render_article(
         inertia,
+        request=request,
         article=article,
         data=article.draft_data or {},
         locale=article.locale,
