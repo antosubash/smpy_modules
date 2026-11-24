@@ -208,10 +208,24 @@ export default function ArticleEditor() {
           {/* Only for someone who may actually publish. The route is behind
               `news.publish`, so showing it to an author who may write but not
               publish would be offering a control that answers 403. */}
-          {canPublish && <ScheduleCard articleId={article_id} onChanged={acceptWrite} />}
+          {canPublish && (
+            <ScheduleCard
+              articleId={article_id}
+              expectedUpdatedAt={article.updated_at}
+              onChanged={acceptWrite}
+            />
+          )}
 
-          <SeoCard articleId={article_id} onChanged={acceptWrite} />
-          <HistoryCard articleId={article_id} onChanged={(updated) => acceptWrite(updated, true)} />
+          <SeoCard
+            articleId={article_id}
+            expectedUpdatedAt={article.updated_at}
+            onChanged={acceptWrite}
+          />
+          <HistoryCard
+            articleId={article_id}
+            expectedUpdatedAt={article.updated_at}
+            onChanged={(updated) => acceptWrite(updated, true)}
+          />
         </aside>
       </div>
     </PageShell>

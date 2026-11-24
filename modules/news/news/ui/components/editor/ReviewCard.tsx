@@ -101,7 +101,10 @@ export function ReviewCard({
           description={t(copy.unpublish_description)}
           confirmLabel={t(copy.unpublish)}
           onConfirm={async () => {
-            const ok = await run(() => unpublishArticle(article.id), t(copy.unpublished_toast));
+            const ok = await run(
+              () => unpublishArticle(article.id, article.updated_at),
+              t(copy.unpublished_toast),
+            );
             // The toast has already said why; throwing keeps the dialog open.
             if (!ok) throw new Error(t(copy.unpublish_failed));
           }}
@@ -135,7 +138,12 @@ export function ReviewCard({
             <Button
               size="sm"
               disabled={busy}
-              onClick={() => void run(() => approveArticle(article.id), t(copy.approved_toast))}
+              onClick={() =>
+                void run(
+                  () => approveArticle(article.id, article.updated_at),
+                  t(copy.approved_toast),
+                )
+              }
             >
               {t(copy.approve)}
             </Button>
@@ -154,7 +162,12 @@ export function ReviewCard({
               size="sm"
               variant="outline"
               disabled={busy}
-              onClick={() => void run(() => submitArticle(article.id), t(copy.submitted_toast))}
+              onClick={() =>
+                void run(
+                  () => submitArticle(article.id, article.updated_at),
+                  t(copy.submitted_toast),
+                )
+              }
             >
               {t(copy.submit)}
             </Button>
@@ -187,15 +200,16 @@ export function ReviewCard({
             <Button
               disabled={busy}
               onClick={() =>
-                void run(() => rejectArticle(article.id, note), t(copy.sent_back_toast)).then(
-                  (ok) => {
-                    // Only on success: a failed send-back keeps the dialog and
-                    // the note, so a long note is not lost to a server refusal.
-                    if (!ok) return;
-                    setRejecting(false);
-                    setNote('');
-                  },
-                )
+                void run(
+                  () => rejectArticle(article.id, note, article.updated_at),
+                  t(copy.sent_back_toast),
+                ).then((ok) => {
+                  // Only on success: a failed send-back keeps the dialog and
+                  // the note, so a long note is not lost to a server refusal.
+                  if (!ok) return;
+                  setRejecting(false);
+                  setNote('');
+                })
               }
             >
               {t(copy.send_back)}

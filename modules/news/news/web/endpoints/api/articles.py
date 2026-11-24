@@ -18,7 +18,7 @@ from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content import service
-from news.content._fresh import ensure_fresh
+from news.content._fresh import ensure_fresh_for_write
 from news.content.articles import ArticlesService
 from news.contracts.schemas import (
     ArticleCreate,
@@ -88,7 +88,7 @@ async def update_article(
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found.")
 
-    ensure_fresh(article, body.expected_updated_at)
+    await ensure_fresh_for_write(db, article, body.expected_updated_at)
 
     sent = body.model_dump(exclude_unset=True)
     sent.pop("expected_updated_at", None)

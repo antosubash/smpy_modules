@@ -157,13 +157,20 @@ class ArticleBodyUpdate(NoNul):
     """See ``ArticleUpdate.expected_updated_at``."""
 
 
-class RejectRequest(NoNul):
+class ArticleWriteVersion(NoNul):
+    """Optional base for workflow and revision writes; omitted keeps legacy behaviour."""
+
+    expected_updated_at: datetime | None = None
+    """See ``ArticleUpdate.expected_updated_at``."""
+
+
+class RejectRequest(ArticleWriteVersion):
     note: str | None = Field(default=None, max_length=MAX_NOTE_LEN)
 
     _note = field_validator("note", mode="before")(_guards.optional_note)
 
 
-class ScheduleRequest(NoNul):
+class ScheduleRequest(ArticleWriteVersion):
     """When an article should go live, and when it should come down.
 
     Both fields are three-valued and the endpoint passes only what was actually

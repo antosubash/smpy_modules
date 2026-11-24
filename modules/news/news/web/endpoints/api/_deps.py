@@ -16,8 +16,10 @@ from simple_module_hosting.permissions import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content import service
+from news.content._fresh import ensure_fresh_for_write
+from news.content.articles import ArticlesService
 from news.content.taxonomy import tag_service
-from news.contracts.schemas import ArticleDetail, ArticleRead
+from news.contracts.schemas import ArticleDetail, ArticleRead, ArticleWriteVersion
 from news.core import locales, tenancy
 from news.core.constants import (
     PERM_EDIT,
@@ -184,3 +186,12 @@ def detail_of(article: NewsArticle, listing: ArticleRead) -> ArticleDetail:
         publish_at=as_utc(article.publish_at),
         unpublish_at=as_utc(article.unpublish_at),
     )
+
+
+async def check_write_version(
+    db: AsyncSession, article_id: int, body: ArticleWriteVersion | None
+) -> None:
+    """An optional version check, locked through the endpoint's subsequent write."""
+    if body is not None and body.expected_updated_at is not None:
+        article = await ArticlesService(db).get_article(article_id)
+        await ensure_fresh_for_write(db, article, body.expected_updated_at)

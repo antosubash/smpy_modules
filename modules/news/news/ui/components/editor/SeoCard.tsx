@@ -28,9 +28,11 @@ const INDEX_ID = 'article-index-in-search';
  */
 export function SeoCard({
   articleId,
+  expectedUpdatedAt,
   onChanged,
 }: {
   articleId: number;
+  expectedUpdatedAt: string | null;
   onChanged: (article: ArticleRead) => void;
 }) {
   const { t } = useT();
@@ -59,6 +61,7 @@ export function SeoCard({
     setBusy(true);
     try {
       const updated = await updateArticle(articleId, {
+        expected_updated_at: expectedUpdatedAt,
         meta_description: description,
         og_image: image,
         canonical_url: canonical,

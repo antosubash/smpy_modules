@@ -18,8 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content.articles import ArticlesService
 from news.content.taxonomy import tag_service
-from news.contracts.schemas import ArticleRead, RejectRequest, ScheduleRequest
-from news.web.endpoints.api._deps import read_one, require_edit, require_publish
+from news.contracts.schemas import ArticleRead, ArticleWriteVersion, RejectRequest, ScheduleRequest
+from news.web.endpoints.api._deps import (
+    check_write_version,
+    read_one,
+    require_edit,
+    require_publish,
+)
 
 router = APIRouter()
 
@@ -39,7 +44,8 @@ async def schedule_article(
     a host that gates publishing would be surprised to find an author could
     arrange one for tomorrow instead.
     """
-    fields = body.model_dump(exclude_unset=True)
+    await check_write_version(db, article_id, body)
+    fields = body.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
     await ArticlesService(db).schedule(article_id, **fields)
     return await read_one(db, article_id)
 
@@ -50,9 +56,10 @@ async def schedule_article(
     dependencies=[require_edit, require_publish],
 )
 async def publish_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
+    article_id: int, body: ArticleWriteVersion | None = None, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:
     """Snapshot the draft and serve it."""
+    await check_write_version(db, article_id, body)
     await ArticlesService(db).publish(article_id)
     return await read_one(db, article_id)
 
@@ -63,9 +70,10 @@ async def publish_article(
     dependencies=[require_edit, require_publish],
 )
 async def unpublish_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
+    article_id: int, body: ArticleWriteVersion | None = None, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:
     """Take the article off the public site, keeping the draft."""
+    await check_write_version(db, article_id, body)
     await ArticlesService(db).unpublish(article_id)
     return await read_one(db, article_id)
 
@@ -76,7 +84,7 @@ async def unpublish_article(
     dependencies=[require_edit],
 )
 async def submit_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
+    article_id: int, body: ArticleWriteVersion | None = None, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:
     """Hand a draft to a reviewer.
 
@@ -84,6 +92,7 @@ async def submit_article(
     they *cannot* publish, so gating it on ``news.publish`` would close the only
     door the separation leaves them.
     """
+    await check_write_version(db, article_id, body)
     await ArticlesService(db).submit_for_review(article_id)
     return await read_one(db, article_id)
 
@@ -94,9 +103,10 @@ async def submit_article(
     dependencies=[require_edit, require_publish],
 )
 async def approve_article(
-    article_id: int, db: AsyncSession = Depends(get_db)
+    article_id: int, body: ArticleWriteVersion | None = None, db: AsyncSession = Depends(get_db)
 ) -> ArticleRead:
     """Approve and publish in one action — see ``WorkflowMixin.approve``."""
+    await check_write_version(db, article_id, body)
     await ArticlesService(db).approve(article_id)
     return await read_one(db, article_id)
 
@@ -112,6 +122,7 @@ async def reject_article(
     db: AsyncSession = Depends(get_db),
 ) -> ArticleRead:
     """Send a submission back to draft, with a reason the author will see."""
+    await check_write_version(db, article_id, body)
     await ArticlesService(db).reject(article_id, body.note if body else None)
     return await read_one(db, article_id)
 

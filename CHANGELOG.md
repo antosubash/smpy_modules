@@ -12,7 +12,9 @@ name the module they affect.
 
 - News keeps the article form version current after search settings, scheduling,
   workflow and revision restores; rejected saves can be corrected and retried
-  without a false concurrent-edit conflict (#444).
+  without a false concurrent-edit conflict. Side writes check the form’s base
+  version under the article lock, so side writes cannot mask concurrent edits
+  to inspector fields (#444).
 
 - News registers its content-bundle section once per app, so restarting the same
   app lifespan works while conflicting section names still fail loudly (#447).

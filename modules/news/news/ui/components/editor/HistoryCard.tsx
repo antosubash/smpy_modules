@@ -38,9 +38,11 @@ const EVENTS: Record<RevisionRead['event'], string> = {
  */
 export function HistoryCard({
   articleId,
+  expectedUpdatedAt,
   onChanged,
 }: {
   articleId: number;
+  expectedUpdatedAt: string | null;
   onChanged: (article: ArticleRead) => void;
 }) {
   const { t, locale } = useT();
@@ -67,7 +69,7 @@ export function HistoryCard({
   const restore = async (revision: RevisionRead) => {
     setBusy(true);
     try {
-      const updated = await restoreArticleRevision(articleId, revision.id);
+      const updated = await restoreArticleRevision(articleId, revision.id, expectedUpdatedAt);
       if (updated) onChanged(updated);
       await load();
       toast.success(t(copy.restored_toast));

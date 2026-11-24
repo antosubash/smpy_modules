@@ -67,5 +67,8 @@ export const deleteTag = (id: number) => write<null>(`/taxonomy/tags/${id}`, 'DE
 export const listArticleTags = (articleId: number, signal?: AbortSignal) =>
   read<string[]>(`/articles/${articleId}/tags`, signal);
 
-export const setArticleTags = (articleId: number, tags: string[]) =>
-  write<string[]>(`/articles/${articleId}/tags`, 'PUT', { tags });
+export const setArticleTags = (
+  articleId: number,
+  tags: string[],
+  expected_updated_at?: string | null,
+) => write<string[]>(`/articles/${articleId}/tags`, 'PUT', { tags, expected_updated_at });

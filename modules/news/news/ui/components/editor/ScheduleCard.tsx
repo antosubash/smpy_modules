@@ -24,9 +24,11 @@ const COME_DOWN_ID = 'article-unpublish-at';
  */
 export function ScheduleCard({
   articleId,
+  expectedUpdatedAt,
   onChanged,
 }: {
   articleId: number;
+  expectedUpdatedAt: string | null;
   onChanged: (article: ArticleRead) => void;
 }) {
   const { t } = useT();
@@ -58,6 +60,7 @@ export function ScheduleCard({
       const updated = await scheduleArticle(articleId, {
         // Empty clears it, which is a real instruction — an explicit null
         // rather than an omitted field, or cancelling would be unspellable.
+        expected_updated_at: expectedUpdatedAt,
         publish_at: publishAt ? new Date(publishAt).toISOString() : null,
         unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
       });

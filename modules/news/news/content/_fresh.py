@@ -38,6 +38,27 @@ def ensure_fresh(article: NewsArticle, expected: datetime | None) -> None:
         raise HTTPException(status_code=409, detail=STALE_DETAIL)
 
 
+async def ensure_fresh_for_write(
+    db: AsyncSession, article: NewsArticle, expected: datetime | None
+) -> None:
+    """Check the base while holding the row until the caller's transaction ends.
+
+    A no-op UPDATE locks on both SQLite and Postgres (SQLite ignores FOR UPDATE).
+    Refresh after acquiring it: a waiting writer may have an older identity-map
+    copy. Keep the timestamp unchanged so a refused or no-op write cannot age it.
+    """
+    if expected is None:
+        return
+    await db.execute(
+        update(NewsArticle)
+        .where(NewsArticle.id == article.id)
+        .values(updated_at=NewsArticle.updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    await db.refresh(article)
+    ensure_fresh(article, expected)
+
+
 async def claim_status(
     db: AsyncSession,
     article: NewsArticle,

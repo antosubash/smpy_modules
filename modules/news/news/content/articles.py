@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from news.content import redirects
-from news.content._fresh import ensure_fresh
+from news.content._fresh import ensure_fresh_for_write
 from news.content._revisions import clear_revisions
 from news.content._slugs import free_slug, slug_exhausted, slug_for_title, slug_taken
 from news.content._workflow import WorkflowMixin
@@ -223,7 +223,7 @@ class ArticlesService(WorkflowMixin):
         record a redirect for.
         """
         article = await self.get_article(article_id)
-        ensure_fresh(article, expected_updated_at)
+        await ensure_fresh_for_write(self.db, article, expected_updated_at)
         article.draft_data = data
         self.db.add(article)
         await self.db.flush()

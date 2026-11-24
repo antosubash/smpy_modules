@@ -162,8 +162,8 @@ export function useArticleEditor(articleId: number) {
         // as null rather than omitted.
         const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
         // In sequence: the metadata PUT carries `expected_updated_at` and the
-        // tags PUT does not, so the tags wait for it. A stale tab is refused on
-        // the first and never gets to overwrite the other writer's tags.
+        // tags PUT uses its returned version, so the tags wait for it. A stale
+        // tab is refused before it can overwrite the other writer's tags.
         let updated: ArticleRead | null;
         try {
           updated = await updateArticle(articleId, {
@@ -188,7 +188,11 @@ export function useArticleEditor(articleId: number) {
         // against what the server now holds.
         if (updated) acceptWrite(updated);
         try {
-          const tags = await setArticleTags(articleId, draft.tags);
+          const tags = await setArticleTags(
+            articleId,
+            draft.tags,
+            updated?.updated_at ?? article.updated_at,
+          );
           if (updated)
             acceptWrite({ ...(articleRef.current ?? updated), tags: tags ?? article.tags });
         } catch (e) {
@@ -207,7 +211,7 @@ export function useArticleEditor(articleId: number) {
       guard(async () => {
         if (!article) return;
         setError(null);
-        const updated = await publishArticle(article.id);
+        const updated = await publishArticle(article.id, article.updated_at);
         if (updated) acceptWrite(updated);
         toast.success(t(keys.news.editor.published_toast));
       }).catch(fail),

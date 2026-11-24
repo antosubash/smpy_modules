@@ -91,13 +91,13 @@ article is a 404 to a non-editor.
 |---|---|---|
 | `POST /articles` | `ArticleCreate` | `ArticleRead`, 201 |
 | `PUT /articles/{id}` | `ArticleUpdate` (partial) | `ArticleRead` |
-| `PUT /articles/{id}/tags` | `{"tags": ["a", "b"]}` (full replacement) | the tag names |
+| `PUT /articles/{id}/tags` | `{"tags": ["a", "b"], "expected_updated_at"?}` (full replacement) | the tag names |
 | `POST /articles/{id}/translations` | `ArticleTranslationCreate` | `ArticleRead`, 201 |
 | `GET /articles/{id}/detail` | — | `ArticleDetail` |
 | `PUT /articles/{id}/body` | `{"draft_data": {…}, "expected_updated_at"?}` | `ArticleDetail` |
 | `GET /articles/{id}/revisions` | — | `RevisionRead[]`, newest first |
-| `POST /articles/{id}/revisions/{rev}/restore` | — | `ArticleDetail` |
-| `POST /articles/{id}/submit` | — | `ArticleRead` |
+| `POST /articles/{id}/revisions/{rev}/restore` | `{"expected_updated_at"?}` | `ArticleDetail` |
+| `POST /articles/{id}/submit` | `{"expected_updated_at"?}` | `ArticleRead` |
 | `POST /articles/{id}/trash` | — | 204 |
 | `POST /articles/{id}/restore` | — | `ArticleRead` |
 
@@ -122,7 +122,13 @@ midnight UTC (`2026-02-01T23:00:00-06:00` records the 1st).
 
 **`expected_updated_at`** — send the `updated_at` you loaded; if the stored
 one differs the write is refused with 409 "This article was changed somewhere
-else…". Omitted, the write goes through.
+else…". The comparison and write hold the same transaction's article lock.
+This optional field is accepted by metadata, body, tag replacement, schedule,
+publish, unpublish, submit, approve, reject and revision restore. Omitted or
+null, the write goes through as before; workflow and revision restore still
+accept no request body. The article edit screen sends its current form version
+on every one of these writes and adopts only successful responses. Trash has
+no version input and keeps its existing behaviour.
 
 **`ArticleTranslationCreate`** — `{"locale", "slug"?, "title"?}`. Creates a
 draft sibling in the same `translation_group`, copying category, author,
@@ -154,11 +160,11 @@ its meaning and permissions are unchanged.
 
 | Method & path | Body | Effect |
 |---|---|---|
-| `POST /articles/{id}/publish` | — | copies `draft_data` to the published snapshot; status `published` |
-| `POST /articles/{id}/unpublish` | — | status `draft`; clears both schedule times |
-| `POST /articles/{id}/approve` | — | `submitted_for_review` → `published` in one step |
-| `POST /articles/{id}/reject` | `{"note"?}` (≤ 2000) | `submitted_for_review` → `draft`, stores the note |
-| `POST /articles/{id}/schedule` | `{"publish_at"?, "unpublish_at"?}` | sets/clears the times |
+| `POST /articles/{id}/publish` | `{"expected_updated_at"?}` | copies `draft_data` to the published snapshot; status `published` |
+| `POST /articles/{id}/unpublish` | `{"expected_updated_at"?}` | status `draft`; clears both schedule times |
+| `POST /articles/{id}/approve` | `{"expected_updated_at"?}` | `submitted_for_review` → `published` in one step |
+| `POST /articles/{id}/reject` | `{"note"?, "expected_updated_at"?}` (note ≤ 2000) | `submitted_for_review` → `draft`, stores the note |
+| `POST /articles/{id}/schedule` | `{"publish_at"?, "unpublish_at"?, "expected_updated_at"?}` | sets/clears the times |
 | `DELETE /articles/{id}` | — | 204; deletes the article outright |
 | `DELETE /articles/{id}/purge` | — | 204; deletes a **trashed** article with its tags and redirects |
 
