@@ -105,6 +105,13 @@ export function localizeConfig<T>(config: T, t: Translate): T {
   return localized as T;
 }
 
+/** Resolve a block's field map through `t`, including `arrayFields` and `objectFields`. */
+export function localizeFields<F extends object>(fields: F, t: Translate): F {
+  return mapValues(fields as Record<string, LabelledField>, (field) =>
+    localizeField(field, t),
+  ) as unknown as F;
+}
+
 /** The viewport switcher's labels, resolved the same way. */
 export function localizeViewports<T extends LabelledViewport>(viewports: T[], t: Translate): T[] {
   return viewports.map((viewport) =>

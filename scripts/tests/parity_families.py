@@ -278,6 +278,13 @@ FAMILIES: tuple[Family, ...] = (
             "_walk": "News' Sources block also yields each `label | href` line via `_sources_links`.",
         },
     ),
+    Family(
+        "Puck config localiser (TypeScript)",
+        (
+            Copy(f"{PB}/ui/components/localizeConfig.ts"),
+            Copy(f"{NEWS}/ui/components/body/localizeConfig.ts"),
+        ),
+    ),
     *SSRF_FAMILIES,
     *CRYPTO_FAMILIES,
     *PUBLIC_FAMILIES,

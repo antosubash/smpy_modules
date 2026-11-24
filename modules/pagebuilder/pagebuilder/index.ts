@@ -16,6 +16,7 @@
 export type { AnyBlock, BlockRegistration } from './ui/components/blockRegistry';
 export { registeredBlocks, registerPuckBlocks } from './ui/components/blockRegistry';
 export { lazyBlock } from './ui/components/lazyBlock';
+export { localizeFields } from './ui/components/localizeConfig';
 export type {
   ArticleCardItem,
   ArticleCardsWidgetProps,

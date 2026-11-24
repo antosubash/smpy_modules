@@ -8,12 +8,13 @@
  * of keys into a config full of the viewer's language, once, inside the screen
  * that mounts Puck.
  *
- * Only chrome is touched: a component's palette label, its field labels and a
- * select's option labels, plus the category titles. `defaultProps` are
- * deliberately left alone — they are the seed *content* a block is inserted
- * with and are then saved into the document, so translating them at render
- * would rewrite what a reader is being served in whatever language the reader
- * happens to be browsing in.
+ * Only chrome is touched: a component's palette label, its field labels
+ * (including the ones nested in an `array` or `object` field) and a select's
+ * option labels, plus the category titles. `defaultProps` are deliberately
+ * left alone — they are the seed *content* a block is inserted with and are
+ * then saved into the document, so translating them at render would rewrite
+ * what a reader is being served in whatever language the *author* happened to
+ * be working in.
  */
 
 import type { Translate } from '../../utils/i18n';
@@ -28,6 +29,8 @@ interface LabelledOption {
 interface LabelledField {
   label?: string;
   options?: LabelledOption[];
+  arrayFields?: Record<string, LabelledField>;
+  objectFields?: Record<string, LabelledField>;
 }
 
 interface LabelledComponent {
@@ -38,6 +41,8 @@ interface LabelledComponent {
 interface LabelledConfig {
   categories?: Record<string, { title?: string }>;
   components?: Record<string, LabelledComponent>;
+  /** The page's own fields — width, title — which Puck shows under "Page". */
+  root?: LabelledComponent;
 }
 
 /** An editor viewport switcher entry — `label` is what the toolbar shows. */
@@ -65,7 +70,24 @@ function localizeField(field: LabelledField, t: Translate): LabelledField {
       option.label ? { ...option, label: t(option.label) } : option,
     );
   }
+  // An `array` or `object` field carries a second level of labels, which the
+  // editor shows once a row is expanded. Missing them left half of every
+  // repeater's chrome untranslated.
+  if (field.arrayFields) {
+    next.arrayFields = mapValues(field.arrayFields, (inner) => localizeField(inner, t));
+  }
+  if (field.objectFields) {
+    next.objectFields = mapValues(field.objectFields, (inner) => localizeField(inner, t));
+  }
   return next;
+}
+
+function localizeComponent(component: LabelledComponent, t: Translate): LabelledComponent {
+  return {
+    ...component,
+    ...(component.label ? { label: t(component.label) } : {}),
+    fields: mapValues(component.fields, (field) => localizeField(field, t)),
+  };
 }
 
 /** The same config with every label resolved. The generic is the caller's own
@@ -77,13 +99,17 @@ export function localizeConfig<T>(config: T, t: Translate): T {
     categories: mapValues(source.categories, (category) =>
       category.title ? { ...category, title: t(category.title) } : category,
     ),
-    components: mapValues(source.components, (component) => ({
-      ...component,
-      ...(component.label ? { label: t(component.label) } : {}),
-      fields: mapValues(component.fields, (field) => localizeField(field, t)),
-    })),
+    components: mapValues(source.components, (component) => localizeComponent(component, t)),
+    ...(source.root ? { root: localizeComponent(source.root, t) } : {}),
   };
   return localized as T;
+}
+
+/** Resolve a block's field map through `t`, including `arrayFields` and `objectFields`. */
+export function localizeFields<F extends object>(fields: F, t: Translate): F {
+  return mapValues(fields as Record<string, LabelledField>, (field) =>
+    localizeField(field, t),
+  ) as unknown as F;
 }
 
 /** The viewport switcher's labels, resolved the same way. */

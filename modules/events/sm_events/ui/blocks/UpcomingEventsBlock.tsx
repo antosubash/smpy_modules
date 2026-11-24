@@ -11,13 +11,13 @@
  */
 
 import type { ComponentConfig } from '@puckeditor/core';
+import { localizeFields } from '@simple-module-py/pagebuilder';
 
 import { keys, type Translate, translate } from '../utils/i18n';
 import { fetchBlockCalendars } from './api-blocks';
 import { countField } from './CountField';
 import { calendarsField, type Option } from './calendarField';
 import { clampCount, oneOf, selectionOf, UPCOMING_DEFAULT } from './limits';
-import { localizeFields } from './localizeFields';
 import {
   HEADING_MAX,
   LAYOUTS,
