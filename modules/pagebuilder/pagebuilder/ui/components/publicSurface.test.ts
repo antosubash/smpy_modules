@@ -10,6 +10,8 @@ describe('the package entry', () => {
     // Pinned in full, so growing the public API is a reviewed change.
     expect(Object.keys(surface).sort()).toEqual([
       'ArticleCardsGrid',
+      'FileGallery',
+      'PublicSiteLayout',
       'Section',
       'StatsView',
       'createImageField',

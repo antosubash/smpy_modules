@@ -60,7 +60,7 @@ export function PreviewBanner({ preview }: { preview: ArticlePreviewState }) {
     // Sticky, because the thing it is disclaiming scrolls.
     <aside
       aria-label={t(keys.news.preview.label)}
-      className="sticky top-0 z-50 bg-foreground text-background print:hidden"
+      className="sticky top-0 z-[60] bg-foreground text-background print:hidden"
     >
       <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
         <span className="rounded bg-background/20 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide">

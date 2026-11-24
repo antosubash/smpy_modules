@@ -10,6 +10,8 @@ import { useMountedRef } from '../../hooks/useMountedRef';
 import { getArticleDetail, updateArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
+import { MediaPickerButton } from '../media/MediaPicker';
+
 const DESC_ID = 'article-meta-description';
 const IMAGE_ID = 'article-og-image';
 const CANONICAL_ID = 'article-canonical-url';
@@ -30,9 +32,11 @@ const INDEX_ID = 'article-index-in-search';
 export function SeoCard({
   articleId,
   writeArticle,
+  mediaPicker = false,
 }: {
   articleId: number;
   writeArticle: ArticleWrite;
+  mediaPicker?: boolean;
 }) {
   const { t } = useT();
   const mounted = useMountedRef();
@@ -109,6 +113,11 @@ export function SeoCard({
           disabled={busy}
           placeholder={t(copy.image_placeholder)}
           onChange={(e) => setImage(e.target.value)}
+        />
+        <MediaPickerButton
+          enabled={mediaPicker}
+          disabled={busy}
+          onSelect={(item) => setImage(item.url)}
         />
         <p className="text-xs text-muted-foreground">{t(copy.image_help)}</p>
       </div>

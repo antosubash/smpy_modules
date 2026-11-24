@@ -119,7 +119,9 @@ stays a draft and both times are cleared.
 | **Canonical URL** | Only for an article republished from elsewhere. Blank uses the article's own address. |
 | **Allow search engines to index it** | Off sends `noindex,nofollow` and drops it from the sitemap; the article stays readable by link. |
 
-**Save search settings** stores them.
+When PageBuilder is installed and you can read its media library, **Choose from
+media library** selects a share/cover image. You can always paste an external
+image URL instead. **Save search settings** stores them.
 
 ### Languages
 
@@ -164,8 +166,11 @@ The palette, by group:
 List-like blocks take one item per line (e.g. Key figures: `21 | sensors
 installed`). **Callout** has a **Correction** kind. **Read next** lists live
 articles (optionally one category), excluding the one you are in. **Contents**
-lists the article's Heading blocks. Images take a URL — there is no media
-picker.
+lists the article's Heading blocks. The **Image** block offers **Choose from media
+library** when PageBuilder is installed and you can read its media. Selecting an
+image fills an empty alt text from the library; your own alt text is kept. URL
+entry is always available, including when PageBuilder is absent. Gallery and
+Before / after images still take URLs.
 
 ## Categories (`/admin/news/categories`)
 

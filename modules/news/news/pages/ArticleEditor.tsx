@@ -32,6 +32,7 @@ export default function ArticleEditor() {
     props: { article_id: number; preview_url: string; locales?: string[] };
   }>().props as unknown as {
     article_id: number;
+    media_picker?: boolean;
     /** Where this article renders through the reader's own screen, over the
      *  draft body. Served rather than assembled here, the same way `edit_url`
      *  is on the listing DTO. */
@@ -209,7 +210,11 @@ export default function ArticleEditor() {
               publish would be offering a control that answers 403. */}
           {canPublish && <ScheduleCard articleId={article_id} writeArticle={writeArticle} />}
 
-          <SeoCard articleId={article_id} writeArticle={writeArticle} />
+          <SeoCard
+            articleId={article_id}
+            writeArticle={writeArticle}
+            mediaPicker={props.media_picker}
+          />
           <HistoryCard articleId={article_id} writeArticle={writeArticle} />
         </aside>
       </div>

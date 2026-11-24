@@ -27,6 +27,18 @@ name the module they affect.
 
 ### Added
 
+- **news: reusable public metadata** (#446). `ArticleHead`, `ArchiveHead`, their
+  prop types and `safeJsonLd` are exported from `@simple-module-py/news` so host
+  page replacements keep the stock metadata and JSON-LD escaping.
+
+- **pagebuilder: reusable public layout** (#443). A tenant-bound
+  `contracts.public.layout_props` and lazy `PublicSiteLayout` package-root export
+  let sibling reader pages reuse the site's header, navigation and footer.
+
+- **news: media-library image picker** (#441). With PageBuilder and media read
+  access, choose an article's share/cover image or body Image from its library;
+  an empty Image alt text is filled from the asset. URL entry remains available.
+
 - **events: external calendar subscriptions** (PR 10 of the events module, the last). A calendar
   shows an external `.ics` feed read-only (marked External, plain text, never re-published or
   reminded), added in a Subscriptions dialog. The address is stored encrypted (`enc:v2:`, a fifth
@@ -446,6 +458,18 @@ name the module they affect.
   the probe routes that read `error` should read `code`.
 
 ### Fixed
+
+- **news: public site layout** (#443). Articles and every archive, including
+  search results and localized routes, reuse pagebuilder's header, navigation
+  and footer where mounted. Standalone rendering is unchanged. Related stories
+  exclude the current article and its translations and stay in its language.
+- **news: draft preview layout** (#443). Draft previews reuse the site's frame
+  in the article's language and the admin request's tenant, with the preview
+  banner above sticky site headers.
+
+- **news: gallery share images work in social previews** (#441). Public article
+  metadata now makes relative image paths absolute using the configured public
+  base URL (or request origin), while stored media references stay relative.
 
 - Every package's `Repository` URL, and images' import User-Agent, name the
   repository by its current name, `antosubash/smpy_modules`; they still named

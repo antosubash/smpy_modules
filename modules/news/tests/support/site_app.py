@@ -34,15 +34,15 @@ COMPONENT = "PageBuilder/PublicNotFound"
 
 
 async def site_client(
-    *, locales: tuple[str, ...] = ("en",), multi: bool = False
+    *, locales: tuple[str, ...] = ("en",), multi: bool = False, user: Any = None
 ) -> AsyncIterator[AsyncClient]:
-    """An anonymous client on a host with both public surfaces.
+    """A client on a host with both public surfaces, anonymous by default.
 
     ``multi`` puts the framework's ``TenantMiddleware`` in the stack (so both
     modules detect MULTI) with an ``x-tenant`` header standing in for its
     resolver, on a strict database.
     """
-    app, state = await _build_app(None)
+    app, state = await _build_app(user)
     pagebuilder = PagebuilderModule()
     media = Path(tempfile.mkdtemp()) / "media"
     media.mkdir()

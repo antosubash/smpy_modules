@@ -166,6 +166,9 @@
     "save": "Planung speichern",
     "saved_toast": "Planung gespeichert"
   },
+  "media_picker": {
+    "browse": "Aus der Mediathek wählen"
+  },
   "seo": {
     "heading": "Suche & Teilen",
     "saving": "Wird gespeichert …",

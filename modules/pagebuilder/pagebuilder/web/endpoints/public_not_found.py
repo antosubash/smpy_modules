@@ -13,21 +13,18 @@ happens to ship.
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Final
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pagebuilder.content import site_nav
-from pagebuilder.content.layout_service import LayoutService, public_layout_props
-from pagebuilder.content.site_nav import SiteNav
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.core.tenancy import vary_on_tenant
 from pagebuilder.web import public_cache
+from pagebuilder.web._public_frame import public_frame
 from pagebuilder.web.html_lang import set_html_lang
-from pagebuilder.web.public_copy import public_copy
 
 PAGE_NOT_FOUND: Final = "PageBuilder/PublicNotFound"
 NOT_FOUND_DETAIL: Final = "Page not found"
@@ -105,11 +102,7 @@ async def render_not_found(
     if wants_json(request):
         response = JSONResponse({"detail": detail}, status_code=404)
     else:
-        frame: dict[str, Any] = {"layout_header": None, "layout_footer": None}
-        nav: SiteNav | None = None
-        if db is not None:
-            frame = public_layout_props(await LayoutService(db).get())
-            nav = await site_nav.site_nav(db, settings.public_route_prefix, locale)
+        frame = await public_frame(db, settings, locale)
         response = await inertia.render(
             PAGE_NOT_FOUND,
             {
@@ -118,9 +111,8 @@ async def render_not_found(
                 # (`/de/` is not a route), so every language links to `/`.
                 "home_href": "/",
                 "site_name": settings.site_name,
-                "copy": public_copy(locale),
+                "copy": frame.pop("copy"),
                 **frame,
-                "site_nav": nav,
             },
         )
         response.status_code = 404
