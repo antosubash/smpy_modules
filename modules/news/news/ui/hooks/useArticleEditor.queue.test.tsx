@@ -131,6 +131,20 @@ it.each(['main', 'side'])('translates a German conflict on %s Save', async (acti
   if (action === 'side') expect(error).toHaveBeenCalledWith(GERMAN);
 });
 
+it('reuses one translated toast for repeated local conflict refusals', async () => {
+  await act(async () => german());
+  const error = vi.spyOn(toast, 'error');
+  vi.mocked(fetch).mockResolvedValueOnce(json({ detail: STALE, code: 'article_conflict' }, 409));
+  await click(de.seo.save);
+  await click(de.seo.save);
+  await click(de.seo.save);
+  expect(editor.error).toBe(GERMAN);
+  expect(error).toHaveBeenCalledTimes(3);
+  const firstId = error.mock.results[0].value;
+  expect(firstId).toBeDefined();
+  expect(error.mock.calls.slice(1).map((call) => call[1]?.id)).toEqual([firstId, firstId]);
+});
+
 it('queues the header Publish behind main Save and before a side write', async () => {
   const server = delayedServer();
   await act(async () => editor.patch({ title: 'Pending headline' }));

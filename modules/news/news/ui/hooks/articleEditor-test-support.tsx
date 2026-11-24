@@ -61,13 +61,13 @@ export function json(body: unknown, code = 200) {
     headers: { 'content-type': 'application/json' },
   });
 }
-function Harness() {
-  editor = useArticleEditor(7);
+function Harness({ id = 7 }: { id?: number }) {
+  editor = useArticleEditor(id);
   return (
     <>
-      <SeoCard articleId={7} writeArticle={editor.writeArticle} />
-      <ScheduleCard articleId={7} writeArticle={editor.writeArticle} />
-      <HistoryCard articleId={7} writeArticle={editor.writeArticle} />
+      <SeoCard articleId={id} writeArticle={editor.writeArticle} />
+      <ScheduleCard articleId={id} writeArticle={editor.writeArticle} />
+      <HistoryCard articleId={id} writeArticle={editor.writeArticle} />
       {editor.article && (
         <ReviewCard article={editor.article} canPublish writeArticle={editor.writeArticle} />
       )}
@@ -131,6 +131,22 @@ beforeEach(async () => {
 });
 export async function unmountEditor() {
   await act(async () => root.unmount());
+}
+export async function renderEditor(id: number, strict = false) {
+  await act(async () =>
+    root.render(
+      strict ? (
+        <React.StrictMode>
+          <Harness id={id} />
+        </React.StrictMode>
+      ) : (
+        <Harness id={id} />
+      ),
+    ),
+  );
+  await act(async () => {
+    await editor.load();
+  });
 }
 afterEach(async () => {
   await unmountEditor();

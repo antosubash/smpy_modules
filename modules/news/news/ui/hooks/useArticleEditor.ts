@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
@@ -42,18 +42,30 @@ function versionKey(iso: string): string {
 export function useArticleEditor(articleId: number) {
   const { t } = useT();
   const [article, setArticle] = useState<ArticleRead | null>(null);
-  const articleRef = useRef<ArticleRead | null>(null);
+  // Pending callbacks keep their article's version even when React reuses this
+  // hook for another route. Their mounted ref detaches at the same boundary.
+  const [articleRef, setArticleRef] = useState({ articleId, current: null as ArticleRead | null });
   const [draft, setDraft] = useState<ArticleDraft | null>(null);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  const { busy: saving, run: guardSave } = useInFlight();
-  const { busy: publishing, run: guardPublish } = useInFlight();
+  const { busy: saving, run: guardSave } = useInFlight(0, articleId);
+  const { busy: publishing, run: guardPublish } = useInFlight(0, articleId);
   const busy = saving || publishing;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const { mounted, runWrite, reset, error, setError, conflict } = useArticleWriteQueue();
+  const { mounted, runWrite, reset, error, setError, conflict } = useArticleWriteQueue(articleId);
   /** The article was trashed or deleted elsewhere: nothing left to save to. */
   const [gone, setGone] = useState(false);
+  if (articleRef.articleId !== articleId) {
+    setArticleRef({ articleId, current: null });
+    setArticle(null);
+    setDraft(null);
+    setDirty(false);
+    setSaved(false);
+    setGone(false);
+    setCategories([]);
+    setTagSuggestions([]);
+  }
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -86,7 +98,7 @@ export function useArticleEditor(articleId: number) {
         })
         .catch(() => {});
     },
-    [articleId, mounted, reset, setError],
+    [articleId, articleRef, mounted, reset, setError],
   );
 
   /** Adopt a write response without discarding unsaved inspector fields.
@@ -111,7 +123,7 @@ export function useArticleEditor(articleId: number) {
       articleRef.current = next;
       if (mounted.current) setArticle(next);
     },
-    [mounted],
+    [articleRef, mounted],
   );
 
   const patch = useCallback((next: Partial<ArticleDraft>) => {
@@ -126,7 +138,7 @@ export function useArticleEditor(articleId: number) {
         const updated = await action(articleRef.current?.updated_at ?? null);
         if (updated) acceptWrite(updated, restoreTitle);
       }, true),
-    [acceptWrite, runWrite],
+    [acceptWrite, articleRef, runWrite],
   );
 
   const save = useCallback(
@@ -163,7 +175,7 @@ export function useArticleEditor(articleId: number) {
           toast.success(t(keys.news.editor.saved_toast));
         }),
       ),
-    [acceptWrite, articleId, draft, guardSave, mounted, runWrite, t],
+    [acceptWrite, articleId, articleRef, draft, guardSave, mounted, runWrite, t],
   );
 
   const publish = useCallback(
@@ -175,15 +187,19 @@ export function useArticleEditor(articleId: number) {
           if (mounted.current) toast.success(t(keys.news.editor.published_toast));
         }),
       ),
-    [acceptWrite, articleId, guardPublish, mounted, runWrite, t],
+    [acceptWrite, articleId, articleRef, guardPublish, mounted, runWrite, t],
   );
 
   const trash = useCallback(
     () =>
-      runWrite(async () => {
-        await trashArticle(articleId);
-        if (mounted.current) toast.success(t(keys.news.trash.moved_toast));
-      }),
+      runWrite(
+        async () => {
+          await trashArticle(articleId);
+          if (mounted.current) toast.success(t(keys.news.trash.moved_toast));
+        },
+        false,
+        true,
+      ),
     [articleId, mounted, runWrite, t],
   );
 

@@ -160,9 +160,51 @@ it.each([409, 422, 500, 'network'] as const)(
       expect(await next).toBe(false);
     });
     expect(pendingServer.writes).toHaveLength(1);
-    expect(warning).toHaveBeenCalledWith(expect.any(String), expect.any(Error));
+    expect(warning).toHaveBeenCalledWith(expect.any(String), expect.any(Object));
     expect(error).not.toHaveBeenCalled();
     expect(lifecycle.lateUpdates).not.toHaveBeenCalled();
+  },
+);
+
+it('logs only safe diagnostic fields from a detached failure', async () => {
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  vi.mocked(fetch).mockImplementationOnce(async () => {
+    await gate;
+    return json({ detail: 'Private article text token=secret' }, 500);
+  });
+  let saving!: Promise<unknown>;
+  act(() => {
+    saving = editor.save();
+  });
+  await leave();
+  await act(async () => {
+    release();
+    await saving;
+  });
+  expect(warning).toHaveBeenCalledWith(expect.any(String), { status: 500 });
+});
+
+it.each([false, true])(
+  'Trash cancels successors and reports success only while mounted (detached=%s)',
+  async (detached) => {
+    const pendingServer = server();
+    let trashing!: Promise<boolean>;
+    let saving!: Promise<unknown>;
+    act(() => {
+      trashing = editor.trash();
+      saving = editor.save();
+    });
+    if (detached) await leave();
+    await act(async () => {
+      pendingServer.release();
+      expect(await trashing).toBe(!detached);
+      expect(await saving).toBe(false);
+    });
+    expect(pendingServer.writes.map((w) => w.url)).toEqual(['/api/news/articles/7/trash']);
   },
 );
 

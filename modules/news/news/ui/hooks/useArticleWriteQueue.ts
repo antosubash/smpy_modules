@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { HttpError } from '../utils/http';
 import { keys, useT } from '../utils/i18n';
@@ -8,14 +8,24 @@ import { useWriteQueue } from './useWriteQueue';
 /** Every callback is an explicitly requested write. Drain those after navigation
  * with send-time versions, stopping at the first failure once the screen is gone.
  * The body editor keeps its separate autosave/final-flush queue. */
-export function useArticleWriteQueue() {
+export function useArticleWriteQueue(articleId: number) {
   const { t } = useT();
-  const mounted = useMountedRef();
+  const mounted = useMountedRef(articleId);
   const queue = useWriteQueue();
-  const blocked = useRef(false);
-  const failed = useRef(false);
+  const [flags, setFlags] = useState({
+    articleId,
+    blocked: false,
+    failed: false,
+    stopped: false,
+    toastId: undefined as string | number | undefined,
+  });
   const [conflict, setConflict] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
+  if (flags.articleId !== articleId) {
+    setFlags({ articleId, blocked: false, failed: false, stopped: false, toastId: undefined });
+    setConflict(false);
+    setErrorState(null);
+  }
   const setError = useCallback(
     (message: string | null) => {
       if (mounted.current) setErrorState(message);
@@ -23,40 +33,51 @@ export function useArticleWriteQueue() {
     [mounted],
   );
   const reset = useCallback(() => {
-    blocked.current = false;
-    failed.current = false;
+    flags.blocked = false;
+    flags.failed = false;
+    flags.stopped = false;
+    flags.toastId = undefined;
     if (mounted.current) setConflict(false);
     setError(null);
-  }, [mounted, setError]);
+  }, [flags, mounted, setError]);
 
   const runWrite = useCallback(
-    (action: () => Promise<void>, notify = false) =>
+    (action: () => Promise<void>, notify = false, terminal = false) =>
       queue(async () => {
-        if (!mounted.current && failed.current) return false;
+        if (flags.stopped || (!mounted.current && flags.failed)) return false;
         try {
-          if (blocked.current) {
+          if (flags.blocked) {
             throw new HttpError(t(keys.news.errors.article_conflict), 409, 'article_conflict');
           }
           setError(null);
           await action();
-          failed.current = false;
+          flags.failed = false;
+          if (terminal) flags.stopped = true;
           // Callers use this to show success or navigate: neither belongs to a
           // screen the writer has left, even though its request succeeded.
           return mounted.current;
         } catch (e) {
-          failed.current = true;
-          if (e instanceof HttpError && e.code === 'article_conflict') blocked.current = true;
+          flags.failed = true;
+          if (e instanceof HttpError && e.code === 'article_conflict') flags.blocked = true;
           if (!mounted.current) {
-            console.warn('Article write failed after leaving the editor', e);
+            // Server details and arbitrary thrown errors can contain the input.
+            console.warn('Article write failed after leaving the editor', {
+              status: e instanceof HttpError ? e.status : undefined,
+            });
             return false;
           }
-          setConflict(blocked.current);
+          setConflict(flags.blocked);
           setError((e as Error).message);
-          if (notify) toast.error((e as Error).message);
+          if (notify) {
+            const message = (e as Error).message;
+            const id = flags.blocked ? flags.toastId : undefined;
+            const shown = id === undefined ? toast.error(message) : toast.error(message, { id });
+            if (flags.blocked) flags.toastId = shown;
+          }
           return false;
         }
       }),
-    [mounted, queue, setError, t],
+    [flags, mounted, queue, setError, t],
   );
 
   return { mounted, runWrite, reset, error, setError, conflict };
