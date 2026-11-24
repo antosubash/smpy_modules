@@ -38,7 +38,7 @@ from typing import Any
 from urllib.parse import quote
 
 from simple_module_core.permissions import grants  # pyright: ignore[reportPrivateImportUsage]
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.core.constants import (
@@ -181,9 +181,11 @@ async def public_layout_props(
         # A missing optional schema must not abort the caller's transaction on Postgres.
         async with db.begin_nested():
             return await layout_props(request, db, locale=locale, tenant_id=tenant_id)
-    except SQLAlchemyError:
-        logger.warning(
-            "Pagebuilder layout unavailable; serving news without its frame", exc_info=True
+    except DBAPIError as exc:
+        # Optional tables can be absent; do not log SQL, parameters or a warning per reader.
+        logger.debug(
+            "Pagebuilder layout unavailable (%s); serving news without its frame",
+            type(exc).__name__,
         )
         return {}
 

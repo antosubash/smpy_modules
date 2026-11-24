@@ -146,3 +146,27 @@ async def test_missing_optional_site_tables_do_not_break_news(bilingual, missing
                 assert response.status_code == 200, response.text
                 props = response.json()["props"]
                 assert not {"layout_header", "layout_footer", "site_nav", "copy"} & props.keys()
+
+
+async def test_frame_recovery_invalidates_the_fallback_etag(monkeypatch):
+    from pagebuilder.content.layout_service import LayoutService
+    from sqlalchemy.exc import OperationalError
+
+    async def unavailable(self):
+        raise OperationalError("SELECT 1", {}, Exception("temporary failure"))
+
+    async for client in site_client():
+        await set_layout(client)
+        async with client.db_state.session_factory() as db:
+            await make_article(db, slug="story")
+        with monkeypatch.context() as patch:
+            patch.setattr(LayoutService, "get", unavailable)
+            fallback = await client.get("/news/story", headers={"Accept": "text/html"})
+        assert fallback.status_code == 200
+        recovered = await client.get(
+            "/news/story",
+            headers={"Accept": "text/html", "If-None-Match": fallback.headers["ETag"]},
+        )
+        assert recovered.status_code == 200
+        assert recovered.headers["ETag"] != fallback.headers["ETag"]
+        assert "Site header" in recovered.text
