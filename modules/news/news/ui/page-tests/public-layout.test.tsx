@@ -43,7 +43,7 @@ const frame = {
           ctaLabel: '',
           ctaHref: '',
           showLocaleSwitcher: false,
-          sticky: false,
+          sticky: true,
         },
       },
     ],
@@ -70,6 +70,12 @@ const frame = {
   },
 };
 const article = { title: 'Story', data: { content: [] }, meta_description: null, og_image: null };
+const preview = {
+  status: 'draft' as const,
+  has_unpublished_changes: false,
+  live_url: null,
+  editor_url: '/admin/news/articles/1/edit',
+};
 const archive = {
   heading: 'News',
   items: [],
@@ -80,16 +86,20 @@ const archive = {
   feed_url: '/news/feed.xml',
 };
 
-it.each(['article', 'index'])(
+it.each(['article', 'index', 'preview'])(
   'renders the site frame around the public %s only with layout props',
   async (page) => {
     const container = document.createElement('div');
     const root = createRoot(container);
     const draw = (withFrame: boolean) =>
-      page === 'article' ? (
-        <PublicArticle {...article} {...(withFrame ? frame : {})} />
-      ) : (
+      page === 'index' ? (
         <PublicIndex {...archive} {...(withFrame ? frame : {})} />
+      ) : (
+        <PublicArticle
+          {...article}
+          {...(withFrame ? frame : {})}
+          preview={page === 'preview' ? preview : undefined}
+        />
       );
     try {
       await act(async () => root.render(draw(false)));
@@ -115,8 +125,14 @@ it.each(['article', 'index'])(
         container.querySelector('[data-testid="site-footer"] a[href="/p/imprint"]')?.textContent,
       ).toBe('Imprint');
       expect(container.querySelector('main h1')?.textContent).toBe(
-        page === 'article' ? 'Story' : 'News',
+        page === 'index' ? 'News' : 'Story',
       );
+      if (page === 'preview') {
+        const banner = container.querySelector('aside[aria-label="Preview"]');
+        expect(banner?.textContent).toContain('Draft');
+        // Above the frame so a sticky site header cannot hide the warning.
+        expect(banner?.nextElementSibling).toBe(container.querySelector('.pb-public'));
+      }
       await act(async () => root.render(draw(false)));
       expect(container.innerHTML).toBe(plain);
     } finally {

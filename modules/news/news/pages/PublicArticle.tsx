@@ -119,59 +119,60 @@ export default function PublicArticle({
   const body = useMemo(() => withBlockIds(data), [data]);
 
   return (
-    <PublicLayout
-      locale={locale}
-      layout_header={layout_header}
-      layout_footer={layout_footer}
-      site_nav={site_nav}
-      copy={layoutCopy}
-    >
+    <>
       {preview && <PreviewBanner preview={preview} />}
-      <ArticleHead
-        title={title}
-        meta_description={meta_description}
-        og_image={og_image}
-        canonical_url={canonical_url}
-        og_url={og_url}
-        index_in_search={index_in_search}
-        json_ld={json_ld}
-        site_name={site_name}
-        twitter_handle={twitter_handle}
-        category={category}
-        author={author}
-        published_at={published_at}
-      />
+      <PublicLayout
+        locale={locale}
+        layout_header={layout_header}
+        layout_footer={layout_footer}
+        site_nav={site_nav}
+        copy={layoutCopy}
+      >
+        <ArticleHead
+          title={title}
+          meta_description={meta_description}
+          og_image={og_image}
+          canonical_url={canonical_url}
+          og_url={og_url}
+          index_in_search={index_in_search}
+          json_ld={json_ld}
+          site_name={site_name}
+          twitter_handle={twitter_handle}
+          category={category}
+          author={author}
+          published_at={published_at}
+        />
 
-      <article>
-        <header className="mx-auto max-w-2xl px-4 pt-12">
-          {category && (
-            <p className="mb-2 text-sm font-medium uppercase tracking-wide text-primary">
-              {category}
-            </p>
-          )}
-          {/* The article's title is the document's only `<h1>` — which is why
+        <article>
+          <header className="mx-auto max-w-2xl px-4 pt-12">
+            {category && (
+              <p className="mb-2 text-sm font-medium uppercase tracking-wide text-primary">
+                {category}
+              </p>
+            )}
+            {/* The article's title is the document's only `<h1>` — which is why
               the body's Heading block starts at level 2. */}
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-          {/* The byline links to everything else under it. A reader who
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
+            {/* The byline links to everything else under it. A reader who
               finishes a piece and wants more of the same writer had nowhere to
               go before — the category and the tags were both links and the
               person who wrote it was not. Its own component because the
               link-or-plain-text rule is the part that must not slip. */}
-          <Byline author={author} dated={dated} url={author_url} />
-          <LanguageSwitch alternates={alternates} current={locale} />
-          {og_image && (
-            <img
-              src={og_image}
-              alt=""
-              className="mt-8 w-full rounded-lg"
-              // The cover is the first thing on screen, so it is the LCP
-              // element — lazy-loading it would delay exactly the paint the
-              // reader is waiting on.
-              fetchPriority="high"
-            />
-          )}
-        </header>
-        {/* `metadata` is how a block learns what it is inside — the seam for
+            <Byline author={author} dated={dated} url={author_url} />
+            <LanguageSwitch alternates={alternates} current={locale} />
+            {og_image && (
+              <img
+                src={og_image}
+                alt=""
+                className="mt-8 w-full rounded-lg"
+                // The cover is the first thing on screen, so it is the LCP
+                // element — lazy-loading it would delay exactly the paint the
+                // reader is waiting on.
+                fetchPriority="high"
+              />
+            )}
+          </header>
+          {/* `metadata` is how a block learns what it is inside — the seam for
             any block that needs the article rather than its own props.
             `Related` reads the slug, because a "read next" list that includes
             the article you are reading is visibly broken; `Contents` and
@@ -179,19 +180,20 @@ export default function PublicArticle({
             no way to see its siblings and a contents list is nothing but a
             statement about them. The canvas builds the same outline the same
             way, so the anchors match on both screens. */}
-        {/* The raw config, labels and all: `<Render>` draws blocks, never the
+          {/* The raw config, labels and all: `<Render>` draws blocks, never the
             panel that names them, so the catalogue keys the config carries
             never reach a reader. The canvas localizes it — see `ArticleBody`. */}
-        <Render
-          config={articlePuckConfig}
-          data={body as unknown as Data}
-          metadata={{
-            currentSlug: slug,
-            currentTranslationGroup: translation_group,
-            outline: articleOutline(body),
-          }}
-        />
-      </article>
-    </PublicLayout>
+          <Render
+            config={articlePuckConfig}
+            data={body as unknown as Data}
+            metadata={{
+              currentSlug: slug,
+              currentTranslationGroup: translation_group,
+              outline: articleOutline(body),
+            }}
+          />
+        </article>
+      </PublicLayout>
+    </>
   );
 }

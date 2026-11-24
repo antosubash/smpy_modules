@@ -15,6 +15,7 @@ from news.content.articles import ArticlesService
 from news.core import constants, locales
 from news.core.settings import active, public_article_path
 from news.core.tenancy import bind_admin
+from news.integrations.pagebuilder import public_layout_props
 from news.models import ArticleStatus, NewsArticle
 from news.web.endpoints.api._deps import may_see_drafts
 from news.web.endpoints.public._render import render_article
@@ -226,7 +227,9 @@ def _preview_state(article: NewsArticle) -> dict[str, Any]:
 )
 async def article_preview(
     article_id: int,
+    request: Request,
     inertia: InertiaDep,
+    tenant: str = Depends(bind_admin),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """The article as a reader would see it, built from ``draft_data``.
@@ -260,6 +263,7 @@ async def article_preview(
         # ``_render``, which defaults both to empty for exactly this caller.
         index_in_search=False,
         preview=_preview_state(article),
+        layout=await public_layout_props(request, db, locale=article.locale, tenant_id=tenant),
     )
     # Never stored, never indexed, and labelled with the language it is in —
     # the same three things the public viewer says about a real article, minus

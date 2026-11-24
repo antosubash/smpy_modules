@@ -11,6 +11,9 @@ name the module they affect.
   search results and localized routes, reuse pagebuilder's header, navigation
   and footer where mounted. Standalone rendering is unchanged. Related stories
   exclude the current article and its translations and stay in its language.
+- **news: draft preview layout** (#443). Draft previews reuse the site's frame
+  in the article's language and the admin request's tenant, with the preview
+  banner above sticky site headers.
 
 ### Added
 

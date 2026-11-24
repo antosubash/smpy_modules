@@ -1,14 +1,80 @@
 """Success pages borrow exactly the site's public layout, with the same cache boundaries."""
 
 import pytest
-from news.models import NewsCategory
+from news.models import ArticleStatus, NewsCategory
 from pagebuilder.models import Layout, Page, PageStatus
 from simple_module_db import tenant_context
 
+from tests.support.app import ROLE_AUTHOR
 from tests.support.factories import make_article
+from tests.support.preview import page_props, preview_of
 from tests.support.site_app import FOOTER, HEADER, INERTIA, set_layout, site_client
+from tests.support.stub_auth import stub_user
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.mark.parametrize("locale,prefix", [("en", ""), ("de", "/de")])
+@pytest.mark.parametrize("multi", [False, True])
+async def test_preview_receives_the_frame_in_its_content_locale(bilingual, locale, prefix, multi):
+    user = stub_user((ROLE_AUTHOR,))
+    user.tenant_id = "home"
+    tenant = "active" if multi else "default"
+    async for client in site_client(locales=bilingual, multi=multi, user=user):
+        await set_layout(client, "home", header={"content": []})
+        await set_layout(client, tenant)
+        with tenant_context(tenant):
+            async with client.db_state.session_factory() as db:
+                article = await make_article(
+                    db, slug="draft", locale=locale, status=ArticleStatus.DRAFT, publish_body=False
+                )
+                db.add(
+                    Page(
+                        title="About",
+                        slug="about",
+                        locale=locale,
+                        status=PageStatus.PUBLISHED,
+                        show_in_header_nav=True,
+                        show_in_footer=True,
+                    )
+                )
+                await db.commit()
+        for representation in ({}, INERTIA):
+            response = await client.get(
+                preview_of(article.id),
+                headers={**representation, **({"x-tenant": tenant} if multi else {})},
+            )
+            assert response.status_code == 200, response.text
+            props = response.json()["props"] if representation else page_props(response.text)
+            assert props["layout_header"] == HEADER
+            assert props["layout_footer"] == FOOTER
+            link = {"label": "About", "href": f"{prefix}/p/about"}
+            assert props["site_nav"] == {"header": [link], "footer": [link]}
+            assert props["copy"]["skip_to_content"] == (
+                "Zum Inhalt springen" if locale == "de" else "Skip to content"
+            )
+            assert props["preview"]["status"] == "draft"
+            assert props["index_in_search"] is False
+            assert props["canonical_url"] is None
+            assert response.headers["Cache-Control"] == "private, no-store"
+            assert response.headers["X-Robots-Tag"] == "noindex, nofollow"
+            assert response.headers["Content-Language"] == locale
+            assert "ETag" not in response.headers
+
+
+async def test_preview_without_pagebuilder_keeps_its_plain_props(editor_client, monkeypatch):
+    from news.integrations import pagebuilder
+
+    monkeypatch.setattr(pagebuilder, "available", lambda: False)
+    async with editor_client.db_state.session_factory() as db:
+        article = await make_article(
+            db, slug="draft", status=ArticleStatus.DRAFT, publish_body=False
+        )
+    response = await editor_client.get(preview_of(article.id), headers=INERTIA)
+    assert response.status_code == 200, response.text
+    props = response.json()["props"]
+    assert props["preview"]["status"] == "draft"
+    assert not {"layout_header", "layout_footer", "site_nav", "copy"} & props.keys()
 
 
 @pytest.mark.parametrize("locale,prefix", [("en", ""), ("de", "/de")])
