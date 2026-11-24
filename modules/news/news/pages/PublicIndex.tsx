@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/react';
-import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 
 import { ArchiveSearch } from '../ui/components/ArchiveSearch';
+import { PublicLayout, type PublicLayoutProps } from '../ui/components/PublicLayout';
 import { useDocumentLang } from '../ui/hooks/useDocumentLang';
 import { type ArticleRead, formatArticleDate } from '../ui/utils/api';
 import { archiveUrl } from '../ui/utils/archiveUrl';
@@ -21,7 +21,7 @@ import { keys, useT } from '../ui/utils/i18n';
  * carries the less there is to unpick.
  */
 
-interface Props {
+interface Props extends PublicLayoutProps {
   heading: string;
   description?: string | null;
   items: ArticleRead[];
@@ -53,15 +53,22 @@ export default function PublicIndex({
   narrowed = false,
   feed_url,
   locale,
+  layout_header,
+  layout_footer,
+  site_nav,
+  copy: layoutCopy,
 }: Props) {
   const { t, locale: consoleLocale } = useT();
   useDocumentLang(locale);
   const copy = keys.news.public;
   return (
-    <div>
-      {/* A public page has no admin layout, so without this the configured
-          brand colour and favicon would stop at the sign-in wall. */}
-      <BrandingHead />
+    <PublicLayout
+      locale={locale}
+      layout_header={layout_header}
+      layout_footer={layout_footer}
+      site_nav={site_nav}
+      copy={layoutCopy}
+    >
       <Head title={query ? t(copy.title_with_query, { query, heading }) : heading}>
         {/* Results pages stay out of the index: the input space is unbounded,
             so one indexed `?q=` link invites a crawler to enumerate query
@@ -173,6 +180,6 @@ export default function PublicIndex({
           </a>
         </p>
       </div>
-    </div>
+    </PublicLayout>
   );
 }

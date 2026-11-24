@@ -61,6 +61,18 @@ describe('pickRelated', () => {
   it('copes with an archive holding only the current article', () => {
     expect(pickRelated([article('only')], 'only', 3)).toEqual([]);
   });
+
+  it('excludes translations of the current story and keeps the content locale', () => {
+    const articles = [
+      { ...article('story'), translation_group: 'current' },
+      { ...article('geschichte'), locale: 'de', translation_group: 'current' },
+      { ...article('other'), translation_group: 'other' },
+      { ...article('fremd'), locale: 'de', translation_group: 'foreign' },
+    ];
+    expect(pickRelated(articles, 'story', 3, 'current', 'en').map((a) => a.slug)).toEqual([
+      'other',
+    ]);
+  });
 });
 
 describe('Read next', () => {

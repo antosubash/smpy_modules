@@ -42,6 +42,7 @@ async def render_article(
     alternates: list[dict[str, str]] | None = None,
     index_in_search: bool = True,
     preview: dict[str, Any] | None = None,
+    layout: dict[str, Any] | None = None,
 ) -> Response:
     """Render ``data`` as this article, through the reader's own screen.
 
@@ -60,9 +61,7 @@ async def render_article(
     for the same reason — the preview forces it False regardless of what the
     article says, which is what puts ``noindex`` in both heads.
     """
-    published_at = (
-        article.published_at.isoformat() if article.published_at is not None else None
-    )
+    published_at = article.published_at.isoformat() if article.published_at is not None else None
     # The byline's archive, where it has one. It was a dead end before: rendered
     # on the page and emitted as ``article:author``, with nowhere for a reader
     # who liked the writer to go, while a category and a tag each had a page.
@@ -90,6 +89,7 @@ async def render_article(
         # article you are reading is visibly broken, and the slug is the only
         # thing that identifies it inside the block document.
         "slug": article.slug,
+        "translation_group": article.translation_group,
         "data": data,
         "meta_description": article.meta_description,
         "og_image": image_or_none(article.og_image),
@@ -105,6 +105,7 @@ async def render_article(
         "published_at": published_at,
         "locale": locale,
         "alternates": alternates or [],
+        **(layout or {}),
     }
     if preview is not None:
         # Absent entirely on the public route rather than sent as null: this

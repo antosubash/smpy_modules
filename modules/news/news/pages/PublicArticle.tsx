@@ -1,6 +1,5 @@
 import { Head } from '@inertiajs/react';
 import { type Data, Render } from '@puckeditor/core';
-import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useEffect, useMemo } from 'react';
 import { Byline } from '../ui/components/Byline';
 import { articlePuckConfig } from '../ui/components/body/articlePuckConfig';
@@ -8,6 +7,7 @@ import { withBlockIds } from '../ui/components/body/blockIds';
 import { articleOutline } from '../ui/components/body/blocks/outline';
 import { type Alternate, LanguageSwitch } from '../ui/components/LanguageSwitch';
 import { type ArticlePreviewState, PreviewBanner } from '../ui/components/PreviewBanner';
+import { PublicLayout, type PublicLayoutProps } from '../ui/components/PublicLayout';
 import { useDocumentLang } from '../ui/hooks/useDocumentLang';
 import { formatArticleDate } from '../ui/utils/api';
 import { useT } from '../ui/utils/i18n';
@@ -26,11 +26,12 @@ import { safeJsonLd } from '../ui/utils/jsonLd';
  * metadata.
  */
 
-interface Props {
+interface Props extends PublicLayoutProps {
   title: string;
   /** Which article this is. Handed to the block document as Puck metadata so a
    *  block can know what it is inside — see the `<Render>` call below. */
   slug?: string;
+  translation_group?: string;
   data: Record<string, unknown>;
   meta_description: string | null;
   og_image: string | null;
@@ -100,6 +101,7 @@ function useAnchorOnArrival() {
 export default function PublicArticle({
   title,
   slug,
+  translation_group,
   data,
   meta_description,
   og_image,
@@ -114,6 +116,10 @@ export default function PublicArticle({
   author_url,
   published_at,
   locale,
+  layout_header,
+  layout_footer,
+  site_nav,
+  copy: layoutCopy,
   alternates,
   preview,
 }: Props) {
@@ -127,10 +133,13 @@ export default function PublicArticle({
   const body = useMemo(() => withBlockIds(data), [data]);
 
   return (
-    <div>
-      {/* A public page has no admin layout, so without this the configured
-          brand colour and favicon would stop at the sign-in wall. */}
-      <BrandingHead />
+    <PublicLayout
+      locale={locale}
+      layout_header={layout_header}
+      layout_footer={layout_footer}
+      site_nav={site_nav}
+      copy={layoutCopy}
+    >
       {preview && <PreviewBanner preview={preview} />}
       <Head title={title}>
         {meta_description && (
@@ -211,9 +220,13 @@ export default function PublicArticle({
         <Render
           config={articlePuckConfig}
           data={body as unknown as Data}
-          metadata={{ currentSlug: slug, outline: articleOutline(body) }}
+          metadata={{
+            currentSlug: slug,
+            currentTranslationGroup: translation_group,
+            outline: articleOutline(body),
+          }}
         />
       </article>
-    </div>
+    </PublicLayout>
   );
 }

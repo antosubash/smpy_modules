@@ -18,6 +18,8 @@ something inferred later.
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from simple_module_db import get_db
@@ -30,6 +32,7 @@ from news.core import locales, tenancy
 from news.core.safe_url import canonical_or_none
 from news.core.settings import NewsSettings, active, public_article_path
 from news.core.tenancy import bind_public_viewer
+from news.integrations.pagebuilder import public_layout_props
 from news.web.endpoints.public._not_found import not_found
 from news.web.endpoints.public._render import render_article
 from news.web.endpoints.public._urls import (
@@ -138,7 +141,12 @@ def article_router(locale: str) -> APIRouter:
             return await not_found(request, inertia, db, locale=locale, tenant=tenant)
 
         variant = "inertia" if request.headers.get("x-inertia") else "html"
-        etag = etag_for(article.id or 0, article.updated_at, variant, viewer_key(request))
+        layout = await public_layout_props(request, db, locale=locale, tenant_id=tenant)
+        # Chrome and flagged nav pages change independently of the article.
+        frame_key = json.dumps(layout, sort_keys=True) if layout else ""
+        etag = etag_for(
+            article.id or 0, article.updated_at, variant, viewer_key(request) + frame_key
+        )
         # A signed-in copy is never kept, so it gets no validator and no 304.
         reader_signed_in = signed_in(request)
 
@@ -177,6 +185,7 @@ def article_router(locale: str) -> APIRouter:
                 canonical=canonical,
                 alternates=siblings,
                 index_in_search=article.index_in_search,
+                layout=layout,
             )
         )
 

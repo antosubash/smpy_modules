@@ -13,10 +13,10 @@ neighbour reached through exactly two files:
 
 | Seam | Used for |
 |---|---|
-| `integrations/pagebuilder.py` | `available()`; Pages and Media search sections; "see all" links into `/pagebuilder/…` |
+| `integrations/pagebuilder.py` | `available()`; Pages and Media search; links into `/pagebuilder/…`; public site layout and 404 |
 | `integrations/locales.py` | borrowing pagebuilder's `content_locales` / `default_content_locale` |
 | `integrations/bundle/` (via `register_bundle_section`) | news' section of pagebuilder's content bundle (#80): capture, validate, plan, apply through `pagebuilder.contracts.bundle`, in the restore's own session and bound tenant; labels are news' own `bundle.*` catalogue keys, rendered by pagebuilder |
-| `pagebuilder-blocks.ts` + `components/NewsFeed.tsx` (frontend) | registering the **News feed** block in pagebuilder's palette |
+| `pagebuilder-blocks.ts` + `ui/components/NewsFeed.tsx` (frontend) | registering news blocks and the optional public layout renderer |
 
 Every Python import of `pagebuilder` is deferred into a function and guarded,
 so importing news (or its migrations) never imports it — `test_module.py`

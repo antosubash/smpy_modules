@@ -68,7 +68,8 @@ dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "simple_module_test>=0.0.36,<0.1"]
 # Raised again to 0.0.16 (#336): the content locales are read through
 # ``pagebuilder.contracts.site``, first released in 0.0.16, instead of
 # ``pagebuilder.core.locales`` and ``app.state.pagebuilder``.
-# floor: 0.0.16 — contracts.site (#336); contracts.bundle (#80) and contracts.public (#248) since 0.0.13.
+# 0.0.16 also adds contracts.public.layout_props (#443), the site's public frame.
+# floor: 0.0.16 — contracts.site (#336), contracts.public.layout_props (#443); bundle/public since 0.0.13.
 pagebuilder = ["simple_module_pagebuilder>=0.0.16,<0.1"]
 
 [build-system]

@@ -18,7 +18,10 @@
  * other host it is simply never imported (a glob that matches nothing is not an
  * error), and no block-glob exclusion is needed.
  *
- * The registration itself is guarded because it runs eagerly at app start, and
+ * The public layout renderer is also registered here; its palette loads only
+ * when a public news page renders the site frame.
+ *
+ * The block registration itself is guarded because it runs eagerly at app start, and
  * a throw here would take down the whole bundle's init rather than quietly
  * leaving one block unregistered.
  *
@@ -26,11 +29,14 @@
  * not demand it of a host that never installs it.
  */
 
-import { registerPuckBlocks } from '@simple-module-py/pagebuilder';
+import { PublicSiteLayout, registerPuckBlocks } from '@simple-module-py/pagebuilder';
 
 import { NewsFeedBlock } from './ui/components/NewsFeed';
 import { NewsStatsBlock } from './ui/components/NewsStats';
+import { registerPublicLayout } from './ui/components/PublicLayout';
 import { keys } from './ui/utils/i18n';
+
+registerPublicLayout(PublicSiteLayout);
 
 try {
   registerPuckBlocks({

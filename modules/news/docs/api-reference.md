@@ -274,3 +274,27 @@ on a 304), with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflan
 | 400 | `Cannot merge a tag into itself.` | tag merge |
 | 409 | `A tag named '…' already exists.` | tag rename |
 | 404 | `Revision not found` / `Category not found.` / `Tag not found.` | |
+
+## Replacing the public pages
+
+A host's Inertia resolver may replace `News/PublicArticle` and
+`News/PublicIndex`. Both receive the same flat site-frame props as pagebuilder's
+`/p/*` pages when pagebuilder is installed **and mounted**: `layout_header`,
+`layout_footer` (Puck documents, or `null` for an empty slot), `site_nav`
+(`header` / `footer` lists of `{label, href}`), and `copy` (frame strings in the
+content locale). They are omitted entirely on standalone news hosts.
+
+`PublicLayout` and `PublicLayoutProps` are exported from
+`@simple-module-py/news`. Pass those props and the page's `locale` to it to keep
+the site's header, nav, footer, design pack, branding and skip link around your
+content. Pagebuilder's own public shell is registered through news' optional
+`pagebuilder-blocks.ts` entry, which pagebuilder loads automatically; do not
+import that entry on a host without pagebuilder. The shared layout palette
+loads on demand rather than entering every page's initial chunk. Without a
+site frame, `PublicLayout` keeps news' original branded reading column.
+
+Frame queries bind the request's resolved tenant through
+`pagebuilder.contracts.public.layout_props` (0.0.16). They do not change the
+response's tenant/cache policy; article ETags include the layout and nav so
+editing either invalidates a cached article. Related stories stay in the
+article's content locale and exclude its slug and translation group.

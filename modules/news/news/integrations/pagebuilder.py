@@ -56,6 +56,7 @@ __all__ = [
     "media_library_path",
     "page_editor_path",
     "page_search_path",
+    "public_layout_props",
     "register_bundle_section",
     "render_not_found",
     "search_media",
@@ -156,9 +157,7 @@ async def search_pages(
     )
 
 
-async def search_media(
-    db: AsyncSession, pattern: str, *, limit: int
-) -> tuple[list[Any], int]:
+async def search_media(db: AsyncSession, pattern: str, *, limit: int) -> tuple[list[Any], int]:
     """Media assets matching ``pattern``. ``([], 0)`` without pagebuilder."""
     contract = _contract()
     if contract is None:
@@ -167,6 +166,17 @@ async def search_media(
 
 
 # ── The site's not-found page ─────────────────────────────────────────
+
+
+async def public_layout_props(
+    request: Any, db: AsyncSession, *, locale: str, tenant_id: str | None
+) -> dict[str, Any]:
+    """The site's success-page frame, or no extra props on a standalone host."""
+    public = getattr(_contract(), "public", None)
+    layout_props = getattr(public, "layout_props", None)
+    if layout_props is None:
+        return {}
+    return await layout_props(request, db, locale=locale, tenant_id=tenant_id)
 
 
 async def render_not_found(
