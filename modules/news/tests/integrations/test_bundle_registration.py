@@ -5,14 +5,21 @@ from __future__ import annotations
 import subprocess
 import sys
 import textwrap
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from news.core import locales as news_locales
+from news.core.settings import NewsSettings
 from news.integrations import pagebuilder as pb
 from news.integrations.bundle import NewsBundleSection
 from news.module import NewsModule
 from pagebuilder.contracts.bundle import BundleSection
+from pagebuilder.core.settings import PagebuilderSettings
+from pagebuilder.module import PagebuilderModule
+from simple_module_core.module_settings import ModuleSettingsRegistry
 
 from tests.support.bundle_app import bundle_host
 
@@ -97,3 +104,50 @@ async def test_on_startup_registers_the_section_on_a_pagebuilder_host(tmp_path) 
             # worker would mount the viewer for this app's languages only.
             await module.on_shutdown(app)
             news_locales.reset()
+
+
+def test_same_app_lifespan_can_start_twice(tmp_path) -> None:
+    news = NewsModule()
+    news.settings = NewsSettings(scheduler_enabled=False)
+    pagebuilder = PagebuilderModule()
+    pagebuilder.settings = PagebuilderSettings(
+        media_root=tmp_path / "media",
+        snapshot_root=tmp_path / "snapshots",
+        scheduler_enabled=False,
+    )
+
+    @asynccontextmanager
+    async def lifespan(app):
+        await pagebuilder.on_startup(app)
+        await news.on_startup(app)
+        try:
+            yield
+        finally:
+            await news.on_shutdown(app)
+            await pagebuilder.on_shutdown(app)
+
+    app = FastAPI(lifespan=lifespan)
+    app.state.settings = SimpleNamespace(module_registry=ModuleSettingsRegistry())
+    pagebuilder.register_settings(app)
+    news.register_settings(app)
+    for _ in range(2):
+        with TestClient(app):
+            assert isinstance(app.state.pagebuilder.bundle_sections.get("news"), NewsBundleSection)
+            assert len(app.state.pagebuilder.bundle_sections) == 1
+
+
+def test_a_different_contributor_claiming_news_is_refused() -> None:
+    from pagebuilder.content.snapshots.registry import SectionRegistry
+
+    class OtherSection(NewsBundleSection):
+        """A different contributor claiming the same name."""
+
+    registry = SectionRegistry()
+    registry.register(OtherSection())
+    app = SimpleNamespace(
+        state=SimpleNamespace(
+            pagebuilder=SimpleNamespace(bundle_sections=registry),
+        )
+    )
+    with pytest.raises(ValueError, match="bundle section 'news' is already registered"):
+        pb.register_bundle_section(app)

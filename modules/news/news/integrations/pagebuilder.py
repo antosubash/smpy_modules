@@ -156,9 +156,7 @@ async def search_pages(
     )
 
 
-async def search_media(
-    db: AsyncSession, pattern: str, *, limit: int
-) -> tuple[list[Any], int]:
+async def search_media(db: AsyncSession, pattern: str, *, limit: int) -> tuple[list[Any], int]:
     """Media assets matching ``pattern``. ``([], 0)`` without pagebuilder."""
     contract = _contract()
     if contract is None:
@@ -205,6 +203,8 @@ def register_bundle_section(app: Any) -> bool:
     section registry while the app is built, before any ``on_startup``, so
     the order the two modules start in does not matter.
     """
+    if getattr(app.state, "_news_bundle_registered", False):
+        return True
     if not available():
         return False
     try:
@@ -214,4 +214,8 @@ def register_bundle_section(app: Any) -> bool:
 
     from news.integrations.bundle import NewsBundleSection
 
-    return bundle.register_section(app, NewsBundleSection())
+    registered = bundle.register_section(app, NewsBundleSection())
+    # The registry lives for the app, beyond any single lifespan. Mark only a
+    # successful registration; a different contributor still raises above.
+    app.state._news_bundle_registered = registered
+    return registered

@@ -5,6 +5,9 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+- News registers its content-bundle section once per app, so restarting the same
+  app lifespan works while conflicting section names still fail loudly (#447).
+
 ### Added
 
 - **events: external calendar subscriptions** (PR 10 of the events module, the last). A calendar
