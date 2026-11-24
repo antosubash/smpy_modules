@@ -262,6 +262,22 @@ FAMILIES: tuple[Family, ...] = (
             Copy("modules/images/sm_images/web/services/masking.py"),
         ),
     ),
+    Family(
+        "block link safety",
+        (
+            Copy(f"{PB}/content/links.py"),
+            Copy(
+                f"{NEWS}/content/links.py",
+                own={
+                    "_sources_links": "News' Sources block packs `label | href` lines into one textarea."
+                },
+            ),
+        ),
+        differ={
+            "FRAME_SOURCES": "Pagebuilder has Iframe/Video `src`; news has Embed/Video/Audio `url`.",
+            "_walk": "News' Sources block also yields each `label | href` line via `_sources_links`.",
+        },
+    ),
     *SSRF_FAMILIES,
     *CRYPTO_FAMILIES,
     *PUBLIC_FAMILIES,

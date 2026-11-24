@@ -13,6 +13,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { keys, useT } from '../../../utils/i18n';
+import { safeFrameSrc } from '../../../utils/safeLinks';
 
 export interface VideoProps {
   url: string;
@@ -29,15 +30,17 @@ export const VideoBlock: ComponentConfig<VideoProps> = {
   },
   defaultProps: { url: '', poster: '', caption: '' },
   render: ({ url, poster, caption }) => {
-    if (!url) return <></>;
+    const safeSrc = safeFrameSrc(url);
+    if (!safeSrc) return <></>;
+    const safePoster = safeFrameSrc(poster);
     return (
       <figure className="my-8">
         {/* `preload="metadata"`, not `auto`: an article can carry several of
             these, and a reader who scrolls past one should not have paid for
             it. A poster gives them something to see before they choose. */}
         <video
-          src={url}
-          poster={poster || undefined}
+          src={safeSrc}
+          poster={safePoster || undefined}
           controls
           preload="metadata"
           className="w-full rounded-lg"
@@ -75,7 +78,8 @@ export const AudioBlock: ComponentConfig<AudioProps> = {
 
 function AudioRender({ url, title, caption }: AudioProps) {
   const { t } = useT();
-  if (!url) return null;
+  const safeSrc = safeFrameSrc(url);
+  if (!safeSrc) return null;
   return (
     <figure className="my-8 rounded-lg border bg-muted/40 p-4">
       {title && <p className="mb-2 text-sm font-semibold">{title}</p>}
@@ -83,7 +87,7 @@ function AudioRender({ url, title, caption }: AudioProps) {
           itself as "audio" and nothing else, which in an article carrying
           three of them tells a listener nothing. */}
       <audio
-        src={url}
+        src={safeSrc}
         controls
         preload="metadata"
         aria-label={title || t(keys.news.blocks.audio.fallback_label)}

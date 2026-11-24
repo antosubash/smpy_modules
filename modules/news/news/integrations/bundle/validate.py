@@ -17,6 +17,7 @@ from typing import Any
 
 from pagebuilder.contracts.bundle import ValidateContext
 
+from news.content.links import UnsafeLinkError, check_links
 from news.core.constants import (
     MAX_AUTHOR_LEN,
     MAX_CATEGORY_LEN,
@@ -162,6 +163,11 @@ def _article(ctx: ValidateContext, relative: str) -> dict[str, Any]:
             raise ctx.invalid(f"{where} has an invalid {field}")
     for field in MEDIA_FIELDS:
         ctx.check_media(doc.get(field), f"article /{doc['slug']} ({doc['locale']})")
+    for field in ("draft_data", "published_data"):
+        try:
+            check_links(doc.get(field), label=f"{where} {field}: ", extra_schemes=("asset",))
+        except UnsafeLinkError as exc:
+            raise ctx.invalid(str(exc)) from exc
     return doc
 
 

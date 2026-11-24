@@ -427,6 +427,13 @@ name the module they affect.
 
 ### Fixed
 
+- **news validates and sanitises article body links and embed sources** (#364).
+  `PUT /api/news/articles/{id}/body` and uploaded `news/` bundle sections now check body documents
+  using the same link rules as pagebuilder (`news.content.links`, parity-checked against
+  `pagebuilder.content.links`): `Embed.url`, `Video.url` and `Audio.url` accept only `http(s)` or
+  relative URLs, and `Sources.items`, `href`/`*Href` props and Markdown links accept only
+  `http(s)`, `mailto`, `tel` or relative addresses. The `Embed`, `Video`, `Audio` and `Sources`
+  blocks also sanitise their URLs at render via `news/ui/utils/safeLinks.ts`.
 - **images' share picker masks email addresses and filters substring matches** (#407).
   `GET /api/images/collections/{id}/share-candidates` now shares events' masking and filtering
   rules: partial-address queries no longer match, nameless or address-shaped labels are masked, and
