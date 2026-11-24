@@ -5,16 +5,6 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
-### Fixed
-
-- **news: public site layout** (#443). Articles and every archive, including
-  search results and localized routes, reuse pagebuilder's header, navigation
-  and footer where mounted. Standalone rendering is unchanged. Related stories
-  exclude the current article and its translations and stay in its language.
-- **news: draft preview layout** (#443). Draft previews reuse the site's frame
-  in the article's language and the admin request's tenant, with the preview
-  banner above sticky site headers.
-
 ### Added
 
 - **news: reusable public metadata** (#446). `ArticleHead`, `ArchiveHead`, their
@@ -448,6 +438,14 @@ name the module they affect.
   the probe routes that read `error` should read `code`.
 
 ### Fixed
+
+- **news: public site layout** (#443). Articles and every archive, including
+  search results and localized routes, reuse pagebuilder's header, navigation
+  and footer where mounted. Standalone rendering is unchanged. Related stories
+  exclude the current article and its translations and stay in its language.
+- **news: draft preview layout** (#443). Draft previews reuse the site's frame
+  in the article's language and the admin request's tenant, with the preview
+  banner above sticky site headers.
 
 - **news: gallery share images work in social previews** (#441). Public article
   metadata now makes relative image paths absolute using the configured public
