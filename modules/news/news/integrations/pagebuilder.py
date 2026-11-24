@@ -169,6 +169,12 @@ async def search_media(db: AsyncSession, pattern: str, *, limit: int) -> tuple[l
 # ── The site's not-found page ─────────────────────────────────────────
 
 
+@cache
+def _warn_layout_unavailable() -> None:
+    # Alert operators once per process without exposing SQL or flooding reader logs.
+    logger.warning("Pagebuilder layout unavailable; serving news without its frame")
+
+
 async def public_layout_props(
     request: Any, db: AsyncSession, *, locale: str, tenant_id: str | None
 ) -> dict[str, Any]:
@@ -182,7 +188,11 @@ async def public_layout_props(
         async with db.begin_nested():
             return await layout_props(request, db, locale=locale, tenant_id=tenant_id)
     except DBAPIError as exc:
-        # Optional tables can be absent; do not log SQL, parameters or a warning per reader.
+        # A savepoint cannot recover a dead connection; preserve the original failure.
+        if exc.connection_invalidated:
+            raise
+        _warn_layout_unavailable()
+        # Keep diagnostics free of SQL, parameters and database exception messages.
         logger.debug(
             "Pagebuilder layout unavailable (%s); serving news without its frame",
             type(exc).__name__,
