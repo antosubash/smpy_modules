@@ -16,6 +16,7 @@ from news.core import constants, locales
 from news.core.settings import active, public_article_path
 from news.core.tenancy import bind_admin
 from news.models import ArticleStatus, NewsArticle
+from news.web.endpoints._media_picker import media_picker_allowed
 from news.web.endpoints.api._deps import may_see_drafts
 from news.web.endpoints.public._render import render_article
 
@@ -120,7 +121,7 @@ async def category_list(inertia: InertiaDep) -> InertiaResponse:
     response_model=None,
     dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
 )
-async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaResponse:
+async def article_editor(article_id: int, inertia: InertiaDep, request: Request) -> InertiaResponse:
     """Everything about an article except its body.
 
     The body has a canvas of its own next door, because the two are edited in
@@ -136,12 +137,11 @@ async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaRespons
         constants._PAGE_ARTICLE_EDITOR,
         {
             "article_id": article_id,
+            "media_picker": await media_picker_allowed(request),
             # Served rather than assembled in the browser, for the same reason
             # ``edit_url`` is on the listing DTO: this screen holds no opinion
             # about how the module routes its own screens.
-            "preview_url": constants.ARTICLE_PREVIEW_URL.format(
-                article_id=article_id
-            ),
+            "preview_url": constants.ARTICLE_PREVIEW_URL.format(article_id=article_id),
             **_locale_props(),
         },
     )
@@ -152,7 +152,7 @@ async def article_editor(article_id: int, inertia: InertiaDep) -> InertiaRespons
     response_model=None,
     dependencies=[Depends(RequiresPermission(constants.PERM_EDIT))],
 )
-async def article_body(article_id: int, inertia: InertiaDep) -> InertiaResponse:
+async def article_body(article_id: int, inertia: InertiaDep, request: Request) -> InertiaResponse:
     """The block canvas an article's body is composed in.
 
     This route is the visible half of the split: it used to be a pagebuilder
@@ -164,7 +164,8 @@ async def article_body(article_id: int, inertia: InertiaDep) -> InertiaResponse:
     document twice on every load.
     """
     return await inertia.render(
-        constants._PAGE_ARTICLE_BODY, {"article_id": article_id}
+        constants._PAGE_ARTICLE_BODY,
+        {"article_id": article_id, "media_picker": await media_picker_allowed(request)},
     )
 
 
@@ -205,16 +206,11 @@ def _preview_state(article: NewsArticle) -> dict[str, Any]:
     timestamp, too: an autosave that restored the previous text moves
     ``updated_at`` and leaves the document identical.
     """
-    live = (
-        article.status is ArticleStatus.PUBLISHED and article.published_data is not None
-    )
+    live = article.status is ArticleStatus.PUBLISHED and article.published_data is not None
     return {
         "status": article.status.value,
-        "has_unpublished_changes": live
-        and article.draft_data != article.published_data,
-        "live_url": (
-            public_article_path(article.slug, article.locale) if live else None
-        ),
+        "has_unpublished_changes": live and article.draft_data != article.published_data,
+        "live_url": (public_article_path(article.slug, article.locale) if live else None),
         "editor_url": constants.ARTICLE_EDITOR_URL.format(article_id=article.id),
     }
 

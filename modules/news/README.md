@@ -628,11 +628,12 @@ block; [docs/user-guide.md](docs/user-guide.md) lists every block by group.
   the head and nothing else. Server-rendering the body would mean a Python
   implementation of all twenty-one blocks, or SSR in the host. Both are real
   projects; neither is this module's to start.
-- **Images take a URL, not a picker.** The media library belongs to
-  pagebuilder, and the Image and Gallery blocks have to work without it. The
-  single-URL fields now show what the address points at as it is typed, so a
-  wrong one is caught in the panel rather than on the published page — but that
-  is a preview, not a library, and the extra step remains.
+- **Gallery and Before / after images still take URLs.** The share/cover image
+  and body Image block offer pagebuilder's media picker when it is installed
+  and the editor holds one of its read permissions. The optional
+  `pagebuilder-blocks.ts` entry registers the gallery; the admin pages import
+  no pagebuilder code. URL entry and the single-URL previews stay available.
+  Picking an Image fills its alt text only when it is empty.
 
   The obvious alternative does not work. This repo's host also runs
   `file_storage`, but every one of its routes sits behind `RequiresPermission`,

@@ -32,6 +32,6 @@ export type { StatItem, StatsWidgetProps } from './ui/components/widgets/stats-w
 export { StatsView } from './ui/components/widgets/stats-widget';
 // Editor fields backed by pagebuilder's media library.
 export type { FileItem, FilePickerAdapter } from './ui/fields';
-export { createImageField, mediaLibraryAdapter } from './ui/fields';
+export { createImageField, FileGallery, mediaLibraryAdapter } from './ui/fields';
 // Link sanitising, so a contributed block treats URLs as pagebuilder's do.
 export { isSafeHref, safeHref } from './ui/utils/markdown-links';

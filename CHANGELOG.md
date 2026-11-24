@@ -7,6 +7,10 @@ name the module they affect.
 
 ### Added
 
+- **news: media-library image picker** (#441). With PageBuilder and media read
+  access, choose an article's share/cover image or body Image from its library;
+  an empty Image alt text is filled from the asset. URL entry remains available.
+
 - **events: external calendar subscriptions** (PR 10 of the events module, the last). A calendar
   shows an external `.ics` feed read-only (marked External, plain text, never re-published or
   reminded), added in a Subscriptions dialog. The address is stored encrypted (`enc:v2:`, a fifth

@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { getArticleDetail, updateArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
+import { MediaPickerButton } from '../media/MediaPicker';
+
 const DESC_ID = 'article-meta-description';
 const IMAGE_ID = 'article-og-image';
 const CANONICAL_ID = 'article-canonical-url';
@@ -26,7 +28,13 @@ const INDEX_ID = 'article-index-in-search';
  * fields into the inspector's draft would mean the main form fetching a second
  * document just to render a panel most edits never touch.
  */
-export function SeoCard({ articleId }: { articleId: number }) {
+export function SeoCard({
+  articleId,
+  mediaPicker = false,
+}: {
+  articleId: number;
+  mediaPicker?: boolean;
+}) {
   const { t } = useT();
   const copy = keys.news.seo;
   const [description, setDescription] = useState('');
@@ -96,6 +104,11 @@ export function SeoCard({ articleId }: { articleId: number }) {
           disabled={busy}
           placeholder={t(copy.image_placeholder)}
           onChange={(e) => setImage(e.target.value)}
+        />
+        <MediaPickerButton
+          enabled={mediaPicker}
+          disabled={busy}
+          onSelect={(item) => setImage(item.url)}
         />
         <p className="text-xs text-muted-foreground">{t(copy.image_help)}</p>
       </div>
