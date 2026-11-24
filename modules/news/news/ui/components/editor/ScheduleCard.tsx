@@ -4,6 +4,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { useMountedRef } from '../../hooks/useMountedRef';
 import { getArticleDetail, scheduleArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
@@ -30,6 +31,7 @@ export function ScheduleCard({
   writeArticle: ArticleWrite;
 }) {
   const { t } = useT();
+  const mounted = useMountedRef();
   const copy = keys.news.schedule;
   const [publishAt, setPublishAt] = useState('');
   const [unpublishAt, setUnpublishAt] = useState('');
@@ -43,6 +45,7 @@ export function ScheduleCard({
     const controller = new AbortController();
     void getArticleDetail(articleId, controller.signal)
       .then((detail) => {
+        if (controller.signal.aborted) return;
         setPublishAt(toLocalInput(detail.publish_at));
         setUnpublishAt(toLocalInput(detail.unpublish_at));
       })
@@ -70,7 +73,7 @@ export function ScheduleCard({
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 

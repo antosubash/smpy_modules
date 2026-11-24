@@ -6,6 +6,7 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { useMountedRef } from '../../hooks/useMountedRef';
 import { getArticleDetail, updateArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
@@ -34,6 +35,7 @@ export function SeoCard({
   writeArticle: ArticleWrite;
 }) {
   const { t } = useT();
+  const mounted = useMountedRef();
   const copy = keys.news.seo;
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
@@ -46,6 +48,7 @@ export function SeoCard({
     const controller = new AbortController();
     void getArticleDetail(articleId, controller.signal)
       .then((detail) => {
+        if (controller.signal.aborted) return;
         setDescription(detail.meta_description ?? '');
         setImage(detail.og_image ?? '');
         setCanonical(detail.canonical_url ?? '');
@@ -73,7 +76,7 @@ export function SeoCard({
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 

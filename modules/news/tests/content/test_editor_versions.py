@@ -116,3 +116,18 @@ async def test_rejected_tags_after_metadata_save_keeps_the_metadata_version(edit
         url, json={"author": "Corrected", "expected_updated_at": stamp}
     )
     assert retried.status_code == 200, retried.text
+
+
+async def test_slug_collision_is_not_a_stale_write_envelope(editor_client):
+    await editor_client.post(ARTICLES, json={"title": "Taken", "slug": "taken"})
+    article = (await editor_client.post(ARTICLES, json={"title": "Original"})).json()
+    url = f"{ARTICLES}/{article['id']}"
+    collision = await editor_client.put(
+        url, json={"slug": "taken", "expected_updated_at": article["updated_at"]}
+    )
+    assert collision.status_code == 409, collision.text
+    assert collision.json() == {"detail": "Slug already in use"}
+    saved = await editor_client.put(
+        url, json={"slug": "available", "expected_updated_at": article["updated_at"]}
+    )
+    assert saved.status_code == 200, saved.text

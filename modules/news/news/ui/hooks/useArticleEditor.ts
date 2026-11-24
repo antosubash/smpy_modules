@@ -18,8 +18,8 @@ import {
   listTags,
   setArticleTags,
 } from '../utils/taxonomyApi';
+import { useArticleWriteQueue } from './useArticleWriteQueue';
 import { useInFlight } from './useInFlight';
-import { useWriteQueue } from './useWriteQueue';
 
 export type ArticleWrite = (
   action: (version: string | null) => Promise<ArticleRead | null>,
@@ -51,12 +51,7 @@ export function useArticleEditor(articleId: number) {
   const busy = saving || publishing;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  /** Someone else changed the article since this copy was loaded. The edits on
-   *  screen are kept; Save stays available only through Reload. */
-  const [conflict, setConflict] = useState(false);
-  const blocked = useRef(false);
-  const queue = useWriteQueue();
+  const { mounted, runWrite, reset, error, setError, conflict } = useArticleWriteQueue();
   /** The article was trashed or deleted elsewhere: nothing left to save to. */
   const [gone, setGone] = useState(false);
 
@@ -68,17 +63,16 @@ export function useArticleEditor(articleId: number) {
         // The detail shape *is* the listing row widened, tags included, and a
         // missing article answers 404 with its own message.
         const found = await getArticleDetail(articleId, signal);
-        if (signal?.aborted) return;
+        if (signal?.aborted || !mounted.current) return;
         articleRef.current = found;
         setArticle(found);
         setDraft(toDraft(found));
         setDirty(false);
-        setError(null);
-        blocked.current = false;
-        setConflict(false);
+        reset();
         setGone(false);
       } catch (e) {
-        if (signal?.aborted) return;
+        if (signal?.aborted || !mounted.current) return;
+        setGone(isHttpStatus(e, 404));
         setError((e as Error).message);
       }
 
@@ -86,80 +80,45 @@ export function useArticleEditor(articleId: number) {
       // nothing else, so it must not blank the screen.
       void Promise.all([listManagedCategories(signal), listTags(signal)])
         .then(([cats, tags]) => {
-          if (signal?.aborted) return;
+          if (signal?.aborted || !mounted.current) return;
           setCategories(cats.items.filter((c) => !c.is_system));
           setTagSuggestions(tags.items.map((t) => t.name));
         })
         .catch(() => {});
     },
-    [articleId],
+    [articleId, mounted, reset, setError],
   );
 
   /** Adopt a write response without discarding unsaved inspector fields.
    * Revision restore deliberately replaces the headline it restored. */
-  const acceptWrite = useCallback((updated: ArticleRead, restoreTitle = false) => {
-    const current = articleRef.current;
-    // Separate cards can finish out of order; an older response cannot undo a
-    // later write or move the optimistic-concurrency stamp backwards.
-    const older = Boolean(
-      current?.updated_at &&
-        updated.updated_at &&
-        versionKey(updated.updated_at) < versionKey(current.updated_at),
-    );
-    // A later SEO/schedule write can already include this restore's title.
-    // Honor that restore, but never replace a title saved after it.
-    if (restoreTitle && (!older || current?.title === updated.title)) {
-      setDraft((current) => (current ? { ...current, title: updated.title } : toDraft(updated)));
-    }
-    if (older) return;
-    const next = { ...updated, tags: updated.tags ?? current?.tags ?? [] };
-    articleRef.current = next;
-    setArticle(next);
-  }, []);
+  const acceptWrite = useCallback(
+    (updated: ArticleRead, restoreTitle = false) => {
+      const current = articleRef.current;
+      // Separate cards can finish out of order; an older response cannot undo a
+      // later write or move the optimistic-concurrency stamp backwards.
+      const older = Boolean(
+        current?.updated_at &&
+          updated.updated_at &&
+          versionKey(updated.updated_at) < versionKey(current.updated_at),
+      );
+      // A later SEO/schedule write can already include this restore's title.
+      // Honor that restore, but never replace a title saved after it.
+      if (mounted.current && restoreTitle && (!older || current?.title === updated.title)) {
+        setDraft((current) => (current ? { ...current, title: updated.title } : toDraft(updated)));
+      }
+      if (older) return;
+      const next = { ...updated, tags: updated.tags ?? current?.tags ?? [] };
+      articleRef.current = next;
+      if (mounted.current) setArticle(next);
+    },
+    [mounted],
+  );
 
   const patch = useCallback((next: Partial<ArticleDraft>) => {
     setDraft((current) => (current ? { ...current, ...next } : current));
     setDirty(true);
     setSaved(false);
   }, []);
-
-  /** One place that turns a failed write into the right state: a stale write
-   *  keeps the edits and offers Reload, a vanished article stops offering Save,
-   *  anything else is just the banner. */
-  const fail = useCallback(
-    (e: unknown) => {
-      if (isHttpStatus(e, 409)) {
-        blocked.current = true;
-        setConflict(true);
-      }
-      if (isHttpStatus(e, 404)) {
-        setGone(true);
-        setError(t(keys.news.errors.gone));
-        return;
-      }
-      setError((e as Error).message);
-    },
-    [t],
-  );
-
-  /** A conflict stops this queue until Reload. Dropped callbacks report nothing:
-   * the predecessor already explained the conflict and kept the pending edits. */
-  const runWrite = useCallback(
-    (action: () => Promise<void>, notify = false) =>
-      queue(async () => {
-        if (blocked.current) return false;
-        setError(null);
-        try {
-          await action();
-          return true;
-        } catch (e) {
-          fail(e);
-          if (notify) toast.error((e as Error).message);
-          return false;
-        }
-      }),
-    [fail, queue],
-  );
 
   const writeArticle: ArticleWrite = useCallback(
     (action, restoreTitle = false) =>
@@ -198,12 +157,13 @@ export function useArticleEditor(articleId: number) {
           if (updated) acceptWrite(updated);
           const tags = await setArticleTags(articleId, draft.tags, articleRef.current.updated_at);
           acceptWrite({ ...articleRef.current, tags: tags ?? articleRef.current.tags });
+          if (!mounted.current) return;
           setDirty(false);
           setSaved(true);
           toast.success(t(keys.news.editor.saved_toast));
         }),
       ),
-    [acceptWrite, articleId, draft, guardSave, runWrite, t],
+    [acceptWrite, articleId, draft, guardSave, mounted, runWrite, t],
   );
 
   const publish = useCallback(
@@ -212,19 +172,19 @@ export function useArticleEditor(articleId: number) {
         runWrite(async () => {
           const updated = await publishArticle(articleId, articleRef.current?.updated_at);
           if (updated) acceptWrite(updated);
-          toast.success(t(keys.news.editor.published_toast));
+          if (mounted.current) toast.success(t(keys.news.editor.published_toast));
         }),
       ),
-    [acceptWrite, articleId, guardPublish, runWrite, t],
+    [acceptWrite, articleId, guardPublish, mounted, runWrite, t],
   );
 
   const trash = useCallback(
     () =>
       runWrite(async () => {
         await trashArticle(articleId);
-        toast.success(t(keys.news.trash.moved_toast));
+        if (mounted.current) toast.success(t(keys.news.trash.moved_toast));
       }),
-    [articleId, runWrite, t],
+    [articleId, mounted, runWrite, t],
   );
 
   /** Whether Save would be accepted.

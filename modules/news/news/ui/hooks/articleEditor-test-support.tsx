@@ -129,8 +129,11 @@ beforeEach(async () => {
     await editor.load();
   });
 });
-afterEach(async () => {
+export async function unmountEditor() {
   await act(async () => root.unmount());
+}
+afterEach(async () => {
+  await unmountEditor();
   host.remove();
   vi.unstubAllGlobals();
 });

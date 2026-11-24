@@ -16,10 +16,12 @@ const MAX_BODY_SNIPPET = 200;
  *  (409) or a vanished article (404) from any other failure. */
 export class HttpError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  readonly code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -50,7 +52,7 @@ export async function errorFrom(response: Response): Promise<HttpError> {
   try {
     const { detail, code } = JSON.parse(body) as { detail?: unknown; code?: unknown };
     if (response.status === 409 && code === 'article_conflict') {
-      return new HttpError(translate(keys.news.errors.article_conflict), response.status);
+      return new HttpError(translate(keys.news.errors.article_conflict), response.status, code);
     }
     if (isCsrfRefusal(response.status, detail)) {
       return new HttpError(translate(keys.news.errors.csrf_failed), response.status);

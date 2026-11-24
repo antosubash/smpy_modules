@@ -7,8 +7,9 @@ signed-in page carries the token as the framework's `csrfToken` Inertia prop,
 and the console's own client sends it from there. Reads need no token, so the feed block on public pages is
 unaffected. The session cookie's `SameSite=Lax` alone is not enough: on a
 multi-tenant host every organisation's public site is same-site with the
-console. Errors are `{"detail": "<message>"}`
-(validation errors use FastAPI's 422 list). Every route is bound to a tenant
+console. Errors normally carry `{"detail": "<message>"}`; stale article writes
+add `"code": "article_conflict"` (see `expected_updated_at` below). Validation
+errors use FastAPI's 422 list. Every route is bound to a tenant
 first — see [Tenancy](#tenancy).
 
 ## Permissions
@@ -121,8 +122,11 @@ article's language. There is no `locale` field: a language is fixed.
 midnight UTC (`2026-02-01T23:00:00-06:00` records the 1st).
 
 **`expected_updated_at`** — send the `updated_at` you loaded; if the stored
-one differs the write is refused with 409 "This article was changed somewhere
-else…". The comparison and write hold the same transaction's article lock.
+one differs the write is refused with HTTP 409 and the JSON envelope
+`{"detail": "This article was changed somewhere else. Reload to get the latest version, then make your change again.", "code": "article_conflict"}`.
+Use `code == "article_conflict"` to identify a stale write; other 409s, such as
+`{"detail": "Slug already in use"}`, carry their own detail and no `code` field.
+The comparison and write hold the same transaction's article lock.
 This optional field is accepted by metadata, body, tag replacement, schedule,
 publish, unpublish, submit, approve, reject and revision restore. Omitted or
 null, the write goes through as before; workflow and revision restore still
@@ -270,7 +274,7 @@ on a 304), with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflan
 | 404 | `No such page` | an archive page past the end |
 | 409 | `Slug already in use` | create, update, translation |
 | 409 | `Could not derive a free URL from '…'. Set one explicitly.` | create without slug |
-| 409 | `This article was changed somewhere else. Reload…` | stale `expected_updated_at` |
+| 409 | `This article was changed somewhere else. Reload…` | stale `expected_updated_at`; `code: "article_conflict"` |
 | 409 | `This article already has a {locale} translation (check the trash).` | translations |
 | 409 | `Only a draft can be submitted for review.` | submit |
 | 409 | `Only a submitted article can be approved.` / `…rejected.` | approve, reject |

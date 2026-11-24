@@ -15,8 +15,10 @@ name the module they affect.
   search settings, scheduling, workflow and revision restores; rejected saves can be corrected and retried
   without a false concurrent-edit conflict. Side writes check the form’s base
   version under the article lock, so side writes cannot mask concurrent edits
-  to inspector fields; conflicts use the console language and cancel queued writes
-  until Reload (#444).
+  to inspector fields; stale-write conflicts use the console language and block
+  queued writes until Reload, while slug collisions and other failures leave the
+  queue usable. Explicitly requested writes finish in order after navigation,
+  stopping on failure without updating the departed screen (#444).
 
 - News registers its content-bundle section once per registry, so restarting the
   same app lifespan works and rebuilding the registry registers it again, while

@@ -107,7 +107,8 @@ it('drops queued writes after a predecessor conflicts and clears pending states'
   expect(server.writes).toHaveLength(1);
   expect(editor.conflict).toBe(true);
   expect(editor.error).toBe(STALE);
-  expect(error).toHaveBeenCalledTimes(1);
+  // Both side writes explain their refusal, including the locally blocked one.
+  expect(error).toHaveBeenCalledTimes(2);
   expect(editor.busy).toBe(false);
   expect(document.querySelector<HTMLButtonElement>('button[disabled]')).toBeNull();
   await act(async () => {

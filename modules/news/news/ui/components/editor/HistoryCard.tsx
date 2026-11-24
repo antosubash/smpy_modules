@@ -2,6 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { useMountedRef } from '../../hooks/useMountedRef';
 import {
   formatTimestamp,
   listArticleRevisions,
@@ -44,6 +45,7 @@ export function HistoryCard({
   writeArticle: ArticleWrite;
 }) {
   const { t, locale } = useT();
+  const mounted = useMountedRef();
   const copy = keys.news.history;
   const [revisions, setRevisions] = useState<RevisionRead[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,11 +53,15 @@ export function HistoryCard({
   const load = useCallback(
     (signal?: AbortSignal) =>
       listArticleRevisions(articleId, signal)
-        .then(setRevisions)
+        .then((items) => {
+          if (mounted.current) setRevisions(items);
+        })
         // An empty history and a failed read look the same here on purpose:
         // this is a panel beside the work, not the work.
-        .catch(() => setRevisions([])),
-    [articleId],
+        .catch(() => {
+          if (mounted.current) setRevisions([]);
+        }),
+    [articleId, mounted],
   );
 
   useEffect(() => {
@@ -73,11 +79,11 @@ export function HistoryCard({
       );
       if (!ok) return;
       await load();
-      toast.success(t(copy.restored_toast));
+      if (mounted.current) toast.success(t(copy.restored_toast));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 
