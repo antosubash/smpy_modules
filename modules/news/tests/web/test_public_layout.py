@@ -2,7 +2,7 @@
 
 import pytest
 from news.models import NewsCategory
-from pagebuilder.models import Page, PageStatus
+from pagebuilder.models import Layout, Page, PageStatus
 from simple_module_db import tenant_context
 
 from tests.support.factories import make_article
@@ -118,3 +118,31 @@ async def test_tenant_layouts_do_not_mix_and_keep_tenant_cache_variation():
                 props = response.json()["props"]
                 assert props["layout_header"]["content"][0]["props"]["text"] == tenant
                 assert "Cookie" in response.headers["Vary"]
+
+
+@pytest.mark.parametrize("missing_model", [Layout, Page])
+async def test_missing_optional_site_tables_do_not_break_news(bilingual, missing_model):
+    async for client in site_client(locales=bilingual):
+        if client.db_state.engine.dialect.name != "sqlite":
+            pytest.skip("Missing-schema fixture uses an isolated SQLite database")
+        async with client.db_state.session_factory() as db:
+            for locale in bilingual:
+                await make_article(db, slug="story", title="Story", locale=locale, author="Ada")
+            db.add(NewsCategory(name="Field notes", slug="field-notes"))
+            await db.commit()
+        # Only this test's in-memory database is changed, never a host database.
+        async with client.db_state.engine.begin() as connection:
+            await connection.run_sync(missing_model.__table__.drop)
+        for prefix in ("", "/de"):
+            for path in (
+                "/news/story",
+                "/news/",
+                "/news/?q=Story",
+                "/news/category/field-notes",
+                "/news/tag/topic",
+                "/news/author/ada",
+            ):
+                response = await client.get(prefix + path, headers=INERTIA)
+                assert response.status_code == 200, response.text
+                props = response.json()["props"]
+                assert not {"layout_header", "layout_footer", "site_nav", "copy"} & props.keys()

@@ -38,6 +38,7 @@ from typing import Any
 from urllib.parse import quote
 
 from simple_module_core.permissions import grants  # pyright: ignore[reportPrivateImportUsage]
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.core.constants import (
@@ -176,7 +177,15 @@ async def public_layout_props(
     layout_props = getattr(public, "layout_props", None)
     if layout_props is None:
         return {}
-    return await layout_props(request, db, locale=locale, tenant_id=tenant_id)
+    try:
+        # A missing optional schema must not abort the caller's transaction on Postgres.
+        async with db.begin_nested():
+            return await layout_props(request, db, locale=locale, tenant_id=tenant_id)
+    except SQLAlchemyError:
+        logger.warning(
+            "Pagebuilder layout unavailable; serving news without its frame", exc_info=True
+        )
+        return {}
 
 
 async def render_not_found(

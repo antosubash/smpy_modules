@@ -72,6 +72,14 @@ describe('pickRelated', () => {
     expect(pickRelated(articles, 'story', 3, 'current', 'en').map((a) => a.slug)).toEqual([
       'other',
     ]);
+    // Check the two exclusions independently: locale filtering must not hide a missing group filter.
+    expect(pickRelated(articles, 'story', 3, 'current').map((a) => a.slug)).toEqual([
+      'other',
+      'fremd',
+    ]);
+    expect(pickRelated(articles, 'story', 3, undefined, 'en').map((a) => a.slug)).toEqual([
+      'other',
+    ]);
   });
 });
 
