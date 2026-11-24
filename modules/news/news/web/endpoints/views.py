@@ -19,6 +19,7 @@ from news.models import ArticleStatus, NewsArticle
 from news.web.endpoints._media_picker import media_picker_allowed
 from news.web.endpoints.api._deps import may_see_drafts
 from news.web.endpoints.public._render import render_article
+from news.web.endpoints.public._urls import public_base_url
 
 # The token the API's CSRF check wants (#110) is the framework's ``csrfToken``
 # shared prop, on every signed-in page (#342).
@@ -245,13 +246,14 @@ async def article_preview(
     German article could be requested through an English prefix on.
     """
     article = await ArticlesService(db).get_article(article_id)
+    settings = active()
     response = await render_article(
         inertia,
-        request=request,
+        base=public_base_url(request, settings),
         article=article,
         data=article.draft_data or {},
         locale=article.locale,
-        settings=active(),
+        settings=settings,
         # No canonical link and no ``hreflang``: a permission-gated URL should
         # claim to be the canonical version of nothing, and every translation
         # it could advertise is an address it is not reachable at. See

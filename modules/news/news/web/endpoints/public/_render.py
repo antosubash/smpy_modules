@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import Request, Response
+from fastapi import Response
 from simple_module_hosting.inertia_deps import InertiaDep
 
 from news.content.authors import slug_for as author_slug
@@ -29,13 +29,12 @@ from news.core.settings import NewsSettings, public_author_path
 from news.models import ArticleStatus, NewsArticle
 from news.web.endpoints.public import _head
 from news.web.endpoints.public._lang import set_html_lang
-from news.web.endpoints.public._urls import absolute
 
 
 async def render_article(
     inertia: InertiaDep,
     *,
-    request: Request,
+    base: str,
     article: NewsArticle,
     data: dict[str, Any],
     locale: str,
@@ -85,7 +84,7 @@ async def render_article(
     byline_slug = author_slug(article.author) if listed else ""
     image = image_or_none(article.og_image)
     if image and image.startswith("/"):
-        image = absolute(request, settings, image)
+        image = f"{base}{image}"
     props: dict[str, Any] = {
         "title": article.title,
         # Which article this is, for the blocks in its own body that need to
