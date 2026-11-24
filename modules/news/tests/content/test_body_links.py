@@ -81,7 +81,9 @@ async def test_media_and_embed_urls_are_http_or_relative_only(block: str, url: s
 
 
 @pytest.mark.parametrize("block", ["Embed", "Video", "Audio"])
-@pytest.mark.parametrize("url", ["https://player.example/v/1", "http://cdn.example/a.mp4", "/a.mp4", ""])
+@pytest.mark.parametrize(
+    "url", ["https://player.example/v/1", "http://cdn.example/a.mp4", "/a.mp4", ""]
+)
 async def test_http_or_relative_media_and_embed_urls_pass(block: str, url: str) -> None:
     check_links(_doc({"type": block, "props": {"id": "m-1", "url": url}}))
 

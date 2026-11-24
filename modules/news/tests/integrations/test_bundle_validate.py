@@ -141,7 +141,10 @@ def test_an_absent_section_directory_passes(tmp_path):
                 "articles/a.json": _doc(
                     published_data={
                         "content": [
-                            {"type": "Sources", "props": {"id": "s-1", "items": "X | data:text/html,x"}}
+                            {
+                                "type": "Sources",
+                                "props": {"id": "s-1", "items": "X | data:text/html,x"},
+                            }
                         ]
                     }
                 )

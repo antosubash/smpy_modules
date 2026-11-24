@@ -269,13 +269,19 @@ FAMILIES: tuple[Family, ...] = (
             Copy(
                 f"{NEWS}/content/links.py",
                 own={
-                    "_sources_links": "News' Sources block packs `label | href` lines into one textarea."
+                    "_sources_links": (
+                        "News' Sources block packs `label | href` lines into one textarea."
+                    )
                 },
             ),
         ),
         differ={
-            "FRAME_SOURCES": "Pagebuilder has Iframe/Video `src`; news has Embed/Video/Audio `url`.",
-            "_walk": "News' Sources block also yields each `label | href` line via `_sources_links`.",
+            "FRAME_SOURCES": (
+                "Pagebuilder has Iframe/Video `src`; news has Embed/Video/Audio `url`."
+            ),
+            "_walk": (
+                "News' Sources block also yields each `label | href` line via `_sources_links`."
+            ),
         },
     ),
     Family(

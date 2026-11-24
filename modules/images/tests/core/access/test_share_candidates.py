@@ -144,7 +144,8 @@ async def test_a_multi_tenant_host_offers_only_members_of_the_bound_tenant(two_t
     owner = as_(ACME, "olga", WRITER)
     cid = await make(client, owner)
     r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
-    assert [c["email"] for c in r.json()] == ["a***@example.com"]  # not bob (nobody's), gus (globex)
+    # Not bob (nobody's), not gus (globex).
+    assert [c["email"] for c in r.json()] == ["a***@example.com"]
 
 
 @pytest.mark.unbound_tenant
@@ -241,7 +242,9 @@ async def test_filter_runs_before_the_limit(client):
 async def test_nameless_user_is_not_labelled_with_the_address(client):
     """With no name the directory's label is the address; the response must not
     carry it in ``display_name`` unless the query is that address."""
-    client.app.state.user_directory = FakeDirectory([person("olga"), person("nina", full_name=None)])
+    client.app.state.user_directory = FakeDirectory(
+        [person("olga"), person("nina", full_name=None)]
+    )
     cid = await make(client, as_user("olga", WRITER))
     assert await _candidates(client, cid, "nina") == []
     got = await _candidates(client, cid, "nina@example.com")
