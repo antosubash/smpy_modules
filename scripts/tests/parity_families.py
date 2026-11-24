@@ -255,6 +255,42 @@ FAMILIES: tuple[Family, ...] = (
             ),
         ),
     ),
+    Family(
+        "share picker email masking",
+        (
+            Copy("modules/events/sm_events/web/services/masking.py"),
+            Copy("modules/images/sm_images/web/services/masking.py"),
+        ),
+    ),
+    Family(
+        "block link safety",
+        (
+            Copy(f"{PB}/content/links.py"),
+            Copy(
+                f"{NEWS}/content/links.py",
+                own={
+                    "_sources_links": (
+                        "News' Sources block packs `label | href` lines into one textarea."
+                    )
+                },
+            ),
+        ),
+        differ={
+            "FRAME_SOURCES": (
+                "Pagebuilder has Iframe/Video `src`; news has Embed/Video/Audio `url`."
+            ),
+            "_walk": (
+                "News' Sources block also yields each `label | href` line via `_sources_links`."
+            ),
+        },
+    ),
+    Family(
+        "Puck config localiser (TypeScript)",
+        (
+            Copy(f"{PB}/ui/components/localizeConfig.ts"),
+            Copy(f"{NEWS}/ui/components/body/localizeConfig.ts"),
+        ),
+    ),
     *SSRF_FAMILIES,
     *CRYPTO_FAMILIES,
     *PUBLIC_FAMILIES,

@@ -8,13 +8,12 @@
  */
 
 import type { ComponentConfig } from '@puckeditor/core';
-import { lazyBlock } from '@simple-module-py/pagebuilder';
+import { lazyBlock, localizeFields } from '@simple-module-py/pagebuilder';
 
 import { keys, type Translate, translate } from '../utils/i18n';
 import { calendarsField, loadCalendarOptions, type Option } from './calendarField';
 import { type EventsCalendarProps, HEIGHT_NAMES, minHeight, VIEWS } from './calendarProps';
 import { oneOf, selectionOf } from './limits';
-import { localizeFields } from './localizeFields';
 
 const copy = keys.events.blocks;
 type Fields = NonNullable<ComponentConfig<EventsCalendarProps>['fields']>;

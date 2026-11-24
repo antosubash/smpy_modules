@@ -124,10 +124,54 @@ def test_an_absent_section_directory_passes(tmp_path):
             {"redirects.json": [{"from_slug": "x", "locale": "en", "to_slug": "y"}] * 2},
             "redirects.json lists en/x twice",
         ),
+        (
+            {
+                "articles/a.json": _doc(
+                    draft_data={
+                        "content": [
+                            {"type": "Embed", "props": {"id": "e-1", "url": "javascript:alert(1)"}}
+                        ]
+                    }
+                )
+            },
+            "Embed (e-1), field url",
+        ),
+        (
+            {
+                "articles/a.json": _doc(
+                    published_data={
+                        "content": [
+                            {
+                                "type": "Sources",
+                                "props": {"id": "s-1", "items": "X | data:text/html,x"},
+                            }
+                        ]
+                    }
+                )
+            },
+            "Sources (s-1), field items[0]",
+        ),
     ],
 )
 def test_a_malformed_section_is_refused(tmp_path, files, message):
     assert message in _refusal(tmp_path, files)
+
+
+def test_bundle_allows_asset_scheme_in_media_block(tmp_path):
+    validate(
+        _section(
+            tmp_path,
+            {
+                "articles/a.json": _doc(
+                    draft_data={
+                        "content": [
+                            {"type": "Video", "props": {"id": "v-1", "url": "asset://hero.png"}}
+                        ]
+                    }
+                ),
+            },
+        )
+    )
 
 
 def test_a_symlinked_document_is_refused(tmp_path):

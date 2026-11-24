@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { localizeConfig, localizeViewports } from './localizeConfig';
+import { localizeConfig, localizeFields, localizeViewports } from './localizeConfig';
 
 /**
  * The half of the i18n mechanism `tsc` cannot check.
@@ -90,5 +90,70 @@ describe('localizeViewports', () => {
   it('resolves the switcher labels and keeps the rest of each entry', () => {
     const out = localizeViewports([{ width: 360, label: 'vp.mobile' }, { width: 1280 }], shout);
     expect(out).toEqual([{ width: 360, label: 'T(vp.mobile)' }, { width: 1280 }]);
+  });
+});
+
+describe('localizeFields', () => {
+  const fields = {
+    heading: { type: 'text', label: 'events.blocks.upcoming.heading' },
+    layout: {
+      type: 'select',
+      label: 'events.blocks.upcoming.layout',
+      options: [
+        { label: 'events.blocks.upcoming.layout_list', value: 'list' },
+        { label: 'events.blocks.upcoming.layout_cards', value: 'cards' },
+      ],
+    },
+    calendars: {
+      type: 'array',
+      label: 'events.blocks.upcoming.calendars',
+      arrayFields: {
+        slug: {
+          type: 'select',
+          label: 'events.blocks.fields.calendar',
+          options: [{ label: 'A calendar name', value: 'a' }],
+        },
+        nested: {
+          type: 'object',
+          label: 'events.blocks.fields.group',
+          objectFields: {
+            inner: { type: 'text', label: 'events.blocks.fields.inner' },
+          },
+        },
+      },
+    },
+  };
+
+  it('translates labels, option labels and nested array and object field labels', () => {
+    const out = localizeFields(fields, shout) as typeof fields;
+    expect(out.heading.label).toBe('T(events.blocks.upcoming.heading)');
+    expect(out.layout.options.map((o) => o.label)).toEqual([
+      'T(events.blocks.upcoming.layout_list)',
+      'T(events.blocks.upcoming.layout_cards)',
+    ]);
+    expect(out.calendars.label).toBe('T(events.blocks.upcoming.calendars)');
+    expect(out.calendars.arrayFields.slug.label).toBe('T(events.blocks.fields.calendar)');
+    expect(out.calendars.arrayFields.nested.objectFields.inner.label).toBe(
+      'T(events.blocks.fields.inner)',
+    );
+  });
+
+  it('leaves values and non-label strings alone', () => {
+    const out = localizeFields(fields, shout) as typeof fields;
+    expect(out.layout.options.map((o) => o.value)).toEqual(['list', 'cards']);
+    expect(out.heading.type).toBe('text');
+    expect(out.calendars.arrayFields.slug.type).toBe('select');
+  });
+
+  it('does not mutate its input', () => {
+    const before = JSON.stringify(fields);
+    localizeFields(fields, shout);
+    expect(JSON.stringify(fields)).toBe(before);
+  });
+
+  it('leaves an option label that is already text as text', () => {
+    const echo = (key: string) => key;
+    const out = localizeFields(fields, echo) as typeof fields;
+    expect(out.calendars.arrayFields.slug.options[0].label).toBe('A calendar name');
   });
 });

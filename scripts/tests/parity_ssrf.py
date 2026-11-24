@@ -32,7 +32,7 @@ SSRF_FAMILIES: tuple[Family, ...] = (
             "ALLOWED_SCHEMES",
             "_DEFAULT_PORTS",
             "_BLOCKED_NETWORKS",
-            "_METADATA",
+            "ALWAYS_DENIED",
             "_NAT64",
             "_V4_COMPATIBLE",
             "UnsafeURLError",

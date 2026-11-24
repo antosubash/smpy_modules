@@ -37,9 +37,9 @@ events = "sm_events.module:EventsModule"
 
 [project.optional-dependencies]
 # floor: 0.0.16 - events imports no pagebuilder Python for its blocks. It ships
-# ``pagebuilder-blocks.ts``, which imports ``registerPuckBlocks`` and ``lazyBlock`` from the
-# ``@simple-module-py/pagebuilder`` entry point (``index.ts``, first released in 0.0.16) and which
-# pagebuilder's ``puck-blocks.ts`` globs in from sibling packages.
+# ``pagebuilder-blocks.ts``, which imports ``registerPuckBlocks``, ``lazyBlock`` and
+# ``localizeFields`` from the ``@simple-module-py/pagebuilder`` entry point (``index.ts``, first
+# released in 0.0.16) and which pagebuilder's ``puck-blocks.ts`` globs in from sibling packages.
 pagebuilder = ["simple_module_pagebuilder>=0.0.16,<0.1"]
 dev = [
     "pytest>=8.0",

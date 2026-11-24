@@ -9,11 +9,12 @@ named after the resource; these are the writes to it.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AfterValidator, Field, field_validator, model_validator
 
 from news.content.display_date import as_display_date
+from news.content.links import checked
 from news.contracts.schemas import _guards
 from news.contracts.schemas._guards import NoNul
 from news.core.constants import (
@@ -144,6 +145,9 @@ class ArticleUpdate(NoNul):
         return self
 
 
+CheckedPuckData = Annotated[dict[str, Any], AfterValidator(checked)]
+
+
 class ArticleBodyUpdate(NoNul):
     """An autosave from the block canvas.
 
@@ -152,7 +156,7 @@ class ArticleBodyUpdate(NoNul):
     the status, or anything else a rename would record a redirect for.
     """
 
-    draft_data: dict[str, Any] = Field(default_factory=dict)
+    draft_data: CheckedPuckData = Field(default_factory=dict)
     expected_updated_at: datetime | None = None
     """See ``ArticleUpdate.expected_updated_at``."""
 

@@ -24,12 +24,35 @@ describe('Video file', () => {
     ).toContain('poster="https://x/p.png"');
     expect(renderBlock(VideoBlock, { url: 'https://x/a.mp4' })).not.toContain('poster=');
   });
+
+  it.each(['javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.org'])(
+    'drops unsafe video URL %s',
+    (url) => {
+      expect(renderBlock(VideoBlock, { url })).toBe('');
+    },
+  );
+
+  it('drops an unsafe poster while keeping a safe video URL', () => {
+    const markup = renderBlock(VideoBlock, {
+      url: 'https://x/a.mp4',
+      poster: 'javascript:alert(1)',
+    });
+    expect(markup).toContain('src="https://x/a.mp4"');
+    expect(markup).not.toContain('poster=');
+  });
 });
 
 describe('Audio clip', () => {
   it('renders nothing without a URL', () => {
     expect(renderBlock(AudioBlock)).toBe('');
   });
+
+  it.each(['javascript:alert(1)', 'data:text/html,x', 'mailto:a@b.org'])(
+    'drops unsafe audio URL %s',
+    (url) => {
+      expect(renderBlock(AudioBlock, { url })).toBe('');
+    },
+  );
 
   it('labels the player, because three bare ones tell a listener nothing', () => {
     expect(renderBlock(AudioBlock, { url: 'https://x/a.mp3', title: 'The call' })).toContain(

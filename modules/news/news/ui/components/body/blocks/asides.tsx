@@ -10,6 +10,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { keys, useT } from '../../../utils/i18n';
+import { safeHref } from '../../../utils/safeLinks';
 
 import { cells, itemKey, lines } from './lines';
 
@@ -196,24 +197,27 @@ export const SourcesBlock: ComponentConfig<SourcesProps> = {
       <section className="my-10 border-t pt-5 text-sm">
         {title && <h2 className="mb-3 text-sm font-semibold tracking-tight">{title}</h2>}
         <ol className="list-decimal space-y-1.5 pl-5 text-muted-foreground">
-          {entries.map(([label, href], index) => (
-            <li key={itemKey(label + href, index)}>
-              {href ? (
-                // Sources point off-site by definition, so they open away from
-                // the article and carry the rel every off-site link needs.
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                  className="underline underline-offset-2 hover:text-foreground"
-                >
-                  {label || href}
-                </a>
-              ) : (
-                label
-              )}
-            </li>
-          ))}
+          {entries.map(([label, href], index) => {
+            const safe = safeHref(href);
+            return (
+              <li key={itemKey(label + href, index)}>
+                {safe ? (
+                  // Sources point off-site by definition, so they open away from
+                  // the article and carry the rel every off-site link needs.
+                  <a
+                    href={safe}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    {label || safe}
+                  </a>
+                ) : (
+                  label
+                )}
+              </li>
+            );
+          })}
         </ol>
       </section>
     );

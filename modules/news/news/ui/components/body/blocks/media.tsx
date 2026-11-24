@@ -17,6 +17,7 @@
 import type { ComponentConfig } from '@puckeditor/core';
 
 import { keys } from '../../../utils/i18n';
+import { safeFrameSrc } from '../../../utils/safeLinks';
 
 import { imageUrlField } from './imageUrlField';
 import { cells, itemKey, lines } from './lines';
@@ -202,14 +203,15 @@ export const EmbedBlock: ComponentConfig<EmbedProps> = {
   },
   defaultProps: { url: '', title: 'Embedded media', ratio: '16/9' },
   render: ({ url, title, ratio }) => {
-    if (!url) return <></>;
+    const safeSrc = safeFrameSrc(url);
+    if (!safeSrc) return <></>;
     return (
       <div
         className="my-8 overflow-hidden rounded-lg"
         style={{ aspectRatio: ratio === '4/3' ? '4 / 3' : '16 / 9' }}
       >
         <iframe
-          src={url}
+          src={safeSrc}
           title={title}
           loading="lazy"
           allowFullScreen

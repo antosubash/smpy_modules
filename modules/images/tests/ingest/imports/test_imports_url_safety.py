@@ -22,9 +22,14 @@ from tests.support.fetch import PUBLIC_IP, PUBLIC_IPV6
         "172.16.0.5",
         "192.168.1.1",
         "169.254.169.254",  # cloud metadata
+        "169.254.170.2",  # AWS ECS task role
+        "169.254.0.23",  # Tencent metadata
         "169.254.1.1",
         "100.64.0.1",  # CGNAT
+        "100.100.100.200",  # Alibaba Cloud metadata
         "100.127.255.254",
+        "168.63.129.16",  # Azure wireserver
+        "192.0.0.192",  # Oracle Cloud metadata
         "198.18.0.1",  # benchmarking
         "198.19.255.255",
         "0.0.0.0",
@@ -36,6 +41,9 @@ from tests.support.fetch import PUBLIC_IP, PUBLIC_IPV6
         "fe80::1",
         "fc00::1",
         "fd00:ec2::254",  # AWS IMDSv6
+        "fd00:ec2::1",  # AWS IPv6 service range
+        "fd00:c1::a9fe:a9fe",  # Oracle IPv6 metadata
+        "fd20:ce::254",  # GCP IPv6 metadata
         "ff02::1",
         "fe80::1%eth0",
     ],
@@ -52,12 +60,18 @@ def test_rejects_private_ip_after_dns(resolver, address):
         "::ffff:127.0.0.1",  # IPv4-mapped
         "::ffff:10.0.0.1",
         "::ffff:169.254.169.254",
+        "::ffff:168.63.129.16",
+        "::ffff:100.100.100.200",
+        "::ffff:192.0.0.192",
         "::ffff:100.64.0.1",
         "::7f00:1",  # IPv4-compatible (deprecated)
+        "::168.63.129.16",
         "64:ff9b::7f00:1",  # NAT64
         "64:ff9b::a9fe:a9fe",
+        "64:ff9b::a83f:8110",  # NAT64 of 168.63.129.16
         "2002:7f00:1::1",  # 6to4
         "2002:a00:1::1",
+        "2002:a83f:8110::1",  # 6to4 of 168.63.129.16
         "2001:0:4136:e378:8000:63bf:80ff:fffe",  # Teredo, client 127.0.0.1
     ],
 )

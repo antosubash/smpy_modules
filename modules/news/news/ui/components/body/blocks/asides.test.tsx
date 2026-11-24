@@ -118,4 +118,13 @@ describe('Sources', () => {
     const markup = renderBlock(SourcesBlock, { items: ' | https://example.org/a' });
     expect(markup).toContain('>https://example.org/a</a>');
   });
+
+  it.each(['javascript:alert(1)', 'data:text/html,x', '//evil.example/x'])(
+    'renders plain label without a link for unsafe URL %s',
+    (url) => {
+      const markup = renderBlock(SourcesBlock, { items: `Report | ${url}` });
+      expect(markup).toContain('Report');
+      expect(markup).not.toContain('<a ');
+    },
+  );
 });

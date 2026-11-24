@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DividerBlock } from './layout';
-import { GalleryBlock, ImageBlock } from './media';
+import { EmbedBlock, GalleryBlock, ImageBlock } from './media';
 import { renderBlock, renderStored } from './renderBlock';
 
 describe('Image', () => {
@@ -92,5 +92,25 @@ describe('Divider', () => {
   it('honours the spacing in both styles', () => {
     expect(renderBlock(DividerBlock, { spacing: 'large' })).toContain('my-12');
     expect(renderBlock(DividerBlock, { spacing: 'large', style: 'asterism' })).toContain('my-12');
+  });
+});
+
+describe('Embed', () => {
+  it('renders an iframe for http(s) and relative URLs', () => {
+    expect(renderBlock(EmbedBlock, { url: 'https://player.example/embed/1' })).toContain(
+      'src="https://player.example/embed/1"',
+    );
+    expect(renderBlock(EmbedBlock, { url: '/embeds/chart.html' })).toContain(
+      'src="/embeds/chart.html"',
+    );
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<script>x</script>',
+    'mailto:a@b.org',
+    '//evil.example/embed',
+  ])('drops unsafe URL %s', (url) => {
+    expect(renderBlock(EmbedBlock, { url })).toBe('');
   });
 });

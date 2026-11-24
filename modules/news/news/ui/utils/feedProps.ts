@@ -5,7 +5,7 @@
  * deliberately strict, so a bad value must be fixed on the way out.
  */
 
-import { isSafeHref } from '@simple-module-py/pagebuilder';
+export { safeHref } from './safeLinks';
 
 export const FEED_LIMIT_MIN = 1;
 export const FEED_LIMIT_MAX = 12;
@@ -18,20 +18,4 @@ export function clampFeedLimit(value: unknown): number {
   const n = typeof value === 'string' && value.trim() ? Number(value) : value;
   if (typeof n !== 'number' || !Number.isFinite(n)) return FEED_LIMIT_DEFAULT;
   return Math.min(FEED_LIMIT_MAX, Math.max(FEED_LIMIT_MIN, Math.trunc(n)));
-}
-
-/** `href` if it is safe to write into `<a href>`, otherwise `''` (no link).
- *
- * The scheme and control-character rules are the pagebuilder's `isSafeHref`
- * (relative references and http(s)/mailto/tel pass; `javascript:`, `data:`, …
- * do not). On top of that, protocol-relative `//host` (or `/\host`, `\host`,
- * which browsers read the same way) is dropped: it is scheme-less, so
- * `isSafeHref` lets it through, but it is an off-site link.
- */
-export function safeHref(href: unknown): string {
-  if (typeof href !== 'string') return '';
-  const value = href.trim();
-  if (!value) return '';
-  if (value.startsWith('//') || value.startsWith('/\\') || value.startsWith('\\')) return '';
-  return isSafeHref(value) ? value : '';
 }

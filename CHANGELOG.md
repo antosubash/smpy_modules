@@ -427,6 +427,22 @@ name the module they affect.
 
 ### Fixed
 
+- **news validates and sanitises article body links and embed sources** (#364).
+  `PUT /api/news/articles/{id}/body` and uploaded `news/` bundle sections now check body documents
+  using the same link rules as pagebuilder (`news.content.links`, parity-checked against
+  `pagebuilder.content.links`): `Embed.url`, `Video.url` and `Audio.url` accept only `http(s)` or
+  relative URLs, and `Sources.items`, `href`/`*Href` props and Markdown links accept only
+  `http(s)`, `mailto`, `tel` or relative addresses. The `Embed`, `Video`, `Audio` and `Sources`
+  blocks also sanitise their URLs at render via `news/ui/utils/safeLinks.ts`.
+- **images' share picker masks email addresses and filters substring matches** (#407).
+  `GET /api/images/collections/{id}/share-candidates` now shares events' masking and filtering
+  rules: partial-address queries no longer match, nameless or address-shaped labels are masked, and
+  an address is shown in full only when `q` equals it (case-insensitive).
+- **images, ai and events reject cloud metadata and control endpoints in the shared SSRF guard**
+  (#426). `url_safety.is_public_address` now checks `ALWAYS_DENIED` (moved from events'
+  `policy.py` into all three parity copies), refusing Azure's wireserver (`168.63.129.16`),
+  Alibaba (`100.100.100.200`), Oracle (`192.0.0.192`), and IPv6 metadata/control ranges plus
+  their IPv6-embedded forms.
 - Every package's `Repository` URL, and images' import User-Agent, name the
   repository by its current name, `antosubash/smpy_modules`; they still named
   the old `simple_module_python_modules`.

@@ -14,8 +14,8 @@ from tests.support.stub_auth import as_user, user_uuid
 
 BASE = "/api/images/collections"
 WRITER = ("images.view", "images.create")
-EVERYONE = {"q": "example"}
-"""Matches every fake address; three characters or more, as the route needs."""
+EVERYONE = {"q": "tester"}
+"""Matches every fake display name; three characters or more, as the route needs."""
 
 
 class FakeDirectory:
@@ -42,9 +42,10 @@ class FakeDirectory:
         return None
 
 
-def person(name: str, *, active: bool = True) -> DirectoryUser:
+def person(name: str, *, active: bool = True, full_name: str | None = ...) -> DirectoryUser:
+    resolved_name = f"{name.title()} Tester" if full_name is ... else full_name
     return DirectoryUser(
-        id=user_uuid(name), email=f"{name}@example.com", full_name=name.title(), is_active=active
+        id=user_uuid(name), email=f"{name}@example.com", full_name=resolved_name, is_active=active
     )
 
 
@@ -65,7 +66,7 @@ async def test_lists_everyone_but_the_owner_and_inactive_on_a_single_tenant_host
     )
     assert r.status_code == 200
     assert r.json() == [
-        {"id": user_uuid("eddie"), "display_name": "Eddie", "email": "eddie@example.com"}
+        {"id": user_uuid("eddie"), "display_name": "Eddie Tester", "email": "e***@example.com"}
     ]
     assert directory.asked[0][0] == "edd"
 
@@ -143,7 +144,8 @@ async def test_a_multi_tenant_host_offers_only_members_of_the_bound_tenant(two_t
     owner = as_(ACME, "olga", WRITER)
     cid = await make(client, owner)
     r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
-    assert [c["email"] for c in r.json()] == ["amy@example.com"]  # not bob (nobody's), gus (globex)
+    # Not bob (nobody's), not gus (globex).
+    assert [c["email"] for c in r.json()] == ["a***@example.com"]
 
 
 @pytest.mark.unbound_tenant
@@ -179,8 +181,99 @@ async def test_a_single_detected_app_with_an_upstream_tenant_still_filters(clien
     owner = {**as_user("olga", WRITER), "X-Up": ACME}
     cid = await make(client, owner)
     r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
-    assert [c["email"] for c in r.json()] == ["amy@example.com"]
+    assert [c["email"] for c in r.json()] == ["a***@example.com"]
 
     del client.app.state.tenant_members  # no store: fail closed, not "everyone"
     r = await client.get(f"{BASE}/{cid}/share-candidates", params=EVERYONE, headers=owner)
     assert r.json() == []
+
+
+async def _candidates(client, cid: str, q: str) -> list[dict]:
+    r = await client.get(
+        f"{BASE}/{cid}/share-candidates", params={"q": q}, headers=as_user("olga", WRITER)
+    )
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.mark.parametrize("q", ["eddie@exa", "@example", "example.com", "ddie@ex", "example"])
+async def test_part_of_an_email_finds_nobody(client, q):
+    """The directory matches on email substrings; the picker must not become an
+    oracle that confirms an address piece by piece."""
+    directory = FakeDirectory([person("olga"), person("eddie"), person("amy")])
+    client.app.state.user_directory = directory
+    cid = await make(client, as_user("olga", WRITER))
+    assert await _candidates(client, cid, q) == []
+    assert directory.asked[0][0] == q  # the directory was asked; the answer is filtered
+
+
+@pytest.mark.parametrize("q", ["EDDIE@example.COM", "  eddie@example.com  ", "Eddie@Example.Com"])
+async def test_exact_address_in_any_case_returns_the_full_address(client, q):
+    client.app.state.user_directory = FakeDirectory([person("olga"), person("eddie")])
+    cid = await make(client, as_user("olga", WRITER))
+    got = await _candidates(client, cid, q)
+    assert [(c["id"], c["email"]) for c in got] == [(user_uuid("eddie"), "eddie@example.com")]
+
+
+async def test_filter_runs_before_the_limit(client):
+    """Email-only hits must not use up the twenty slots a name match needs."""
+    people = [person("olga")] + [
+        DirectoryUser(
+            id=user_uuid(f"u{n:02d}"),
+            email=f"zed{n:02d}@example.com",
+            full_name=f"Nobody {n}",
+            is_active=True,
+        )
+        for n in range(30)
+    ]
+    people.append(
+        DirectoryUser(
+            id=user_uuid("real"),
+            email="real@elsewhere.org",
+            full_name="Zed Real",
+            is_active=True,
+        )
+    )
+    client.app.state.user_directory = FakeDirectory(people)
+    cid = await make(client, as_user("olga", WRITER))
+    assert [c["id"] for c in await _candidates(client, cid, "zed")] == [user_uuid("real")]
+
+
+async def test_nameless_user_is_not_labelled_with_the_address(client):
+    """With no name the directory's label is the address; the response must not
+    carry it in ``display_name`` unless the query is that address."""
+    client.app.state.user_directory = FakeDirectory(
+        [person("olga"), person("nina", full_name=None)]
+    )
+    cid = await make(client, as_user("olga", WRITER))
+    assert await _candidates(client, cid, "nina") == []
+    got = await _candidates(client, cid, "nina@example.com")
+    assert got == [
+        {
+            "id": user_uuid("nina"),
+            "display_name": "nina@example.com",
+            "email": "nina@example.com",
+        }
+    ]
+    got = await _candidates(client, cid, "NINA@example.com")
+    assert got[0]["email"] == "nina@example.com"
+
+
+async def test_label_containing_an_at_sign_is_masked(client):
+    client.app.state.user_directory = FakeDirectory(
+        [
+            person("olga"),
+            DirectoryUser(
+                id=user_uuid("ww"),
+                email="ww@example.com",
+                full_name="Wanda <wanda@corp.example>",
+                is_active=True,
+            ),
+        ]
+    )
+    cid = await make(client, as_user("olga", WRITER))
+    assert await _candidates(client, cid, "wanda") == []
+    got = await _candidates(client, cid, "ww@example.com")
+    assert got == [
+        {"id": user_uuid("ww"), "display_name": "ww@example.com", "email": "ww@example.com"}
+    ]

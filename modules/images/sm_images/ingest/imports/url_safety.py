@@ -27,6 +27,7 @@ from typing import Final
 import httpx
 
 __all__ = [
+    "ALWAYS_DENIED",
     "DEFAULT_ALLOWED_PORTS",
     "UnsafeURLError",
     "check_url",
@@ -57,7 +58,28 @@ _BLOCKED_NETWORKS: Final = tuple(
         "fe80::/10",
     )
 )
-_METADATA: Final = frozenset(ipaddress.ip_address(a) for a in ("169.254.169.254", "fd00:ec2::254"))
+ALWAYS_DENIED: Final = tuple(
+    ipaddress.ip_network(n)
+    for n in (
+        "127.0.0.0/8",  # loopback: this server's own services
+        "::1/128",  # loopback (IPv6)
+        "0.0.0.0/8",  # "this network", including the unspecified address
+        "::/128",  # unspecified (IPv6)
+        # link-local: AWS, GCP, Azure, OpenStack and DigitalOcean metadata (169.254.169.254),
+        # the AWS ECS task-role endpoint (169.254.170.2), Tencent (169.254.0.23)
+        "169.254.0.0/16",
+        "fe80::/10",  # link-local (IPv6)
+        "224.0.0.0/4",  # multicast
+        "ff00::/8",  # multicast (IPv6)
+        "255.255.255.255/32",  # broadcast
+        "100.100.100.200/32",  # Alibaba Cloud metadata, inside CGNAT
+        "168.63.129.16/32",  # Azure wireserver and host agent (a public-looking address)
+        "192.0.0.192/32",  # Oracle Cloud metadata
+        "fd00:c1::/32",  # Oracle Cloud IPv6 metadata (fd00:c1::a9fe:a9fe), inside fc00::/7
+        "fd20:ce::254/128",  # Google Cloud IPv6 metadata server, inside fc00::/7
+        "fd00:ec2::/32",  # AWS IPv6 metadata (fd00:ec2::254) and its service range, inside fc00::/7
+    )
+)
 # RFC 6052 NAT64 well-known prefix and the deprecated IPv4-compatible block: in
 # both the low 32 bits are an IPv4 address.
 _NAT64: Final = ipaddress.IPv6Network("64:ff9b::/96")
@@ -90,14 +112,17 @@ def _embedded_ipv4(ip: ipaddress.IPv6Address) -> list[ipaddress.IPv4Address]:
 def is_public_address(ip: IPAddress) -> bool:
     """Whether ``ip`` is publicly routable in every sense.
 
-    ``is_global`` alone misses multicast and does not look inside IPv6 forms
+    ``is_global`` alone misses multicast, cloud control endpoints such as
+    Azure's wireserver (168.63.129.16), and does not look inside IPv6 forms
     that embed an IPv4 address, so an embedded address must be public too.
     """
     if isinstance(ip, ipaddress.IPv6Address) and any(
         not is_public_address(v4) for v4 in _embedded_ipv4(ip)
     ):
         return False
-    if ip in _METADATA or any(ip in net for net in _BLOCKED_NETWORKS if net.version == ip.version):
+    if any(ip in net for net in ALWAYS_DENIED if net.version == ip.version) or any(
+        ip in net for net in _BLOCKED_NETWORKS if net.version == ip.version
+    ):
         return False
     if (
         ip.is_private

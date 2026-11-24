@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { clampFeedLimit, safeHref } from './feedProps';
+import { safeFrameSrc } from './safeLinks';
 
 describe('clampFeedLimit', () => {
   it.each([
@@ -80,5 +81,31 @@ describe('safeHref', () => {
   it('drops non-strings', () => {
     expect(safeHref(undefined)).toBe('');
     expect(safeHref(null)).toBe('');
+  });
+});
+
+describe('safeFrameSrc', () => {
+  it.each([
+    ['https://player.example/v/1', 'https://player.example/v/1'],
+    ['http://cdn.example/a.mp4', 'http://cdn.example/a.mp4'],
+    ['/media/clip.mp4', '/media/clip.mp4'],
+    ['  /media/clip.mp4  ', '/media/clip.mp4'],
+  ])('keeps %s', (input, expected) => {
+    expect(safeFrameSrc(input)).toBe(expected);
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,x',
+    'mailto:a@b.org',
+    'tel:+123',
+    '//evil.example/embed',
+    '/\\evil.example',
+    '\\evil.example',
+    '\x01https://example.org',
+    '',
+    '   ',
+  ])('drops %j', (input) => {
+    expect(safeFrameSrc(input)).toBe('');
   });
 });

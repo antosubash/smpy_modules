@@ -200,4 +200,10 @@ if [[ "${E2E_BUNDLE:-}" == "1" ]]; then
   exec uv run --project host uvicorn main:app --app-dir host --port "${API_PORT:?}"
 fi
 
+# Playwright attaches a non-blocking pipe to webServer's stderr; the framework's
+# dev-boot diagnostics print ~390 lines at startup and intermittently hit
+# BlockingIOError (#419, upstream simple_module_python#1024). Routing stderr
+# through `cat` gives the child process a blocking pipe while keeping `make dev`
+# as the exec'd PID Playwright signals on teardown.
+exec 2> >(cat >&2)
 exec make dev
