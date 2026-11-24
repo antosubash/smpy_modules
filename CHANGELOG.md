@@ -5,6 +5,10 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
+- News keeps the article form version current after search settings, scheduling,
+  workflow and revision restores; rejected saves can be corrected and retried
+  without a false concurrent-edit conflict (#444).
+
 - News registers its content-bundle section once per app, so restarting the same
   app lifespan works while conflicting section names still fail loudly (#447).
 

@@ -59,7 +59,7 @@ export function ReviewCard({
 }: {
   article: ArticleRead;
   canPublish: boolean;
-  onChanged: () => Promise<void> | void;
+  onChanged: (article: ArticleRead) => void;
 }) {
   const { t } = useT();
   const copy = keys.news.review;
@@ -69,11 +69,11 @@ export function ReviewCard({
 
   /** Resolves `true` only when the transition went through, so a caller can
    *  keep its dialog and its typed note open on failure. */
-  const run = async (action: () => Promise<unknown>, done: string): Promise<boolean> => {
+  const run = async (action: () => Promise<ArticleRead | null>, done: string): Promise<boolean> => {
     const ok = await guard(async () => {
       try {
-        await action();
-        await onChanged();
+        const updated = await action();
+        if (updated) onChanged(updated);
         toast.success(done);
         return true;
       } catch (e) {

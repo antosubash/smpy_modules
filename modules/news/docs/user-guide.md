@@ -77,6 +77,10 @@ A card, **The body has its own canvas**, links to **Edit the body**.
 If someone else saved the article since you loaded it, saving is refused with
 "This article was changed somewhere else. Reload to get the latest version,
 then make your change again."
+Search settings, schedule and workflow saves update the form's version without
+clearing unsaved inspector edits. Restoring history also replaces the headline
+with the restored one. A rejected save keeps the last successful version; fix
+the invalid fields and save again.
 
 ### Review
 

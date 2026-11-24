@@ -4,7 +4,7 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { getArticleDetail, scheduleArticle } from '../../utils/api';
+import { type ArticleRead, getArticleDetail, scheduleArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
 const GO_LIVE_ID = 'article-publish-at';
@@ -22,7 +22,13 @@ const COME_DOWN_ID = 'article-unpublish-at';
  * metadata and may be in the past. These are instants with one job each, and
  * both are cleared the moment they are acted on.
  */
-export function ScheduleCard({ articleId }: { articleId: number }) {
+export function ScheduleCard({
+  articleId,
+  onChanged,
+}: {
+  articleId: number;
+  onChanged: (article: ArticleRead) => void;
+}) {
   const { t } = useT();
   const copy = keys.news.schedule;
   const [publishAt, setPublishAt] = useState('');
@@ -49,12 +55,13 @@ export function ScheduleCard({ articleId }: { articleId: number }) {
   const save = async () => {
     setBusy(true);
     try {
-      await scheduleArticle(articleId, {
+      const updated = await scheduleArticle(articleId, {
         // Empty clears it, which is a real instruction — an explicit null
         // rather than an omitted field, or cancelling would be unspellable.
         publish_at: publishAt ? new Date(publishAt).toISOString() : null,
         unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
       });
+      if (updated) onChanged(updated);
       setSaved(true);
       toast.success(t(copy.saved_toast));
     } catch (e) {

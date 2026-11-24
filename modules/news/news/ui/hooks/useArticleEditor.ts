@@ -102,6 +102,15 @@ export function useArticleEditor(articleId: number) {
     [articleId],
   );
 
+  /** Adopt a write response without discarding unsaved inspector fields.
+   * Revision restore deliberately replaces the headline it restored. */
+  const acceptWrite = useCallback((updated: ArticleRead, restoreTitle = false) => {
+    setArticle((current) => ({ ...updated, tags: updated.tags ?? current?.tags }));
+    if (restoreTitle) {
+      setDraft((current) => (current ? { ...current, title: updated.title } : toDraft(updated)));
+    }
+  }, []);
+
   const patch = useCallback((next: Partial<ArticleDraft>) => {
     setDraft((current) => (current ? { ...current, ...next } : current));
     setDirty(true);
@@ -177,11 +186,11 @@ export function useArticleEditor(articleId: number) {
       guard(async () => {
         if (!article) return;
         setError(null);
-        await publishArticle(article.id);
-        await load();
+        const updated = await publishArticle(article.id);
+        if (updated) acceptWrite(updated);
         toast.success(t(keys.news.editor.published_toast));
       }).catch(fail),
-    [article, fail, guard, load, t],
+    [acceptWrite, article, fail, guard, t],
   );
 
   // Hard delete. Requires `news.publish` on the server — see `deleteArticle`
@@ -218,6 +227,7 @@ export function useArticleEditor(articleId: number) {
     /** Exposed so a sibling panel — the language switcher — reports through the
      *  same banner rather than growing an error surface of its own. */
     setError,
+    acceptWrite,
     load,
     patch,
     save,

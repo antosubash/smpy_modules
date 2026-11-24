@@ -55,6 +55,7 @@ export default function ArticleEditor() {
     conflict,
     gone,
     setError,
+    acceptWrite,
     saved,
     load,
     patch,
@@ -202,7 +203,7 @@ export default function ArticleEditor() {
             </Button>
           )}
 
-          <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
+          <ReviewCard article={article} canPublish={canPublish} onChanged={acceptWrite} />
 
           {/* Only on a multilingual site: a panel listing one language is a
               panel that answers a question nobody asked. */}
@@ -213,10 +214,10 @@ export default function ArticleEditor() {
           {/* Only for someone who may actually publish. The route is behind
               `news.publish`, so showing it to an author who may write but not
               publish would be offering a control that answers 403. */}
-          {canPublish && <ScheduleCard articleId={article_id} />}
+          {canPublish && <ScheduleCard articleId={article_id} onChanged={acceptWrite} />}
 
-          <SeoCard articleId={article_id} />
-          <HistoryCard articleId={article_id} />
+          <SeoCard articleId={article_id} onChanged={acceptWrite} />
+          <HistoryCard articleId={article_id} onChanged={(updated) => acceptWrite(updated, true)} />
         </aside>
       </div>
     </PageShell>

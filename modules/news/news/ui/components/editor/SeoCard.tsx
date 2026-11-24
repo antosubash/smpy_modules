@@ -6,7 +6,7 @@ import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { getArticleDetail, updateArticle } from '../../utils/api';
+import { type ArticleRead, getArticleDetail, updateArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
 const DESC_ID = 'article-meta-description';
@@ -26,7 +26,13 @@ const INDEX_ID = 'article-index-in-search';
  * fields into the inspector's draft would mean the main form fetching a second
  * document just to render a panel most edits never touch.
  */
-export function SeoCard({ articleId }: { articleId: number }) {
+export function SeoCard({
+  articleId,
+  onChanged,
+}: {
+  articleId: number;
+  onChanged: (article: ArticleRead) => void;
+}) {
   const { t } = useT();
   const copy = keys.news.seo;
   const [description, setDescription] = useState('');
@@ -52,12 +58,13 @@ export function SeoCard({ articleId }: { articleId: number }) {
   const save = async () => {
     setBusy(true);
     try {
-      await updateArticle(articleId, {
+      const updated = await updateArticle(articleId, {
         meta_description: description,
         og_image: image,
         canonical_url: canonical,
         index_in_search: indexed,
       });
+      if (updated) onChanged(updated);
       setSaved(true);
       toast.success(t(copy.saved_toast));
     } catch (e) {

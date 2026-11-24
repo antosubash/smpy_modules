@@ -2,6 +2,7 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
+  type ArticleRead,
   formatTimestamp,
   listArticleRevisions,
   type RevisionRead,
@@ -35,7 +36,13 @@ const EVENTS: Record<RevisionRead['event'], string> = {
  * with an older one — recoverable only by restoring again from a row this very
  * action pushes further down the list.
  */
-export function HistoryCard({ articleId }: { articleId: number }) {
+export function HistoryCard({
+  articleId,
+  onChanged,
+}: {
+  articleId: number;
+  onChanged: (article: ArticleRead) => void;
+}) {
   const { t, locale } = useT();
   const copy = keys.news.history;
   const [revisions, setRevisions] = useState<RevisionRead[] | null>(null);
@@ -60,7 +67,8 @@ export function HistoryCard({ articleId }: { articleId: number }) {
   const restore = async (revision: RevisionRead) => {
     setBusy(true);
     try {
-      await restoreArticleRevision(articleId, revision.id);
+      const updated = await restoreArticleRevision(articleId, revision.id);
+      if (updated) onChanged(updated);
       await load();
       toast.success(t(copy.restored_toast));
     } catch (e) {
