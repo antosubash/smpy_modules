@@ -7,10 +7,7 @@ from news.integrations import pagebuilder
 
 
 async def media_picker_allowed(request: Request) -> bool:
-    if not pagebuilder.available() or not pagebuilder.may_read(
-        await ensure_resolved_permissions(request)
-    ):
+    """Offer the picker only where the library is mounted and this user may read it."""
+    if not pagebuilder.mounted(request.app):
         return False
-    from pagebuilder.contracts.cards import mounted
-
-    return mounted(request.app)
+    return pagebuilder.may_read(await ensure_resolved_permissions(request))
