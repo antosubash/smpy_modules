@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { errorMessage, fromValidationErrors } from './request';
+import { errorMessage, fromValidationErrors, request } from './request';
 
 /**
  * The rule these guard: a failed request must never render the response body
@@ -103,4 +103,43 @@ describe('fromValidationErrors', () => {
     expect(fromValidationErrors([])).toBeNull();
     expect(fromValidationErrors(undefined)).toBeNull();
   });
+});
+
+it('keeps the stable conflict code and translates the conflict detail', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      response('{"detail":"Server wording","code":"page_conflict"}', {
+        status: 409,
+        statusText: 'Conflict',
+      }),
+    ),
+  );
+  try {
+    await expect(request('/pages/7', { method: 'PUT' })).rejects.toMatchObject({
+      status: 409,
+      code: 'page_conflict',
+      message: 'This page was changed elsewhere',
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('does not classify a slug collision as a stale draft', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      response('{"detail":"Slug already in use"}', { status: 409, statusText: 'Conflict' }),
+    ),
+  );
+  try {
+    await expect(request('/pages/7', { method: 'PUT' })).rejects.toMatchObject({
+      status: 409,
+      code: undefined,
+      message: 'Slug already in use',
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

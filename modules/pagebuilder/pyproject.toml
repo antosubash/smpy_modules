@@ -48,6 +48,7 @@ exclude = [
     "**/__tests__/**",
     "**/test-dom.tsx",
     "**/*-test-support.ts",
+    "**/*-test-support.tsx",
 ]
 # The built frontend bundle is gitignored, so hatchling's VCS-aware file
 # selection skips it. `artifacts` is the supported way to pull ignored build

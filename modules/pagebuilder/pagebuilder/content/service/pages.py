@@ -24,6 +24,7 @@ from sqlmodel import select
 
 from pagebuilder.content import redirects
 from pagebuilder.content.service._common import _UNSET, _normalize_to_utc
+from pagebuilder.content.service._fresh import ensure_fresh_for_write
 from pagebuilder.content.service._revisions import RevisionsMixin
 from pagebuilder.content.service._translations import TranslationsMixin
 from pagebuilder.content.service._trash import TrashMixin
@@ -239,8 +240,9 @@ class PagesService(WorkflowMixin, RevisionsMixin, TrashMixin, TranslationsMixin)
         return page
 
     async def update(self, page_id: int, data: PageUpdate) -> Page:
+        await ensure_fresh_for_write(self.db, page_id, data)
         page = await self.get_page(page_id)
-        update = data.model_dump(exclude_unset=True)
+        update = data.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
         # Captured before the loop: once the slug is overwritten there is
         # nothing left to redirect *from*. The locale is read here too, and
         # for a second reason — a rollback below expires the instance, so

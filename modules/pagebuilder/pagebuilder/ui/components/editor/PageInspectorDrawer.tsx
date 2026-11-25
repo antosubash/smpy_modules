@@ -133,6 +133,7 @@ export function PageInspectorDrawer({
           publicPrefix={publicPrefix}
           actions={
             <PageActions
+              writes={form.writes}
               pageId={form.pageId}
               title={form.title}
               slug={form.effectiveSlug}

@@ -168,7 +168,10 @@ class PagebuilderModule(ModuleBase):
         """
         from simple_module_core.module_settings import register_module_settings
 
+        from pagebuilder.core.errors import install_exception_handlers
         from pagebuilder.core.services import PagebuilderServices
+
+        install_exception_handlers(app)
 
         register_module_settings(
             app,

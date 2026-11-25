@@ -1,11 +1,12 @@
 import { type Data, Puck } from '@puckeditor/core';
 import '../ui/components/editor/puck-editor.css';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
 import { useMemo, useState } from 'react';
 
 import { NarrowCanvas } from '../ui/components/editor/NarrowCanvas';
 import { NO_HEADER_ACTIONS } from '../ui/components/editor/noHeaderActions';
+import { PageConflict } from '../ui/components/editor/PageConflict';
 import { PageEditorToolbar } from '../ui/components/editor/PageEditorToolbar';
 import { PageInspectorDrawer } from '../ui/components/editor/PageInspectorDrawer';
 import { RevisionHistoryPanel } from '../ui/components/editor/RevisionHistoryPanel';
@@ -109,6 +110,7 @@ export default function PageEditor() {
 
   const { isDirty, saveState, lastSavedAt, autosaveError, markSaved } = useAutosave({
     pageId: form.pageId,
+    writes: form.writes,
     busy,
     data: form.data,
     snapshotPayload: form.snapshotPayload,
@@ -157,6 +159,16 @@ export default function PageEditor() {
         onApprove={workflow.handleApprove}
         onReject={workflow.handleReject}
       />
+
+      {form.writes.conflict && (
+        <PageConflict
+          busy={busy}
+          onReload={() =>
+            router.visit(`/pagebuilder/${form.pageId}/edit`, { preserveState: false })
+          }
+          onOverwrite={() => workflow.handleSave(form.data, true)}
+        />
+      )}
 
       {rejectionNote && form.status === 'draft' && (
         <div className="border-b bg-red-50 px-4 py-3 text-sm text-red-800">

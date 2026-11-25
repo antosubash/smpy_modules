@@ -37,10 +37,14 @@ export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSche
     }
     setBusy(true);
     try {
-      const updated = await schedulePage(form.pageId, {
-        publish_at: publish,
-        unpublish_at: unpublish,
-      });
+      const id = form.pageId;
+      const updated = await form.writes.run((token) =>
+        schedulePage(id, {
+          expected_updated_at: token,
+          publish_at: publish,
+          unpublish_at: unpublish,
+        }),
+      );
       form.setPublishAt(updated.publish_at);
       form.setUnpublishAt(updated.unpublish_at);
       setMessage(t(keys.pagebuilder.schedule.saved));
@@ -56,10 +60,14 @@ export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSche
     setBusy(true);
     setScheduleError(null);
     try {
-      const updated = await schedulePage(form.pageId, {
-        publish_at: null,
-        unpublish_at: null,
-      });
+      const id = form.pageId;
+      const updated = await form.writes.run((token) =>
+        schedulePage(id, {
+          expected_updated_at: token,
+          publish_at: null,
+          unpublish_at: null,
+        }),
+      );
       form.setPublishAt(updated.publish_at);
       form.setUnpublishAt(updated.unpublish_at);
       setMessage(t(keys.pagebuilder.schedule.cleared));

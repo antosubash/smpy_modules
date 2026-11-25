@@ -23,7 +23,7 @@ router-level dependencies, in this order:
    `/pagebuilder/` (the draft preview included) run the same gate.
 
 "Permission" below is the extra `RequiresPermission` check on top; **read** means
-any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; the table is at the end.
+any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; draft conflicts also carry `"code": "page_conflict"`. The table is at the end.
 
 ## Pages
 
@@ -119,6 +119,29 @@ Partial update: any of `title`, `slug`, `meta_title`, `meta_description`,
 `index_in_search`, `json_ld`, `draft_data`, `parent_id`, `is_template`. There is
 no `locale`: a page's language cannot change. A slug change records a redirect
 from the old slug (same locale). Returns `PageDetail`.
+
+**Optimistic concurrency** (#448): send `expected_updated_at` with the exact
+`updated_at` returned when you loaded the page or last wrote it. Use `null` if
+that loaded page has never been updated (`updated_at: null`). An explicit
+`null` checks for that untouched version; omitting the field skips the check.
+A stale token returns HTTP 409 with
+`{"detail": "This page was changed elsewhere", "code": "page_conflict"}` and
+changes nothing. Instants are compared in UTC, including equivalent offsets.
+
+The editor serializes draft saves (autosave included) and its other writes,
+using each successful response's `updated_at` for the next write. Publish,
+unpublish, submit, approve, reject, schedule and revision restore accept the
+same optional `expected_updated_at` in their JSON body. Settings/SEO and
+save-as-template use `PUT /pages/{id}` and follow the same rule. Revisions are
+publish/workflow snapshots, so their ids cannot version ordinary draft saves.
+
+**Compatibility:** API consumers and bundles that omit the token keep the
+existing last-write-wins behaviour. The editor only omits it after the user
+chooses **Overwrite**. On conflict, autosave and further writes pause until
+**Reload** loads the server's page and discards local edits, or **Overwrite**
+saves the current local draft deliberately. The overwrite response supplies
+the version for subsequent guarded saves.
+
 
 ### `POST /api/pagebuilder/pages/{id}/translations` — `pagebuilder.edit` → 201
 

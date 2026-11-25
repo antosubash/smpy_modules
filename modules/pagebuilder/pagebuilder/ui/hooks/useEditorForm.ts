@@ -8,8 +8,10 @@ import type { PageDetail } from '../utils/api';
 import type { EditorSnapshot } from '../utils/editorSnapshot';
 import { keys, useT } from '../utils/i18n';
 import { slugify } from '../utils/slugify';
+import { type PageWrites, usePageWrites } from './usePageWrites';
 
 export interface EditorForm {
+  writes: PageWrites;
   pageId: number | null;
   setPageId: (id: number | null) => void;
   /** Which language the page is written in.
@@ -66,6 +68,7 @@ export interface EditorForm {
 export function useEditorForm(page: PageDetail | null, defaultLocale = 'en'): EditorForm {
   const { t } = useT();
   const [pageId, setPageId] = useState<number | null>(page?.id ?? null);
+  const writes = usePageWrites(pageId, page?.updated_at ?? null);
   const [title, setTitle] = useState(page?.title ?? 'Untitled page');
   const [slug, setSlug] = useState(page?.slug ?? '');
   const [slugTouched, setSlugTouched] = useState(Boolean(page?.slug));
@@ -203,6 +206,7 @@ export function useEditorForm(page: PageDetail | null, defaultLocale = 'en'): Ed
   };
 
   return {
+    writes,
     pageId,
     setPageId,
     // A page that has never been saved is in the site's default language:

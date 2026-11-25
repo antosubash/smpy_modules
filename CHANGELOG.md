@@ -439,6 +439,13 @@ name the module they affect.
 
 ### Fixed
 
+- **pagebuilder: warn before overwriting another editor's draft** (#448).
+  Draft saves and autosave send `expected_updated_at`; a stale write returns
+  409 `page_conflict`. The editor pauses saves and offers Reload (discard local
+  changes) or Overwrite (save deliberately). All writes on the editor share a
+  queue and advance the version from their responses. API consumers and bundles
+  that omit the token retain the existing behaviour.
+
 - **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
   Main fields, search settings, schedule, review notes and history show the
   server's current state; rejected values are discarded before another save.

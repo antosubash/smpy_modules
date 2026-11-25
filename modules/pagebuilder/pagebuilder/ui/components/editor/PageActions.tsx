@@ -1,12 +1,13 @@
 import { router } from '@inertiajs/react';
 import { Button } from '@simple-module-py/ui/components/ui/button';
-
+import type { PageWrites } from '../../hooks/usePageWrites';
 import type { PageDetail } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
-import { createPage, deletePage, savePage } from '../../utils/pagesApi';
+import { createPage, deletePage } from '../../utils/pagesApi';
 import { ConfirmDialog } from '../ConfirmDialog';
 
 interface Props {
+  writes: PageWrites;
   /** Null for a page that has never been saved — see below. */
   pageId: number | null;
   title: string;
@@ -24,6 +25,7 @@ interface Props {
  * showing three disabled buttons explains nothing about why.
  */
 export function PageActions({
+  writes,
   pageId,
   title,
   slug,
@@ -61,7 +63,8 @@ export function PageActions({
         variant="outline"
         size="sm"
         onClick={() => {
-          void savePage(pageId, { is_template: true })
+          void writes
+            .save({ is_template: true })
             .then(() => onNotice(t(keys.pagebuilder.actions.templated)))
             .catch((e: Error) => onError(e.message));
         }}

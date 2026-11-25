@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder.content.service._fresh import ensure_fresh_for_write
 from pagebuilder.content.service.pages import _UNSET, PagesService
 from pagebuilder.contracts.schemas import (
     PageNoteRequest,
@@ -34,6 +35,7 @@ async def publish_page(
 ) -> PageRead:
     """Publish the current draft. The optional ``note`` is captured on
     the revision row so the history panel can label the publish."""
+    await ensure_fresh_for_write(db, page_id, body)
     page = await PagesService(db).publish(page_id, note=_note(body))
     return PageRead.model_validate(page)
 
@@ -48,6 +50,7 @@ async def unpublish_page(
     db: AsyncSession = Depends(get_db),
     body: PageNoteRequest | None = None,
 ) -> PageRead:
+    await ensure_fresh_for_write(db, page_id, body)
     page = await PagesService(db).unpublish(page_id, note=_note(body))
     return PageRead.model_validate(page)
 
@@ -63,6 +66,7 @@ async def submit_page(
     body: PageNoteRequest | None = None,
 ) -> PageRead:
     """Editor action: hand a draft off to the approver queue."""
+    await ensure_fresh_for_write(db, page_id, body)
     page = await PagesService(db).submit_for_review(page_id, note=_note(body))
     return PageRead.model_validate(page)
 
@@ -78,6 +82,7 @@ async def approve_page(
     body: PageNoteRequest | None = None,
 ) -> PageRead:
     """Approver action: take a submission live (also publishes)."""
+    await ensure_fresh_for_write(db, page_id, body)
     page = await PagesService(db).approve(page_id, note=_note(body))
     return PageRead.model_validate(page)
 
@@ -99,6 +104,7 @@ async def schedule_page(
     ``POST {"publish_at": "..."}`` only touches ``publish_at`` and leaves
     ``unpublish_at`` as-is.
     """
+    await ensure_fresh_for_write(db, page_id, body)
     publish_at = body.publish_at if "publish_at" in body.model_fields_set else _UNSET
     unpublish_at = body.unpublish_at if "unpublish_at" in body.model_fields_set else _UNSET
     page = await PagesService(db).schedule(
@@ -120,5 +126,6 @@ async def reject_page(
     db: AsyncSession = Depends(get_db),
 ) -> PageRead:
     """Approver action: send a submission back to draft with feedback."""
+    await ensure_fresh_for_write(db, page_id, body)
     page = await PagesService(db).reject(page_id, body.note)
     return PageRead.model_validate(page)
