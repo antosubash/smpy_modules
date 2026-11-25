@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@simple-module-py/ui/components/ui/dialog';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ArticleWrite } from '../../hooks/useArticleEditor';
 import { useInFlight } from '../../hooks/useInFlight';
@@ -70,6 +70,8 @@ export function ReviewCard({
   const { busy, run: guard } = useInFlight(TRANSITION_COOLDOWN_MS);
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');
+  const conflictRef = useRef(conflict);
+  conflictRef.current = conflict;
 
   /** Resolves `true` when the transition went through. On failure, resolves the
    *  server's own message (the 409 conflict text, a 403), so a caller can keep
@@ -90,12 +92,7 @@ export function ReviewCard({
             throw e;
           }
         });
-        if (!written) {
-          // The action never ran when the editor is already blocked on a
-          // conflict, so the reason is that conflict.
-          failure.reason ??= conflict ? t(keys.news.errors.article_conflict) : null;
-          return false;
-        }
+        if (!written) return false;
         toast.success(done);
         return true;
       } catch (e) {
@@ -104,7 +101,12 @@ export function ReviewCard({
         return false;
       }
     });
-    return ok === true ? true : (failure.reason ?? t(copy.unpublish_failed));
+    // An earlier queued write can discover a conflict while this action waits;
+    // read the current flag after the guard settles, not the click's old prop.
+    return ok === true
+      ? true
+      : (failure.reason ??
+          (conflictRef.current ? t(keys.news.errors.article_conflict) : t(copy.unpublish_failed)));
   };
   const run = async (
     action: (version: string | null) => Promise<ArticleRead | null>,

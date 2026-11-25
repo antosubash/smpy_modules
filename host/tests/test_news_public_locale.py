@@ -4,7 +4,7 @@ The framework ships one catalogue with each page, chosen for the reader (cookie,
 then ``Accept-Language``). On ``/de/news/`` the module's own strings stayed
 English for a visitor whose browser asks for English, beside pagebuilder's German
 chrome. This boots the real host (the stub apps in ``modules/news/tests`` carry
-no i18n shared props) with content languages ``en`` and ``de``.
+no i18n shared props) with content languages including ``en`` and ``de``.
 """
 
 from __future__ import annotations
@@ -48,7 +48,13 @@ def host_app(tmp_path, monkeypatch):
     url = f"sqlite+aiosqlite:///{tmp_path / 'host.db'}"
     _run([sys.executable, "-m", "alembic", "-c", "host/alembic.ini", "upgrade", "heads"], url)
     _run(
-        [sys.executable, "scripts/set_setting.py", "pagebuilder", "content_locales", '["en","de"]'],
+        [
+            sys.executable,
+            "scripts/set_setting.py",
+            "pagebuilder",
+            "content_locales",
+            '["en","de","de-at","fr"]',
+        ],
         url,
         SM_SECRET_KEY=SECRET,
     )
@@ -73,11 +79,16 @@ def _catalogues(app, monkeypatch) -> dict[str, dict]:
         async with app.router.lifespan_context(app), AsyncClient(
             transport=ASGITransport(app=app), base_url="http://localhost"
         ) as http:
-            for name, path, lang in (
-                ("de", "/de/news/", "en"),
-                ("en", "/news/", "de"),
+            for name, path, lang, cookie in (
+                ("de", "/de/news/", "en", ""),
+                ("en", "/news/", "de", ""),
+                ("de-at", "/de-at/news/", "en", ""),
+                ("fr", "/fr/news/", "de", ""),
+                ("de-cookie", "/de/news/", "de", "locale=en"),
             ):
-                response = await http.get(path, headers={**INERTIA, "Accept-Language": lang})
+                response = await http.get(
+                    path, headers={**INERTIA, "Accept-Language": lang, "Cookie": cookie}
+                )
                 assert response.status_code == 200, response.text[:300]
                 out[name] = response.json()["props"]["i18n"]
         return out
@@ -97,3 +108,6 @@ def test_a_page_speaks_the_language_of_its_address(host_app, monkeypatch):
     # ...and the default language's address stays English for a browser asking for German.
     assert got["en"]["locale"] == "en"
     assert got["en"]["messages"][FEED] == en
+    for name in ("de-at", "fr", "de-cookie"):
+        assert got[name]["locale"] == "de"
+        assert got[name]["messages"][FEED] == de

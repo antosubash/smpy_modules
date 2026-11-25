@@ -37,7 +37,7 @@ export function editorStatus(status: ArticleRead['status'], dated: string, t: Tr
  *
  * `published_at` is the editorial display date, not a schedule — the field
  * that actually drives auto-publish is `publish_at`, set from ScheduleCard
- * and not read anywhere in this list. A future `published_at` used to read
+ * and exposed to this list as `scheduled_at`. A future `published_at` used to read
  * as "publishes {date}", which promised something this row cannot keep: an
  * editor could set a future display date, see "publishes …" and believe the
  * article will go live on its own when nothing here does that.

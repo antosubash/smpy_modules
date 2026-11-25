@@ -60,13 +60,24 @@ class TestKeys:
         assert len(server) == len(set(server)), "a key appears twice in the head"
         assert set(server) == client
 
+    async def test_archive_keys_match_the_client(self, anon_client) -> None:
+        response = await anon_client.get(f"{NEWS}/?q=trees")
+        assert response.status_code == 200
+        head = response.text.split("</head>", 1)[0]
+        server = re.findall(r'data-inertia="([^"]+)"', head)
+        client = re.findall(
+            r'head-key="([^"]+)"',
+            ARTICLE_HEAD.with_name("ArchiveHead.tsx").read_text(encoding="utf-8"),
+        )
+        assert server == client == ["robots"]
+
     async def test_a_tag_only_the_server_writes_is_not_managed(
         self, anon_client
     ) -> None:
-        # The client never renders hreflang or the feed link, so a key on one
-        # would make hydration delete it.
+        # An unsearched archive has no client tags except its title; marking
+        # its metadata, canonical or alternate links would delete them.
         body = (await anon_client.get(f"{NEWS}/")).text
         head = body.split("</head>", 1)[0]
         assert 'rel="alternate"' in head
         assert 'rel="canonical"' in head
-        assert "data-inertia" not in head.split('rel="alternate"', 1)[1].split(">", 1)[0]
+        assert "data-inertia" not in head

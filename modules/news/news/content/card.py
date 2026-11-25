@@ -105,7 +105,7 @@ SCHEDULED_AT: Final = case(
 ).label("scheduled_at")
 """When a draft is due to go live by itself, or ``NULL``.
 
-Only a *draft* can be waiting: the beat publishes ``DRAFT`` rows whose
+Only a *draft* can be waiting: the scheduler publishes ``DRAFT`` rows whose
 ``publish_at`` has passed (``_workflow``), and a published article's
 ``publish_at`` is cleared once acted on. The list shows it so a scheduled
 draft does not read as "Draft · dated today" like any other.
