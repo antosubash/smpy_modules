@@ -62,7 +62,9 @@ async def test_head_and_json_ld_cannot_break_out(public_locales_client, fx):
     html = (await public_locales_client.get(f"/events/{fx.slug(fx.one_off)}")).text
     assert "<script>alert" not in html
     assert html.count("<script") == 2 and html.count("</script>") == 2  # the shell's and JSON-LD
-    ld = re.search(r'<script type="application/ld\+json">(.*?)</script>', html, re.S).group(1)
+    ld = re.search(
+        r'<script type="application/ld\+json" data-inertia="json-ld">(.*?)</script>', html, re.S
+    ).group(1)
     assert json.loads(ld)["name"] == EVIL + separator
     assert separator not in ld  # the JS line separator is an escape inside the script
     assert "&lt;/script&gt;" in html  # the title in <title> and og: is escaped text
@@ -72,8 +74,10 @@ async def test_head_tags(public_locales_client, fx):
     slug = fx.slug(fx.one_off)
     html = (await public_locales_client.get(f"/events/{slug}")).text
     assert f"<title>{slug.title()}</title>" in html
-    assert f'<link rel="canonical" href="http://test/events/{slug}">' in html
-    assert '<meta property="og:type" content="website">' in html
+    assert (
+        f'<link rel="canonical" data-inertia="canonical" href="http://test/events/{slug}">' in html
+    )
+    assert '<meta property="og:type" data-inertia="og:type" content="website">' in html
     assert 'hreflang="de"' in html and 'hreflang="x-default"' in html
     assert '<html lang="en"' in html
     de = (await public_locales_client.get(f"/de/events/{fx.slug(fx.one_off, 'de')}")).text
@@ -204,7 +208,7 @@ async def test_noindex_text(public_locales_client, fx):
     path = f"/events/{fx.slug(fx.one_off)}"
     assert props(await get(public_locales_client, path))["index_in_search"] is False
     assert (
-        '<meta name="robots" content="noindex,nofollow">'
+        '<meta name="robots" data-inertia="robots" content="noindex,nofollow">'
         in (await public_locales_client.get(path)).text
     )
 

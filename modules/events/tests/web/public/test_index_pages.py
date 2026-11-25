@@ -180,13 +180,16 @@ async def test_head_injected(public_locales_client, fx):
     html = got.text
     assert got.status_code == 200 and '<html lang="de"' in html
     assert "<title>Events</title>" in html
-    assert '<link rel="canonical" href="http://test/de/events/">' in html
+    assert '<link rel="canonical" data-inertia="canonical" href="http://test/de/events/">' in html
     for locale, url in (
         ("en", "http://test/events/"),
         ("de", "http://test/de/events/"),
         ("x-default", "http://test/events/"),
     ):
-        assert f'<link rel="alternate" hreflang="{locale}" href="{url}">' in html
+        assert (
+            f'<link rel="alternate" data-inertia="hreflang-{locale}" '
+            f'hreflang="{locale}" href="{url}">'
+        ) in html
     assert 'type="text/calendar"' in html and 'href="http://test/de/events/calendar.ics"' in html
     assert got.headers["content-language"] == "de"
 
@@ -201,7 +204,10 @@ async def test_canonical_ignores_the_view_and_keeps_filters(public_locales_clien
     html = (
         await public_locales_client.get(f"{IDX}?view=calendar&category={fx.public_cat.slug}")
     ).text
-    assert f'rel="canonical" href="http://test/events/?category={fx.public_cat.slug}"' in html
+    assert (
+        'rel="canonical" data-inertia="canonical" '
+        f'href="http://test/events/?category={fx.public_cat.slug}"'
+    ) in html
 
 
 async def test_a_configured_origin_beats_a_spoofed_host(public_locales_client, fx):

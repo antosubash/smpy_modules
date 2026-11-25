@@ -24,6 +24,10 @@ from fastapi import Response
 __all__ = ["event_head", "inject", "listing_head", "safe_json_ld", "set_html_lang"]
 
 _CLOSE_HEAD = b"</head>"
+# The attribute Inertia's head manager keys on: an element carrying it is replaced by the client's
+# ``<Head>`` tag with the same key (``head-key`` in ``PublicHead.tsx``) instead of duplicated. Every
+# tag here has a client twin and is keyed; the two sides must agree (tests/web/public).
+_MANAGED = "data-inertia"
 _EXISTING_TITLE = re.compile(rb"<title>.*?</title>", re.S)
 # ``\s`` before ``lang``, not ``\b``: ``xml:lang=`` and ``data-lang=`` are other attributes.
 _HTML_LANG = re.compile(rb"""(<html\b[^>]*?\slang=)(["'])([^"']*)\2""", re.IGNORECASE)
@@ -40,19 +44,47 @@ def _e(value: str) -> str:
     return html.escape(value, quote=True)
 
 
-def _tag(name: str, value: str | None, *, prop: bool = False) -> str:
-    """One meta tag, or nothing when the value is empty. ``name`` is a literal of the callers."""
+def _tag(
+    name: str, value: str | None, *, prop: bool = False, managed: bool = False
+) -> str:
+    """One meta tag, or nothing when the value is empty.
+
+    ``managed`` marks a tag the client's ``<Head>`` renders under the same key
+    (the tag's own name), so hydration adopts it rather than duplicating it.
+
+    The value is HTML-escaped with ``quote=True``: these are author-written
+    strings landing in an attribute, and a headline containing a quotation mark
+    is ordinary rather than an attack. ``name`` is a literal from the call sites
+    below, never user input.
+    """
     if not value:
         return ""
     key = "property" if prop else "name"
-    return f'<meta {key}="{name}" content="{html.escape(value, quote=True)}">'
+    keyed = f' {_MANAGED}="{name}"' if managed else ""
+    return f'<meta {key}="{name}"{keyed} content="{html.escape(value, quote=True)}">'
 
 
-def _alternate_links(alternates: list[dict[str, str]] | None) -> list[str]:
-    """``hreflang`` links (``x-default`` included); none for a monolingual site."""
+def _alternate_links(
+    alternates: list[dict[str, str]] | None, *, managed: bool = False
+) -> list[str]:
+    """``hreflang`` links for a document that exists in several languages.
+
+    Server-rendered rather than left to Inertia's ``<Head>`` for the same reason
+    everything else here is: a crawler deciding which language to index for a
+    query does it without running the script, and a switch it never sees is a
+    switch that does not exist.
+
+    Empty for a monolingual site — see ``alternates`` in ``_article``, which
+    returns nothing rather than a lone entry pointing at the document itself.
+
+    ``managed`` keys each link ``hreflang-<locale>``, for a client that renders
+    the same set through ``<Head>`` (events' ``PublicHead``); news' does not, so
+    its links stay unkeyed.
+    """
     return [
         '<link rel="alternate" '
-        f'hreflang="{html.escape(entry["locale"], quote=True)}" '
+        + (f'{_MANAGED}="hreflang-{html.escape(entry["locale"], quote=True)}" ' if managed else "")
+        + f'hreflang="{html.escape(entry["locale"], quote=True)}" '
         f'href="{html.escape(entry["url"], quote=True)}">'
         for entry in alternates or []
     ]
@@ -71,18 +103,18 @@ def _common(
 ) -> list[str]:  # fmt: skip
     parts = [
         f"<title>{_e(title)}</title>",
-        _tag("description", description),
-        _tag("og:title", title, prop=True),
-        _tag("og:description", description, prop=True),
-        _tag("og:type", "website", prop=True),
-        _tag("og:url", canonical, prop=True),
+        _tag("description", description, managed=True),
+        _tag("og:title", title, prop=True, managed=True),
+        _tag("og:description", description, prop=True, managed=True),
+        _tag("og:type", "website", prop=True, managed=True),
+        _tag("og:url", canonical, prop=True, managed=True),
         # The bare tag, not an invented ``ll_CC`` region.
-        _tag("og:locale", locale, prop=True),
-        _tag("robots", robots),
+        _tag("og:locale", locale, prop=True, managed=True),
+        _tag("robots", robots, managed=True),
     ]
-    parts.extend(_alternate_links(alternates))
+    parts.extend(_alternate_links(alternates, managed=True))
     if canonical:
-        parts.append(f'<link rel="canonical" href="{_e(canonical)}">')
+        parts.append(f'<link rel="canonical" {_MANAGED}="canonical" href="{_e(canonical)}">')
     return parts
 
 
@@ -101,13 +133,16 @@ def event_head(
         alternates=alternates,
         robots=None if index_in_search else "noindex,nofollow",
     )
-    parts.append(_tag("og:image", image, prop=True))
-    parts.append(_tag("twitter:card", "summary_large_image" if image else "summary"))
-    parts.append(_tag("twitter:image", image))
+    parts.append(_tag("og:image", image, prop=True, managed=True))
+    parts.append(
+        _tag("twitter:card", "summary_large_image" if image else "summary", managed=True)
+    )
+    parts.append(_tag("twitter:image", image, managed=True))
     if json_ld:
         attribute = f' nonce="{_e(nonce)}"' if nonce else ""
         parts.append(
-            f'<script type="application/ld+json"{attribute}>{safe_json_ld(json_ld)}</script>'
+            f'<script type="application/ld+json" {_MANAGED}="json-ld"{attribute}>'
+            f"{safe_json_ld(json_ld)}</script>"
         )
     return "".join(part for part in parts if part)
 
@@ -127,7 +162,8 @@ def listing_head(
     )
     if feed_url:
         parts.append(
-            f'<link rel="alternate" type="text/calendar" title="{_e(title)}" href="{_e(feed_url)}">'
+            f'<link rel="alternate" type="text/calendar" {_MANAGED}="feed" '
+            f'title="{_e(title)}" href="{_e(feed_url)}">'
         )
     return "".join(part for part in parts if part)
 

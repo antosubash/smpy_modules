@@ -38,6 +38,7 @@ function PublicEventPage(p: PublicEventProps) {
         image={p.image}
         locale={p.locale}
         jsonLd={p.json_ld}
+        event
       />
       <main className="mx-auto max-w-3xl space-y-6 p-4">
         {p.cancelled || p.when?.status === 'cancelled' ? (

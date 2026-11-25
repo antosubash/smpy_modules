@@ -69,7 +69,9 @@ def _tag(
     return f'<meta {key}="{name}"{keyed} content="{html.escape(value, quote=True)}">'
 
 
-def _alternate_links(alternates: list[dict[str, str]] | None) -> list[str]:
+def _alternate_links(
+    alternates: list[dict[str, str]] | None, *, managed: bool = False
+) -> list[str]:
     """``hreflang`` links for a document that exists in several languages.
 
     Server-rendered rather than left to Inertia's ``<Head>`` for the same reason
@@ -79,10 +81,15 @@ def _alternate_links(alternates: list[dict[str, str]] | None) -> list[str]:
 
     Empty for a monolingual site — see ``alternates`` in ``_article``, which
     returns nothing rather than a lone entry pointing at the document itself.
+
+    ``managed`` keys each link ``hreflang-<locale>``, for a client that renders
+    the same set through ``<Head>`` (events' ``PublicHead``); news' does not, so
+    its links stay unkeyed.
     """
     return [
         '<link rel="alternate" '
-        f'hreflang="{html.escape(entry["locale"], quote=True)}" '
+        + (f'{_MANAGED}="hreflang-{html.escape(entry["locale"], quote=True)}" ' if managed else "")
+        + f'hreflang="{html.escape(entry["locale"], quote=True)}" '
         f'href="{html.escape(entry["url"], quote=True)}">'
         for entry in alternates or []
     ]

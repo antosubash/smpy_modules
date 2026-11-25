@@ -99,6 +99,7 @@ carries `X-Events-Truncated: 1`. The single-event file has no window.
 Each event page carries `<title>`, description, canonical (the `?date=` address for an occurrence),
 `hreflang` for the languages it exists in plus `x-default`, Open Graph tags and `Event` JSON-LD
 (`eventStatus` including cancelled and rescheduled, `eventAttendanceMode`, `location`, `organizer`).
+The server writes each tag with an Inertia `data-inertia` key and `PublicHead` renders the same key (`head-key`), so the browser keeps one copy after hydration; a tag added on one side joins the other.
 An event with no summary, description or SEO text gets a generated one-line description (date and
 time, place, calendar) in the page's language. An event that exists in a single language still
 names it, with `x-default`. A series' bare page lists its next ten occurrences in JSON-LD. Tick **No index** on a text to add

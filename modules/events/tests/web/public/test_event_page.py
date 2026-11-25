@@ -261,7 +261,9 @@ async def test_a_sub_event_on_another_public_calendar_shows_its_own(public_local
 
 async def _description_meta(client, path, **headers):
     html = (await client.get(path, headers=headers)).text
-    found = re.search(r'<meta name="description" content="([^"]*)">', html)
+    found = re.search(
+        r'<meta name="description" data-inertia="description" content="([^"]*)">', html
+    )
     return found.group(1) if found else None
 
 

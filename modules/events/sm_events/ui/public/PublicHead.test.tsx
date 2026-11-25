@@ -53,3 +53,40 @@ it('mirrors the server head: canonical, hreflang, robots, feed', async () => {
     '/events/calendar.ics',
   );
 });
+
+it('keys every tag the server keys, so hydration replaces rather than doubles it (#461)', async () => {
+  // React hoists meta and link into `document.head`, where earlier tests left theirs.
+  document.head.replaceChildren();
+  await mount(
+    <PublicHead
+      title="T"
+      locale="en"
+      description="d"
+      canonical="https://x.example/e"
+      image="https://x.example/i.png"
+      alternates={[{ locale: 'de', url: 'https://x.example/de/e' }]}
+      noindex
+      event
+      jsonLd={{ '@type': 'Event' }}
+    />,
+  );
+  // The mocked `Head` keeps `head-key` as a plain attribute.
+  const keys = [...document.querySelectorAll('[head-key]')].map((e) => e.getAttribute('head-key'));
+  expect(keys.sort()).toEqual(
+    [
+      'canonical',
+      'description',
+      'hreflang-de',
+      'json-ld',
+      'og:description',
+      'og:image',
+      'og:locale',
+      'og:title',
+      'og:type',
+      'og:url',
+      'robots',
+      'twitter:card',
+      'twitter:image',
+    ].sort(),
+  );
+});
