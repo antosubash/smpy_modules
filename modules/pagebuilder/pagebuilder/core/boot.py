@@ -103,12 +103,22 @@ def exempt_public_routes(app: FastAPI, settings: PagebuilderSettings) -> None:
     # ``media_url_prefix`` to a parent of the page route, say): a rule carrying
     # a rate beats one without, so "off" would also lift the limit from those
     # pages, which are rendered from the database. Media keeps the host rate
-    # there. Only rules registered so far are seen.
+    # there. A rule with its own rate, or for other verbs, cannot lose anything
+    # and does not count. Neither does a broader prefix, a suffix or a regex
+    # rule: under the media prefix it can only match a path this mount serves.
+    # Only rules registered so far are seen, hence sitemap and robots first.
+    if settings.sitemap_enabled:
+        registry.add_exact("/sitemap.xml", methods=methods)
+    if settings.robots_enabled:
+        registry.add_exact("/robots.txt", methods=methods)
     media_prefix = dir_prefix(settings.media_url_prefix)
     inside = sorted(
         route.pattern
         for route in registry.routes
-        if route.kind in ("prefix", "exact") and route.pattern.startswith(media_prefix)
+        if route.rate is None
+        and route.kind in ("prefix", "exact")
+        and route.pattern.startswith(media_prefix)
+        and (route.methods is None or _READ_ONLY.intersection(route.methods))
     )
     if inside:
         _log.warning(
@@ -118,10 +128,6 @@ def exempt_public_routes(app: FastAPI, settings: PagebuilderSettings) -> None:
             ", ".join(inside),
         )
     registry.add_prefix(media_prefix, methods=methods, rate=None if inside else "off")
-    if settings.sitemap_enabled:
-        registry.add_exact("/sitemap.xml", methods=methods)
-    if settings.robots_enabled:
-        registry.add_exact("/robots.txt", methods=methods)
 
 
 def mount_public_routers(app: FastAPI, settings: PagebuilderSettings) -> None:
