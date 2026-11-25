@@ -4,8 +4,8 @@ import { App, router } from '@inertiajs/react';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ArticleHead, type ArticleHeadProps } from '../components/ArticleHead';
 import { ArchiveHead } from '../components/ArchiveHead';
+import { ArticleHead, type ArticleHeadProps } from '../components/ArticleHead';
 
 // Exercise the real React Head and core DOM renderer, without initializing navigation.
 const page: Page = {
@@ -87,7 +87,9 @@ it('renders every article tag without server injection, including former fragmen
   ]) {
     expect(all(`[data-inertia="${key}"]`), key).toHaveLength(1);
   }
-  expect(JSON.parse(document.head.querySelector('script')?.textContent ?? '')).toEqual(article.json_ld);
+  expect(JSON.parse(document.head.querySelector('script')?.textContent ?? '')).toEqual(
+    article.json_ld,
+  );
 });
 
 it('adopts keyed server article tags and retains unkeyed locale and alternate tags', async () => {
@@ -127,7 +129,9 @@ it('adopts archive robots, but preserves the pre-existing unkeyed archive metada
   ]);
   await render(<ArchiveHead heading="Archive" />);
   expect(all('link[rel="canonical"]')).toHaveLength(1);
-  expect(all('meta[property="og:type"]').map((tag) => tag.getAttribute('content'))).toEqual(['website']);
+  expect(all('meta[property="og:type"]').map((tag) => tag.getAttribute('content'))).toEqual([
+    'website',
+  ]);
   expect(all('meta[name="robots"]')).toHaveLength(0);
 });
 
