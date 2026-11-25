@@ -98,7 +98,26 @@ def exempt_public_routes(app: FastAPI, settings: PagebuilderSettings) -> None:
     # ``rate_limit_public`` (120/minute per address by default), a page with a
     # dozen images spends a tenth of the budget per view, and a visitor who
     # opens a few pages gets 429s in place of images (#442).
-    registry.add_prefix(dir_prefix(settings.media_url_prefix), methods=methods, rate="off")
+    #
+    # Not when another public rule lies inside the media prefix (a host that set
+    # ``media_url_prefix`` to a parent of the page route, say): a rule carrying
+    # a rate beats one without, so "off" would also lift the limit from those
+    # pages, which are rendered from the database. Media keeps the host rate
+    # there. Only rules registered so far are seen.
+    media_prefix = dir_prefix(settings.media_url_prefix)
+    inside = sorted(
+        route.pattern
+        for route in registry.routes
+        if route.kind in ("prefix", "exact") and route.pattern.startswith(media_prefix)
+    )
+    if inside:
+        _log.warning(
+            "pagebuilder.media_url_prefix %s contains other public routes (%s); "
+            "media requests stay under the host's rate_limit_public",
+            media_prefix,
+            ", ".join(inside),
+        )
+    registry.add_prefix(media_prefix, methods=methods, rate=None if inside else "off")
     if settings.sitemap_enabled:
         registry.add_exact("/sitemap.xml", methods=methods)
     if settings.robots_enabled:

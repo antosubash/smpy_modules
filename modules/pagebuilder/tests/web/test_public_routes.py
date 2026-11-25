@@ -105,6 +105,16 @@ def test_a_custom_media_prefix_is_not_rate_limited_either():
     assert rule is not None and rule.rate == "off"
 
 
+def test_media_keeps_the_host_rate_when_its_prefix_contains_the_pages(caplog):
+    """"off" on a prefix that holds the page route would unlimit the pages too."""
+    with caplog.at_level("WARNING", logger="simple_module.pagebuilder"):
+        registry = _registry(media_url_prefix="/p")
+    for path in ("/p/launch-announcement", "/p/default/abc123.png"):
+        rule = registry.match("GET", path)
+        assert rule is not None and rule.rate is None
+    assert "contains other public routes (/p/)" in caplog.text
+
+
 def test_a_sibling_of_the_media_prefix_stays_gated():
     assert not _registry().matches("GET", "/media/pagebuilder-private/secret.png")
 
