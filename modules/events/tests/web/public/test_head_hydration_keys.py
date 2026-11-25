@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from sm_events.web.endpoints.public import _head
 
 from tests.web.public.test_index_pages import fx  # noqa: F401  (fixture)
@@ -44,7 +45,7 @@ def _server_keys(head: str) -> list[str]:
 def _event_head() -> str:
     return _head.event_head(
         title="T", description="d", canonical="https://x.example/e", image="https://x.example/i.png",
-        index_in_search=False, json_ld={"@type": "Event"}, locale="en", alternates=ALTERNATES,
+        robots=_head.ROBOTS_NOINDEX, json_ld={"@type": "Event"}, locale="en", alternates=ALTERNATES,
         nonce="n",
     )  # fmt: skip
 
@@ -76,6 +77,62 @@ def test_json_ld_keeps_its_nonce_beside_the_key():
 def test_the_title_is_unkeyed_so_the_client_replaces_it():
     # Inertia removes every unmanaged <title> once the client renders one: one title remains.
     assert "<title>T</title>" in _event_head() and "<title data-inertia" not in _event_head()
+
+
+@pytest.mark.parametrize("flags", range(64))
+def test_event_optional_key_combinations(flags):
+    description = "d" if flags & 1 else None
+    image = "https://x.example/i.png" if flags & 2 else None
+    noindex = bool(flags & 4)
+    canonical = "https://x.example/e" if flags & 8 else None
+    alternates = [{"locale": "de", "url": "https://x.example/de/e"}] if flags & 16 else []
+    json_ld = {"@type": "Event"} if flags & 32 else None
+    head = _head.event_head(
+        title="Event", description=description, image=image,
+        robots="noindex,nofollow" if noindex else None,
+        canonical=canonical, alternates=alternates, json_ld=json_ld, locale="en",
+    )  # fmt: skip
+    keys = {"og:title", "og:type", "og:locale", "twitter:card"}
+    if description:
+        keys |= {"description", "og:description"}
+    if image:
+        keys |= {"og:image", "twitter:image"}
+    if noindex:
+        keys.add("robots")
+    if canonical:
+        keys |= {"canonical", "og:url"}
+    if alternates:
+        keys.add("hreflang-de")
+    if json_ld:
+        keys.add("json-ld")
+    actual = _server_keys(head)
+    assert len(actual) == len(set(actual)) and set(actual) == keys
+    card = "summary_large_image" if image else "summary"
+    assert f'name="twitter:card" data-inertia="twitter:card" content="{card}"' in head
+
+
+@pytest.mark.parametrize("flags", range(16))
+def test_listing_optional_key_combinations(flags):
+    description = "d" if flags & 1 else None
+    canonical = "https://x.example/events/" if flags & 2 else None
+    alternates = [{"locale": "de", "url": "https://x.example/de/events/"}] if flags & 4 else []
+    feed_url = "/events/calendar.ics" if flags & 8 else None
+    head = _head.listing_head(
+        title="Events", description=description, canonical=canonical, alternates=alternates,
+        feed_url=feed_url, locale="en",
+    )  # fmt: skip
+    keys = {"og:title", "og:type", "og:locale"}
+    if description:
+        keys |= {"description", "og:description"}
+    if canonical:
+        keys |= {"canonical", "og:url"}
+    if alternates:
+        keys.add("hreflang-de")
+    if feed_url:
+        keys.add("feed")
+        assert 'title="Events"' in head
+    actual = _server_keys(head)
+    assert len(actual) == len(set(actual)) and set(actual) == keys
 
 
 async def test_served_pages_carry_the_keys(public_locales_client, fx):  # noqa: F811

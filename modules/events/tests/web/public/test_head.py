@@ -22,7 +22,7 @@ def test_json_ld_script_break_out():
         description=EVIL,
         canonical="https://x.example/e",
         image=None,
-        index_in_search=True,
+        robots=None,
         json_ld={"@type": "Event", "name": EVIL},
         locale="en",
         alternates=[],
@@ -51,12 +51,12 @@ def test_html_comment_escaped():
 def test_noindex():
     head = _head.event_head(
         title="T", description=None, canonical="https://x/e", image=None,
-        index_in_search=False, json_ld=None, locale="en", alternates=[],
+        robots=_head.ROBOTS_NOINDEX, json_ld=None, locale="en", alternates=[],
     )  # fmt: skip
     assert '<meta name="robots" data-inertia="robots" content="noindex,nofollow">' in head
     ok = _head.event_head(
         title="T", description=None, canonical="https://x/e", image=None,
-        index_in_search=True, json_ld=None, locale="en", alternates=[],
+        robots=None, json_ld=None, locale="en", alternates=[],
     )  # fmt: skip
     assert "robots" not in ok
 
@@ -67,7 +67,7 @@ def test_canonical_and_hreflang_escaped():
         description='x"y',
         canonical='https://x.example/e?date=1&a="b"',
         image=None,
-        index_in_search=True,
+        robots=None,
         json_ld=None,
         locale="de",
         alternates=[
@@ -127,7 +127,7 @@ def test_set_html_lang_escapes_the_locale():
 def test_no_executable_script():
     head = _head.event_head(
         title="T", description="d", canonical="https://x/e", image="https://x/i.png",
-        index_in_search=True, json_ld={"@type": "Event"}, locale="en", alternates=[],
+        robots=None, json_ld={"@type": "Event"}, locale="en", alternates=[],
     )  # fmt: skip
     scripts = re.findall(r"<script[^>]*>", head)
     assert scripts == ['<script type="application/ld+json" data-inertia="json-ld">']
@@ -135,12 +135,12 @@ def test_no_executable_script():
 
 def test_json_ld_carries_the_request_nonce():
     head = _head.event_head(
-        title="T", description=None, canonical=None, image=None, index_in_search=True,
+        title="T", description=None, canonical=None, image=None, robots=None,
         json_ld={"@type": "Event"}, locale="en", alternates=[], nonce='abc"def',
     )  # fmt: skip
     assert '<script type="application/ld+json" data-inertia="json-ld" nonce="abc&quot;def">' in head
     plain = _head.event_head(
-        title="T", description=None, canonical=None, image=None, index_in_search=True,
+        title="T", description=None, canonical=None, image=None, robots=None,
         json_ld={"@type": "Event"}, locale="en", alternates=[],
     )  # fmt: skip
     assert "nonce" not in plain

@@ -170,7 +170,7 @@ async def test_cancelled_event(public_locales_client, fx):
     assert p["cancelled"] is True and p["registration_url"] is None and p["index_in_search"] is True
     assert p["json_ld"]["eventStatus"].endswith("EventCancelled")
     html = (await public_locales_client.get(f"/events/{fx.slug(fx.one_off)}")).text
-    assert "robots" not in html
+    assert 'name="robots"' not in html
 
 
 async def test_registration_link_when_not_cancelled(public_locales_client, fx):

@@ -21,13 +21,22 @@ from typing import Any
 
 from fastapi import Response
 
-__all__ = ["event_head", "inject", "listing_head", "safe_json_ld", "set_html_lang"]
+__all__ = [
+    "ROBOTS_NOINDEX",
+    "event_head",
+    "inject",
+    "listing_head",
+    "safe_json_ld",
+    "set_html_lang",
+]
 
 _CLOSE_HEAD = b"</head>"
 # The attribute Inertia's head manager keys on: an element carrying it is replaced by the client's
 # ``<Head>`` tag with the same key (``head-key`` in ``PublicHead.tsx``) instead of duplicated. Every
-# tag here has a client twin and is keyed; the two sides must agree (tests/web/public).
+# tag here has a client twin and is keyed, and the client renders the page's ``head`` prop (the
+# values written here), so the two cannot differ (tests/web/public/test_head_matches_props.py).
 _MANAGED = "data-inertia"
+ROBOTS_NOINDEX = "noindex,nofollow"
 _EXISTING_TITLE = re.compile(rb"<title>.*?</title>", re.S)
 # ``\s`` before ``lang``, not ``\b``: ``xml:lang=`` and ``data-lang=`` are other attributes.
 _HTML_LANG = re.compile(rb"""(<html\b[^>]*?\slang=)(["'])([^"']*)\2""", re.IGNORECASE)
@@ -120,7 +129,7 @@ def _common(
 
 def event_head(
     *, title: str, description: str | None, canonical: str | None, image: str | None,
-    index_in_search: bool, json_ld: Any, locale: str | None,
+    robots: str | None, json_ld: Any, locale: str | None,
     alternates: list[dict[str, str]] | None, nonce: str | None = None,
 ) -> str:  # fmt: skip
     """The head an event page needs, as markup. ``nonce`` is the request's CSP nonce: the JSON-LD
@@ -131,7 +140,7 @@ def event_head(
         canonical=canonical,
         locale=locale,
         alternates=alternates,
-        robots=None if index_in_search else "noindex,nofollow",
+        robots=robots,
     )
     parts.append(_tag("og:image", image, prop=True, managed=True))
     parts.append(

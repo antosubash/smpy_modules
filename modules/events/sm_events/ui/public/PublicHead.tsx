@@ -1,55 +1,51 @@
 import { Head } from '@inertiajs/react';
 import { safeJsonLd } from '../utils/jsonLd';
-import type { Alternate } from './types';
+import type { Alternate, HeadValues } from './types';
 
 type Props = {
-  title: string;
-  description?: string | null;
-  canonical?: string | null;
-  alternates?: Alternate[];
-  noindex?: boolean;
-  image?: string | null;
+  head: HeadValues;
   locale: string;
-  feedUrl?: string | null;
+  alternates?: Alternate[];
   jsonLd?: unknown;
   /** An event page: the server also writes its `twitter:*` tags, so they are rendered here too. */
   event?: boolean;
 };
 
-/** The tags the server writes into the document (`_head.py`), repeated for visits made inside
- *  the SPA. Every tag carries a `head-key` equal to the server's `data-inertia` value, so
- *  hydration replaces the server's copy instead of adding a second one (#461); a tag the server
+/** The tags the server writes into the document (`_head.py`), rendered from the same values
+ *  (`head`, resolved once by the endpoint), so each keyed tag hydrates into an equal one. Every
+ *  tag carries a `head-key` equal to the server's `data-inertia` value (#461); a tag the server
  *  writes must be rendered here under the same key, or hydration deletes it. `<Head>` does not
  *  flatten fragments, hence the flat children. The JSON-LD is the one place a public screen sets
  *  inner HTML: a non-executable `application/ld+json` script whose text has no `<`, `>` or `&`
  *  left in it. */
-export function PublicHead(p: Props) {
+export function PublicHead({ head, locale, alternates = [], jsonLd, event }: Props) {
+  const { title, description, canonical, image, robots, feed_url: feedUrl } = head;
   return (
-    <Head title={p.title}>
-      {p.description ? (
-        <meta head-key="description" name="description" content={p.description} />
+    <Head title={title}>
+      {description ? (
+        <meta head-key="description" name="description" content={description} />
       ) : null}
-      <meta head-key="og:title" property="og:title" content={p.title} />
-      {p.description ? (
-        <meta head-key="og:description" property="og:description" content={p.description} />
+      <meta head-key="og:title" property="og:title" content={title} />
+      {description ? (
+        <meta head-key="og:description" property="og:description" content={description} />
       ) : null}
       <meta head-key="og:type" property="og:type" content="website" />
-      <meta head-key="og:locale" property="og:locale" content={p.locale} />
-      {p.canonical ? <meta head-key="og:url" property="og:url" content={p.canonical} /> : null}
-      {p.image ? <meta head-key="og:image" property="og:image" content={p.image} /> : null}
-      {p.event ? (
+      <meta head-key="og:locale" property="og:locale" content={locale} />
+      {canonical ? <meta head-key="og:url" property="og:url" content={canonical} /> : null}
+      {image ? <meta head-key="og:image" property="og:image" content={image} /> : null}
+      {event ? (
         <meta
           head-key="twitter:card"
           name="twitter:card"
-          content={p.image ? 'summary_large_image' : 'summary'}
+          content={image ? 'summary_large_image' : 'summary'}
         />
       ) : null}
-      {p.event && p.image ? (
-        <meta head-key="twitter:image" name="twitter:image" content={p.image} />
+      {event && image ? (
+        <meta head-key="twitter:image" name="twitter:image" content={image} />
       ) : null}
-      {p.noindex ? <meta head-key="robots" name="robots" content="noindex,nofollow" /> : null}
-      {p.canonical ? <link head-key="canonical" rel="canonical" href={p.canonical} /> : null}
-      {(p.alternates ?? []).map((a) => (
+      {robots ? <meta head-key="robots" name="robots" content={robots} /> : null}
+      {canonical ? <link head-key="canonical" rel="canonical" href={canonical} /> : null}
+      {alternates.map((a) => (
         <link
           key={a.locale}
           head-key={`hreflang-${a.locale}`}
@@ -58,21 +54,15 @@ export function PublicHead(p: Props) {
           href={a.url}
         />
       ))}
-      {p.feedUrl ? (
-        <link
-          head-key="feed"
-          rel="alternate"
-          type="text/calendar"
-          title={p.title}
-          href={p.feedUrl}
-        />
+      {feedUrl ? (
+        <link head-key="feed" rel="alternate" type="text/calendar" title={title} href={feedUrl} />
       ) : null}
-      {p.jsonLd ? (
+      {jsonLd ? (
         <script
           head-key="json-ld"
           type="application/ld+json"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: escaped by safeJsonLd, never executed
-          dangerouslySetInnerHTML={{ __html: safeJsonLd(p.jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
         />
       ) : null}
     </Head>

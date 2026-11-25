@@ -30,12 +30,8 @@ function PublicEventPage(p: PublicEventProps) {
   return (
     <>
       <PublicHead
-        title={p.title}
-        description={p.summary}
-        canonical={p.canonical_url}
+        head={p.head}
         alternates={p.alternates}
-        noindex={!p.index_in_search}
-        image={p.image}
         locale={p.locale}
         jsonLd={p.json_ld}
         event

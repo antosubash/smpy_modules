@@ -78,13 +78,7 @@ function PublicIndexPage(props: PublicIndexProps) {
   };
   return (
     <>
-      <PublicHead
-        title={title}
-        description={props.calendar?.description}
-        locale={props.locale}
-        alternates={props.alternates}
-        feedUrl={props.feed_url}
-      />
+      <PublicHead head={props.head} locale={props.locale} alternates={props.alternates} />
       <main className="mx-auto max-w-4xl space-y-6 p-4" aria-label={t(copy.region)}>
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold">{title}</h1>
