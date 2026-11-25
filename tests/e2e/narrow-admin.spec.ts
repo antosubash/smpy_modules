@@ -217,7 +217,7 @@ test.describe('The article list below 900px', () => {
     // line here instead: a gesture has no keyboard or screen-reader equivalent,
     // and nothing on screen would say it exists.
     await expect(row.getByRole('link', { name: /^edit$/i })).toBeVisible();
-    await expect(row.getByRole('button', { name: /^delete$/i })).toBeVisible();
+    await expect(row.getByRole('button', { name: /^move to trash$/i })).toBeVisible();
     await expect(row.getByRole('button', { name: /more actions/i })).toBeVisible();
   });
 

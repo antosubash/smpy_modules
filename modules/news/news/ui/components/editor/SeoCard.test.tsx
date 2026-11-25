@@ -6,6 +6,7 @@ import '../../../pagebuilder-blocks';
 import {
   button,
   cleanup,
+  directWrite,
   fakeApi,
   flush,
   input,
@@ -23,18 +24,18 @@ const image = () => input('#article-og-image');
 
 describe('share image media picker', () => {
   it('offers the gallery only with the server capability', async () => {
-    await mount(<SeoCard articleId={7} mediaPicker />);
+    await mount(<SeoCard articleId={7} writeArticle={directWrite} mediaPicker />);
     expect(button('Choose from media library')).toBeDefined();
   });
   it('keeps the URL field without a capability and never lists media', async () => {
-    await mount(<SeoCard articleId={7} />);
+    await mount(<SeoCard articleId={7} writeArticle={directWrite} />);
     expect(button('Choose from media library')).toBeUndefined();
     await type(image(), 'https://external.example/photo.png');
     expect(image().value).toBe('https://external.example/photo.png');
     expect(requests.some((url) => url.includes('/pagebuilder/'))).toBe(false);
   });
   it('cancels without replacing the URL and returns focus to the browse button', async () => {
-    await mount(<SeoCard articleId={7} mediaPicker />);
+    await mount(<SeoCard articleId={7} writeArticle={directWrite} mediaPicker />);
     await type(image(), 'https://external.example/keep.png');
     const browse = button('Choose from media library');
     if (!browse) throw new Error('Missing media picker button');
@@ -51,7 +52,7 @@ describe('share image media picker', () => {
     expect(document.activeElement).toBe(browse);
   });
   it('saves the picked URL and still accepts an external URL', async () => {
-    await mount(<SeoCard articleId={7} mediaPicker />);
+    await mount(<SeoCard articleId={7} writeArticle={directWrite} mediaPicker />);
     await pickCover();
     expect(image().value).toBe('/media/default/cover.webp');
     expect(document.querySelector('[role="dialog"]')).toBeNull();

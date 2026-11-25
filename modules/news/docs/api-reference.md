@@ -7,8 +7,9 @@ signed-in page carries the token as the framework's `csrfToken` Inertia prop,
 and the console's own client sends it from there. Reads need no token, so the feed block on public pages is
 unaffected. The session cookie's `SameSite=Lax` alone is not enough: on a
 multi-tenant host every organisation's public site is same-site with the
-console. Errors are `{"detail": "<message>"}`
-(validation errors use FastAPI's 422 list). Every route is bound to a tenant
+console. Errors normally carry `{"detail": "<message>"}`; stale article writes
+add `"code": "article_conflict"` (see `expected_updated_at` below). Validation
+errors use FastAPI's 422 list. Every route is bound to a tenant
 first — see [Tenancy](#tenancy).
 
 ## Permissions
@@ -91,13 +92,13 @@ article is a 404 to a non-editor.
 |---|---|---|
 | `POST /articles` | `ArticleCreate` | `ArticleRead`, 201 |
 | `PUT /articles/{id}` | `ArticleUpdate` (partial) | `ArticleRead` |
-| `PUT /articles/{id}/tags` | `{"tags": ["a", "b"]}` (full replacement) | the tag names |
+| `PUT /articles/{id}/tags` | `{"tags": ["a", "b"], "expected_updated_at"?}` (full replacement) | the tag names |
 | `POST /articles/{id}/translations` | `ArticleTranslationCreate` | `ArticleRead`, 201 |
 | `GET /articles/{id}/detail` | — | `ArticleDetail` |
 | `PUT /articles/{id}/body` | `{"draft_data": {…}, "expected_updated_at"?}` | `ArticleDetail` |
 | `GET /articles/{id}/revisions` | — | `RevisionRead[]`, newest first |
-| `POST /articles/{id}/revisions/{rev}/restore` | — | `ArticleDetail` |
-| `POST /articles/{id}/submit` | — | `ArticleRead` |
+| `POST /articles/{id}/revisions/{rev}/restore` | `{"expected_updated_at"?}` | `ArticleDetail` |
+| `POST /articles/{id}/submit` | `{"expected_updated_at"?}` | `ArticleRead` |
 | `POST /articles/{id}/trash` | — | 204 |
 | `POST /articles/{id}/restore` | — | `ArticleRead` |
 
@@ -121,8 +122,17 @@ article's language. There is no `locale` field: a language is fixed.
 midnight UTC (`2026-02-01T23:00:00-06:00` records the 1st).
 
 **`expected_updated_at`** — send the `updated_at` you loaded; if the stored
-one differs the write is refused with 409 "This article was changed somewhere
-else…". Omitted, the write goes through.
+one differs the write is refused with HTTP 409 and the JSON envelope
+`{"detail": "This article was changed somewhere else. Reload to get the latest version, then make your change again.", "code": "article_conflict"}`.
+Use `code == "article_conflict"` to identify a stale write; other 409s, such as
+`{"detail": "Slug already in use"}`, carry their own detail and no `code` field.
+The comparison and write hold the same transaction's article lock.
+This optional field is accepted by metadata, body, tag replacement, schedule,
+publish, unpublish, submit, approve, reject and revision restore. Omitted or
+null, the write goes through as before; workflow and revision restore still
+accept no request body. The article edit screen sends its current form version
+on every one of these writes and adopts only successful responses. Trash has
+no version input and keeps its existing behaviour.
 
 **`ArticleTranslationCreate`** — `{"locale", "slug"?, "title"?}`. Creates a
 draft sibling in the same `translation_group`, copying category, author,
@@ -141,18 +151,24 @@ change the slug, the status or the published snapshot.
 `approve` or `reject`. Restoring copies the revision's body, title, summary
 and image into the draft and does not publish.
 
-**Trash** keeps the slug claimed. **Restore** leaves the status as it was and
-clears any schedule time that elapsed while trashed.
+**Trash** (`POST /articles/{id}/trash`, `news.edit`) is the admin list and
+editor's removal action. It hides the article immediately, keeps the slug
+claimed and preserves redirects. The scheduler skips trashed articles.
+**Restore** leaves the status as it was (a previously published article is live
+again), clears elapsed schedule times and keeps future times. **Delete for good**
+on the Trash screen uses `DELETE /articles/{id}/purge` with both permissions.
+The existing `DELETE /articles/{id}` remains a permanent delete for API clients;
+its meaning and permissions are unchanged.
 
 ## Publishing — `news.edit` + `news.publish`
 
 | Method & path | Body | Effect |
 |---|---|---|
-| `POST /articles/{id}/publish` | — | copies `draft_data` to the published snapshot; status `published` |
-| `POST /articles/{id}/unpublish` | — | status `draft`; clears both schedule times |
-| `POST /articles/{id}/approve` | — | `submitted_for_review` → `published` in one step |
-| `POST /articles/{id}/reject` | `{"note"?}` (≤ 2000) | `submitted_for_review` → `draft`, stores the note |
-| `POST /articles/{id}/schedule` | `{"publish_at"?, "unpublish_at"?}` | sets/clears the times |
+| `POST /articles/{id}/publish` | `{"expected_updated_at"?}` | copies `draft_data` to the published snapshot; status `published` |
+| `POST /articles/{id}/unpublish` | `{"expected_updated_at"?}` | status `draft`; clears both schedule times |
+| `POST /articles/{id}/approve` | `{"expected_updated_at"?}` | `submitted_for_review` → `published` in one step |
+| `POST /articles/{id}/reject` | `{"note"?, "expected_updated_at"?}` (note ≤ 2000) | `submitted_for_review` → `draft`, stores the note |
+| `POST /articles/{id}/schedule` | `{"publish_at"?, "unpublish_at"?, "expected_updated_at"?}` | sets/clears the times |
 | `DELETE /articles/{id}` | — | 204; deletes the article outright |
 | `DELETE /articles/{id}/purge` | — | 204; deletes a **trashed** article with its tags and redirects |
 
@@ -258,7 +274,7 @@ on a 304), with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflan
 | 404 | `No such page` | an archive page past the end |
 | 409 | `Slug already in use` | create, update, translation |
 | 409 | `Could not derive a free URL from '…'. Set one explicitly.` | create without slug |
-| 409 | `This article was changed somewhere else. Reload…` | stale `expected_updated_at` |
+| 409 | `This article was changed somewhere else. Reload…` | stale `expected_updated_at`; `code: "article_conflict"` |
 | 409 | `This article already has a {locale} translation (check the trash).` | translations |
 | 409 | `Only a draft can be submitted for review.` | submit |
 | 409 | `Only a submitted article can be approved.` / `…rejected.` | approve, reject |

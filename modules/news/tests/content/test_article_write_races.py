@@ -228,12 +228,14 @@ async def test_a_stale_expected_updated_at_is_a_409(editor_client) -> None:
     )
     assert stale.status_code == 409
     assert stale.json()["detail"] == STALE_DETAIL
+    assert stale.json()["code"] == "article_conflict"
 
     stale_body = await editor_client.put(
         f"{ARTICLES}/{article_id}/body",
         json={"draft_data": {"content": []}, "expected_updated_at": stamp},
     )
     assert stale_body.status_code == 409
+    assert stale_body.json()["code"] == "article_conflict"
 
     ok_body = await editor_client.put(
         f"{ARTICLES}/{article_id}/body",

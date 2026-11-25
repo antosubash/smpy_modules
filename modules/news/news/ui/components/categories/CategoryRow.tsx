@@ -109,12 +109,19 @@ export function CategoryRow({
           </div>
         ) : (
           <>
-            <p className="truncate font-medium">{category.name}</p>
+            <p className="truncate font-medium">
+              {category.is_system ? t(keys.news.categories.uncategorised) : category.name}
+            </p>
             <p className="truncate text-sm text-muted-foreground">
               {category.is_system
                 ? t(keys.news.categories.system)
                 : `/admin/news/?category=${category.slug}`}
             </p>
+            {!managed && !category.is_system && (
+              <p className="text-xs text-muted-foreground">
+                {t(keys.news.categories.unmanaged_help)}
+              </p>
+            )}
           </>
         )}
       </div>

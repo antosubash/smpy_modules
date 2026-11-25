@@ -19,17 +19,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from news.content import redirects
-from news.content._fresh import ensure_fresh
+from news.content._fresh import ensure_fresh_for_write
 from news.content._revisions import clear_revisions
 from news.content._slugs import free_slug, slug_exhausted, slug_for_title, slug_taken
 from news.content._workflow import WorkflowMixin
 from news.core import locales
+from news.core.errors import ArticleNotFound
 from news.models import NOT_TRASHED, ArticleStatus, NewsArticle
 
 __all__ = ["ArticlesService", "empty_article_document", "slug_for_title"]
@@ -81,7 +81,7 @@ class ArticlesService(WorkflowMixin):
         if article is None or (
             article.deleted_at is not None and not include_trashed
         ):
-            raise HTTPException(status_code=404, detail="Article not found")
+            raise ArticleNotFound("Article not found")
         return article
 
     async def get_by_slug_published(
@@ -223,7 +223,7 @@ class ArticlesService(WorkflowMixin):
         record a redirect for.
         """
         article = await self.get_article(article_id)
-        ensure_fresh(article, expected_updated_at)
+        await ensure_fresh_for_write(self.db, article, expected_updated_at)
         article.draft_data = data
         self.db.add(article)
         await self.db.flush()

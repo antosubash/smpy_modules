@@ -439,6 +439,31 @@ name the module they affect.
 
 ### Fixed
 
+- **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
+  Main fields, search settings, schedule, review notes and history show the
+  server's current state; rejected values are discarded before another save.
+  Successful card saves still preserve unsaved edits elsewhere on the screen.
+- **news: Delete moves an article to Trash** (#445). The Delete action on the
+  article list and the edit screen moves the article to Trash, where it can be
+  restored; permanent deletion is on the Trash screen only. The Categories screen
+  says how to manage a category that was entered on an article, and names the
+  system category in the console language. The article list drops a filter whose
+  option has gone, and refreshes after acting on an article that is already gone.
+- **news: saving after another save on the article screen** (#444). The edit
+  screen keeps the article's version current after every write it makes (search
+  settings, schedule, publish and review actions, revision restore, tags), and
+  sends its writes one at a time, so a second Save is no longer refused with
+  "changed somewhere else". A change made by someone else is still refused, on
+  every one of those writes, with the message in the console language; the
+  screen then asks for a reload before it saves again. The API accepts an
+  optional `expected_updated_at` on those writes and marks the refusal with the
+  code `article_conflict`. A write on an article that was trashed or deleted
+  meanwhile says so and stops offering Save; the API answers it with a JSON 404
+  carrying the code `article_not_found`.
+- **news: starting the same app twice** (#447). News registers its
+  content-bundle section once per registry, so a second lifespan start of the
+  same app no longer fails; a different section under the name `news` is still
+  refused.
 - **news: public site layout** (#443). Articles and every archive, including
   search results and localized routes, reuse pagebuilder's header, navigation
   and footer where mounted. Standalone rendering is unchanged. Related stories

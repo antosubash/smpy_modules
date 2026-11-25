@@ -130,6 +130,11 @@ class NewsModule(ModuleBase):
         api_router.include_router(api)
         view_router.include_router(views)
 
+    def register_exception_handlers(self, app: FastAPI) -> None:
+        from news.core.errors import install_exception_handlers
+
+        install_exception_handlers(app)
+
     def register_permissions(self, registry: PermissionRegistry) -> None:
         registry.add_group(
             NewsModule.meta.name,

@@ -1,6 +1,7 @@
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { vi } from 'vitest';
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let root: Root;
@@ -116,3 +117,9 @@ export function input(selector = 'input'): HTMLInputElement {
   if (!found) throw new Error(`Missing input: ${selector}`);
   return found;
 }
+
+/** The editor's write queue reduced to a pass-through: these tests are about the picker. */
+export const directWrite: ArticleWrite = async (action) => {
+  await action(null);
+  return true;
+};

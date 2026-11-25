@@ -5,7 +5,8 @@ import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { useMountedRef } from '../../hooks/useMountedRef';
 import { getArticleDetail, updateArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
@@ -30,12 +31,15 @@ const INDEX_ID = 'article-index-in-search';
  */
 export function SeoCard({
   articleId,
+  writeArticle,
   mediaPicker = false,
 }: {
   articleId: number;
+  writeArticle: ArticleWrite;
   mediaPicker?: boolean;
 }) {
   const { t } = useT();
+  const mounted = useMountedRef();
   const copy = keys.news.seo;
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
@@ -48,6 +52,7 @@ export function SeoCard({
     const controller = new AbortController();
     void getArticleDetail(articleId, controller.signal)
       .then((detail) => {
+        if (controller.signal.aborted) return;
         setDescription(detail.meta_description ?? '');
         setImage(detail.og_image ?? '');
         setCanonical(detail.canonical_url ?? '');
@@ -60,18 +65,22 @@ export function SeoCard({
   const save = async () => {
     setBusy(true);
     try {
-      await updateArticle(articleId, {
-        meta_description: description,
-        og_image: image,
-        canonical_url: canonical,
-        index_in_search: indexed,
-      });
+      const ok = await writeArticle((version) =>
+        updateArticle(articleId, {
+          expected_updated_at: version,
+          meta_description: description,
+          og_image: image,
+          canonical_url: canonical,
+          index_in_search: indexed,
+        }),
+      );
+      if (!ok) return;
       setSaved(true);
       toast.success(t(copy.saved_toast));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 

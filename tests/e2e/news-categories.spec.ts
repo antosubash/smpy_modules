@@ -71,7 +71,7 @@ test.describe('News categories', () => {
 
     // Formalise the free-text category so it becomes renameable.
     await categoryRow(page, original)
-      .getByRole('button', { name: /add to list/i })
+      .getByRole('button', { name: /manage category/i })
       .click();
     const row = categoryRow(page, original);
     await expect(row.getByRole('button', { name: /^rename$/i })).toBeVisible();
@@ -118,7 +118,7 @@ test.describe('News categories', () => {
     await makeArticle(page, doomed);
     await page.goto(CATEGORIES_URL);
     await categoryRow(page, doomed)
-      .getByRole('button', { name: /add to list/i })
+      .getByRole('button', { name: /manage category/i })
       .click();
 
     const row = categoryRow(page, doomed);

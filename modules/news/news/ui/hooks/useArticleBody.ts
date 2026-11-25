@@ -18,6 +18,7 @@ import {
 } from '../utils/api';
 import { isHttpStatus } from '../utils/http';
 import { useInFlight } from './useInFlight';
+import { useWriteQueue } from './useWriteQueue';
 
 /** How long after the last edit a save fires.
  *
@@ -91,7 +92,7 @@ export function useArticleBody(articleId: number) {
   /** One save at a time. The timer, Save, Publish and unmount can all flush;
    *  overlapping, the later request would carry the `updated_at` from before
    *  the earlier one landed and be refused as a conflict with itself. */
-  const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const queue = useWriteQueue();
 
   /** One request; `flush` is what callers use. Reads the refs at send time,
    *  so a queued save carries whatever the previous one left behind. */
@@ -142,11 +143,9 @@ export function useArticleBody(articleId: number) {
   const flush = useCallback(
     (next: Data): Promise<boolean> => {
       pendingRef.current = null;
-      const run = queueRef.current.then(() => send(next));
-      queueRef.current = run.catch(() => undefined);
-      return run;
+      return queue(() => send(next));
     },
-    [send],
+    [queue, send],
   );
 
   /** Leaving the screen inside the debounce window must not drop the last edit. */

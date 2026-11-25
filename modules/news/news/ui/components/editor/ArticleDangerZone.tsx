@@ -7,10 +7,6 @@ interface Props {
   title: string;
   isPublished: boolean;
   busy: boolean;
-  /** Whether the viewer holds `news.publish`. */
-  canPublish: boolean;
-  /** Deletes and then leaves the screen — the article it was showing is gone. */
-  onDelete: () => Promise<unknown>;
   onTrash: () => Promise<unknown>;
 }
 
@@ -20,38 +16,11 @@ interface Props {
  * moved into the locale catalogue; the reasoning behind each level came with
  * it.
  */
-export function ArticleDangerZone({
-  title,
-  isPublished,
-  busy,
-  canPublish,
-  onDelete,
-  onTrash,
-}: Props) {
+export function ArticleDangerZone({ title, isPublished, busy, onTrash }: Props) {
   const { t } = useT();
   const copy = keys.news.editor;
 
-  return canPublish ? (
-    <ConfirmDialog
-      // Medium, where this used to be low — see ArticleRow for why the
-      // same button changed cost when the sidecar went away.
-      //
-      // Gated on canPublish: the backend requires news.publish for a
-      // hard delete, the same pair it requires for purge, because
-      // nothing here comes back. An author with news.edit alone gets
-      // the recoverable trash below instead.
-      level="medium"
-      title={t(copy.delete_title, { title })}
-      description={t(copy.delete_description)}
-      confirmLabel={t(copy.delete_confirm)}
-      onConfirm={onDelete}
-      trigger={
-        <Button variant="ghost" size="sm" className="text-destructive" disabled={busy}>
-          {t(copy.delete_trigger)}
-        </Button>
-      }
-    />
-  ) : (
+  return (
     <ConfirmDialog
       // Medium for a published article — trashing takes it off the
       // public site immediately, same as unpublish, even though it is

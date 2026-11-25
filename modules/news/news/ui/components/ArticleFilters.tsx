@@ -1,5 +1,6 @@
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { NativeSelect } from '@simple-module-py/ui/components/ui/native-select';
+import { useEffect } from 'react';
 import type { ArticleCounts, CategoryCount } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 import { localeLabel } from '../utils/locale';
@@ -56,6 +57,12 @@ export function ArticleFilters({
   onChange,
 }: Props) {
   const { t } = useT();
+  useEffect(() => {
+    const next: { status?: string; locale?: string } = {};
+    if (status && !STATUSES.some((option) => option.value === status)) next.status = '';
+    if (locale && !locales.includes(locale)) next.locale = '';
+    if (Object.keys(next).length) onChange(next);
+  }, [status, locale, locales, onChange]);
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <Input

@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field, StringConstraints
 
 from news.contracts.schemas._guards import NoNul
+from news.contracts.schemas._writes import ArticleWriteVersion
 from news.core.constants import MAX_CATEGORY_LEN, MAX_TAG_LEN
 
 
@@ -107,7 +108,7 @@ class TagMergeResult(BaseModel):
     moved: int
 
 
-class ArticleTagsUpdate(NoNul):
+class ArticleTagsUpdate(ArticleWriteVersion):
     """Full replacement set — a tag the writer removed has to disappear."""
 
     tags: list[str] = Field(default_factory=list)

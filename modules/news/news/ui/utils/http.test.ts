@@ -82,6 +82,15 @@ describe('errorFrom — matching pagebuilder/ui/utils/request.ts', () => {
   });
 });
 
+it('preserves the decoded conflict code separately from the HTTP status', async () => {
+  const stale = await errorFrom(
+    response(JSON.stringify({ detail: 'Stale', code: 'article_conflict' }), { status: 409 }),
+  );
+  expect(stale).toMatchObject({ status: 409, code: 'article_conflict' });
+  const slug = await errorFrom(response('{"detail":"Slug already in use"}', { status: 409 }));
+  expect(slug).not.toHaveProperty('code', 'article_conflict');
+});
+
 describe('fromValidationErrors', () => {
   it("says a bad slug in the editor's words, not the regex", () => {
     expect(fromValidationErrors(PYDANTIC_SLUG_ERROR)).toBe(

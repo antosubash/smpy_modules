@@ -54,14 +54,15 @@ export default function ArticleEditor() {
     valid,
     error,
     conflict,
+    reloadKey,
     gone,
     setError,
+    writeArticle,
     saved,
     load,
     patch,
     save,
     publish,
-    remove,
     trash,
   } = useArticleEditor(article_id);
 
@@ -146,7 +147,10 @@ export default function ArticleEditor() {
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div
+        key={`${article_id}:${reloadKey}`}
+        className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]"
+      >
         <section className="space-y-3">
           <div className="rounded-lg border border-dashed p-8 text-center">
             <p className="font-medium">{t(copy.body_card_title)}</p>
@@ -162,14 +166,8 @@ export default function ArticleEditor() {
             title={article.title}
             isPublished={isPublished}
             busy={busy}
-            canPublish={canPublish}
-            onDelete={async () => {
-              await remove();
-              router.visit('/admin/news/');
-            }}
             onTrash={async () => {
-              await trash();
-              router.visit('/admin/news/');
+              if (await trash()) router.visit('/admin/news/');
             }}
           />
         </section>
@@ -203,7 +201,7 @@ export default function ArticleEditor() {
             </Button>
           )}
 
-          <ReviewCard article={article} canPublish={canPublish} onChanged={load} />
+          <ReviewCard article={article} canPublish={canPublish} writeArticle={writeArticle} />
 
           {/* Only on a multilingual site: a panel listing one language is a
               panel that answers a question nobody asked. */}
@@ -214,10 +212,14 @@ export default function ArticleEditor() {
           {/* Only for someone who may actually publish. The route is behind
               `news.publish`, so showing it to an author who may write but not
               publish would be offering a control that answers 403. */}
-          {canPublish && <ScheduleCard articleId={article_id} />}
+          {canPublish && <ScheduleCard articleId={article_id} writeArticle={writeArticle} />}
 
-          <SeoCard articleId={article_id} mediaPicker={props.media_picker} />
-          <HistoryCard articleId={article_id} />
+          <SeoCard
+            articleId={article_id}
+            writeArticle={writeArticle}
+            mediaPicker={props.media_picker}
+          />
+          <HistoryCard articleId={article_id} writeArticle={writeArticle} />
         </aside>
       </div>
     </PageShell>

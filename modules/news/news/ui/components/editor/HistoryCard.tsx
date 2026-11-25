@@ -1,6 +1,8 @@
 import { Button } from '@simple-module-py/ui/components/ui/button';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { useMountedRef } from '../../hooks/useMountedRef';
 import {
   formatTimestamp,
   listArticleRevisions,
@@ -35,8 +37,15 @@ const EVENTS: Record<RevisionRead['event'], string> = {
  * with an older one — recoverable only by restoring again from a row this very
  * action pushes further down the list.
  */
-export function HistoryCard({ articleId }: { articleId: number }) {
+export function HistoryCard({
+  articleId,
+  writeArticle,
+}: {
+  articleId: number;
+  writeArticle: ArticleWrite;
+}) {
   const { t, locale } = useT();
+  const mounted = useMountedRef();
   const copy = keys.news.history;
   const [revisions, setRevisions] = useState<RevisionRead[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,11 +53,15 @@ export function HistoryCard({ articleId }: { articleId: number }) {
   const load = useCallback(
     (signal?: AbortSignal) =>
       listArticleRevisions(articleId, signal)
-        .then(setRevisions)
+        .then((items) => {
+          if (mounted.current) setRevisions(items);
+        })
         // An empty history and a failed read look the same here on purpose:
         // this is a panel beside the work, not the work.
-        .catch(() => setRevisions([])),
-    [articleId],
+        .catch(() => {
+          if (mounted.current) setRevisions([]);
+        }),
+    [articleId, mounted],
   );
 
   useEffect(() => {
@@ -60,13 +73,17 @@ export function HistoryCard({ articleId }: { articleId: number }) {
   const restore = async (revision: RevisionRead) => {
     setBusy(true);
     try {
-      await restoreArticleRevision(articleId, revision.id);
+      const ok = await writeArticle(
+        (version) => restoreArticleRevision(articleId, revision.id, version),
+        true,
+      );
+      if (!ok) return;
       await load();
-      toast.success(t(copy.restored_toast));
+      if (mounted.current) toast.success(t(copy.restored_toast));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 

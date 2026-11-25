@@ -252,6 +252,11 @@ def register_bundle_section(app: Any) -> bool:
     """
     if not available():
         return False
+    services = getattr(app.state, "pagebuilder", None)
+    registry = getattr(services, "bundle_sections", None)
+    previous = getattr(app.state, "_news_bundle_registered", None)
+    if previous is not None and registry is not None and registry.get(previous.name) is previous:
+        return True
     try:
         from pagebuilder.contracts import bundle
     except ImportError:  # a pagebuilder older than the extra's floor: no bundle contract
@@ -259,4 +264,10 @@ def register_bundle_section(app: Any) -> bool:
 
     from news.integrations.bundle import NewsBundleSection
 
-    return bundle.register_section(app, NewsBundleSection())
+    section = NewsBundleSection()
+    registered = bundle.register_section(app, section)
+    # Skip only while our own section is still present. A rebuilt registry
+    # needs registration again, including its duplicate-name validation.
+    if registered:
+        app.state._news_bundle_registered = section
+    return registered

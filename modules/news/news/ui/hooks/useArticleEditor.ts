@@ -3,12 +3,12 @@ import { toast } from 'sonner';
 import type { ArticleDraft } from '../components/editor/ArticleInspector';
 import {
   type ArticleRead,
-  deleteArticle,
   getArticleDetail,
   publishArticle,
   trashArticle,
   updateArticle,
 } from '../utils/api';
+import { toDraft } from '../utils/articleDraft';
 import { isHttpStatus } from '../utils/http';
 import { keys, useT } from '../utils/i18n';
 import { SLUG_PATTERN } from '../utils/slugify';
@@ -18,32 +18,18 @@ import {
   listTags,
   setArticleTags,
 } from '../utils/taxonomyApi';
+import { useArticleWriteQueue } from './useArticleWriteQueue';
 import { useInFlight } from './useInFlight';
 
-/** Split a stored instant into the two controls the inspector shows.
- *
- * Read in UTC, because `published_at` is a display date stored at midnight UTC
- * — reading it in the viewer's own timezone shifts the date a day for everyone
- * west of UTC, which is the bug `formatArticleDate` already documents.
- */
-function splitInstant(iso: string | null): { date: string; time: string } {
-  if (!iso) return { date: '', time: '' };
-  return { date: iso.slice(0, 10), time: iso.slice(11, 16) || '00:00' };
-}
+export type ArticleWrite = (
+  action: (version: string | null) => Promise<ArticleRead | null>,
+  restoreTitle?: boolean,
+) => Promise<boolean>;
 
-function toDraft(article: ArticleRead): ArticleDraft {
-  const { date, time } = splitInstant(article.published_at);
-  return {
-    title: article.title,
-    slug: article.slug,
-    category: article.category,
-    tags: article.tags ?? [],
-    date,
-    time,
-    author: article.author ?? '',
-    pinned: article.pinned ?? false,
-    showInFeed: article.show_in_feed ?? true,
-  };
+/** Server versions are UTC and retain Python's microsecond precision. */
+function versionKey(iso: string): string {
+  const [seconds, fraction = ''] = iso.replace(/(?:Z|\+00:00)$/, '').split('.');
+  return `${seconds}.${fraction.padEnd(6, '0')}`;
 }
 
 /** Loads one article and saves the whole inspector in a single round trip.
@@ -56,18 +42,33 @@ function toDraft(article: ArticleRead): ArticleDraft {
 export function useArticleEditor(articleId: number) {
   const { t } = useT();
   const [article, setArticle] = useState<ArticleRead | null>(null);
+  // Pending callbacks keep their article's version even when React reuses this
+  // hook for another route. Their mounted ref detaches at the same boundary.
+  const [articleRef, setArticleRef] = useState({ articleId, current: null as ArticleRead | null });
   const [draft, setDraft] = useState<ArticleDraft | null>(null);
   const [categories, setCategories] = useState<CategoryRead[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
-  const { busy, run: guard } = useInFlight();
+  const { busy: saving, run: guardSave } = useInFlight(0, articleId);
+  const { busy: publishing, run: guardPublish } = useInFlight(0, articleId);
+  const busy = saving || publishing;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  /** Someone else changed the article since this copy was loaded. The edits on
-   *  screen are kept; Save stays available only through Reload. */
-  const [conflict, setConflict] = useState(false);
+  /** Successful loads discard local state in every editor card as well as the draft. */
+  const [reloadKey, setReloadKey] = useState(0);
+  const { mounted, runWrite, reset, error, setError, conflict, missing } =
+    useArticleWriteQueue(articleId);
   /** The article was trashed or deleted elsewhere: nothing left to save to. */
   const [gone, setGone] = useState(false);
+  if (articleRef.articleId !== articleId) {
+    setArticleRef({ articleId, current: null });
+    setArticle(null);
+    setDraft(null);
+    setDirty(false);
+    setSaved(false);
+    setGone(false);
+    setCategories([]);
+    setTagSuggestions([]);
+  }
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -77,15 +78,18 @@ export function useArticleEditor(articleId: number) {
         // The detail shape *is* the listing row widened, tags included, and a
         // missing article answers 404 with its own message.
         const found = await getArticleDetail(articleId, signal);
-        if (signal?.aborted) return;
+        if (signal?.aborted || !mounted.current) return;
+        articleRef.current = found;
         setArticle(found);
         setDraft(toDraft(found));
         setDirty(false);
-        setError(null);
-        setConflict(false);
+        setSaved(false);
+        setReloadKey((key) => key + 1);
+        reset();
         setGone(false);
       } catch (e) {
-        if (signal?.aborted) return;
+        if (signal?.aborted || !mounted.current) return;
+        setGone(isHttpStatus(e, 404));
         setError((e as Error).message);
       }
 
@@ -93,13 +97,38 @@ export function useArticleEditor(articleId: number) {
       // nothing else, so it must not blank the screen.
       void Promise.all([listManagedCategories(signal), listTags(signal)])
         .then(([cats, tags]) => {
-          if (signal?.aborted) return;
+          if (signal?.aborted || !mounted.current) return;
           setCategories(cats.items.filter((c) => !c.is_system));
           setTagSuggestions(tags.items.map((t) => t.name));
         })
         .catch(() => {});
     },
-    [articleId],
+    [articleId, articleRef, mounted, reset, setError],
+  );
+
+  /** Adopt a write response without discarding unsaved inspector fields.
+   * Revision restore deliberately replaces the headline it restored. */
+  const acceptWrite = useCallback(
+    (updated: ArticleRead, restoreTitle = false) => {
+      const current = articleRef.current;
+      // Separate cards can finish out of order; an older response cannot undo a
+      // later write or move the optimistic-concurrency stamp backwards.
+      const older = Boolean(
+        current?.updated_at &&
+          updated.updated_at &&
+          versionKey(updated.updated_at) < versionKey(current.updated_at),
+      );
+      // A later SEO/schedule write can already include this restore's title.
+      // Honor that restore, but never replace a title saved after it.
+      if (mounted.current && restoreTitle && (!older || current?.title === updated.title)) {
+        setDraft((current) => (current ? { ...current, title: updated.title } : toDraft(updated)));
+      }
+      if (older) return;
+      const next = { ...updated, tags: updated.tags ?? current?.tags ?? [] };
+      articleRef.current = next;
+      if (mounted.current) setArticle(next);
+    },
+    [articleRef, mounted],
   );
 
   const patch = useCallback((next: Partial<ArticleDraft>) => {
@@ -108,36 +137,26 @@ export function useArticleEditor(articleId: number) {
     setSaved(false);
   }, []);
 
-  /** One place that turns a failed write into the right state: a stale write
-   *  keeps the edits and offers Reload, a vanished article stops offering Save,
-   *  anything else is just the banner. */
-  const fail = useCallback(
-    (e: unknown) => {
-      if (isHttpStatus(e, 409)) setConflict(true);
-      if (isHttpStatus(e, 404)) {
-        setGone(true);
-        setError(t(keys.news.errors.gone));
-        return;
-      }
-      setError((e as Error).message);
-    },
-    [t],
+  const writeArticle: ArticleWrite = useCallback(
+    (action, restoreTitle = false) =>
+      runWrite(async () => {
+        const updated = await action(articleRef.current?.updated_at ?? null);
+        if (updated) acceptWrite(updated, restoreTitle);
+      }, true),
+    [acceptWrite, articleRef, runWrite],
   );
 
   const save = useCallback(
     () =>
-      guard(async () => {
-        if (!draft || !article) return;
-        setError(null);
-        // An empty date is a real value — it undates the article — so it is sent
-        // as null rather than omitted.
-        const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
-        // In sequence: the metadata PUT carries `expected_updated_at` and the
-        // tags PUT does not, so the tags wait for it. A stale tab is refused on
-        // the first and never gets to overwrite the other writer's tags.
-        let updated: ArticleRead | null;
-        try {
-          updated = await updateArticle(articleId, {
+      guardSave(() =>
+        runWrite(async () => {
+          if (!draft || !articleRef.current) return;
+          // An empty date is a real value — it undates the article — so it is sent
+          // as null rather than omitted.
+          const publishedAt = draft.date ? `${draft.date}T${draft.time || '00:00'}:00Z` : null;
+          // Metadata and tags form one queued write: no card can slip between
+          // them and invalidate the stamp the metadata response just returned.
+          const updated = await updateArticle(articleId, {
             // Sent every time rather than only when changed: the server compares
             // the incoming slug against the stored one and records a redirect only
             // for a real move, so an unchanged value costs nothing and diffing here
@@ -149,48 +168,45 @@ export function useArticleEditor(articleId: number) {
             pinned: draft.pinned,
             show_in_feed: draft.showInFeed,
             author: draft.author,
-            expected_updated_at: article.updated_at,
+            expected_updated_at: articleRef.current.updated_at,
           });
-        } catch (e) {
-          fail(e);
-          return;
-        }
-        // Every write response refreshes the copy, so the next save is made
-        // against what the server now holds.
-        if (updated) setArticle({ ...updated, tags: article.tags });
-        try {
-          const tags = await setArticleTags(articleId, draft.tags);
-          if (updated) setArticle({ ...updated, tags: tags ?? article.tags });
-        } catch (e) {
-          fail(e);
-          return;
-        }
-        setDirty(false);
-        setSaved(true);
-        toast.success(t(keys.news.editor.saved_toast));
-      }).catch(fail),
-    [article, articleId, draft, fail, guard, t],
+          // Adopt immediately: even if tags fail, retry against the saved metadata.
+          if (updated) acceptWrite(updated);
+          const tags = await setArticleTags(articleId, draft.tags, articleRef.current.updated_at);
+          acceptWrite({ ...articleRef.current, tags: tags ?? articleRef.current.tags });
+          if (!mounted.current) return;
+          setDirty(false);
+          setSaved(true);
+          toast.success(t(keys.news.editor.saved_toast));
+        }),
+      ),
+    [acceptWrite, articleId, articleRef, draft, guardSave, mounted, runWrite, t],
   );
 
   const publish = useCallback(
     () =>
-      guard(async () => {
-        if (!article) return;
-        setError(null);
-        await publishArticle(article.id);
-        await load();
-        toast.success(t(keys.news.editor.published_toast));
-      }).catch(fail),
-    [article, fail, guard, load, t],
+      guardPublish(() =>
+        runWrite(async () => {
+          const updated = await publishArticle(articleId, articleRef.current?.updated_at);
+          if (updated) acceptWrite(updated);
+          if (mounted.current) toast.success(t(keys.news.editor.published_toast));
+        }),
+      ),
+    [acceptWrite, articleId, articleRef, guardPublish, mounted, runWrite, t],
   );
 
-  // Hard delete. Requires `news.publish` on the server — see `deleteArticle`
-  // — so the editor screen only offers it to a viewer who has it.
-  const remove = useCallback(() => deleteArticle(articleId), [articleId]);
-
-  // The recoverable door `news.edit` alone keeps open, for a viewer who
-  // cannot hard-delete.
-  const trash = useCallback(() => trashArticle(articleId), [articleId]);
+  const trash = useCallback(
+    () =>
+      runWrite(
+        async () => {
+          await trashArticle(articleId);
+          if (mounted.current) toast.success(t(keys.news.trash.moved_toast));
+        },
+        false,
+        true,
+      ),
+    [articleId, mounted, runWrite, t],
+  );
 
   /** Whether Save would be accepted.
    *
@@ -201,7 +217,10 @@ export function useArticleEditor(articleId: number) {
    * still comes from the server — only it knows what is taken.
    */
   const valid =
-    !gone && draft !== null && draft.title.trim().length > 0 && SLUG_PATTERN.test(draft.slug);
+    !(gone || missing) &&
+    draft !== null &&
+    draft.title.trim().length > 0 &&
+    SLUG_PATTERN.test(draft.slug);
 
   return {
     article,
@@ -214,15 +233,17 @@ export function useArticleEditor(articleId: number) {
     saved,
     error,
     conflict,
-    gone,
+    reloadKey,
+    gone: gone || missing,
     /** Exposed so a sibling panel — the language switcher — reports through the
      *  same banner rather than growing an error surface of its own. */
     setError,
+    acceptWrite,
+    writeArticle,
     load,
     patch,
     save,
     publish,
-    remove,
     trash,
   };
 }

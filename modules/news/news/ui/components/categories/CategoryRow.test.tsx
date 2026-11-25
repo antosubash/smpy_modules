@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
+import { updateI18n } from '@simple-module-py/i18n';
 import * as React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import de from '../../../locales/de.json';
 
 import type { CategoryRead } from '../../utils/taxonomyApi';
 import { CategoryRow } from './CategoryRow';
@@ -31,9 +33,13 @@ describe('CategoryRow — rename', () => {
   afterEach(() => {
     act(() => root?.unmount());
     host?.remove();
+    act(() => updateI18n({ locale: 'en', messages: {} }));
   });
 
-  async function mount(onSave: (id: number, name: string, slug: string) => Promise<boolean>) {
+  async function mount(
+    onSave: (id: number, name: string, slug: string) => Promise<boolean>,
+    row = category,
+  ) {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -41,7 +47,7 @@ describe('CategoryRow — rename', () => {
       root?.render(
         <ul>
           <CategoryRow
-            category={category}
+            category={row}
             busy={false}
             dragging={false}
             onSave={onSave}
@@ -68,6 +74,17 @@ describe('CategoryRow — rename', () => {
     });
   }
 
+  it('uses the translated system category name in German', async () => {
+    updateI18n({
+      locale: 'de',
+      messages: Object.fromEntries(
+        Object.entries(de.categories).map(([key, value]) => [`news.categories.${key}`, value]),
+      ),
+    });
+    await mount(async () => true, { ...category, name: 'Uncategorised', is_system: true });
+    expect(host?.querySelector('.font-medium')?.textContent).toBe('Ohne Kategorie');
+  });
+
   it('stays in edit mode with the typed name when the rename is refused', async () => {
     const onSave = vi.fn(async () => false);
     const view = await mount(onSave);
@@ -84,4 +101,44 @@ describe('CategoryRow — rename', () => {
     await act(async () => view.buttons()[0]?.click());
     expect(view.inputs()).toHaveLength(0);
   });
+});
+
+it('explains free-text category management and exposes Rename and Delete once adopted', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const adopt = vi.fn();
+  const render = (managed: boolean) =>
+    root.render(
+      <ul>
+        <CategoryRow
+          category={{ ...category, id: managed ? 3 : 0 }}
+          busy={false}
+          dragging={false}
+          onSave={async () => true}
+          onAdopt={adopt}
+          deleteSlot={<button type="button">Delete category</button>}
+          onDragStart={() => {}}
+          onDragOver={() => {}}
+          onDrop={() => {}}
+          onDragEnd={() => {}}
+        />
+      </ul>,
+    );
+  try {
+    await act(async () => render(false));
+    const manage = Array.from(host.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Manage category',
+    );
+    expect(manage).toBeDefined();
+    expect(host.textContent).toContain('rename, delete or reorder');
+    await act(async () => manage?.click());
+    expect(adopt).toHaveBeenCalledWith('Politics');
+    await act(async () => render(true));
+    expect(host.textContent).toContain('Rename');
+    expect(host.textContent).toContain('Delete category');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
 });

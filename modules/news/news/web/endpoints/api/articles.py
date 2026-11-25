@@ -18,13 +18,14 @@ from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content import service
-from news.content._fresh import ensure_fresh
+from news.content._fresh import ensure_fresh_for_write
 from news.content.articles import ArticlesService
 from news.contracts.schemas import (
     ArticleCreate,
     ArticleRead,
     ArticleUpdate,
 )
+from news.core.errors import ArticleNotFound
 from news.web.endpoints.api._article_listing import router
 from news.web.endpoints.api._deps import (
     checked_locale,
@@ -86,9 +87,9 @@ async def update_article(
     # `select` further down did, and returned the very row already in hand.
     article = await service.get(db, article_id)
     if article is None:
-        raise HTTPException(status_code=404, detail="Article not found.")
+        raise ArticleNotFound
 
-    ensure_fresh(article, body.expected_updated_at)
+    await ensure_fresh_for_write(db, article, body.expected_updated_at)
 
     sent = body.model_dump(exclude_unset=True)
     sent.pop("expected_updated_at", None)
@@ -148,5 +149,5 @@ async def delete_article(
     """
     article = await service.get(db, article_id)
     if article is None:
-        raise HTTPException(status_code=404, detail="Article not found.")
+        raise ArticleNotFound
     await service.delete(db, article)

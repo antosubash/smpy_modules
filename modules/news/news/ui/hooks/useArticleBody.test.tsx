@@ -100,7 +100,42 @@ describe('useArticleBody — stale writes', () => {
     });
     expect(api.conflict).toBe(false);
     expect(api.error).toBeNull();
+    expect(api.data).toMatchObject({ zones: { n: 9 } });
+    expect(api.dirty).toBe(false);
+    expect(api.reloadKey).toBe(1);
+    const afterReload = calls.length;
+    await act(async () => {
+      await api.saveNow();
+    });
+    expect(calls).toHaveLength(afterReload);
+    await act(async () => api.change(edit(10)));
+    await act(async () => {
+      await api.saveNow();
+    });
+    expect(calls.at(-1)?.body).toEqual({
+      draft_data: edit(10),
+      expected_updated_at: '2026-01-01T00:01:00Z',
+    });
+    expect(api.saveState).toBe('saved');
     await act(async () => root.unmount());
+  });
+
+  it('flushes the final pending body edit when leaving inside the debounce window', async () => {
+    responder = (_url, method) =>
+      method === 'GET'
+        ? json(detail('2026-01-01T00:00:00Z'))
+        : json(detail('2026-01-01T00:00:05Z'));
+    const root = await mount();
+    const body = { content: [], root: { props: {} }, zones: { final: true } };
+    await act(async () => api.change(body as never));
+    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(0);
+    await act(async () => root.unmount());
+    const writes = calls.filter((call) => call.method === 'PUT');
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({
+      url: '/api/news/articles/7/body',
+      body: { draft_data: body, expected_updated_at: '2026-01-01T00:00:00Z' },
+    });
   });
 
   it('publishes once however many times it is clicked', async () => {

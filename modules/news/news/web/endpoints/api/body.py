@@ -14,8 +14,13 @@ from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.content.articles import ArticlesService
-from news.contracts.schemas import ArticleBodyUpdate, ArticleDetail, RevisionRead
-from news.web.endpoints.api._deps import detail_of, read_one, require_edit
+from news.contracts.schemas import (
+    ArticleBodyUpdate,
+    ArticleDetail,
+    ArticleWriteVersion,
+    RevisionRead,
+)
+from news.web.endpoints.api._deps import check_write_version, detail_of, read_one, require_edit
 
 router = APIRouter(dependencies=[require_edit])
 """``news.edit`` on every route here.
@@ -87,11 +92,15 @@ async def list_article_revisions(
     response_model=ArticleDetail,
 )
 async def restore_article_revision(
-    article_id: int, revision_id: int, db: AsyncSession = Depends(get_db)
+    article_id: int,
+    revision_id: int,
+    body: ArticleWriteVersion | None = None,
+    db: AsyncSession = Depends(get_db),
 ) -> ArticleDetail:
     """Copy a revision back into the draft.
 
     Deliberately does not publish — see ``RevisionsMixin.restore_revision``.
     """
+    await check_write_version(db, article_id, body)
     article = await ArticlesService(db).restore_revision(article_id, revision_id)
     return detail_of(article, await read_one(db, article_id))

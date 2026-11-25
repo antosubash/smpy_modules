@@ -3,7 +3,8 @@ import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
+import type { ArticleWrite } from '../../hooks/useArticleEditor';
+import { useMountedRef } from '../../hooks/useMountedRef';
 import { getArticleDetail, scheduleArticle } from '../../utils/api';
 import { keys, useT } from '../../utils/i18n';
 
@@ -22,8 +23,15 @@ const COME_DOWN_ID = 'article-unpublish-at';
  * metadata and may be in the past. These are instants with one job each, and
  * both are cleared the moment they are acted on.
  */
-export function ScheduleCard({ articleId }: { articleId: number }) {
+export function ScheduleCard({
+  articleId,
+  writeArticle,
+}: {
+  articleId: number;
+  writeArticle: ArticleWrite;
+}) {
   const { t } = useT();
+  const mounted = useMountedRef();
   const copy = keys.news.schedule;
   const [publishAt, setPublishAt] = useState('');
   const [unpublishAt, setUnpublishAt] = useState('');
@@ -37,6 +45,7 @@ export function ScheduleCard({ articleId }: { articleId: number }) {
     const controller = new AbortController();
     void getArticleDetail(articleId, controller.signal)
       .then((detail) => {
+        if (controller.signal.aborted) return;
         setPublishAt(toLocalInput(detail.publish_at));
         setUnpublishAt(toLocalInput(detail.unpublish_at));
       })
@@ -49,18 +58,22 @@ export function ScheduleCard({ articleId }: { articleId: number }) {
   const save = async () => {
     setBusy(true);
     try {
-      await scheduleArticle(articleId, {
-        // Empty clears it, which is a real instruction — an explicit null
-        // rather than an omitted field, or cancelling would be unspellable.
-        publish_at: publishAt ? new Date(publishAt).toISOString() : null,
-        unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
-      });
+      const ok = await writeArticle((version) =>
+        scheduleArticle(articleId, {
+          // Empty clears it, which is a real instruction — an explicit null
+          // rather than an omitted field, or cancelling would be unspellable.
+          expected_updated_at: version,
+          publish_at: publishAt ? new Date(publishAt).toISOString() : null,
+          unpublish_at: unpublishAt ? new Date(unpublishAt).toISOString() : null,
+        }),
+      );
+      if (!ok) return;
       setSaved(true);
       toast.success(t(copy.saved_toast));
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 

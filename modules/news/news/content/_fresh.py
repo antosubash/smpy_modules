@@ -18,13 +18,10 @@ from fastapi import HTTPException
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from news.core.errors import STALE_DETAIL as STALE_DETAIL
+from news.core.errors import ArticleConflict, ArticleNotFound
 from news.core.naive_utc import as_utc
 from news.models import ArticleStatus, NewsArticle
-
-STALE_DETAIL = (
-    "This article was changed somewhere else. Reload to get the latest version, "
-    "then make your change again."
-)
 
 
 def ensure_fresh(article: NewsArticle, expected: datetime | None) -> None:
@@ -35,7 +32,30 @@ def ensure_fresh(article: NewsArticle, expected: datetime | None) -> None:
     back a naive instant.
     """
     if expected is not None and as_utc(expected) != as_utc(article.updated_at):
-        raise HTTPException(status_code=409, detail=STALE_DETAIL)
+        raise ArticleConflict()
+
+
+async def ensure_fresh_for_write(
+    db: AsyncSession, article: NewsArticle, expected: datetime | None
+) -> None:
+    """Check the base while holding the row until the caller's transaction ends.
+
+    A no-op UPDATE locks on both SQLite and Postgres (SQLite ignores FOR UPDATE).
+    Refresh after acquiring it: a waiting writer may have an older identity-map
+    copy. Keep the timestamp unchanged so a refused or no-op write cannot age it.
+    """
+    if expected is None:
+        return
+    result = await db.execute(
+        update(NewsArticle)
+        .where(NewsArticle.id == article.id)
+        .values(updated_at=NewsArticle.updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        raise ArticleNotFound("Article not found")
+    await db.refresh(article)
+    ensure_fresh(article, expected)
 
 
 async def claim_status(

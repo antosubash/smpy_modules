@@ -41,6 +41,7 @@ from news.contracts.schemas._writes import (
     ArticleCreate,
     ArticleTranslationCreate,
     ArticleUpdate,
+    ArticleWriteVersion,
     RejectRequest,
     ScheduleRequest,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "ArticleTagsUpdate",
     "ArticleTranslationCreate",
     "ArticleUpdate",
+    "ArticleWriteVersion",
     "CategoryAdminListResponse",
     "CategoryCount",
     "CategoryCreate",
