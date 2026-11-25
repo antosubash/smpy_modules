@@ -86,3 +86,13 @@ async def test_side_write_accepts_current_or_optional_version(editor_client, act
         assert detail["status"] == "draft"
     else:
         assert detail["title"] == "Headline A"
+
+
+async def test_a_write_on_a_trashed_article_is_a_coded_404(editor_client):
+    """The editor tells "article gone" from any other 404 by the code (#444)."""
+    article = (await editor_client.post(ARTICLES, json={"title": "Headline A"})).json()
+    url = f"{ARTICLES}/{article['id']}"
+    assert (await editor_client.delete(url)).status_code in (200, 204)
+    response = await editor_client.put(url, json={"title": "Headline B"})
+    assert response.status_code == 404, response.text
+    assert response.json()["code"] == "article_not_found"

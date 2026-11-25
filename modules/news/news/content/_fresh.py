@@ -19,7 +19,7 @@ from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.core.errors import STALE_DETAIL as STALE_DETAIL
-from news.core.errors import ArticleConflict
+from news.core.errors import ArticleConflict, ArticleNotFound
 from news.core.naive_utc import as_utc
 from news.models import ArticleStatus, NewsArticle
 
@@ -53,7 +53,7 @@ async def ensure_fresh_for_write(
         .execution_options(synchronize_session=False)
     )
     if result.rowcount != 1:
-        raise HTTPException(status_code=404, detail="Article not found")
+        raise ArticleNotFound("Article not found")
     await db.refresh(article)
     ensure_fresh(article, expected)
 

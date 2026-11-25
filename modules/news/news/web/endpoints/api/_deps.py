@@ -27,6 +27,7 @@ from news.core.constants import (
     PRIVATE_CACHE_CONTROL,
     PUBLIC_CACHE_CONTROL,
 )
+from news.core.errors import ArticleNotFound
 from news.core.naive_utc import as_utc
 from news.models import NewsArticle
 
@@ -160,7 +161,7 @@ async def read_one(db: AsyncSession, article_id: int) -> ArticleRead:
     """
     article = await service.get_read(db, article_id, include_drafts=True)
     if article is None:
-        raise HTTPException(status_code=404, detail="Article not found.")
+        raise ArticleNotFound
     article.tags = await tag_service.list_for_article(db, article_id)
     return article
 

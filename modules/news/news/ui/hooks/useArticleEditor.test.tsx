@@ -148,3 +148,23 @@ it('a save answered 404 says the article is gone and stops offering Save', async
   expect(editor.error).toBe('This article was moved to the trash or deleted.');
   expect(editor.conflict).toBe(false);
 });
+
+it('stays gone after a later write fails for another reason, and sends nothing more', async () => {
+  setReject('gone');
+  await save();
+  setReject('metadata');
+  await save();
+  expect(editor.gone).toBe(true);
+  setReject(null);
+  const sent = lastSave();
+  await click('Save search settings');
+  expect(lastSave()).toBe(sent);
+  expect(editor.gone).toBe(true);
+});
+
+it('a 404 that is not about the article leaves the article editable', async () => {
+  setReject('revision');
+  await save();
+  expect(editor.gone).toBe(false);
+  expect(editor.error).toBe('Revision not found');
+});

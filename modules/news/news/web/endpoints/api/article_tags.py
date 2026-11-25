@@ -19,6 +19,7 @@ from news.content import service
 from news.content.taxonomy import tag_service
 from news.content.taxonomy.tag_service import TagNameError
 from news.contracts.schemas import ArticleTagsUpdate
+from news.core.errors import ArticleNotFound
 from news.web.endpoints.api._deps import check_write_version, may_see_drafts, require_edit
 
 router = APIRouter()
@@ -48,7 +49,7 @@ async def list_article_tags(
     # One message for both misses on purpose: a distinguishable "exists but is
     # hidden" would answer the question the 404 is there to refuse.
     if visible is None:
-        raise HTTPException(status_code=404, detail="Article not found.")
+        raise ArticleNotFound
     return await tag_service.list_for_article(db, article_id)
 
 
@@ -62,7 +63,7 @@ async def set_article_tags(
 ) -> list[str]:
     """Replace the article's tags, creating any name that is new."""
     if await service.get(db, article_id) is None:
-        raise HTTPException(status_code=404, detail="Article not found.")
+        raise ArticleNotFound
     await check_write_version(db, article_id, body)
     try:
         return await tag_service.set_for_article(db, article_id, body.tags)

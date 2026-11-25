@@ -21,7 +21,8 @@ export function useArticleWriteQueue(articleId: number) {
   });
   const [conflict, setConflict] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
-  // A write answered 404: the article was trashed or purged under the editor.
+  // A write found no article: it was trashed or purged under the editor. Stays
+  // set, and stops later writes, until Reload or another article resets it.
   const [missing, setMissing] = useState(false);
   if (flags.articleId !== articleId) {
     setFlags({ articleId, blocked: false, failed: false, stopped: false, toastId: undefined });
@@ -70,11 +71,13 @@ export function useArticleWriteQueue(articleId: number) {
             });
             return false;
           }
-          const vanished = e instanceof HttpError && e.status === 404;
+          // By code, not status: a missing revision is a 404 on a live article.
+          const vanished = e instanceof HttpError && e.code === 'article_not_found';
+          if (vanished) flags.stopped = true;
           // The server's "not found" says less than what happened to the article.
           const message = vanished ? t(keys.news.errors.gone) : (e as Error).message;
           setConflict(flags.blocked);
-          setMissing(vanished);
+          if (vanished) setMissing(true);
           setError(message);
           if (notify) {
             const id = flags.blocked ? flags.toastId : undefined;

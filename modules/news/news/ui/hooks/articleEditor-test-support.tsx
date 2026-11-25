@@ -102,7 +102,10 @@ beforeEach(async () => {
           ]);
         return json(article());
       }
-      if (reject === 'gone') return json({ detail: 'Article not found' }, 404);
+      if (reject === 'gone')
+        return json({ detail: 'Article not found', code: 'article_not_found' }, 404);
+      // A 404 about something else on a live article: no article code.
+      if (reject === 'revision') return json({ detail: 'Revision not found' }, 404);
       if (reject === 'metadata' && url.endsWith('/7'))
         return json({ detail: 'Invalid title' }, 422);
       if (reject === 'tags' && url.endsWith('/tags')) return json({ detail: 'Invalid tag' }, 422);

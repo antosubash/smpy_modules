@@ -57,7 +57,11 @@ export async function errorFrom(response: Response): Promise<HttpError> {
     if (isCsrfRefusal(response.status, detail)) {
       return new HttpError(translate(keys.news.errors.csrf_failed), response.status);
     }
-    if (typeof detail === 'string' && detail.trim()) return new HttpError(detail, response.status);
+    if (typeof detail === 'string' && detail.trim()) {
+      // The code travels with the message: a caller tells a vanished article
+      // (`article_not_found`) from any other 404 by it, never by the wording.
+      return new HttpError(detail, response.status, typeof code === 'string' ? code : undefined);
+    }
     const validation = fromValidationErrors(detail);
     if (validation) return new HttpError(validation, response.status);
   } catch {
