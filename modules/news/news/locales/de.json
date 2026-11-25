@@ -49,6 +49,7 @@
     "status_pending": "In Prüfung",
     "status_draft_dated": "Entwurf · datiert {when}",
     "status_draft_undated": "Entwurf · ohne Datum",
+    "status_draft_scheduled": "Entwurf · geplant für {when}",
     "unpublished_edits": "Unveröffentlichte Änderungen",
     "edit": "Bearbeiten",
     "more_actions": "Weitere Aktionen für {title}",
@@ -81,6 +82,7 @@
   },
   "editor": {
     "fallback_title": "Artikel",
+    "not_found_title": "Artikel nicht gefunden",
     "loading": "Wird geladen …",
     "loading_article": "Artikel wird geladen",
     "untitled": "Artikel ohne Titel",

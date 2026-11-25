@@ -439,6 +439,14 @@ name the module they affect.
 
 ### Fixed
 
+- **news: small defects on the article screens** (#449). Unpublish refused with the
+  stale-write conflict now shows that message in its dialog instead of a generic
+  one. An empty or invalid URL says why Save is disabled. The German tag input's
+  placeholder is no longer clipped. An article that is not found says so in the
+  header and the tab title instead of "Loading…". A draft with a go-live time is
+  listed as "Draft · scheduled for …" (the list API gains an editorial-only
+  `scheduled_at`). "Publish now" is hidden, on the list and the edit screen,
+  from a user without `news.publish`.
 - **news: public pages use the language of their address** (#450). On
   `/de/news/` the module's own strings (search box, pager, "Subscribe by RSS")
   now come from the German catalogue for a visitor whose browser asks for

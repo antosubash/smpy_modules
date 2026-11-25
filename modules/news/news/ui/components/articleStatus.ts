@@ -42,7 +42,7 @@ export function editorStatus(status: ArticleRead['status'], dated: string, t: Tr
  * editor could set a future display date, see "publishes …" and believe the
  * article will go live on its own when nothing here does that.
  */
-export function statusLine(article: ArticleRead, t: Translate): string {
+export function statusLine(article: ArticleRead, t: Translate, locale?: string): string {
   const when = article.published_at;
   const row = keys.news.row;
 
@@ -52,6 +52,16 @@ export function statusLine(article: ArticleRead, t: Translate): string {
       : t(row.status_published_undated);
   }
   if (article.status === 'submitted_for_review') return t(row.status_pending);
+  // A draft with a go-live time is waiting, not just dated: say so, with the
+  // instant, since the editor chose a time and not only a day.
+  if (article.scheduled_at) {
+    const at = new Date(article.scheduled_at);
+    if (!Number.isNaN(at.getTime())) {
+      return t(row.status_draft_scheduled, {
+        when: at.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }),
+      });
+    }
+  }
   return when
     ? t(row.status_draft_dated, { when: relativeDay(when, t) })
     : t(row.status_draft_undated);

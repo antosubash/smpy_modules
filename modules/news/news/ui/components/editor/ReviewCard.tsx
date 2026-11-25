@@ -56,10 +56,14 @@ export function ReviewCard({
   article,
   canPublish,
   writeArticle,
+  conflict = false,
 }: {
   article: ArticleRead;
   canPublish: boolean;
   writeArticle: ArticleWrite;
+  /** The editor is blocked on a stale-write conflict (every write is refused
+   *  until Reload), so the action may fail without ever reaching the server. */
+  conflict?: boolean;
 }) {
   const { t } = useT();
   const copy = keys.news.review;
@@ -67,24 +71,45 @@ export function ReviewCard({
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');
 
-  /** Resolves `true` only when the transition went through, so a caller can
-   *  keep its dialog and its typed note open on failure. */
-  const run = async (
+  /** Resolves `true` when the transition went through. On failure, resolves the
+   *  server's own message (the 409 conflict text, a 403), so a caller can keep
+   *  its dialog open and say why instead of a generic line, and keep a typed
+   *  note. */
+  const attempt = async (
     action: (version: string | null) => Promise<ArticleRead | null>,
     done: string,
-  ): Promise<boolean> => {
+  ): Promise<true | string> => {
+    const failure: { reason: string | null } = { reason: null };
     const ok = await guard(async () => {
       try {
-        if (!(await writeArticle(action))) return false;
+        const written = await writeArticle(async (version) => {
+          try {
+            return await action(version);
+          } catch (e) {
+            failure.reason = (e as Error).message;
+            throw e;
+          }
+        });
+        if (!written) {
+          // The action never ran when the editor is already blocked on a
+          // conflict, so the reason is that conflict.
+          failure.reason ??= conflict ? t(keys.news.errors.article_conflict) : null;
+          return false;
+        }
         toast.success(done);
         return true;
       } catch (e) {
         toast.error((e as Error).message);
+        failure.reason = (e as Error).message;
         return false;
       }
     });
-    return ok === true;
+    return ok === true ? true : (failure.reason ?? t(copy.unpublish_failed));
   };
+  const run = async (
+    action: (version: string | null) => Promise<ArticleRead | null>,
+    done: string,
+  ): Promise<boolean> => (await attempt(action, done)) === true;
 
   const submitted = article.status === 'submitted_for_review';
 
@@ -103,12 +128,13 @@ export function ReviewCard({
           description={t(copy.unpublish_description)}
           confirmLabel={t(copy.unpublish)}
           onConfirm={async () => {
-            const ok = await run(
+            const result = await attempt(
               (version) => unpublishArticle(article.id, version),
               t(copy.unpublished_toast),
             );
-            // The toast has already said why; throwing keeps the dialog open.
-            if (!ok) throw new Error(t(copy.unpublish_failed));
+            // The toast has already said why; throwing keeps the dialog open
+            // and shows the same reason inside it.
+            if (result !== true) throw new Error(result);
           }}
           trigger={
             <Button size="sm" variant="outline" disabled={busy}>
