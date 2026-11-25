@@ -457,7 +457,9 @@ name the module they affect.
   every one of those writes, with the message in the console language; the
   screen then asks for a reload before it saves again. The API accepts an
   optional `expected_updated_at` on those writes and marks the refusal with the
-  code `article_conflict`.
+  code `article_conflict`. A write on an article that was trashed or deleted
+  meanwhile says so and stops offering Save; the API answers it with a JSON 404
+  carrying the code `article_not_found`.
 - **news: starting the same app twice** (#447). News registers its
   content-bundle section once per registry, so a second lifespan start of the
   same app no longer fails; a different section under the name `news` is still

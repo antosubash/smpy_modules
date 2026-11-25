@@ -105,7 +105,9 @@ test.describe('News — first visit of a session', () => {
       // rather than the CSRF check's 403.
       const pageJson = document.querySelector('script[data-page="app"]')?.textContent ?? '{}';
       const token = (JSON.parse(pageJson) as { props?: { csrfToken?: string } }).props?.csrfToken;
-      const r = await fetch('/api/news/articles/999999', {
+      // A tag, not an article: a missing article answers a coded JSON 404
+      // whatever the request accepts (#444), a missing tag the host's HTML.
+      const r = await fetch('/api/news/taxonomy/tags/999999', {
         method: 'PUT',
         credentials: 'same-origin',
         headers: {
@@ -113,7 +115,7 @@ test.describe('News — first visit of a session', () => {
           'Content-Type': 'application/json',
           'X-CSRF-Token': token ?? '',
         },
-        body: JSON.stringify({ category: 'nope' }),
+        body: JSON.stringify({ name: 'nope' }),
       });
       const text = await r.text();
       return {
