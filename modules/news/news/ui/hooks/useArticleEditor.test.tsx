@@ -138,3 +138,13 @@ it('tags finishing after a side-card save do not roll the metadata version back'
   expect(editor.article?.updated_at).toBe(third);
   expect(editor.article?.tags).toEqual(['Saved tag']);
 });
+
+it('a save answered 404 says the article is gone and stops offering Save', async () => {
+  // Someone trashed or purged it while this screen was open.
+  setReject('gone');
+  await save();
+  expect(editor.gone).toBe(true);
+  expect(editor.valid).toBe(false);
+  expect(editor.error).toBe('This article was moved to the trash or deleted.');
+  expect(editor.conflict).toBe(false);
+});

@@ -102,6 +102,7 @@ beforeEach(async () => {
           ]);
         return json(article());
       }
+      if (reject === 'gone') return json({ detail: 'Article not found' }, 404);
       if (reject === 'metadata' && url.endsWith('/7'))
         return json({ detail: 'Invalid title' }, 422);
       if (reject === 'tags' && url.endsWith('/tags')) return json({ detail: 'Invalid tag' }, 422);

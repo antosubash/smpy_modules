@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMountedRef } from './useMountedRef';
 
 /**
  * The action lifecycle shared by `ConfirmDialog` and `NoteDialog`.
@@ -10,6 +11,7 @@ import { useState } from 'react';
  * and closing clears the error so a reopened dialog starts clean.
  */
 export function usePendingDialog(fallbackError: string, onClose?: () => void) {
+  const mounted = useMountedRef();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,12 +32,13 @@ export function usePendingDialog(fallbackError: string, onClose?: () => void) {
     setError(null);
     try {
       await work();
+      if (!mounted.current) return;
       setOpen(false);
       onClose?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : fallbackError);
+      if (mounted.current) setError(e instanceof Error ? e.message : fallbackError);
     } finally {
-      setPending(false);
+      if (mounted.current) setPending(false);
     }
   };
 

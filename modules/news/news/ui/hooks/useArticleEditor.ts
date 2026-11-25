@@ -55,7 +55,8 @@ export function useArticleEditor(articleId: number) {
   const [saved, setSaved] = useState(false);
   /** Successful loads discard local state in every editor card as well as the draft. */
   const [reloadKey, setReloadKey] = useState(0);
-  const { mounted, runWrite, reset, error, setError, conflict } = useArticleWriteQueue(articleId);
+  const { mounted, runWrite, reset, error, setError, conflict, missing } =
+    useArticleWriteQueue(articleId);
   /** The article was trashed or deleted elsewhere: nothing left to save to. */
   const [gone, setGone] = useState(false);
   if (articleRef.articleId !== articleId) {
@@ -216,7 +217,10 @@ export function useArticleEditor(articleId: number) {
    * still comes from the server — only it knows what is taken.
    */
   const valid =
-    !gone && draft !== null && draft.title.trim().length > 0 && SLUG_PATTERN.test(draft.slug);
+    !(gone || missing) &&
+    draft !== null &&
+    draft.title.trim().length > 0 &&
+    SLUG_PATTERN.test(draft.slug);
 
   return {
     article,
@@ -230,7 +234,7 @@ export function useArticleEditor(articleId: number) {
     error,
     conflict,
     reloadKey,
-    gone,
+    gone: gone || missing,
     /** Exposed so a sibling panel — the language switcher — reports through the
      *  same banner rather than growing an error surface of its own. */
     setError,

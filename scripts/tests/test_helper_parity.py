@@ -33,6 +33,13 @@ def test_use_pending_dialog_is_byte_identical() -> None:
     assert news == pagebuilder
 
 
+def test_use_mounted_ref_is_byte_identical() -> None:
+    """The dialog helper above imports it, so the two copies travel together."""
+    news = (REPO / NEWS / "ui/hooks/useMountedRef.ts").read_bytes()
+    pagebuilder = (REPO / PB / "ui/hooks/useMountedRef.ts").read_bytes()
+    assert news == pagebuilder
+
+
 def _literal(path: str, name: str) -> object:
     for node in ast.parse((REPO / path).read_text(encoding="utf-8")).body:
         if isinstance(node, ast.Assign) and any(

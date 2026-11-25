@@ -21,10 +21,13 @@ export function useArticleWriteQueue(articleId: number) {
   });
   const [conflict, setConflict] = useState(false);
   const [error, setErrorState] = useState<string | null>(null);
+  // A write answered 404: the article was trashed or purged under the editor.
+  const [missing, setMissing] = useState(false);
   if (flags.articleId !== articleId) {
     setFlags({ articleId, blocked: false, failed: false, stopped: false, toastId: undefined });
     setConflict(false);
     setErrorState(null);
+    setMissing(false);
   }
   const setError = useCallback(
     (message: string | null) => {
@@ -38,6 +41,7 @@ export function useArticleWriteQueue(articleId: number) {
     flags.stopped = false;
     flags.toastId = undefined;
     if (mounted.current) setConflict(false);
+    if (mounted.current) setMissing(false);
     setError(null);
   }, [flags, mounted, setError]);
 
@@ -66,10 +70,13 @@ export function useArticleWriteQueue(articleId: number) {
             });
             return false;
           }
+          const vanished = e instanceof HttpError && e.status === 404;
+          // The server's "not found" says less than what happened to the article.
+          const message = vanished ? t(keys.news.errors.gone) : (e as Error).message;
           setConflict(flags.blocked);
-          setError((e as Error).message);
+          setMissing(vanished);
+          setError(message);
           if (notify) {
-            const message = (e as Error).message;
             const id = flags.blocked ? flags.toastId : undefined;
             const shown = id === undefined ? toast.error(message) : toast.error(message, { id });
             if (flags.blocked) flags.toastId = shown;
@@ -80,5 +87,5 @@ export function useArticleWriteQueue(articleId: number) {
     [flags, mounted, queue, setError, t],
   );
 
-  return { mounted, runWrite, reset, error, setError, conflict };
+  return { mounted, runWrite, reset, error, setError, conflict, missing };
 }
