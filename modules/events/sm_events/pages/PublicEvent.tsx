@@ -28,6 +28,87 @@ function PublicEventPage(p: PublicEventProps) {
   // An occurrence of a series (it has a `?date=`) cancelled on its own: say "this date", not "this event".
   const cancelledDate = p.when?.status === 'cancelled' && p.when.date_param !== null;
   return (
+    <main className="mx-auto max-w-3xl space-y-6 p-4">
+      {p.cancelled || p.when?.status === 'cancelled' ? (
+        <CancelledBanner occurrence={cancelledDate} />
+      ) : null}
+      <header className="space-y-2">
+        {p.parent ? (
+          <p className="text-sm">
+            <a href={p.parent.url} className="underline">
+              {t(copy.part_of, { title: p.parent.title })}
+            </a>
+          </p>
+        ) : null}
+        <h1 className="text-2xl font-semibold">
+          <bdi>{p.title}</bdi>
+        </h1>
+        {p.summary ? <p className="text-lg">{p.summary}</p> : null}
+        <LanguageSwitch alternates={p.alternates} locale={p.locale} />
+      </header>
+      {p.image ? (
+        <img src={p.image} alt="" className="max-h-80 w-full rounded-md object-cover" />
+      ) : null}
+      <section aria-labelledby="when-title" className="space-y-2">
+        <h2 id="when-title" className="font-semibold">
+          {t(copy.when)}
+        </h2>
+        {p.when ? <EventWhen when={p.when} timezone={p.timezone} locale={p.locale} /> : null}
+        {p.series ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {t(copy.series)}: {ruleText(p)}
+            </p>
+            <h3 className="text-sm font-semibold">{t(copy.next_dates)}</h3>
+            <ul className="space-y-1">
+              {p.series.next.map((n) => {
+                const time = localSpan(n.start_local, n.end_local, p.locale);
+                return (
+                  <li key={n.url}>
+                    <a href={n.url} className="underline">
+                      {n.status === 'cancelled' ? t(copy.next_cancelled, { time }) : time}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+      </section>
+      <EventPlace place={p.place} />
+      {p.organiser ? <p>{t(copy.organiser, { name: p.organiser })}</p> : null}
+      <p className="text-sm text-muted-foreground">
+        {p.category ? <>{p.category.name} · </> : null}
+        <a href={p.calendar.url} className="underline">
+          {p.calendar.name}
+        </a>
+      </p>
+      <RichText nodes={p.description_tree} />
+      <PluginDetail type={p.type} title={p.title} publicExtra={p.public_extra} locale={p.locale} />
+      <SubEvents items={p.sub_events} locale={p.locale} />
+      {p.registration?.mode === 'builtin' ? (
+        <RegistrationSlot registration={p.registration} locale={p.locale} />
+      ) : null}
+      <p className="flex flex-wrap gap-4">
+        {p.registration?.mode === 'external' ? (
+          <RegistrationSlot registration={p.registration} locale={p.locale} />
+        ) : !p.registration && p.registration_url ? (
+          <a href={p.registration_url} rel="noopener nofollow" className="font-medium underline">
+            {t(copy.register)}
+          </a>
+        ) : null}
+        <a href={p.ics_url} className="underline">
+          {t(copy.add_to_calendar)}
+        </a>
+      </p>
+    </main>
+  );
+}
+
+export default function PublicEvent(p: PublicEventProps) {
+  // The head sits outside `PageLocale`: that boundary suspends while a language's catalogue
+  // loads, and with no `<Head>` mounted Inertia removes the keyed tags the server wrote (#461).
+  return (
     <>
       <PublicHead
         head={p.head}
@@ -36,93 +117,9 @@ function PublicEventPage(p: PublicEventProps) {
         jsonLd={p.json_ld}
         event
       />
-      <main className="mx-auto max-w-3xl space-y-6 p-4">
-        {p.cancelled || p.when?.status === 'cancelled' ? (
-          <CancelledBanner occurrence={cancelledDate} />
-        ) : null}
-        <header className="space-y-2">
-          {p.parent ? (
-            <p className="text-sm">
-              <a href={p.parent.url} className="underline">
-                {t(copy.part_of, { title: p.parent.title })}
-              </a>
-            </p>
-          ) : null}
-          <h1 className="text-2xl font-semibold">
-            <bdi>{p.title}</bdi>
-          </h1>
-          {p.summary ? <p className="text-lg">{p.summary}</p> : null}
-          <LanguageSwitch alternates={p.alternates} locale={p.locale} />
-        </header>
-        {p.image ? (
-          <img src={p.image} alt="" className="max-h-80 w-full rounded-md object-cover" />
-        ) : null}
-        <section aria-labelledby="when-title" className="space-y-2">
-          <h2 id="when-title" className="font-semibold">
-            {t(copy.when)}
-          </h2>
-          {p.when ? <EventWhen when={p.when} timezone={p.timezone} locale={p.locale} /> : null}
-          {p.series ? (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                {t(copy.series)}: {ruleText(p)}
-              </p>
-              <h3 className="text-sm font-semibold">{t(copy.next_dates)}</h3>
-              <ul className="space-y-1">
-                {p.series.next.map((n) => {
-                  const time = localSpan(n.start_local, n.end_local, p.locale);
-                  return (
-                    <li key={n.url}>
-                      <a href={n.url} className="underline">
-                        {n.status === 'cancelled' ? t(copy.next_cancelled, { time }) : time}
-                      </a>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : null}
-        </section>
-        <EventPlace place={p.place} />
-        {p.organiser ? <p>{t(copy.organiser, { name: p.organiser })}</p> : null}
-        <p className="text-sm text-muted-foreground">
-          {p.category ? <>{p.category.name} · </> : null}
-          <a href={p.calendar.url} className="underline">
-            {p.calendar.name}
-          </a>
-        </p>
-        <RichText nodes={p.description_tree} />
-        <PluginDetail
-          type={p.type}
-          title={p.title}
-          publicExtra={p.public_extra}
-          locale={p.locale}
-        />
-        <SubEvents items={p.sub_events} locale={p.locale} />
-        {p.registration?.mode === 'builtin' ? (
-          <RegistrationSlot registration={p.registration} locale={p.locale} />
-        ) : null}
-        <p className="flex flex-wrap gap-4">
-          {p.registration?.mode === 'external' ? (
-            <RegistrationSlot registration={p.registration} locale={p.locale} />
-          ) : !p.registration && p.registration_url ? (
-            <a href={p.registration_url} rel="noopener nofollow" className="font-medium underline">
-              {t(copy.register)}
-            </a>
-          ) : null}
-          <a href={p.ics_url} className="underline">
-            {t(copy.add_to_calendar)}
-          </a>
-        </p>
-      </main>
+      <PageLocale locale={p.locale}>
+        <PublicEventPage {...p} />
+      </PageLocale>
     </>
-  );
-}
-
-export default function PublicEvent(p: PublicEventProps) {
-  return (
-    <PageLocale locale={p.locale}>
-      <PublicEventPage {...p} />
-    </PageLocale>
   );
 }
