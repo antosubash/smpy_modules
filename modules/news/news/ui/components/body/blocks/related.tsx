@@ -14,7 +14,7 @@
 
 import type { ComponentConfig } from '@puckeditor/core';
 import { useEffect, useState } from 'react';
-import { useDateLocale } from '../../../hooks/useContentLocale';
+import { useContentLocale, useDateLocale } from '../../../hooks/useContentLocale';
 import { type ArticleRead, formatArticleDate, listArticles } from '../../../utils/api';
 import { keys } from '../../../utils/i18n';
 
@@ -39,9 +39,16 @@ export function pickRelated(
   articles: ArticleRead[],
   currentSlug: string | undefined,
   limit: number,
+  currentTranslationGroup?: string,
+  locale?: string,
 ): ArticleRead[] {
   return articles
-    .filter((article) => article.slug !== currentSlug)
+    .filter(
+      (article) =>
+        article.slug !== currentSlug &&
+        (!currentTranslationGroup || article.translation_group !== currentTranslationGroup) &&
+        (!locale || article.locale === locale),
+    )
     .slice(0, Math.max(1, Math.min(limit, MAX)));
 }
 
@@ -50,9 +57,11 @@ export function RelatedRender({
   category,
   limit,
   currentSlug,
-}: RelatedProps & { currentSlug?: string }) {
+  currentTranslationGroup,
+}: RelatedProps & { currentSlug?: string; currentTranslationGroup?: string }) {
   const [items, setItems] = useState<ArticleRead[] | null>(null);
   const locale = useDateLocale();
+  const contentLocale = useContentLocale();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,15 +71,20 @@ export function RelatedRender({
       limit: Math.min(limit, MAX) + 1,
       category,
       in_feed: true,
+      locale: contentLocale,
       signal: controller.signal,
     })
-      .then((response) => setItems(pickRelated(response.items, currentSlug, limit)))
+      .then((response) =>
+        setItems(
+          pickRelated(response.items, currentSlug, limit, currentTranslationGroup, contentLocale),
+        ),
+      )
       // An empty list and a failed request look the same to a reader, on
       // purpose: a listing that is briefly down must not put an error box in
       // the middle of a published article.
       .catch(() => setItems([]));
     return () => controller.abort();
-  }, [limit, category, currentSlug]);
+  }, [limit, category, currentSlug, currentTranslationGroup, contentLocale]);
 
   // Nothing until the first response, and nothing when the archive has nothing
   // else to offer — a heading over an empty list reads as broken.
@@ -113,6 +127,7 @@ export const RelatedBlock: ComponentConfig<RelatedProps> = {
       category={category}
       limit={limit}
       currentSlug={puck?.metadata?.currentSlug as string | undefined}
+      currentTranslationGroup={puck?.metadata?.currentTranslationGroup as string | undefined}
     />
   ),
 };

@@ -5,8 +5,8 @@ Editors write **articles** in the module's own block editor, group them by
 **category** and **tag**, take them through an optional review step, and
 publish them to a public archive at `/news/` with its own article pages,
 category, tag and author pages, an RSS feed and a sitemap. No other content
-module is required; where the host also runs `simple_module_pagebuilder`, two
-extras appear (a **News feed** block and Pages/Media sections in admin search).
+module is required; where the host also runs `simple_module_pagebuilder`, extras
+appear: news blocks, Pages/Media admin search, and the shared public site layout.
 
 Start with the document that matches what you are trying to do.
 

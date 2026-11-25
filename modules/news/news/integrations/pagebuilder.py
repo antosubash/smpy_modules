@@ -38,6 +38,7 @@ from typing import Any
 from urllib.parse import quote
 
 from simple_module_core.permissions import grants  # pyright: ignore[reportPrivateImportUsage]
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from news.core.constants import (
@@ -57,6 +58,7 @@ __all__ = [
     "mounted",
     "page_editor_path",
     "page_search_path",
+    "public_layout_props",
     "register_bundle_section",
     "render_not_found",
     "search_media",
@@ -170,9 +172,7 @@ async def search_pages(
     )
 
 
-async def search_media(
-    db: AsyncSession, pattern: str, *, limit: int
-) -> tuple[list[Any], int]:
+async def search_media(db: AsyncSession, pattern: str, *, limit: int) -> tuple[list[Any], int]:
     """Media assets matching ``pattern``. ``([], 0)`` without pagebuilder."""
     contract = _contract()
     if contract is None:
@@ -181,6 +181,37 @@ async def search_media(
 
 
 # ── The site's not-found page ─────────────────────────────────────────
+
+
+@cache
+def _warn_layout_unavailable() -> None:
+    # Alert operators once per process without exposing SQL or flooding reader logs.
+    logger.warning("Pagebuilder layout unavailable; serving news without its frame")
+
+
+async def public_layout_props(
+    request: Any, db: AsyncSession, *, locale: str, tenant_id: str | None
+) -> dict[str, Any]:
+    """The site's success-page frame, or no extra props on a standalone host."""
+    public = getattr(_contract(), "public", None)
+    layout_props = getattr(public, "layout_props", None)
+    if layout_props is None:
+        return {}
+    try:
+        # A missing optional schema must not abort the caller's transaction on Postgres.
+        async with db.begin_nested():
+            return await layout_props(request, db, locale=locale, tenant_id=tenant_id)
+    except DBAPIError as exc:
+        # A savepoint cannot recover a dead connection; preserve the original failure.
+        if exc.connection_invalidated:
+            raise
+        _warn_layout_unavailable()
+        # Keep diagnostics free of SQL, parameters and database exception messages.
+        logger.debug(
+            "Pagebuilder layout unavailable (%s); serving news without its frame",
+            type(exc).__name__,
+        )
+        return {}
 
 
 async def render_not_found(

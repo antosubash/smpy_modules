@@ -24,17 +24,17 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pagebuilder.content import redirects, site_nav
-from pagebuilder.content.layout_service import LayoutService, public_layout_props
+from pagebuilder.content.layout_service import LayoutService
 from pagebuilder.content.service.pages import PagesService
 from pagebuilder.core import locales
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.core.tenancy import bind_public_viewer, vary_on_tenant
 from pagebuilder.media.og_image import og_image
 from pagebuilder.web import public_cache
+from pagebuilder.web._public_frame import public_frame
 from pagebuilder.web.deps import get_settings
 from pagebuilder.web.endpoints.public_not_found import render_not_found
 from pagebuilder.web.html_lang import set_html_lang
-from pagebuilder.web.public_copy import public_copy
 from pagebuilder.web.public_origin import public_origin, vary_on_host
 
 _PAGE_PUBLIC = "PageBuilder/PublicPage"
@@ -169,6 +169,7 @@ async def render_public_page(
     canonical = page.canonical_url or _absolute_page_url(
         request, settings, slug, prefix, page.locale
     )
+    frame = await public_frame(db, settings, page.locale, layout=layout, nav=nav)
     rendered = await inertia.render(
         _PAGE_PUBLIC,
         {
@@ -186,10 +187,9 @@ async def render_public_page(
             "site_name": settings.site_name,
             "twitter_handle": settings.twitter_handle,
             "locale": page.locale,
-            "copy": public_copy(page.locale),
+            "copy": frame.pop("copy"),
             "alternates": await _alternates(db, request, settings, page.translation_group),
-            **public_layout_props(layout),
-            "site_nav": nav,
+            **frame,
         },
     )
     # A full document carries the host shell, whose `lang` is the host's. An

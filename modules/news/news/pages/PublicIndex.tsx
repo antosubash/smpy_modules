@@ -1,7 +1,6 @@
-import { Head } from '@inertiajs/react';
-import { BrandingHead } from '@simple-module-py/ui/components/BrandingHead';
-
+import { ArchiveHead } from '../ui/components/ArchiveHead';
 import { ArchiveSearch } from '../ui/components/ArchiveSearch';
+import { PublicLayout, type PublicLayoutProps } from '../ui/components/PublicLayout';
 import { useDocumentLang } from '../ui/hooks/useDocumentLang';
 import { type ArticleRead, formatArticleDate } from '../ui/utils/api';
 import { archiveUrl } from '../ui/utils/archiveUrl';
@@ -21,7 +20,7 @@ import { keys, useT } from '../ui/utils/i18n';
  * carries the less there is to unpick.
  */
 
-interface Props {
+interface Props extends PublicLayoutProps {
   heading: string;
   description?: string | null;
   items: ArticleRead[];
@@ -53,25 +52,23 @@ export default function PublicIndex({
   narrowed = false,
   feed_url,
   locale,
+  layout_header,
+  layout_footer,
+  site_nav,
+  copy: layoutCopy,
 }: Props) {
   const { t, locale: consoleLocale } = useT();
   useDocumentLang(locale);
   const copy = keys.news.public;
   return (
-    <div>
-      {/* A public page has no admin layout, so without this the configured
-          brand colour and favicon would stop at the sign-in wall. */}
-      <BrandingHead />
-      <Head title={query ? t(copy.title_with_query, { query, heading }) : heading}>
-        {/* Results pages stay out of the index: the input space is unbounded,
-            so one indexed `?q=` link invites a crawler to enumerate query
-            strings forever, and every result page is a rearrangement of
-            articles already indexed at their own addresses. `follow`, though —
-            the links out of it are the real documents. The server writes the
-            same tag into the head for the crawler that never runs this script;
-            see `endpoints/public/_head.py`. */}
-        {query && <meta name="robots" content="noindex,follow" />}
-      </Head>
+    <PublicLayout
+      locale={locale}
+      layout_header={layout_header}
+      layout_footer={layout_footer}
+      site_nav={site_nav}
+      copy={layoutCopy}
+    >
+      <ArchiveHead heading={heading} query={query} />
 
       <div className="mx-auto max-w-2xl px-4 py-12">
         <header className="mb-10">
@@ -173,6 +170,6 @@ export default function PublicIndex({
           </a>
         </p>
       </div>
-    </div>
+    </PublicLayout>
   );
 }

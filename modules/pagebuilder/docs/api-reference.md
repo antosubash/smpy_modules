@@ -347,6 +347,15 @@ resolved for the request, never client input: when `request.state.tenant_id`
 names a different one the call raises `TenantMismatchError` instead of rendering
 another tenant's frame. News' article and archive pages are the consumer.
 
+**`pagebuilder.contracts.public.layout_props(request, db, *, locale, tenant_id)`**
+(#443, 0.0.16) supplies `layout_header`, `layout_footer`, `site_nav` and the
+localized frame `copy` used by `/p/*`. It binds the named tenant itself,
+refuses a resolved-tenant mismatch, and never commits. An unmounted site or
+`tenant_id=None` returns `{}` without querying. Sibling public pages can render
+these props with `PublicSiteLayout` (and `PublicSiteLayoutProps`) from
+`@simple-module-py/pagebuilder`; its renderer loads lazily so the shared layout
+palette stays out of the package-root entry chunk.
+
 **`PageDeleted(page_id, slug)`** (`pagebuilder.contracts.events`) is published
 on the event bus when a page is *purged* — not when it is trashed, since a
 restore would otherwise come back without what other modules dropped. A module

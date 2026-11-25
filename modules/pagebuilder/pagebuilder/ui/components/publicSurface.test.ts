@@ -11,6 +11,7 @@ describe('the package entry', () => {
     expect(Object.keys(surface).sort()).toEqual([
       'ArticleCardsGrid',
       'FileGallery',
+      'PublicSiteLayout',
       'Section',
       'StatsView',
       'createImageField',

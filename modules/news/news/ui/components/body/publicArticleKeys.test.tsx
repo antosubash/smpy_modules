@@ -26,6 +26,8 @@ vi.mock('../../utils/api', async (importOriginal) => {
     id,
     slug,
     title: `Story ${id}`,
+    // Every article the API returns names its language; Related keeps only the reader's.
+    locale: 'en',
     url: `/news/${slug}`,
     published_at: '2026-10-01T09:00:00Z',
   });

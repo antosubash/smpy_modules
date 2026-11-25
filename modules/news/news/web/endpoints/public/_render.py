@@ -43,6 +43,7 @@ async def render_article(
     alternates: list[dict[str, str]] | None = None,
     index_in_search: bool = True,
     preview: dict[str, Any] | None = None,
+    layout: dict[str, Any] | None = None,
 ) -> Response:
     """Render ``data`` as this article, through the reader's own screen.
 
@@ -92,6 +93,7 @@ async def render_article(
         # article you are reading is visibly broken, and the slug is the only
         # thing that identifies it inside the block document.
         "slug": article.slug,
+        "translation_group": article.translation_group,
         "data": data,
         "meta_description": article.meta_description,
         "og_image": image,
@@ -107,6 +109,7 @@ async def render_article(
         "published_at": published_at,
         "locale": locale,
         "alternates": alternates or [],
+        **(layout or {}),
     }
     if preview is not None:
         # Absent entirely on the public route rather than sent as null: this
