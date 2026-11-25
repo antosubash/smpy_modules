@@ -439,6 +439,12 @@ name the module they affect.
 
 ### Fixed
 
+- **news: public pages use the language of their address** (#450). On
+  `/de/news/` the module's own strings (search box, pager, "Subscribe by RSS")
+  now come from the German catalogue for a visitor whose browser asks for
+  English, as pagebuilder's chrome beside them already did; the default
+  language's address stays English whatever the browser asks for. A content
+  language the console has no catalogue for keeps the reader's language.
 - **news: article head tags no longer double after hydration** (#451). The
   canonical link, `og:*`, `article:*`, `twitter:*` and JSON-LD the server writes
   into a public article carry Inertia's `data-inertia` key, and `ArticleHead` and
