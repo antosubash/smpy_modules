@@ -32,40 +32,59 @@ export function ArticleHead({
   published_at,
 }: ArticleHeadProps) {
   const jsonLdScript = json_ld ? safeJsonLd(json_ld) : null;
+  // Every element carries a `head-key` equal to the one the server wrote into
+  // the document (`endpoints/public/_head.py`, `data-inertia`). That key is how
+  // Inertia's head manager adopts the server's tag on hydration rather than
+  // adding a second one beside it. Keep the two lists in step. No fragments:
+  // `<Head>` does not flatten them, so each tag is its own conditional.
   return (
     <Head title={title}>
       {meta_description && (
-        <>
-          <meta name="description" content={meta_description} />
-          <meta property="og:description" content={meta_description} />
-        </>
+        <meta head-key="description" name="description" content={meta_description} />
       )}
-      <meta property="og:title" content={title} />
+      {meta_description && (
+        <meta head-key="og:description" property="og:description" content={meta_description} />
+      )}
+      <meta head-key="og:title" property="og:title" content={title} />
       {/* `article`, not `website` — the whole reason this module took its own
         address is that these documents are not generic pages, and the
         metadata should say so too. */}
-      <meta property="og:type" content="article" />
-      {og_url && <meta property="og:url" content={og_url} />}
-      {site_name && <meta property="og:site_name" content={site_name} />}
-      {published_at && <meta property="article:published_time" content={published_at} />}
-      {author && <meta property="article:author" content={author} />}
-      {category && <meta property="article:section" content={category} />}
-      {og_image && (
-        <>
-          <meta property="og:image" content={og_image} />
-          <meta name="twitter:image" content={og_image} />
-        </>
+      <meta head-key="og:type" property="og:type" content="article" />
+      {og_url && <meta head-key="og:url" property="og:url" content={og_url} />}
+      {site_name && <meta head-key="og:site_name" property="og:site_name" content={site_name} />}
+      {published_at && (
+        <meta
+          head-key="article:published_time"
+          property="article:published_time"
+          content={published_at}
+        />
       )}
-      <meta name="twitter:card" content={og_image ? 'summary_large_image' : 'summary'} />
-      {twitter_handle && <meta name="twitter:site" content={twitter_handle} />}
-      {canonical_url && <link rel="canonical" href={canonical_url} />}
-      {!index_in_search && <meta name="robots" content="noindex,nofollow" />}
+      {author && <meta head-key="article:author" property="article:author" content={author} />}
+      {category && (
+        <meta head-key="article:section" property="article:section" content={category} />
+      )}
+      {og_image && <meta head-key="og:image" property="og:image" content={og_image} />}
+      {og_image && <meta head-key="twitter:image" name="twitter:image" content={og_image} />}
+      <meta
+        head-key="twitter:card"
+        name="twitter:card"
+        content={og_image ? 'summary_large_image' : 'summary'}
+      />
+      {twitter_handle && (
+        <meta head-key="twitter:site" name="twitter:site" content={twitter_handle} />
+      )}
+      {canonical_url && <link head-key="canonical" rel="canonical" href={canonical_url} />}
+      {!index_in_search && <meta head-key="robots" name="robots" content="noindex,nofollow" />}
       {jsonLdScript && (
         // Emitting author-composed JSON-LD is the feature. The content is
         // written by permission-holding editors and served under the app's CSP
         // (and NewsSettings.public_csp, when set).
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: author-composed JSON-LD is the feature
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript }} />
+        <script
+          head-key="json-ld"
+          type="application/ld+json"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: author-composed JSON-LD is the feature
+          dangerouslySetInnerHTML={{ __html: jsonLdScript }}
+        />
       )}
     </Head>
   );

@@ -439,6 +439,11 @@ name the module they affect.
 
 ### Fixed
 
+- **news: article head tags no longer double after hydration** (#451). The
+  canonical link, `og:*`, `article:*`, `twitter:*` and JSON-LD the server writes
+  into a public article carry Inertia's `data-inertia` key, and `ArticleHead` and
+  `ArchiveHead` render the same keys, so the browser keeps one of each instead of
+  two.
 - **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
   Main fields, search settings, schedule, review notes and history show the
   server's current state; rejected values are discarded before another save.
