@@ -85,6 +85,26 @@ def test_the_admin_surface_stays_gated(path):
     assert not _registry().matches("GET", path), f"{path} must require auth"
 
 
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+def test_media_is_not_rate_limited(method):
+    """A page's images must not spend the visitor's request budget (#442).
+
+    The files come from a static mount, like the host's ``/static/``, which the
+    limiter skips by itself. Pages keep the host's rate.
+    """
+    registry = _registry()
+    media = registry.match(method, "/media/pagebuilder/abc123.png")
+    assert media is not None and media.rate == "off"
+    page = registry.match(method, "/p/launch-announcement")
+    assert page is not None and page.rate is None
+
+
+def test_a_custom_media_prefix_is_not_rate_limited_either():
+    registry = _registry(media_url_prefix="/uploads/site")
+    rule = registry.match("GET", "/uploads/site/default/abc123.png")
+    assert rule is not None and rule.rate == "off"
+
+
 def test_a_sibling_of_the_media_prefix_stays_gated():
     assert not _registry().matches("GET", "/media/pagebuilder-private/secret.png")
 

@@ -439,6 +439,11 @@ name the module they affect.
 
 ### Fixed
 
+- **pagebuilder: a page's images no longer count against the visitor's request
+  budget** (#442). The media prefix is registered with `rate="off"`, as the host's
+  `/static/` already is. Before, each image request counted against the host's
+  `rate_limit_public` (120 a minute per address by default), so a visitor who
+  opened a few image-heavy pages got `429` in place of images.
 - **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
   Main fields, search settings, schedule, review notes and history show the
   server's current state; rejected values are discarded before another save.

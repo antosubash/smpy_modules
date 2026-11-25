@@ -92,7 +92,13 @@ def exempt_public_routes(app: FastAPI, settings: PagebuilderSettings) -> None:
         )
     # Published pages reference uploaded images; without this the page renders
     # for an anonymous visitor but every image 302s to login.
-    registry.add_prefix(dir_prefix(settings.media_url_prefix), methods=methods)
+    #
+    # ``rate="off"``: these are files from a static mount, like the host's own
+    # ``/static/`` which the limiter already skips. Counted against the host's
+    # ``rate_limit_public`` (120/minute per address by default), a page with a
+    # dozen images spends a tenth of the budget per view, and a visitor who
+    # opens a few pages gets 429s in place of images (#442).
+    registry.add_prefix(dir_prefix(settings.media_url_prefix), methods=methods, rate="off")
     if settings.sitemap_enabled:
         registry.add_exact("/sitemap.xml", methods=methods)
     if settings.robots_enabled:
