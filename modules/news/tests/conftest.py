@@ -77,16 +77,22 @@ def _no_leaked_module_state():
     would mount the *next* test's routes in whatever language it configured —
     an order-dependent failure with no visible cause.
 
+    News also publishes its own content locales when pagebuilder is mounted;
+    clear those so the next app can borrow its own configured languages.
+
     There is no slug claim to reset any more. An article was a pagebuilder page
     when there was, and it is not one now.
     """
+    from news.core import locales as news_locales
     from news.core import settings as news_settings
     from pagebuilder.core import locales
 
     news_settings.reset()
+    news_locales.reset()
     locales.reset()
     yield
     news_settings.reset()
+    news_locales.reset()
     locales.reset()
 
 
