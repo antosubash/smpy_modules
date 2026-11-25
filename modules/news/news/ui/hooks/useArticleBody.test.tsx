@@ -100,6 +100,23 @@ describe('useArticleBody — stale writes', () => {
     });
     expect(api.conflict).toBe(false);
     expect(api.error).toBeNull();
+    expect(api.data).toMatchObject({ zones: { n: 9 } });
+    expect(api.dirty).toBe(false);
+    expect(api.reloadKey).toBe(1);
+    const afterReload = calls.length;
+    await act(async () => {
+      await api.saveNow();
+    });
+    expect(calls).toHaveLength(afterReload);
+    await act(async () => api.change(edit(10)));
+    await act(async () => {
+      await api.saveNow();
+    });
+    expect(calls.at(-1)?.body).toEqual({
+      draft_data: edit(10),
+      expected_updated_at: '2026-01-01T00:01:00Z',
+    });
+    expect(api.saveState).toBe('saved');
     await act(async () => root.unmount());
   });
 

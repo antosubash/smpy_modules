@@ -53,6 +53,8 @@ export function useArticleEditor(articleId: number) {
   const busy = saving || publishing;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  /** Successful loads discard local state in every editor card as well as the draft. */
+  const [reloadKey, setReloadKey] = useState(0);
   const { mounted, runWrite, reset, error, setError, conflict } = useArticleWriteQueue(articleId);
   /** The article was trashed or deleted elsewhere: nothing left to save to. */
   const [gone, setGone] = useState(false);
@@ -80,6 +82,8 @@ export function useArticleEditor(articleId: number) {
         setArticle(found);
         setDraft(toDraft(found));
         setDirty(false);
+        setSaved(false);
+        setReloadKey((key) => key + 1);
         reset();
         setGone(false);
       } catch (e) {
@@ -225,6 +229,7 @@ export function useArticleEditor(articleId: number) {
     saved,
     error,
     conflict,
+    reloadKey,
     gone,
     /** Exposed so a sibling panel — the language switcher — reports through the
      *  same banner rather than growing an error surface of its own. */

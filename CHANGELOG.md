@@ -439,6 +439,10 @@ name the module they affect.
 
 ### Fixed
 
+- **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
+  Main fields, search settings, schedule, review notes and history show the
+  server's current state; rejected values are discarded before another save.
+  Successful card saves still preserve unsaved edits elsewhere on the screen.
 - **news: Delete moves an article to Trash** (#445). The Delete action on the
   article list and the edit screen moves the article to Trash, where it can be
   restored; permanent deletion is on the Trash screen only. The Categories screen

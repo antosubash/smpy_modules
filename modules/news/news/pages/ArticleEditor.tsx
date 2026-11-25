@@ -54,6 +54,7 @@ export default function ArticleEditor() {
     valid,
     error,
     conflict,
+    reloadKey,
     gone,
     setError,
     writeArticle,
@@ -146,7 +147,10 @@ export default function ArticleEditor() {
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div
+        key={`${article_id}:${reloadKey}`}
+        className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]"
+      >
         <section className="space-y-3">
           <div className="rounded-lg border border-dashed p-8 text-center">
             <p className="font-medium">{t(copy.body_card_title)}</p>
