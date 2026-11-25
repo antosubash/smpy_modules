@@ -5,26 +5,6 @@ name the module they affect.
 
 ## 0.0.16 (unreleased)
 
-- News admin removal now moves articles to Trash for authors and publishers,
-  with recovery wording and a confirmation toast; permanent deletion remains
-  on the Trash screen. Categories explain how to enable management for a
-  category entered on an article and translate the system category label. Lists
-  refresh stale rows and clear filters whose options disappear (#445).
-
-- News serializes article editor writes and keeps the form version current after
-  search settings, scheduling, workflow and revision restores; rejected saves can be corrected and retried
-  without a false concurrent-edit conflict. Side writes check the form’s base
-  version under the article lock, so side writes cannot mask concurrent edits
-  to inspector fields; stale-write conflicts use the console language and block
-  queued writes until Reload, while slug collisions and other failures leave the
-  queue usable. Explicitly requested writes finish in order after navigation,
-  stopping on failure without updating the departed screen; successful Trash
-  cancels later queued writes (#444).
-
-- News registers its content-bundle section once per registry, so restarting the
-  same app lifespan works and rebuilding the registry registers it again, while
-  conflicting section names still fail loudly (#447).
-
 ### Added
 
 - **news: reusable public metadata** (#446). `ArticleHead`, `ArchiveHead`, their
@@ -459,6 +439,25 @@ name the module they affect.
 
 ### Fixed
 
+- **news: Delete moves an article to Trash** (#445). The Delete action on the
+  article list and the edit screen moves the article to Trash, where it can be
+  restored; permanent deletion is on the Trash screen only. The Categories screen
+  says how to manage a category that was entered on an article, and names the
+  system category in the console language. The article list drops a filter whose
+  option has gone, and refreshes after acting on an article that is already gone.
+- **news: saving after another save on the article screen** (#444). The edit
+  screen keeps the article's version current after every write it makes (search
+  settings, schedule, publish and review actions, revision restore, tags), and
+  sends its writes one at a time, so a second Save is no longer refused with
+  "changed somewhere else". A change made by someone else is still refused, on
+  every one of those writes, with the message in the console language; the
+  screen then asks for a reload before it saves again. The API accepts an
+  optional `expected_updated_at` on those writes and marks the refusal with the
+  code `article_conflict`.
+- **news: starting the same app twice** (#447). News registers its
+  content-bundle section once per registry, so a second lifespan start of the
+  same app no longer fails; a different section under the name `news` is still
+  refused.
 - **news: public site layout** (#443). Articles and every archive, including
   search results and localized routes, reuse pagebuilder's header, navigation
   and footer where mounted. Standalone rendering is unchanged. Related stories
