@@ -25,9 +25,9 @@ from simple_module_hosting.inertia_deps import InertiaDep
 from news.content.authors import slug_for as author_slug
 from news.core import constants
 from news.core.safe_url import image_or_none
-from news.core.settings import NewsSettings, public_author_path
+from news.core.settings import NewsSettings, public_author_path, public_feed_path
 from news.models import ArticleStatus, NewsArticle
-from news.web.endpoints.public import _head
+from news.web.endpoints.public import _head, _head_pages
 from news.web.endpoints.public._lang import set_html_lang
 
 
@@ -86,7 +86,24 @@ async def render_article(
     image = image_or_none(article.og_image)
     if image and image.startswith("/"):
         image = f"{base}{image}"
+    head = {
+        "title": article.title,
+        "description": article.meta_description or None,
+        "canonical": canonical,
+        "image": image,
+        "site_name": settings.site_name or None,
+        "twitter_handle": settings.twitter_handle or None,
+        "published_at": published_at,
+        "author": article.author or None,
+        "section": article.category or None,
+        "index_in_search": index_in_search,
+        "json_ld": article.json_ld or None,
+        "locale": locale,
+        "alternates": alternates,
+        "feed_url": f"{base}{public_feed_path(locale)}" if preview is None else None,
+    }
     props: dict[str, Any] = {
+        "head": head,
         "title": article.title,
         # Which article this is, for the blocks in its own body that need to
         # know. `Related` is the one: a "read next" list that includes the
@@ -123,19 +140,5 @@ async def render_article(
     # into the document server-side — see `_head` for why both are needed.
     return _head.inject(
         set_html_lang(rendered, locale),
-        _head.article_head(
-            title=article.title,
-            description=article.meta_description or None,
-            canonical=canonical,
-            image=image,
-            site_name=settings.site_name or None,
-            twitter_handle=settings.twitter_handle or None,
-            published_at=published_at,
-            author=article.author or None,
-            section=article.category or None,
-            index_in_search=index_in_search,
-            json_ld=article.json_ld,
-            locale=locale,
-            alternates=alternates,
-        ),
+        _head_pages.article_head(**head),
     )

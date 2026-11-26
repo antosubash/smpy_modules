@@ -86,6 +86,7 @@ function useAnchorOnArrival() {
 }
 
 export default function PublicArticle({
+  head,
   title,
   slug,
   translation_group,
@@ -120,6 +121,21 @@ export default function PublicArticle({
 
   return (
     <>
+      <ArticleHead
+        head={head}
+        title={title}
+        meta_description={meta_description}
+        og_image={og_image}
+        canonical_url={canonical_url}
+        og_url={og_url}
+        index_in_search={index_in_search}
+        json_ld={json_ld}
+        site_name={site_name}
+        twitter_handle={twitter_handle}
+        category={category}
+        author={author}
+        published_at={published_at}
+      />
       {preview && <PreviewBanner preview={preview} />}
       <PublicLayout
         locale={locale}
@@ -128,21 +144,6 @@ export default function PublicArticle({
         site_nav={site_nav}
         copy={layoutCopy}
       >
-        <ArticleHead
-          title={title}
-          meta_description={meta_description}
-          og_image={og_image}
-          canonical_url={canonical_url}
-          og_url={og_url}
-          index_in_search={index_in_search}
-          json_ld={json_ld}
-          site_name={site_name}
-          twitter_handle={twitter_handle}
-          category={category}
-          author={author}
-          published_at={published_at}
-        />
-
         <article>
           <header className="mx-auto max-w-2xl px-4 pt-12">
             {category && (

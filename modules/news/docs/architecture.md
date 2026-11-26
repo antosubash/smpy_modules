@@ -150,12 +150,19 @@ each from auth (prefix with trailing slash, plus the bare path exactly).
 Inside one router, fixed paths (`feed.xml`, `sitemap.xml`, `/`,
 `/category/…`, `/tag/…`, `/author/…`) are registered before the `/{slug}`
 catch-all — the order is load-bearing. The sitemap hangs off the default
-locale only and lists every language. `_head.py` writes title, meta, OG,
-Twitter, canonical, `hreflang`, `robots` and JSON-LD into the server-rendered
-shell, and `_lang.py` rewrites `<html lang>`, because the host has no SSR.
-Tags shared with `ArticleHead` / `ArchiveHead` use matching Inertia keys to
-avoid duplicates after hydration; server-only tags stay unkeyed so the head
-manager does not remove them. Before Inertia resolves its shared props,
+locale only and lists every language. `_head_pages.py` builds title, meta, OG,
+Twitter, canonical, `hreflang`, `robots` and JSON-LD markup; `_head.py` supplies
+escaping and injects it into the server-rendered shell. `_lang.py` rewrites
+`<html lang>`, because the host has no SSR.
+Each endpoint resolves one `head` prop for both server markup and
+`ArticleHead` / `ArchiveHead` (host replacements should pass `head` unchanged).
+Every meta tag, canonical, `hreflang` alternate, RSS feed link and JSON-LD script
+has a matching Inertia key; the title uses Inertia's special title handling.
+Hydration keeps those values, and client visits replace or remove every tag as
+the current page requires (#462). `og:locale:alternate` names other published
+languages, excluding the current language and `x-default`. The head stays outside
+the optional site-layout language boundary so loading a catalogue cannot remove it.
+Before Inertia resolves its shared props,
 `use_content_locale` overrides the request's reader locale with the content
 locale's available catalogue (exact tag, then primary subtag), so news' public
 strings agree with the address and pagebuilder's frame. If neither catalogue

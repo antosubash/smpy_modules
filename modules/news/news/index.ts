@@ -6,3 +6,4 @@ export type { ArticleHeadProps } from './ui/components/ArticleHead';
 export { ArchiveHead } from './ui/components/ArchiveHead';
 export type { ArchiveHeadProps } from './ui/components/ArchiveHead';
 export { safeJsonLd } from './ui/utils/jsonLd';
+export type { PublicHeadValues } from './ui/components/PublicHead';

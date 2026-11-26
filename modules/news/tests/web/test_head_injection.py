@@ -8,7 +8,7 @@ would warn on every one of them.
 from __future__ import annotations
 
 from fastapi import Response
-from news.web.endpoints.public import _head
+from news.web.endpoints.public import _head, _head_pages
 
 
 def test_it_leaves_a_body_with_no_head_alone() -> None:
@@ -62,7 +62,7 @@ def test_it_leaves_the_body_untouched() -> None:
 
 
 def test_an_empty_value_emits_no_tag() -> None:
-    head = _head.article_head(
+    head = _head_pages.article_head(
         title="T",
         description=None,
         canonical=None,
@@ -82,7 +82,7 @@ def test_an_empty_value_emits_no_tag() -> None:
 
 
 def test_a_listing_head_without_a_feed_omits_autodiscovery() -> None:
-    head = _head.listing_head(
+    head = _head_pages.listing_head(
         title="T", description=None, canonical=None, site_name=None, feed_url=None
     )
 

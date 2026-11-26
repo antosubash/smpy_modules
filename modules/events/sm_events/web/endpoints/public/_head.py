@@ -87,8 +87,7 @@ def _alternate_links(
     returns nothing rather than a lone entry pointing at the document itself.
 
     ``managed`` keys each link ``hreflang-<locale>``, for a client that renders
-    the same set through ``<Head>`` (events' ``PublicHead``); news' does not, so
-    its links stay unkeyed.
+    the same set through ``<Head>`` (news and events both do this).
     """
     return [
         '<link rel="alternate" '

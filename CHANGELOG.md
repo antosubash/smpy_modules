@@ -446,6 +446,10 @@ name the module they affect.
   variable now gets one warning naming it and the setting to store instead, and
   the "media row(s) have no file" warning names `SM_PAGEBUILDER_MEDIA_ROOT` when
   it is set. Values are never logged; the boot does not fail.
+- **news: public head tags follow client-side visits** (#462). Archive and article
+  pages share the server-resolved head values with Inertia, keeping canonical,
+  social, language, feed and structured-data tags current without duplicates or
+  stale tags after navigation.
 - **pagebuilder: warn before overwriting another editor's site layout** (#466).
   Header/footer saves and revision restores send `expected_updated_at`; a stale
   write returns 409 `layout_conflict` without changing the layout or its history.
