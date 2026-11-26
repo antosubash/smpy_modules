@@ -80,6 +80,13 @@ Pagebuilder reads **no** environment variables. The settings class drops every
 env, `.env` and secrets source, so an `SM_PAGEBUILDER_*` line does nothing. A
 value comes from the store or from the default below, and is validated at boot.
 
+A variable with that prefix left in the process environment is reported at boot,
+one warning each, naming the variable (never its value) and the setting to use
+instead (#459). A deployment that set `SM_PAGEBUILDER_MEDIA_ROOT` before 0.0.15
+must store `media_root` and restart: until then media is read from and written to
+the default directory, and the "media row(s) have no file" warning says so. A
+line in a `.env` file is not reported.
+
 Fields marked ● are read once, in `on_startup`, because they decide which routes
 are mounted and what is exempt from login. Changing one needs a restart, and the
 Settings screen says so. Everything else is read per request and applies on save.

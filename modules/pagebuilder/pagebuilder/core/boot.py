@@ -28,7 +28,7 @@ import logging
 from fastapi import FastAPI
 
 from pagebuilder.content.snapshots.blobs import BLOBS_DIR, is_digest
-from pagebuilder.core import locales
+from pagebuilder.core import dead_env, locales
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.media.media_files import (
     MediaFiles,
@@ -185,5 +185,5 @@ async def mount_media(app: FastAPI, settings: PagebuilderSettings) -> None:
         name="pagebuilder_media",
     )
     sm = getattr(app.state, "sm", None)
-    if sm is not None:
-        await warn_on_orphaned_media(sm.db.session_factory, media_root)
+    if sm is not None and await warn_on_orphaned_media(sm.db.session_factory, media_root):
+        dead_env.media_root_hint()

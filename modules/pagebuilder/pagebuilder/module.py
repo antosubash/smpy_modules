@@ -14,7 +14,7 @@ from simple_module_core.menu import MenuRegistry
 from simple_module_core.permissions import PermissionRegistry
 from simple_module_core.public_routes import PublicRouteRegistry
 
-from pagebuilder.core import boot, locales, tenancy
+from pagebuilder.core import boot, dead_env, locales, tenancy
 from pagebuilder.core.settings import PagebuilderSettings
 from pagebuilder.scheduling.scheduler import Scheduler
 from pagebuilder.web import menu
@@ -137,6 +137,8 @@ class PagebuilderModule(ModuleBase):
         from pagebuilder.web.public_origin import warn_if_unset
 
         warn_if_unset(app, settings)
+        # A leftover SM_PAGEBUILDER_* variable does nothing; say so once (#459).
+        dead_env.warn_on_dead_env()
         boot.exempt_public_routes(app, settings)
         boot.mount_public_routers(app, settings)
         await boot.mount_media(app, settings)

@@ -439,6 +439,13 @@ name the module they affect.
 
 ### Fixed
 
+- **pagebuilder: a leftover `SM_PAGEBUILDER_*` environment variable is reported at
+  boot** (#459). Settings are database-backed since 0.0.15, so such a variable does
+  nothing; a deployment that still set `SM_PAGEBUILDER_MEDIA_ROOT` booted, served
+  no images and wrote uploads to the default directory with no hint why. Each
+  variable now gets one warning naming it and the setting to store instead, and
+  the "media row(s) have no file" warning names `SM_PAGEBUILDER_MEDIA_ROOT` when
+  it is set. Values are never logged; the boot does not fail.
 - **news: public head tags follow client-side visits** (#462). Archive and article
   pages share the server-resolved head values with Inertia, keeping canonical,
   social, language, feed and structured-data tags current without duplicates or
