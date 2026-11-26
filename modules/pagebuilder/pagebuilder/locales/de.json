@@ -960,6 +960,8 @@
     "upload_to": "In Ordner hochladen"
   },
   "gallery": {
+    "chunk_failed": "Die Mediathek konnte nicht geladen werden. Prüfen Sie die Verbindung und versuchen Sie es erneut.",
+    "close": "Schließen",
     "description": "Wählen Sie eine hochgeladene Datei. Suchen Sie nach dem Dateinamen oder blättern Sie durch die Mediathek.",
     "empty": "Noch keine Dateien hochgeladen.",
     "file_count_one": "{count} Datei",

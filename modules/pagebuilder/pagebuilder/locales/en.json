@@ -960,6 +960,8 @@
     "upload_to": "Upload to folder"
   },
   "gallery": {
+    "chunk_failed": "The file library could not be loaded. Check your connection and try again.",
+    "close": "Close",
     "description": "Pick an uploaded file. Search by file name, or page through the library.",
     "empty": "No files uploaded yet.",
     "file_count_one": "{count} file",
