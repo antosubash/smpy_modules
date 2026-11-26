@@ -439,6 +439,11 @@ name the module they affect.
 
 ### Fixed
 
+- **pagebuilder: lazy media gallery** (#455). Image fields, the MediaPicker block
+  field and the stats widget now share the lazy gallery used by news, keeping
+  its dialog and list out of public entry chunks. Package-root exports and
+  picker callbacks are unchanged; the gallery loads when first opened.
+
 - **pagebuilder: warn before overwriting another editor's draft** (#448).
   Draft saves and autosave send `expected_updated_at`; a stale write returns
   409 `page_conflict`. The editor pauses saves and offers Reload (discard local
