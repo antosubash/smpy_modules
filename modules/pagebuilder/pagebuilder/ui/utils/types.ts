@@ -89,6 +89,7 @@ export interface LayoutRevisionRead {
 }
 
 export interface LayoutUpdate {
+  expected_updated_at?: string | null;
   header_data?: Record<string, unknown> | null;
   footer_data?: Record<string, unknown> | null;
   note?: string | null;

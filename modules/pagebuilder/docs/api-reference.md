@@ -23,7 +23,7 @@ router-level dependencies, in this order:
    `/pagebuilder/` (the draft preview included) run the same gate.
 
 "Permission" below is the extra `RequiresPermission` check on top; **read** means
-any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; editor writes also carry `"code": "page_conflict"` for stale versions or `"code": "page_not_found"` for missing pages. The table is at the end.
+any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; editor writes also carry `"code": "page_conflict"` for stale versions or `"code": "page_not_found"` for missing pages; layout writes carry `"code": "layout_conflict"` for stale versions. The table is at the end.
 
 ## Pages
 
@@ -224,10 +224,24 @@ A revision that belongs to another page is 404.
 | Route | Permission | Body / returns |
 |---|---|---|
 | `GET /layout` | read | `LayoutDetail` (`id`, `header_data`, `footer_data`, timestamps); created empty on first read |
-| `PUT /layout` | `pagebuilder.edit` | `{"header_data"?, "footer_data"?, "note"?}`; `null`/absent leaves a slot alone. An unchanged save writes no revision. |
+| `PUT /layout` | `pagebuilder.edit` | `{"header_data"?, "footer_data"?, "note"?, "expected_updated_at"?}`; `null`/absent leaves a slot alone. An unchanged save writes no revision. |
 | `GET /layout/revisions` | read | `{"items": [{"id", "layout_id", "note", "created_at", "created_by"}]}` |
 | `GET /layout/revisions/{id}` | read | revision + `header_data`, `footer_data` |
-| `POST /layout/revisions/{id}/restore` | `pagebuilder.edit` | `LayoutDetail` |
+| `POST /layout/revisions/{id}/restore` | `pagebuilder.edit` | Optional `{"expected_updated_at"?}` body; returns `LayoutDetail` |
+
+**Optimistic concurrency** (#466) follows the [page editor's rule](#put-apipagebuilderpagesid--pagebuilderedit):
+send the loaded layout's `updated_at` as `expected_updated_at` on saves and
+revision restores, including `null` for an untouched layout. A stale token
+returns HTTP 409 with
+`{"detail": "This layout was changed elsewhere", "code": "layout_conflict"}`;
+neither slot nor revision history changes. Both slots, including their
+navigation links, share one tenant-scoped version; the layout has no per-locale
+variant. Each successful response supplies the token for the next write.
+Omitting the field (or the restore body) preserves existing API callers and
+allows deliberate Overwrite. The screen pauses writes after a conflict and
+reuses the page editor's Reload (discard all local edits) and Overwrite (save
+both local slots) actions.
+
 
 ## Media
 
