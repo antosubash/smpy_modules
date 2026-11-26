@@ -8,7 +8,7 @@ This writes the copy with the ``<package>/`` step removed.
 
 An editable install serves the source tree, so it keeps the file as written.
 The same file sits in every module that ships an entry point; keep the copies
-identical (``scripts/tests/test_wheel_package_json.py``).
+identical (``scripts/tests/test_wheel_contents.py``).
 """
 
 from __future__ import annotations
