@@ -10,7 +10,7 @@
 
 import { useState } from 'react';
 
-import { FileGallery } from '../../fields/file-picker/file-gallery';
+import { FileGallery } from '../../fields/file-picker/lazy-file-gallery';
 import { mediaLibraryAdapter } from '../../fields/media-adapter';
 import { keys, useT } from '../../utils/i18n';
 

@@ -439,6 +439,11 @@ name the module they affect.
 
 ### Fixed
 
+- **pagebuilder: lazy media gallery** (#455). Image fields, the MediaPicker block
+  field and the stats widget now share the lazy gallery used by news, keeping
+  its dialog and list out of public entry chunks. Package-root exports and
+  picker callbacks are unchanged; the gallery loads when first opened.
+
 - **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
   Main fields, search settings, schedule, review notes and history show the
   server's current state; rejected values are discarded before another save.

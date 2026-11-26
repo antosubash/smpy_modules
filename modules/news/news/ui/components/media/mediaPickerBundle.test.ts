@@ -14,15 +14,10 @@ it('keeps the registered media gallery behind a dynamic import', async () => {
     logLevel: 'error',
     plugins: [
       {
-        name: 'isolate-new-media-picker-imports',
+        name: 'externalize-package-dependencies',
         enforce: 'pre',
         resolveId(source) {
           if (source === '@simple-module-py/pagebuilder') return pagebuilder;
-          // Existing createImageField / StatsView paths already reach the gallery.
-          // Exclude those two legacy paths to guard only the new registration/export.
-          if (/\/(image-picker-field|stats-widget)(\.tsx)?$/.test(source)) {
-            return { id: source, external: true };
-          }
           if (!source.startsWith('.') && !source.startsWith('/')) {
             return { id: source, external: true };
           }

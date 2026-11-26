@@ -1,0 +1,56 @@
+import { fileURLToPath } from 'node:url';
+import { build } from 'vite';
+import { expect, it } from 'vitest';
+
+const entry = fileURLToPath(new URL('../../index.ts', import.meta.url));
+const gallery = '/ui/fields/file-picker/file-gallery.tsx';
+
+it('keeps the package root media gallery behind a dynamic import', async () => {
+  const result = await build({
+    configFile: false,
+    logLevel: 'error',
+    plugins: [
+      {
+        name: 'externalize-package-dependencies',
+        enforce: 'pre',
+        resolveId(source) {
+          if (!source.startsWith('.') && !source.startsWith('/')) {
+            return { id: source, external: true };
+          }
+        },
+      },
+    ],
+    build: {
+      write: false,
+      minify: false,
+      rollupOptions: { input: entry },
+    },
+  });
+  if (!('output' in result)) throw new Error('Expected a single bundle output');
+  const chunks = result.output.filter((output) => output.type === 'chunk');
+  const main = chunks.find((chunk) => chunk.isEntry);
+  expect(main).toBeDefined();
+  const galleryChunk = chunks.find((chunk) =>
+    Object.keys(chunk.modules).some((id) => id.endsWith(gallery)),
+  );
+  expect(galleryChunk).toBeDefined();
+
+  function reachable(dynamic: boolean): Set<string> {
+    const seen = new Set<string>();
+    const pending = [main?.fileName ?? ''];
+    while (pending.length) {
+      const name = pending.pop() as string;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const chunk = chunks.find((item) => item.fileName === name);
+      if (chunk) pending.push(...chunk.imports, ...(dynamic ? chunk.dynamicImports : []));
+    }
+    return seen;
+  }
+
+  expect(
+    reachable(false).has(galleryChunk?.fileName ?? ''),
+    Object.keys(main?.modules ?? {}).join('\n'),
+  ).toBe(false);
+  expect(reachable(true).has(galleryChunk?.fileName ?? '')).toBe(true);
+});
