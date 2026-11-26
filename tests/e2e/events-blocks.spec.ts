@@ -142,12 +142,20 @@ test('the list shows public published events in the event clock, and nothing hid
   }
   const href = await events.getByRole('link', { name: 'Poetry night' }).getAttribute('href');
   expect(href).toMatch(/^\/events\/poetry-night/);
-  await expect(
-    page.locator('[data-events-calendar]').getByTestId('calendar-title'),
-  ).not.toBeEmpty();
-  await expect(
-    page.locator('[data-events-calendar]').getByText('Writing circle').first(),
-  ).toBeVisible();
+  const grid = page.locator('[data-events-calendar]');
+  const title = grid.getByTestId('calendar-title');
+  await expect(title).not.toBeEmpty();
+  // The series starts one to two weeks ahead, which late in a month is past the grid of this
+  // month (it failed from the 26th of November 2026): step forward until the grid shows it.
+  const circle = grid.getByText('Writing circle').first();
+  await page.waitForLoadState('networkidle');
+  for (let step = 0; step < 2 && !(await circle.isVisible()); step++) {
+    const before = await title.textContent();
+    await grid.getByRole('button', { name: 'Next' }).click();
+    await expect(title).not.toHaveText(before ?? '');
+    await page.waitForLoadState('networkidle');
+  }
+  await expect(circle).toBeVisible();
   await shoot(page, '02-public-upcoming', { fullPage: true });
 });
 
