@@ -384,6 +384,7 @@ venv; `make unlink-framework` reverts. Neither touches a tracked file;
 
 ## i18n
 
+- Set `ModuleMeta.i18n_audience="admin"` when no anonymous page, form or embedded block reads that module's shared catalogue; public strings must then come from server copy or a bundled catalogue (events' `PageLocale` is the reference).
 - **Console UI is English and German in all nine modules**: `locales/en.json` and
   `de.json`, every string through `t(keys.<module>.<section>.<key>)`, no
   `defaultValue`. Add a key to every catalogue at once. A runtime-chosen family

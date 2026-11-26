@@ -1,6 +1,6 @@
 /** Framework transport supplies same-origin credentials and the session CSRF token. */
 import { type ApiFetchInit, apiFetch, NETWORK_FAILURE } from '@simple-module-py/ui/lib/api';
-import { keys, translate as t } from './i18n';
+import { keys, type Translate, translate } from './i18n';
 import { EVENT_MAX_DAYS, SERIES_EVENT_MAX_DAYS } from './limits';
 import type { Calendar, CalendarInput, Category, CategoryInput, Visibility } from './types';
 
@@ -46,8 +46,10 @@ export const isGone = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 404;
 
 /** The message for a failed request. `gone` words a 404 for this screen's
- *  subject ("This calendar no longer exists.") instead of the generic one. */
-export function errorText(error: unknown, gone?: string): string {
+ *  subject ("This calendar no longer exists.") instead of the generic one. A
+ *  component that anonymous visitors reach passes its own `t`: theirs speaks the
+ *  page's language, and the shared catalogue no longer carries this module (#417). */
+export function errorText(error: unknown, gone?: string, t: Translate = translate): string {
   const messages: Record<string, string> = {
     slug_taken: keys.events.errors.slug_taken,
     owner_required: keys.events.errors.owner_required,
@@ -109,7 +111,7 @@ export function errorText(error: unknown, gone?: string): string {
   };
   if (!(error instanceof ApiError)) return t(keys.events.errors.generic);
   if (gone && error.status === 404) return t(gone);
-  if (error.status === 429) return rateLimitText(error.retryAfter);
+  if (error.status === 429) return rateLimitText(error.retryAfter, t);
   if (error.code === 'duration_too_long') {
     return t(messages.duration_too_long as string, {
       oneOff: EVENT_MAX_DAYS,
@@ -124,7 +126,7 @@ export function errorText(error: unknown, gone?: string): string {
   return t(keys.events.errors.generic);
 }
 
-function rateLimitText(seconds: number | null): string {
+function rateLimitText(seconds: number | null, t: Translate): string {
   return seconds === null
     ? t(keys.events.errors.requests_limited_soon)
     : t(keys.events.errors.requests_limited, { count: seconds });
@@ -133,6 +135,7 @@ function rateLimitText(seconds: number | null): string {
 /** The message for a failed people search: a 429 says "searches", anything else is `errorText`. */
 export function searchErrorText(error: unknown, gone?: string): string {
   if (!(error instanceof ApiError) || error.status !== 429) return errorText(error, gone);
+  const t = translate;
   return error.retryAfter === null
     ? t(keys.events.errors.rate_limited_soon)
     : t(keys.events.errors.rate_limited, { count: error.retryAfter });

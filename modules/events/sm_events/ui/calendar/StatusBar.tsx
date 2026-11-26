@@ -48,7 +48,7 @@ export function StatusBar({
           role="alert"
           className="flex flex-wrap items-center gap-2 text-destructive dark:text-red-400"
         >
-          <span>{errorText(error)}</span>
+          <span>{errorText(error, undefined, t)}</span>
           <Button type="button" size="sm" variant="outline" onClick={onRetry}>
             {t(keys.events.common.retry)}
           </Button>

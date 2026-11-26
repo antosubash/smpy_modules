@@ -271,6 +271,14 @@ derive them from the module's own `en.json` at compile time: copy
 labels hold the key and are resolved at render (each module's
 `localizeConfig.ts`).
 
+Set `ModuleMeta.i18n_audience="admin"` unless anonymous pages, forms or embedded
+blocks need the module's shared catalogue. This withholds its strings from
+anonymous Inertia props; every signed-in user still receives them, and server
+translations remain available. Public UI can instead use server-provided copy
+or events' bundled `PageLocale` pattern (English bundled, German lazy-loaded).
+Audit shared components and public block renderers before switching an existing
+module; an English fallback alone does not preserve German translations.
+
 ## 11. Copied helpers stay in step
 
 When the module copies a helper another module already has (tenancy, the

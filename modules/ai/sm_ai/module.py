@@ -33,6 +33,7 @@ class AiModule(ModuleBase):
         view_prefix=constants.VIEW_PREFIX,
         depends_on=[constants._MODULE_SETTINGS],
         version=_VERSION,
+        i18n_audience="admin",
         # The framework API version (1.0.0) is decoupled from the framework
         # package version (0.0.x) — this range is correct as written.
         requires_framework=">=1.0,<2.0",

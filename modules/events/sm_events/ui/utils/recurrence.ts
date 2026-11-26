@@ -1,7 +1,7 @@
 /** The recurrence editor's model: a small subset of RRULE that a form can show,
  *  and the text the server stores (`sm_events/calendar/rrule.py` is the judge).
  *  A stored rule outside the subset is `{ custom }` and is edited as raw text. */
-import { keys, translate as t } from './i18n';
+import { keys, type Translate, translate } from './i18n';
 
 export const WEEKDAYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
@@ -211,8 +211,14 @@ const ORDINAL = {
   '-1': keys.events.recurrence.ordinal.last,
 } as const;
 
-/** A sentence for the rule: "Every week on Monday and Wednesday, 10 times". */
-export function summarise(rule: RuleForm | Custom, start: string, locale?: string): string {
+/** A sentence for the rule: "Every week on Monday and Wednesday, 10 times". A public
+ *  page passes its own `t`, which speaks the page's language (#417). */
+export function summarise(
+  rule: RuleForm | Custom,
+  start: string,
+  locale?: string,
+  t: Translate = translate,
+): string {
   if (isCustom(rule)) return t(keys.events.recurrence.custom_summary, { rule: rule.custom });
   const copy = keys.events.recurrence;
   const { day, weekday } = startParts(start);

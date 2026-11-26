@@ -10,15 +10,15 @@ import { RichText } from '../ui/public/RichText';
 import { SubEvents } from '../ui/public/SubEvents';
 import type { PublicEventProps } from '../ui/public/types';
 import { localSpan } from '../ui/utils/datetime';
-import { keys, useT } from '../ui/utils/i18n';
+import { keys, type Translate, useT } from '../ui/utils/i18n';
 import { PageLocale } from '../ui/utils/PageLocale';
 import { parseRule, summarise } from '../ui/utils/recurrence';
 
 /** The rule as a sentence, from the normalised text and the first start, in the page's language. */
-function ruleText(p: PublicEventProps): string {
+function ruleText(p: PublicEventProps, t: Translate): string {
   if (!p.series) return '';
   const rule = parseRule(p.series.rule, p.series.start_local, p.timezone);
-  return rule ? summarise(rule, p.series.start_local, p.locale) : p.series.rule;
+  return rule ? summarise(rule, p.series.start_local, p.locale, t) : p.series.rule;
 }
 
 function PublicEventPage(p: PublicEventProps) {
@@ -57,7 +57,7 @@ function PublicEventPage(p: PublicEventProps) {
         {p.series ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              {t(copy.series)}: {ruleText(p)}
+              {t(copy.series)}: {ruleText(p, t)}
             </p>
             <h3 className="text-sm font-semibold">{t(copy.next_dates)}</h3>
             <ul className="space-y-1">
