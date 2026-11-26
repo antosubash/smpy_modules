@@ -14,6 +14,7 @@ export function ArchiveHead({ head, heading, query = '' }: ArchiveHeadProps) {
   const { t } = useT();
   const copy = keys.news.public;
   if (head) return <PublicHead head={head} />;
+  // Hosts using the original package export may not yet pass the resolved head.
   return (
     <Head title={query ? t(copy.title_with_query, { query, heading }) : heading}>
       {/* Results pages stay out of the index: the input space is unbounded,

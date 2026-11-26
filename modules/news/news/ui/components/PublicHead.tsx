@@ -86,6 +86,7 @@ export function PublicHead({
       {canonical && <link head-key="canonical" rel="canonical" href={canonical} />}
       {robots && <meta head-key="robots" name="robots" content={robots} />}
       {locale && <meta head-key="og:locale" property="og:locale" content={locale} />}
+      {/* OG lists other languages; x-default is a fallback URL, not a language. */}
       {alternates
         .filter((a) => a.locale !== locale && a.locale !== 'x-default')
         .map((a) => (

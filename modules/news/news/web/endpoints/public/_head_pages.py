@@ -14,6 +14,7 @@ def _locale_links(
     parts = _head._alternate_links(alternates, managed=True)
     for entry in alternates or []:
         language = entry["locale"]
+        # OG lists other languages; x-default is a fallback URL, not a language.
         if language not in {locale, "x-default"}:
             parts.append(
                 '<meta property="og:locale:alternate" '

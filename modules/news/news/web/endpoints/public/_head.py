@@ -1,4 +1,4 @@
-"""Server-rendered metadata for the pages news serves to the public.
+"""Shared head escaping and injection; the page renderers are in ``_head_pages``.
 
 The host renders one Inertia shell for every screen: a fixed
 ``<title>SimpleModule</title>`` and a ``{% inertia_head %}`` slot that only
@@ -31,8 +31,6 @@ import re
 from typing import Any
 
 from fastapi import Response
-
-from news.web.endpoints.public._head_pages import article_head, listing_head  # noqa: F401
 
 _CLOSE_HEAD = b"</head>"
 

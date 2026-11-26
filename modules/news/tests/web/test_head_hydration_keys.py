@@ -7,13 +7,15 @@ All other elements must be managed, or they survive a client-side visit.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from html.parser import HTMLParser
+from pathlib import Path
 
 import pytest
 from news.core import settings as news_settings
 from news.core.settings import NewsSettings
-from news.web.endpoints.public import _head
+from news.web.endpoints.public import _head_pages
 
 from tests.support.factories import make_article
 
@@ -58,16 +60,31 @@ def test_every_emitted_tag_is_managed(article):
         ],
     }
     if article:
-        markup = _head.article_head(
+        markup = _head_pages.article_head(
             **values, image="https://example.org/cover.png", twitter_handle="@site",
             published_at="2026-01-01", author="Ada", section="Trees", index_in_search=False,
             json_ld={"headline": "</script><!--"},
+            feed_url="https://example.org/news/feed.xml",
         )
     else:
-        markup = _head.listing_head(**values, feed_url="https://example.org/news/feed.xml")
+        markup = _head_pages.listing_head(**values, feed_url="https://example.org/news/feed.xml")
     keyed = Head(markup).keyed()
     required = {"canonical", "og:title", "og:type", "og:url", "og:locale", "hreflang-de"}
     assert required <= keyed.keys()
+    if article:
+        # Compare the two implementations directly; hand-written DOM fixtures alone
+        # would still pass if a server key changed without updating the client.
+        source = (
+            Path(__file__).resolve().parents[2]
+            / "news/ui/components/PublicHead.tsx"
+        ).read_text(encoding="utf-8")
+        literal_keys = set(re.findall(r'head-key="([^"]+)"', source))
+        assert set(re.findall(r'head-key=\{`([^`]+)`\}', source)) == {
+            "hreflang-${a.locale}", "og:locale:alternate-${a.locale}",
+        }
+        assert set(keyed) == literal_keys | {
+            "hreflang-en", "hreflang-de", "hreflang-x-default", "og:locale:alternate-de",
+        }
 
 
 async def check_props(client, path, *, article):

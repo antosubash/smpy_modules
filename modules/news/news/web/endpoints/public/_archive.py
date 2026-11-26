@@ -24,7 +24,7 @@ from news.content import service
 from news.core import constants, locales
 from news.core.settings import NewsSettings, active, public_feed_path
 from news.integrations.pagebuilder import public_layout_props
-from news.web.endpoints.public import _head
+from news.web.endpoints.public import _head, _head_pages
 from news.web.endpoints.public._lang import set_html_lang
 from news.web.endpoints.public._not_found import NO_SUCH_PAGE, not_found
 from news.web.endpoints.public._paging import MAX_PAGE
@@ -250,7 +250,7 @@ async def render_archive(
     )
     response = _head.inject(
         set_html_lang(rendered, locale),
-        _head.listing_head(**head),
+        _head_pages.listing_head(**head),
     )
     apply_cache(response, request, settings, listing=True, per_viewer=True)
     response.headers["Content-Language"] = locale

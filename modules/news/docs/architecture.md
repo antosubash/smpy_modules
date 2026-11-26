@@ -150,9 +150,10 @@ each from auth (prefix with trailing slash, plus the bare path exactly).
 Inside one router, fixed paths (`feed.xml`, `sitemap.xml`, `/`,
 `/category/…`, `/tag/…`, `/author/…`) are registered before the `/{slug}`
 catch-all — the order is load-bearing. The sitemap hangs off the default
-locale only and lists every language. `_head.py` writes title, meta, OG,
-Twitter, canonical, `hreflang`, `robots` and JSON-LD into the server-rendered
-shell, and `_lang.py` rewrites `<html lang>`, because the host has no SSR.
+locale only and lists every language. `_head_pages.py` builds title, meta, OG,
+Twitter, canonical, `hreflang`, `robots` and JSON-LD markup; `_head.py` supplies
+escaping and injects it into the server-rendered shell. `_lang.py` rewrites
+`<html lang>`, because the host has no SSR.
 Each endpoint resolves one `head` prop for both server markup and
 `ArticleHead` / `ArchiveHead` (host replacements should pass `head` unchanged).
 Every meta tag, canonical, `hreflang` alternate, RSS feed link and JSON-LD script

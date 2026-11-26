@@ -27,7 +27,7 @@ from news.core import constants
 from news.core.safe_url import image_or_none
 from news.core.settings import NewsSettings, public_author_path, public_feed_path
 from news.models import ArticleStatus, NewsArticle
-from news.web.endpoints.public import _head
+from news.web.endpoints.public import _head, _head_pages
 from news.web.endpoints.public._lang import set_html_lang
 
 
@@ -140,5 +140,5 @@ async def render_article(
     # into the document server-side — see `_head` for why both are needed.
     return _head.inject(
         set_html_lang(rendered, locale),
-        _head.article_head(**head),
+        _head_pages.article_head(**head),
     )

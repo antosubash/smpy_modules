@@ -59,8 +59,7 @@ export const articleHead = {
     { locale: 'de', url: 'https://example.test/de/news/geschichte' },
   ],
 };
-// Literal server markup, independent of the client renderer.
-// Literal server markup: catching an unkeyed server tag requires starting with it present.
+// Independent server markup: catching an unkeyed tag requires starting with it present.
 export const archiveServerHead = `<title>Archive — Site</title>
     <link rel="canonical" data-inertia="canonical" href="https://example.test/news/">
     <meta name="description" data-inertia="description" content="All stories">

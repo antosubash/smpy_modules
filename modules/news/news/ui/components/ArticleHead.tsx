@@ -1,6 +1,6 @@
 import { PublicHead, type PublicHeadValues } from './PublicHead';
 
-/** Metadata shared by the stock article page and host replacements. */
+/** Metadata for stock pages and host replacements; legacy props remain public API. */
 export interface ArticleHeadProps {
   /** Pass the endpoint's head prop unchanged to preserve server/client parity. */
   head?: PublicHeadValues;
