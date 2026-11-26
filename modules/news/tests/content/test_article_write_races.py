@@ -128,7 +128,9 @@ async def test_a_stored_hostless_url_is_not_rendered(editor_public_client, bad: 
     page = await editor_public_client.get("/news/legacy-hostless")
     assert page.status_code == 200
     assert bad not in page.text
-    assert 'rel="canonical" href="http://test/news/legacy-hostless"' in page.text
+    assert (
+        'rel="canonical" data-inertia="canonical" href="http://test/news/legacy-hostless"'
+    ) in page.text
     assert 'property="og:image"' not in page.text
 
 

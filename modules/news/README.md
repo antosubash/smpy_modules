@@ -234,10 +234,12 @@ do not — so an article link previewed as "SimpleModule" with no description an
 no image, and an article marked `index_in_search=false` was indexed anyway
 because the `noindex` never reached the crawler either.
 
-`endpoints/public/_head.py` writes them in on the way out. The tags are
-duplicated with the client-side ones on purpose: one copy serves the crawler
-that never runs the script, the other serves the reader who arrived through the
-SPA and never reloaded, and neither covers the other's case. If the host ever
+`endpoints/public/_head.py` writes them in on the way out. The client-side
+`<Head>` renders the same tags on purpose: one copy serves the crawler that
+never runs the script, the other serves the reader who arrived through the SPA
+and never reloaded, and neither covers the other's case. Each pair shares a key
+(`data-inertia` on the server tag, `head-key` on the client one), so after
+hydration the document holds one of each (#451). If the host ever
 adopts SSR, `{% inertia_head %}` starts emitting the same tags and that module
 should be deleted rather than made cleverer.
 
@@ -289,7 +291,9 @@ ordered pinned first, then newest, with undated articles last;
 `undated_first=true` flips the undated to the front, which is what the admin
 list uses so work in progress is not buried on the last page. An editor
 additionally sees drafts. Each item carries `status`, which the admin list
-renders as a badge; without `news.edit` it is always `published`.
+renders as a status sentence; without `news.edit` it is always `published`. A
+draft with a go-live time also carries `scheduled_at` for a caller who may see
+drafts, and the list says "scheduled for"; everyone else gets `null`.
 
 An editor's items also carry `has_unpublished_changes` — the article is live
 and its draft has since moved on, so what you are looking at is not what

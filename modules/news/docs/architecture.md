@@ -153,6 +153,13 @@ catch-all — the order is load-bearing. The sitemap hangs off the default
 locale only and lists every language. `_head.py` writes title, meta, OG,
 Twitter, canonical, `hreflang`, `robots` and JSON-LD into the server-rendered
 shell, and `_lang.py` rewrites `<html lang>`, because the host has no SSR.
+Tags shared with `ArticleHead` / `ArchiveHead` use matching Inertia keys to
+avoid duplicates after hydration; server-only tags stay unkeyed so the head
+manager does not remove them. Before Inertia resolves its shared props,
+`use_content_locale` overrides the request's reader locale with the content
+locale's available catalogue (exact tag, then primary subtag), so news' public
+strings agree with the address and pagebuilder's frame. If neither catalogue
+is loaded, the reader's locale stays in place.
 The article body itself is rendered client-side.
 
 ## Settings

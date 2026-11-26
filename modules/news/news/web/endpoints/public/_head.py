@@ -35,8 +35,27 @@ from fastapi import Response
 _CLOSE_HEAD = b"</head>"
 
 
-def _tag(name: str, value: str | None, *, prop: bool = False) -> str:
+# The attribute Inertia's head manager keys on. An element in ``document.head``
+# carrying it is *managed*: on hydration the client's ``<Head>`` replaces the
+# managed element with the same key instead of appending a second copy, and
+# removes one the page no longer renders. An element without it is invisible to
+# the manager, so a client tag beside it is simply added: two canonicals, two of
+# every ``og:`` tag. The React side sets the same key through ``head-key``
+# (``ArticleHead``, ``ArchiveHead``); the two must agree, and only tags the
+# client also renders may carry it, or hydration deletes a server-only tag.
+_MANAGED = "data-inertia"
+KEY_CANONICAL = "canonical"
+KEY_ROBOTS = "robots"
+KEY_JSON_LD = "json-ld"
+
+
+def _tag(
+    name: str, value: str | None, *, prop: bool = False, managed: bool = False
+) -> str:
     """One meta tag, or nothing when the value is empty.
+
+    ``managed`` marks a tag the client's ``<Head>`` renders under the same key
+    (the tag's own name), so hydration adopts it rather than duplicating it.
 
     The value is HTML-escaped with ``quote=True``: these are author-written
     strings landing in an attribute, and a headline containing a quotation mark
@@ -46,10 +65,13 @@ def _tag(name: str, value: str | None, *, prop: bool = False) -> str:
     if not value:
         return ""
     key = "property" if prop else "name"
-    return f'<meta {key}="{name}" content="{html.escape(value, quote=True)}">'
+    keyed = f' {_MANAGED}="{name}"' if managed else ""
+    return f'<meta {key}="{name}"{keyed} content="{html.escape(value, quote=True)}">'
 
 
-def _alternate_links(alternates: list[dict[str, str]] | None) -> list[str]:
+def _alternate_links(
+    alternates: list[dict[str, str]] | None, *, managed: bool = False
+) -> list[str]:
     """``hreflang`` links for a document that exists in several languages.
 
     Server-rendered rather than left to Inertia's ``<Head>`` for the same reason
@@ -59,10 +81,15 @@ def _alternate_links(alternates: list[dict[str, str]] | None) -> list[str]:
 
     Empty for a monolingual site — see ``alternates`` in ``_article``, which
     returns nothing rather than a lone entry pointing at the document itself.
+
+    ``managed`` keys each link ``hreflang-<locale>``, for a client that renders
+    the same set through ``<Head>`` (events' ``PublicHead``); news' does not, so
+    its links stay unkeyed.
     """
     return [
         '<link rel="alternate" '
-        f'hreflang="{html.escape(entry["locale"], quote=True)}" '
+        + (f'{_MANAGED}="hreflang-{html.escape(entry["locale"], quote=True)}" ' if managed else "")
+        + f'hreflang="{html.escape(entry["locale"], quote=True)}" '
         f'href="{html.escape(entry["url"], quote=True)}">'
         for entry in alternates or []
     ]
@@ -93,21 +120,21 @@ def article_head(
     """
     parts = [
         f"<title>{html.escape(title)}</title>",
-        _tag("description", description),
-        _tag("og:title", title, prop=True),
-        _tag("og:description", description, prop=True),
+        _tag("description", description, managed=True),
+        _tag("og:title", title, prop=True, managed=True),
+        _tag("og:description", description, prop=True, managed=True),
         # ``article``, not ``website``: the whole reason this module took its
         # own address is that these documents are not generic pages.
-        _tag("og:type", "article", prop=True),
-        _tag("og:url", canonical, prop=True),
-        _tag("og:site_name", site_name, prop=True),
-        _tag("og:image", image, prop=True),
-        _tag("article:published_time", published_at, prop=True),
-        _tag("article:author", author, prop=True),
-        _tag("article:section", section, prop=True),
-        _tag("twitter:card", "summary_large_image" if image else "summary"),
-        _tag("twitter:image", image),
-        _tag("twitter:site", twitter_handle),
+        _tag("og:type", "article", prop=True, managed=True),
+        _tag("og:url", canonical, prop=True, managed=True),
+        _tag("og:site_name", site_name, prop=True, managed=True),
+        _tag("og:image", image, prop=True, managed=True),
+        _tag("article:published_time", published_at, prop=True, managed=True),
+        _tag("article:author", author, prop=True, managed=True),
+        _tag("article:section", section, prop=True, managed=True),
+        _tag("twitter:card", "summary_large_image" if image else "summary", managed=True),
+        _tag("twitter:image", image, managed=True),
+        _tag("twitter:site", twitter_handle, managed=True),
         # The bare language tag, not a full ``ll_CC`` locale: content locales
         # here are BCP-47 and often just ``de``, and inventing a region to fill
         # the Open Graph shape would claim something nobody configured.
@@ -115,12 +142,15 @@ def article_head(
     ]
     parts.extend(_alternate_links(alternates))
     if canonical:
-        parts.append(f'<link rel="canonical" href="{html.escape(canonical, quote=True)}">')
+        parts.append(
+            f'<link rel="canonical" {_MANAGED}="{KEY_CANONICAL}" '
+            f'href="{html.escape(canonical, quote=True)}">'
+        )
     if not index_in_search:
-        parts.append('<meta name="robots" content="noindex,nofollow">')
+        parts.append(f'<meta name="robots" {_MANAGED}="{KEY_ROBOTS}" content="noindex,nofollow">')
     if json_ld:
         parts.append(
-            '<script type="application/ld+json">'
+            f'<script type="application/ld+json" {_MANAGED}="{KEY_JSON_LD}">'
             f"{_safe_json_ld(json_ld)}</script>"
         )
     return "".join(part for part in parts if part)
@@ -163,7 +193,7 @@ def listing_head(
         _tag("og:url", canonical, prop=True),
         _tag("og:site_name", site_name, prop=True),
         _tag("og:locale", locale, prop=True),
-        _tag("robots", robots),
+        _tag("robots", robots, managed=True),
     ]
     parts.extend(_alternate_links(alternates))
     if canonical:

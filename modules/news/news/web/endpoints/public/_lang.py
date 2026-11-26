@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Awaitable, Callable
 
-from fastapi import Response
+from fastapi import Request, Response
 
 # ``\s`` before ``lang``, not ``\b``: ``xml:lang=`` and ``data-lang=`` are
 # other attributes, and ``\b`` would match inside either.
@@ -42,3 +43,36 @@ def set_html_lang(response: Response, locale: str) -> Response:
         response.body = patched
         response.headers["content-length"] = str(len(patched))
     return response
+
+
+def use_content_locale(locale: str) -> Callable[[Request], Awaitable[None]]:
+    """A route dependency that serves the page's strings in ``locale`` (#450).
+
+    The framework ships one catalogue with a page, chosen for the *reader* (the
+    ``locale`` cookie, then ``Accept-Language``). ``/de/news/`` is a German
+    address, so a visitor whose browser says English got a German page with the
+    module's own words in English, beside pagebuilder's German chrome, which
+    reads its strings for the content locale instead. The page is the same for
+    every visitor to an address, which is also what lets a shared cache hold it.
+
+    Setting ``request.state.locale`` is enough, because the shared props are
+    built lazily at render time from it. It must run before the endpoint's own
+    ``InertiaDep`` resolves them, which a router-level dependency does.
+
+    A content locale the console has no catalogue for (a site publishing in
+    ``fr`` while the host ships ``en`` and ``de``) keeps the reader's language
+    rather than a catalogue of raw keys; ``de-at`` falls back to ``de``.
+    """
+
+    async def dependency(request: Request) -> None:
+        registry = getattr(getattr(request.app.state, "sm", None), "i18n_registry", None)
+        if registry is None:
+            return
+        available = {tag.lower(): tag for tag in registry.available_locales()}
+        wanted = locale.lower()
+        for tag in (wanted, wanted.split("-", 1)[0]):
+            if tag in available:
+                request.state.locale = available[tag]
+                return
+
+    return dependency

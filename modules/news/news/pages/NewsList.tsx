@@ -62,6 +62,8 @@ export default function NewsList() {
     LocaleProps;
   const { auth } = props;
   const canEdit = auth?.permissions?.includes('news.edit');
+  // Publishing is its own permission; the server answers 403 without it.
+  const canPublish = auth?.permissions?.includes('news.publish') ?? false;
   const locales = props.locales ?? [];
   const defaultLocale = props.default_locale ?? 'en';
 
@@ -177,6 +179,7 @@ export default function NewsList() {
               article={article}
               busy={busyId === article.id || busy || !canEdit}
               suggestionsId={CATEGORY_SUGGESTIONS_ID}
+              canPublish={canPublish}
               onSave={(id, category, publishedAt) =>
                 runRow(id, () => updateArticle(id, { category, published_at: publishedAt }))
               }

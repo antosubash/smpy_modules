@@ -41,6 +41,7 @@ from sm_events.web.endpoints.public._respond import conditional
 from sm_events.web.endpoints.public._tenant import public_tenant
 from sm_events.web.schemas.public import (
     AlternateOut,
+    HeadOut,
     PublicCalendarOut,
     PublicCategoryOut,
     PublicIndexProps,
@@ -135,6 +136,15 @@ async def _render(
         api_url=_urls.api_path(),
         alternates=_alternates(request, calendar),
     )
+    canonical = _urls.absolute(request, _path(locale, calendar) + _query(category, page))
+    props.head = HeadOut(
+        title=props.title,
+        description=calendar.description if calendar else None,
+        canonical=canonical,
+        image=None,
+        robots=None,
+        feed_url=_urls.absolute(request, props.feed_url),
+    )
     body = props.model_dump(mode="json")
     digest = hashlib.sha256(props.model_dump_json().encode()).hexdigest()
     variant = "inertia" if request.headers.get("x-inertia") else "html"
@@ -142,14 +152,15 @@ async def _render(
     if (unchanged := conditional(request, settings, kind="listing", etag=etag)) is not None:
         return unchanged
     response = await inertia.render(constants._PAGE_PUBLIC_INDEX, body)
-    canonical = _urls.absolute(request, _path(locale, calendar) + _query(category, page))
+    values = props.head
     head = _head.listing_head(
-        title=props.title,
-        description=calendar.description if calendar else None,
-        canonical=canonical,
-        feed_url=_urls.absolute(request, props.feed_url),
+        title=values.title,
+        description=values.description,
+        canonical=values.canonical,
+        feed_url=values.feed_url,
         locale=locale,
         alternates=[a.model_dump() for a in props.alternates],
+        robots=values.robots,
     )
     response = _head.inject(_head.set_html_lang(response, locale), head)
     response.headers["Content-Language"] = locale

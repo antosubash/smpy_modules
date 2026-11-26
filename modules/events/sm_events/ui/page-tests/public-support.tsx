@@ -1,5 +1,17 @@
 /** Fixtures for the public screens' tests. */
-import type { PublicIndexProps, PublicListItem } from '../public/types';
+import type { HeadValues, PublicIndexProps, PublicListItem } from '../public/types';
+
+export function headValues(title: string, overrides: Partial<HeadValues> = {}): HeadValues {
+  return {
+    title,
+    description: null,
+    canonical: null,
+    image: null,
+    robots: null,
+    feed_url: null,
+    ...overrides,
+  };
+}
 
 export function item(overrides: Partial<PublicListItem> = {}): PublicListItem {
   return {
@@ -53,6 +65,7 @@ export function indexProps(overrides: Partial<PublicIndexProps> = {}): PublicInd
     default_timezone: 'Europe/Vienna',
     api_url: '/events/api/occurrences',
     alternates: [],
+    head: headValues('Events', { feed_url: 'https://x.example/events/calendar.ics' }),
     ...overrides,
   };
 }

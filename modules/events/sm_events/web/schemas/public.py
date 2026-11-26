@@ -140,6 +140,23 @@ class AlternateOut(BaseModel):
     url: str
 
 
+class HeadOut(BaseModel):
+    """The values the server writes into the document head, handed to the page so ``PublicHead``
+    renders exactly these (same keys, same attribute values) and recomputes nothing: hydration
+    replaces a keyed server tag with the client's, so any difference would show. Everything here is
+    already in the page's HTML head."""
+
+    title: str
+    description: str | None
+    canonical: str | None
+    image: str | None
+    """Absolute, as ``og:image`` needs."""
+    robots: str | None
+    """The whole directive (``noindex,nofollow``), or ``None`` for no tag."""
+    feed_url: str | None
+    """Absolute calendar feed address, for autodiscovery; listing pages only."""
+
+
 class PublicIndexProps(BaseModel):
     locale: str
     title: str
@@ -155,6 +172,8 @@ class PublicIndexProps(BaseModel):
     default_timezone: str
     api_url: str
     alternates: list[AlternateOut]
+    head: HeadOut | None = None
+    """Set by the endpoint, which resolves it with the values it writes into the head."""
 
 
 # --- the pagebuilder blocks' routes (``/api/events/public/*``) ------------------------------

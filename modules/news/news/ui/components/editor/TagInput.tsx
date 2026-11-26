@@ -66,7 +66,7 @@ export function TagInput({ tags, disabled = false, suggestions, onChange }: Prop
         list={SUGGESTIONS_ID}
         value={draft}
         disabled={disabled}
-        className="h-7 w-28 border-dashed"
+        className="h-7 w-36 border-dashed"
         onChange={(e) => {
           const value = e.target.value;
           if (value.endsWith(',')) add(value);

@@ -36,7 +36,7 @@ class TestItIsNotForReaders:
 
         body = (await editor_client.get(preview_of(article.id))).text
 
-        assert '<meta name="robots" content="noindex,nofollow">' in body
+        assert '<meta name="robots" data-inertia="robots" content="noindex,nofollow">' in body
 
     async def test_it_says_noindex_in_a_header_too(self, editor_client) -> None:
         """The head is written into the document, and ``_head.inject`` has

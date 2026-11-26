@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { afterEach, expect, it, vi } from 'vitest';
+import { headValues } from '../page-tests/public-support';
 import { mount } from '../page-tests/test-dom';
 
 vi.mock('@inertiajs/react', () => ({
@@ -15,7 +16,7 @@ afterEach(() => {
 it('writes JSON-LD that cannot break out of its script', async () => {
   const evil = '</script><script>alert(1)</script>';
   const view = await mount(
-    <PublicHead title="T" locale="en" jsonLd={{ '@type': 'Event', name: evil }} />,
+    <PublicHead head={headValues('T')} locale="en" jsonLd={{ '@type': 'Event', name: evil }} />,
   );
   const scripts = view.all('script');
   expect(scripts).toHaveLength(1);
@@ -24,18 +25,20 @@ it('writes JSON-LD that cannot break out of its script', async () => {
   expect(view.host.innerHTML).not.toContain('<script>alert');
 });
 
-it('mirrors the server head: canonical, hreflang, robots, feed', async () => {
+it('renders the server head values verbatim: canonical, hreflang, robots, feed', async () => {
+  document.head.replaceChildren();
   await mount(
     <PublicHead
-      title="T"
+      head={headValues('T', {
+        canonical: 'https://x.example/events/a',
+        robots: 'noindex,follow',
+        feed_url: 'https://x.example/events/calendar.ics',
+      })}
       locale="de"
-      canonical="https://x.example/events/a"
       alternates={[
         { locale: 'en', url: 'https://x.example/events/a' },
         { locale: 'x-default', url: 'https://x.example/events/a' },
       ]}
-      noindex
-      feedUrl="/events/calendar.ics"
     />,
   );
   expect(document.querySelector('link[rel=canonical]')?.getAttribute('href')).toBe(
@@ -47,9 +50,9 @@ it('mirrors the server head: canonical, hreflang, robots, feed', async () => {
     ),
   ).toEqual(['en', 'x-default']);
   expect(document.querySelector('meta[name=robots]')?.getAttribute('content')).toBe(
-    'noindex,nofollow',
+    'noindex,follow',
   );
   expect(document.querySelector('link[type="text/calendar"]')?.getAttribute('href')).toBe(
-    '/events/calendar.ics',
+    'https://x.example/events/calendar.ics',
   );
 });
