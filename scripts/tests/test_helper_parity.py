@@ -8,6 +8,8 @@ copies that need more than a source comparison.
 from __future__ import annotations
 
 import ast
+import asyncio
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -38,6 +40,30 @@ def test_use_mounted_ref_is_byte_identical() -> None:
     news = (REPO / NEWS / "ui/hooks/useMountedRef.ts").read_bytes()
     pagebuilder = (REPO / PB / "ui/hooks/useMountedRef.ts").read_bytes()
     assert news == pagebuilder
+
+
+@pytest.mark.parametrize(
+    ("package", "error_name", "code"),
+    [(NEWS, "ArticleConflict", "article_conflict"), (PB, "PageConflict", "page_conflict")],
+)
+def test_draft_conflicts_keep_the_same_error_envelope(package, error_name, code) -> None:
+    """Wording and extra news handlers differ; stale-write responses must not."""
+    from fastapi import FastAPI
+
+    # Load the standalone helper without importing either optional module's models.
+    spec = importlib.util.spec_from_file_location(
+        "conflict_errors", REPO / package / "core/errors.py"
+    )
+    assert spec is not None and spec.loader is not None
+    errors = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(errors)
+    app = FastAPI()
+    errors.install_exception_handlers(app)
+    error = getattr(errors, error_name)()
+    response = asyncio.run(app.exception_handlers[type(error)](None, error))
+    assert response.status_code == 409
+    assert isinstance(error.detail, str) and error.detail
+    assert json.loads(response.body) == {"detail": error.detail, "code": code}
 
 
 def _literal(path: str, name: str) -> object:

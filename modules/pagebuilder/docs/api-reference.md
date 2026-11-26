@@ -128,7 +128,7 @@ A stale token returns HTTP 409 with
 `{"detail": "This page was changed elsewhere", "code": "page_conflict"}` and
 changes nothing. Instants are compared in UTC, including equivalent offsets.
 
-The editor serializes draft saves (autosave included) and its other writes,
+The editor serializes draft saves (autosave included) and workflow writes,
 using each successful response's `updated_at` for the next write. Publish,
 unpublish, submit, approve, reject, schedule and revision restore accept the
 same optional `expected_updated_at` in their JSON body. Settings/SEO and
@@ -137,11 +137,10 @@ publish/workflow snapshots, so their ids cannot version ordinary draft saves.
 
 **Compatibility:** API consumers and bundles that omit the token keep the
 existing last-write-wins behaviour. The editor only omits it after the user
-chooses **Overwrite**. On conflict, autosave and further writes pause until
+chooses **Overwrite**. On conflict, draft and workflow writes pause until
 **Reload** loads the server's page and discards local edits, or **Overwrite**
 saves the current local draft deliberately. The overwrite response supplies
 the version for subsequent guarded saves.
-
 
 ### `POST /api/pagebuilder/pages/{id}/translations` — `pagebuilder.edit` → 201
 

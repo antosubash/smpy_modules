@@ -15,13 +15,13 @@ export const BASE = '/api/pagebuilder';
 
 /** A coded refusal, preserving the readable detail and HTTP status. */
 export class HttpError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code?: string,
-  ) {
+  readonly status: number;
+  readonly code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = 'HttpError';
+    this.status = status;
+    this.code = code;
   }
 }
 
@@ -87,7 +87,7 @@ export async function errorMessage(response: Response): Promise<string> {
   return (await errorFrom(response)).message;
 }
 
-export async function errorFrom(response: Response): Promise<HttpError> {
+async function errorFrom(response: Response): Promise<HttpError> {
   const fallback = translate(keys.pagebuilder.errors.request_failed, {
     status: response.status,
     statusText: response.statusText,

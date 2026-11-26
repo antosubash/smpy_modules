@@ -6,7 +6,7 @@ import { savePage } from '../utils/pagesApi';
 import { HttpError } from '../utils/request';
 import { useMountedRef } from './useMountedRef';
 
-/** One queue and send-time version for every write to the open page. */
+/** One queue and send-time version for draft and workflow writes. */
 export function usePageWrites(pageId: number | null, initialVersion: string | null) {
   const version = useRef(initialVersion);
   const tail = useRef<Promise<unknown>>(Promise.resolve());

@@ -24,13 +24,13 @@ export let autosave: ReturnType<typeof useAutosave>;
 export let workflow: ReturnType<typeof usePageWorkflow>;
 export let schedule: ReturnType<typeof usePageSchedule>;
 export let revisions: ReturnType<typeof usePageRevisions>;
-export let hold: (() => void) | null;
+let hold: (() => void) | null;
 let generation: number;
 let host: HTMLDivElement;
 let root: Root;
 let loaded: PageDetail;
 
-export function json(body: unknown, status = 200) {
+function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status });
 }
 
