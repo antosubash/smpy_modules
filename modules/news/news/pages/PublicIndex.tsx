@@ -1,5 +1,7 @@
+import { Link } from '@inertiajs/react';
 import { ArchiveHead } from '../ui/components/ArchiveHead';
 import { ArchiveSearch } from '../ui/components/ArchiveSearch';
+import type { PublicHeadValues } from '../ui/components/PublicHead';
 import { PublicLayout, type PublicLayoutProps } from '../ui/components/PublicLayout';
 import { useDocumentLang } from '../ui/hooks/useDocumentLang';
 import { type ArticleRead, formatArticleDate } from '../ui/utils/api';
@@ -21,6 +23,7 @@ import { keys, useT } from '../ui/utils/i18n';
  */
 
 interface Props extends PublicLayoutProps {
+  head?: PublicHeadValues;
   heading: string;
   description?: string | null;
   items: ArticleRead[];
@@ -41,6 +44,7 @@ interface Props extends PublicLayoutProps {
 }
 
 export default function PublicIndex({
+  head,
   heading,
   description,
   items,
@@ -61,115 +65,116 @@ export default function PublicIndex({
   useDocumentLang(locale);
   const copy = keys.news.public;
   return (
-    <PublicLayout
-      locale={locale}
-      layout_header={layout_header}
-      layout_footer={layout_footer}
-      site_nav={site_nav}
-      copy={layoutCopy}
-    >
-      <ArchiveHead heading={heading} query={query} />
+    <>
+      <ArchiveHead head={head} heading={heading} query={query} />
+      <PublicLayout
+        locale={locale}
+        layout_header={layout_header}
+        layout_footer={layout_footer}
+        site_nav={site_nav}
+        copy={layoutCopy}
+      >
+        <div className="mx-auto max-w-2xl px-4 py-12">
+          <header className="mb-10">
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{heading}</h1>
+            {description && <p className="mt-2 text-muted-foreground">{description}</p>}
+          </header>
 
-      <div className="mx-auto max-w-2xl px-4 py-12">
-        <header className="mb-10">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{heading}</h1>
-          {description && <p className="mt-2 text-muted-foreground">{description}</p>}
-        </header>
+          <ArchiveSearch basePath={base_path} query={query} narrowed={narrowed} heading={heading} />
 
-        <ArchiveSearch basePath={base_path} query={query} narrowed={narrowed} heading={heading} />
-
-        {items.length === 0 ? (
-          // An archive with nothing in it says so. A blank page is
-          // indistinguishable from one that failed to load — and a search that
-          // found nothing needs a way out as well as an explanation, or the
-          // reader's only route back is the browser's Back button.
-          <div className="text-muted-foreground">
-            {query ? (
-              <>
-                {/* One entry per sentence rather than a translated fragment
+          {items.length === 0 ? (
+            // An archive with nothing in it says so. A blank page is
+            // indistinguishable from one that failed to load — and a search that
+            // found nothing needs a way out as well as an explanation, or the
+            // reader's only route back is the browser's Back button.
+            <div className="text-muted-foreground">
+              {query ? (
+                <>
+                  {/* One entry per sentence rather than a translated fragment
                     around the emphasised term: which half of "in {heading}"
                     leads is the translator's call. */}
-                <p>
-                  {narrowed
-                    ? t(copy.no_match_narrowed, { query, heading })
-                    : t(copy.no_match, { query })}
-                </p>
-                <p className="mt-2">
-                  <a href={base_path} className="underline underline-offset-2">
-                    {narrowed ? t(copy.show_all_narrowed, { heading }) : t(copy.show_all)}
-                  </a>
-                </p>
-              </>
-            ) : (
-              <p>{t(copy.empty)}</p>
-            )}
-          </div>
-        ) : (
-          <ul className="space-y-8">
-            {items.map((article) => {
-              const dated = formatArticleDate(article.published_at, locale ?? consoleLocale);
-              return (
-                <li key={article.id}>
-                  <article>
-                    {article.category && (
-                      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-primary">
-                        {article.category}
-                      </p>
-                    )}
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      <a href={article.url} className="hover:underline">
-                        {article.title}
-                      </a>
-                    </h2>
-                    {dated && <p className="mt-1 text-sm text-muted-foreground">{dated}</p>}
-                    {article.excerpt && (
-                      <p className="mt-2 leading-relaxed text-muted-foreground">
-                        {article.excerpt}
-                      </p>
-                    )}
-                  </article>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  <p>
+                    {narrowed
+                      ? t(copy.no_match_narrowed, { query, heading })
+                      : t(copy.no_match, { query })}
+                  </p>
+                  <p className="mt-2">
+                    <a href={base_path} className="underline underline-offset-2">
+                      {narrowed ? t(copy.show_all_narrowed, { heading }) : t(copy.show_all)}
+                    </a>
+                  </p>
+                </>
+              ) : (
+                <p>{t(copy.empty)}</p>
+              )}
+            </div>
+          ) : (
+            <ul className="space-y-8">
+              {items.map((article) => {
+                const dated = formatArticleDate(article.published_at, locale ?? consoleLocale);
+                return (
+                  <li key={article.id}>
+                    <article>
+                      {article.category && (
+                        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-primary">
+                          {article.category}
+                        </p>
+                      )}
+                      <h2 className="text-xl font-semibold tracking-tight">
+                        <Link href={article.url} className="hover:underline">
+                          {article.title}
+                        </Link>
+                      </h2>
+                      {dated && <p className="mt-1 text-sm text-muted-foreground">{dated}</p>}
+                      {article.excerpt && (
+                        <p className="mt-2 leading-relaxed text-muted-foreground">
+                          {article.excerpt}
+                        </p>
+                      )}
+                    </article>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-        {pages > 1 && (
-          // Real links, not buttons: this is the surface a crawler follows to
-          // reach everything past the first page, and "load more" is not a link.
-          <nav className="mt-12 flex items-center justify-between border-t pt-5 text-sm">
-            {page > 1 ? (
-              <a
-                href={archiveUrl(base_path, page - 1, query)}
-                className="underline underline-offset-2"
-              >
-                {t(copy.newer)}
-              </a>
-            ) : (
-              <span />
-            )}
-            <span className="text-muted-foreground">
-              {t(copy.pager, { page, pages, count: total })}
-            </span>
-            {page < pages ? (
-              <a
-                href={archiveUrl(base_path, page + 1, query)}
-                className="underline underline-offset-2"
-              >
-                {t(copy.older)}
-              </a>
-            ) : (
-              <span />
-            )}
-          </nav>
-        )}
+          {pages > 1 && (
+            // Real links, not buttons: this is the surface a crawler follows to
+            // reach everything past the first page, and "load more" is not a link.
+            <nav className="mt-12 flex items-center justify-between border-t pt-5 text-sm">
+              {page > 1 ? (
+                <a
+                  href={archiveUrl(base_path, page - 1, query)}
+                  className="underline underline-offset-2"
+                >
+                  {t(copy.newer)}
+                </a>
+              ) : (
+                <span />
+              )}
+              <span className="text-muted-foreground">
+                {t(copy.pager, { page, pages, count: total })}
+              </span>
+              {page < pages ? (
+                <a
+                  href={archiveUrl(base_path, page + 1, query)}
+                  className="underline underline-offset-2"
+                >
+                  {t(copy.older)}
+                </a>
+              ) : (
+                <span />
+              )}
+            </nav>
+          )}
 
-        <p className="mt-10 text-sm text-muted-foreground">
-          <a href={feed_url} className="underline underline-offset-2">
-            {t(copy.feed)}
-          </a>
-        </p>
-      </div>
-    </PublicLayout>
+          <p className="mt-10 text-sm text-muted-foreground">
+            <a href={feed_url} className="underline underline-offset-2">
+              {t(copy.feed)}
+            </a>
+          </p>
+        </div>
+      </PublicLayout>
+    </>
   );
 }

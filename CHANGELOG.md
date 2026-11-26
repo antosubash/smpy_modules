@@ -439,6 +439,11 @@ name the module they affect.
 
 ### Fixed
 
+- **news: public head tags follow client-side visits** (#462). Archive and article
+  pages share the server-resolved head values with Inertia, keeping canonical,
+  social, language, feed and structured-data tags current without duplicates or
+  stale tags after navigation.
+
 - **pagebuilder: lazy media gallery** (#455). Image fields, the MediaPicker block
   field and the stats widget now share the lazy gallery used by news, keeping
   its dialog and list out of public entry chunks. Package-root exports and

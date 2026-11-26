@@ -99,7 +99,7 @@ class TestLanguage:
 
         assert response.headers["Content-Language"] == "de"
         assert page_props(response.text)["locale"] == "de"
-        assert '<meta property="og:locale" content="de">' in response.text
+        assert '<meta property="og:locale" data-inertia="og:locale" content="de">' in response.text
 
     async def test_the_live_link_carries_the_language_prefix(
         self, bilingual, editor_client

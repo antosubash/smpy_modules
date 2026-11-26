@@ -1,15 +1,19 @@
 import { Head } from '@inertiajs/react';
 import { keys, useT } from '../utils/i18n';
+import { PublicHead, type PublicHeadValues } from './PublicHead';
 
 export interface ArchiveHeadProps {
+  /** Pass the endpoint's head prop unchanged to preserve server/client parity. */
+  head?: PublicHeadValues;
   heading: string;
   query?: string;
 }
 
 /** Archive titles and the crawler policy for query results. */
-export function ArchiveHead({ heading, query = '' }: ArchiveHeadProps) {
+export function ArchiveHead({ head, heading, query = '' }: ArchiveHeadProps) {
   const { t } = useT();
   const copy = keys.news.public;
+  if (head) return <PublicHead head={head} />;
   return (
     <Head title={query ? t(copy.title_with_query, { query, heading }) : heading}>
       {/* Results pages stay out of the index: the input space is unbounded,

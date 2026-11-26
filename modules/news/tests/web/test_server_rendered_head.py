@@ -153,7 +153,7 @@ class TestListingHead:
         self, anon_client
     ) -> None:
         body = (await anon_client.get(f"{NEWS}/")).text
-        assert '<meta property="og:type" content="website">' in body
+        assert '<meta property="og:type" data-inertia="og:type" content="website">' in body
 
 
 class TestTheViewerAdvertisesItsTranslations:

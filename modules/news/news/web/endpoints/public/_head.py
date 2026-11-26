@@ -32,6 +32,8 @@ from typing import Any
 
 from fastapi import Response
 
+from news.web.endpoints.public._head_pages import article_head, listing_head  # noqa: F401
+
 _CLOSE_HEAD = b"</head>"
 
 
@@ -41,8 +43,8 @@ _CLOSE_HEAD = b"</head>"
 # removes one the page no longer renders. An element without it is invisible to
 # the manager, so a client tag beside it is simply added: two canonicals, two of
 # every ``og:`` tag. The React side sets the same key through ``head-key``
-# (``ArticleHead``, ``ArchiveHead``); the two must agree, and only tags the
-# client also renders may carry it, or hydration deletes a server-only tag.
+# (``ArticleHead``, ``ArchiveHead``), rendering the same resolved ``head`` prop.
+# Titles are replaced specially by Inertia; every other tag is managed.
 _MANAGED = "data-inertia"
 KEY_CANONICAL = "canonical"
 KEY_ROBOTS = "robots"
@@ -83,8 +85,7 @@ def _alternate_links(
     returns nothing rather than a lone entry pointing at the document itself.
 
     ``managed`` keys each link ``hreflang-<locale>``, for a client that renders
-    the same set through ``<Head>`` (events' ``PublicHead``); news' does not, so
-    its links stay unkeyed.
+    the same set through ``<Head>`` (news and events both do this).
     """
     return [
         '<link rel="alternate" '
@@ -93,121 +94,6 @@ def _alternate_links(
         f'href="{html.escape(entry["url"], quote=True)}">'
         for entry in alternates or []
     ]
-
-
-def article_head(
-    *,
-    title: str,
-    description: str | None,
-    canonical: str | None,
-    image: str | None,
-    site_name: str | None,
-    twitter_handle: str | None,
-    published_at: str | None,
-    author: str | None,
-    section: str | None,
-    index_in_search: bool,
-    json_ld: dict[str, Any] | None,
-    locale: str | None = None,
-    alternates: list[dict[str, str]] | None = None,
-) -> str:
-    """The head an article needs, as markup.
-
-    Mirrors what ``PublicArticle.tsx`` renders client-side. The duplication is
-    the point rather than an oversight: one copy serves the crawler that never
-    runs the script, the other serves the reader who navigated in through the
-    SPA and never reloaded, and neither can cover the other's case.
-    """
-    parts = [
-        f"<title>{html.escape(title)}</title>",
-        _tag("description", description, managed=True),
-        _tag("og:title", title, prop=True, managed=True),
-        _tag("og:description", description, prop=True, managed=True),
-        # ``article``, not ``website``: the whole reason this module took its
-        # own address is that these documents are not generic pages.
-        _tag("og:type", "article", prop=True, managed=True),
-        _tag("og:url", canonical, prop=True, managed=True),
-        _tag("og:site_name", site_name, prop=True, managed=True),
-        _tag("og:image", image, prop=True, managed=True),
-        _tag("article:published_time", published_at, prop=True, managed=True),
-        _tag("article:author", author, prop=True, managed=True),
-        _tag("article:section", section, prop=True, managed=True),
-        _tag("twitter:card", "summary_large_image" if image else "summary", managed=True),
-        _tag("twitter:image", image, managed=True),
-        _tag("twitter:site", twitter_handle, managed=True),
-        # The bare language tag, not a full ``ll_CC`` locale: content locales
-        # here are BCP-47 and often just ``de``, and inventing a region to fill
-        # the Open Graph shape would claim something nobody configured.
-        _tag("og:locale", locale, prop=True),
-    ]
-    parts.extend(_alternate_links(alternates))
-    if canonical:
-        parts.append(
-            f'<link rel="canonical" {_MANAGED}="{KEY_CANONICAL}" '
-            f'href="{html.escape(canonical, quote=True)}">'
-        )
-    if not index_in_search:
-        parts.append(f'<meta name="robots" {_MANAGED}="{KEY_ROBOTS}" content="noindex,nofollow">')
-    if json_ld:
-        parts.append(
-            f'<script type="application/ld+json" {_MANAGED}="{KEY_JSON_LD}">'
-            f"{_safe_json_ld(json_ld)}</script>"
-        )
-    return "".join(part for part in parts if part)
-
-
-def listing_head(
-    *,
-    title: str,
-    description: str | None,
-    canonical: str | None,
-    site_name: str | None,
-    feed_url: str | None,
-    locale: str | None = None,
-    alternates: list[dict[str, str]] | None = None,
-    robots: str | None = None,
-) -> str:
-    """The head an archive page needs.
-
-    ``og:type`` is ``website`` here and ``article`` above, which is the
-    distinction the split was about in the first place.
-
-    The ``hreflang`` set is the same archive in the site's other languages,
-    which is a fixed list of addresses rather than something to look up: every
-    language has an index, a category page and a tag page at the same shape of
-    URL under its own prefix.
-
-    ``robots`` is a directive rather than a boolean because the archive needs
-    one the article page never does: a *search results* page is
-    ``noindex,follow`` — keep it out of the index, but do follow the links out
-    of it — where an article opted out of indexing is ``noindex,nofollow``.
-    Omitted entirely by default, which is what every ordinary archive page
-    wants.
-    """
-    parts = [
-        f"<title>{html.escape(title)}</title>",
-        _tag("description", description),
-        _tag("og:title", title, prop=True),
-        _tag("og:description", description, prop=True),
-        _tag("og:type", "website", prop=True),
-        _tag("og:url", canonical, prop=True),
-        _tag("og:site_name", site_name, prop=True),
-        _tag("og:locale", locale, prop=True),
-        _tag("robots", robots, managed=True),
-    ]
-    parts.extend(_alternate_links(alternates))
-    if canonical:
-        parts.append(f'<link rel="canonical" href="{html.escape(canonical, quote=True)}">')
-    if feed_url:
-        # Feed autodiscovery: this is the tag a reader's browser extension and
-        # every feed reader looks for, and without it the feed exists but is
-        # findable only by guessing its address.
-        parts.append(
-            '<link rel="alternate" type="application/rss+xml" '
-            f'title="{html.escape(title, quote=True)}" '
-            f'href="{html.escape(feed_url, quote=True)}">'
-        )
-    return "".join(part for part in parts if part)
 
 
 def _safe_json_ld(doc: dict[str, Any]) -> str:

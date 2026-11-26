@@ -64,6 +64,57 @@ test.describe('News — the public article address', () => {
     expect((await page.request.get(url)).status()).toBe(404);
   });
 
+  test('head tags follow archive → article → archive client visits (#462)', async ({ page }) => {
+    await login(page);
+    const category = uniqueSlug('head-visit');
+    const article = await seedArticle(page, {
+      prefix: 'head-visit',
+      category,
+      publish: true,
+      body: paragraphBody('Current article head'),
+    });
+    const archive = `/news/category/${category}`;
+    await page.goto(archive);
+    await expect(page.getByRole('link', { name: article.title, exact: true })).toBeVisible();
+    const origin = new URL(page.url()).origin;
+    const assertHead = async (path: string, languages: string[]) => {
+      await expect(page.locator('head link[rel=canonical]')).toHaveCount(1);
+      await expect(page.locator('head link[rel=canonical]')).toHaveAttribute(
+        'href',
+        `${origin}${path}`,
+      );
+      await expect(page.locator('head meta[property="og:url"]')).toHaveCount(1);
+      await expect(page.locator('head meta[property="og:url"]')).toHaveAttribute(
+        'content',
+        `${origin}${path}`,
+      );
+      await expect(page.locator('head link[hreflang]')).toHaveCount(languages.length);
+      for (const language of languages) {
+        await expect(page.locator(`head link[hreflang="${language}"]`)).toHaveCount(1);
+      }
+    };
+    await assertHead(archive, ['en', 'de', 'x-default']);
+    // A window marker proves both transitions kept this document alive.
+    await page.evaluate(() => {
+      Object.assign(window, { newsHeadVisit: true });
+    });
+    const visit = page.waitForRequest(
+      (r) => new URL(r.url()).pathname === article.url && r.headers()['x-inertia'] === 'true',
+    );
+    await page.getByRole('link', { name: article.title, exact: true }).click();
+    await visit;
+    await expect(page.getByRole('heading', { level: 1, name: article.title })).toBeVisible();
+    await assertHead(article.url, []);
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`${archive}$`));
+    await assertHead(archive, ['en', 'de', 'x-default']);
+    expect(await page.evaluate(() => Reflect.get(window, 'newsHeadVisit'))).toBe(true);
+    await expect(page.locator('head link[hreflang="de"]')).toHaveAttribute(
+      'href',
+      `${origin}/de${archive}`,
+    );
+  });
+
   test('an ordinary page still serves at /p/{slug}', async ({ page }) => {
     // The two modules own separate prefixes over separate tables. Neither
     // answers for the other, and this is the half that used to need a claim.
