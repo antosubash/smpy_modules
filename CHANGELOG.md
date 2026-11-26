@@ -467,6 +467,14 @@ name the module they affect.
   server wrote (`head` prop: title, description, canonical, image, robots, feed
   link) and `PublicHead` renders only those, so a tag cannot change or vanish when
   the script runs.
+- **pagebuilder: a page's images no longer count against the visitor's request
+  budget by default** (#442). The media prefix is registered with `rate="off"`,
+  matching the host limiter's built-in exemption for `/static/`. If a host has set
+  `media_url_prefix` so that another public route lies inside it, media keeps the
+  host rate and a warning is logged, so that route is not unlimited too. Before,
+  each image request counted against the host's `rate_limit_public` (120 a minute
+  per address by default), so a visitor who opened a few image-heavy pages got
+  `429` in place of images.
 - **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
   Main fields, search settings, schedule, review notes and history show the
   server's current state; rejected values are discarded before another save.
