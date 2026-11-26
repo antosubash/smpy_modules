@@ -113,7 +113,8 @@ it.each(['article', 'index', 'preview'])(
             'Site header',
           );
         },
-        { timeout: 3000 },
+        // The frame is a lazy chunk; under a full-suite run it once took over 3 s to arrive (#468).
+        { timeout: 15000 },
       );
       expect(container.querySelector('[data-testid="site-footer"]')?.textContent).toContain(
         'Site footer',
@@ -139,4 +140,6 @@ it.each(['article', 'index', 'preview'])(
       await act(async () => root.unmount());
     }
   },
+  // Room for the wait above (the default is 5 s).
+  20000,
 );
