@@ -439,6 +439,15 @@ name the module they affect.
 
 ### Fixed
 
+- **analytics, events, images, news, newsletter, pagebuilder: the package root
+  resolves from an installed wheel** (#472, #473). A wheel carries the module's
+  `package.json` inside the package, but its `exports` (pagebuilder: `main` and
+  `types`) still named the source-tree path, `./<package>/index.ts`, which does
+  not exist there. A host that installed from PyPI got `TS2307` from `tsc` and
+  `UNLOADABLE_DEPENDENCY` from `vite build` for
+  `import … from '@simple-module-py/analytics'`. The wheel's copy now says
+  `./index.ts`. Hosts that worked around it with
+  `@simple-module-py/<module>/index` keep working.
 - **news: public head tags follow client-side visits** (#462). Archive and article
   pages share the server-resolved head values with Inertia, keeping canonical,
   social, language, feed and structured-data tags current without duplicates or
