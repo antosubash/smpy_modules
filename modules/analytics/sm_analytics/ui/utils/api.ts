@@ -4,6 +4,7 @@ import type { Filters, GeoStatus, Property, PropertyInput, Report } from './type
 import { validationMessage } from './validationMessage';
 
 const BASE = '/api/analytics';
+const LOGIN_PATH = '/users/login';
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -35,10 +36,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       ...options.headers,
     },
   });
+  options.signal?.throwIfAborted();
   if (!response.ok) {
     if (response.status === 401) {
-      const next = `${window.location.pathname}${window.location.search}`;
-      window.location.assign(`/users/login?next=${encodeURIComponent(next)}`);
+      // The framework records return URLs on protected document navigations;
+      // the login page deliberately ignores a user-supplied `next` parameter.
+      if (window.location.pathname !== LOGIN_PATH) window.location.reload();
       throw new ApiError(401, translate(keys.analytics.session_expired));
     }
     let detail = '';

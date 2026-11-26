@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { startHostAnalytics } from './hostTracker';
+import { CONFIG_TTL_MS, FAILURE_BACKOFF_MS, startHostAnalytics } from './hostTracker';
 import { track } from './tracker';
 
 const config = {
@@ -77,7 +77,12 @@ it('refreshes expired config and picks up a newly enabled property', async () =>
       String(url).endsWith('/config') ? Response.json(config) : new Response(null, { status: 204 }),
     ),
   );
-  await vi.advanceTimersByTimeAsync(180000);
+  await vi.advanceTimersByTimeAsync(CONFIG_TTL_MS - 1);
+  navigate('/p/before-expiry');
+  await flush();
+  expect(configs()).toHaveLength(1);
+  expect(collected()).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(1);
   navigate('/p/two');
   await flush();
   expect(configs()).toHaveLength(2);
@@ -110,7 +115,11 @@ it.each(['network', 'http', 'malformed', 'timeout'])(
     await flush();
     expect(configs()).toHaveLength(1);
     mockConfig(config);
-    await vi.advanceTimersByTimeAsync(30000);
+    await vi.advanceTimersByTimeAsync(FAILURE_BACKOFF_MS - 1);
+    navigate('/p/before-retry');
+    await flush();
+    expect(fetch).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     navigate('/p/four');
     await flush();
     expect(configs()).toHaveLength(1);

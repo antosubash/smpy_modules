@@ -31,7 +31,7 @@ it.each(['list', 'report'])(
   async (source) => {
     vi.useFakeTimers();
     vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
-    vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+    vi.spyOn(window.location, 'reload').mockImplementation(() => {});
     let expired = false;
     const fetcher = vi.fn((url: string) => {
       const unauthorized =
@@ -56,7 +56,7 @@ it.each(['list', 'report'])(
       expect(container.textContent).toBe('9');
       expired = true;
       await act(async () => reload());
-      expect(window.location.assign).toHaveBeenCalled();
+      expect(window.location.reload).toHaveBeenCalled();
       expect(container.textContent).toBe('');
       const requests = fetcher.mock.calls.length;
       await act(async () => vi.advanceTimersByTime(90000));

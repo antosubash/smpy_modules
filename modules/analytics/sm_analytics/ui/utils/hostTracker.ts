@@ -12,8 +12,8 @@ type Subscribe = (listener: (page: Page) => void) => () => void;
 export type HostAnalyticsOptions = {
   shouldTrack?: (page: HostAnalyticsPage & { path: string }) => boolean;
 };
-const CONFIG_TTL = 180000;
-const FAILURE_BACKOFF = 30000;
+export const CONFIG_TTL_MS = 180000;
+export const FAILURE_BACKOFF_MS = 30000;
 
 /** Start once per tab; reuse config only within the same origin and tenant. */
 export function startHostAnalytics(
@@ -54,12 +54,12 @@ export function startHostAnalytics(
         const config = (await response.json()) as AnalyticsConfig;
         if (!Array.isArray(config?.properties)) throw new Error('Invalid configuration');
         entry.config = config;
-        entry.expires = Date.now() + CONFIG_TTL;
+        entry.expires = Date.now() + CONFIG_TTL_MS;
         return config;
       })
       .catch(() => {
         // Fail closed and bound retries even when no property is enabled.
-        entry.expires = Date.now() + FAILURE_BACKOFF;
+        entry.expires = Date.now() + FAILURE_BACKOFF_MS;
         return undefined;
       })
       .finally(() => {
@@ -71,13 +71,19 @@ export function startHostAnalytics(
   const navigate = (value: Page) => {
     const page = typeof value === 'string' ? { url: value } : value;
     const absolute = new URL(page.url, window.location.origin);
+    // Same-origin tenant switches must not reuse the previous tenant's properties.
     const key = JSON.stringify([absolute.origin, page.tenantId ?? null]);
     const hash = absolute.hash;
     absolute.hash = '';
-    const eligible =
-      absolute.origin === window.location.origin &&
-      !privacyRequested() &&
-      shouldTrack?.({ ...page, url: absolute.href, path: absolute.pathname }) !== false;
+    let eligible = false;
+    if (absolute.origin === window.location.origin && !privacyRequested()) {
+      try {
+        eligible =
+          shouldTrack?.({ ...page, url: absolute.href, path: absolute.pathname }) !== false;
+      } catch {
+        // A failed page policy must disable tracking for the new page.
+      }
+    }
     const hashOnly =
       previousEligible &&
       eligible &&

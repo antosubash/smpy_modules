@@ -69,3 +69,54 @@ it('refreshes configuration when a tenant switch navigates to the same URL', asy
   expect(fetch).toHaveBeenCalledTimes(2);
   stop();
 });
+
+it('disables custom events when the page policy throws and recovers on the next page', async () => {
+  let navigate = (_url: string) => {};
+  const config = {
+    properties: [
+      {
+        id: 'one',
+        kind: 'public',
+        route_patterns: ['/p/:slug'],
+        utm_parameters: [],
+        event_allowlist: { download: [] },
+      },
+    ],
+  };
+  const fetcher = vi.fn((url: string) =>
+    Promise.resolve(
+      url.endsWith('/config') ? Response.json(config) : new Response(null, { status: 204 }),
+    ),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  const stop = startHostAnalytics(
+    (callback) => {
+      navigate = callback;
+      return () => {};
+    },
+    '/p/one',
+    {
+      shouldTrack: ({ path }) => {
+        if (path === '/p/broken') throw new Error('Page metadata unavailable');
+        return true;
+      },
+    },
+  );
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    let failure: unknown;
+    try {
+      navigate('/p/broken');
+    } catch (reason) {
+      failure = reason;
+    }
+    await track('download');
+    expect(fetcher.mock.calls.filter(([url]) => url.endsWith('/collect'))).toHaveLength(1);
+    expect(failure).toBeUndefined();
+    navigate('/p/two');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetcher.mock.calls.filter(([url]) => url.endsWith('/collect'))).toHaveLength(2);
+  } finally {
+    stop();
+  }
+});

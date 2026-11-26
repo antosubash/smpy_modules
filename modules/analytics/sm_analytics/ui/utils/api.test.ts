@@ -47,10 +47,11 @@ it('retains nested 422 field paths and removes the pydantic prefix', async () =>
   });
 });
 it.each(['list', 'geo', 'report'])(
-  'redirects an expired session on a %s read to sign-in with a return URL',
+  'reloads the protected page after a %s 401 so the framework preserves the return URL',
   async (kind) => {
     window.history.replaceState({}, '', '/analytics/?range=week');
     const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => Response.json({ detail: 'Not authenticated' }, { status: 401 })),
@@ -70,6 +71,44 @@ it.each(['list', 'geo', 'report'])(
               city: '',
             });
     await expect(call).rejects.toMatchObject({ status: 401 });
-    expect(assign).toHaveBeenCalledWith('/users/login?next=%2Fanalytics%2F%3Frange%3Dweek');
+    expect(reload).toHaveBeenCalledOnce();
+    expect(assign).not.toHaveBeenCalled();
+    expect(window.location.pathname + window.location.search).toBe('/analytics/?range=week');
   },
 );
+
+it('does not reload the login page if a pending API read returns 401 there', async () => {
+  window.history.replaceState({}, '', '/users/login');
+  const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+  const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ detail: 'Not authenticated' }, { status: 401 })),
+  );
+  await expect(listProperties()).rejects.toMatchObject({ status: 401 });
+  expect(reload).not.toHaveBeenCalled();
+  expect(assign).not.toHaveBeenCalled();
+});
+
+it('does not redirect when a canceled read returns an expired-session response', async () => {
+  const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {});
+  const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+  let finish = (_response: Response) => {};
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    ),
+  );
+  const controller = new AbortController();
+  const request = listProperties(controller.signal);
+  const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+  finish(Response.json({ detail: 'Not authenticated' }, { status: 401 }));
+  controller.abort();
+  await rejected;
+  expect(assign).not.toHaveBeenCalled();
+  expect(reload).not.toHaveBeenCalled();
+});

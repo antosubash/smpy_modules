@@ -21,8 +21,8 @@ from sm_analytics.core.runtime import Runtime
 from sm_analytics.core.settings import AnalyticsSettings
 from sm_analytics.core.tenancy import bind_admin
 
-# In this file, not in ``constants``: the framework's doctor matches a page to its
-# ``render`` call only through a constant defined beside the call (SM003, #482).
+# Kept beside render so the framework doctor sees a bare constant name rather
+# than c.<name> attribute access, which its page scan cannot resolve (SM003, #482).
 _PAGE_DASHBOARD = "Analytics/Dashboard"
 
 
