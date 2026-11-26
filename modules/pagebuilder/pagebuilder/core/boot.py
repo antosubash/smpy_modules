@@ -92,11 +92,42 @@ def exempt_public_routes(app: FastAPI, settings: PagebuilderSettings) -> None:
         )
     # Published pages reference uploaded images; without this the page renders
     # for an anonymous visitor but every image 302s to login.
-    registry.add_prefix(dir_prefix(settings.media_url_prefix), methods=methods)
+    #
+    # ``rate="off"``: these are files from a static mount, like the host's own
+    # ``/static/`` which the limiter already skips. Counted against the host's
+    # ``rate_limit_public`` (120/minute per address by default), a page with a
+    # dozen images spends a tenth of the budget per view, and a visitor who
+    # opens a few pages gets 429s in place of images (#442).
+    #
+    # Not when another public rule lies inside the media prefix (a host that set
+    # ``media_url_prefix`` to a parent of the page route, say): a rule carrying
+    # a rate beats one without, so "off" would also lift the limit from those
+    # pages, which are rendered from the database. Media keeps the host rate
+    # there. A rule with its own rate, or for other verbs, cannot lose anything
+    # and does not count. Neither does a broader prefix, a suffix or a regex
+    # rule: under the media prefix it can only match a path this mount serves.
+    # Only rules registered so far are seen, hence sitemap and robots first.
     if settings.sitemap_enabled:
         registry.add_exact("/sitemap.xml", methods=methods)
     if settings.robots_enabled:
         registry.add_exact("/robots.txt", methods=methods)
+    media_prefix = dir_prefix(settings.media_url_prefix)
+    inside = sorted(
+        route.pattern
+        for route in registry.routes
+        if route.rate is None
+        and route.kind in ("prefix", "exact")
+        and route.pattern.startswith(media_prefix)
+        and (route.methods is None or _READ_ONLY.intersection(route.methods))
+    )
+    if inside:
+        _log.warning(
+            "pagebuilder.media_url_prefix %s contains other public routes (%s); "
+            "media requests stay under the host's rate_limit_public",
+            media_prefix,
+            ", ".join(inside),
+        )
+    registry.add_prefix(media_prefix, methods=methods, rate=None if inside else "off")
 
 
 def mount_public_routers(app: FastAPI, settings: PagebuilderSettings) -> None:
