@@ -133,7 +133,8 @@ export const saveLayout = (body: LayoutUpdate) =>
 export const listLayoutRevisions = () =>
   request<{ items: LayoutRevisionRead[] }>('/layout/revisions');
 
-export const restoreLayoutRevision = (revisionId: number) =>
+export const restoreLayoutRevision = (revisionId: number, token?: string | null) =>
   request<LayoutDetail>(`/layout/revisions/${revisionId}/restore`, {
     method: 'POST',
+    body: noteBody(null, token),
   });

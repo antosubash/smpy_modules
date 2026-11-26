@@ -100,6 +100,9 @@ async function errorFrom(response: Response): Promise<HttpError> {
     if (response.status === 409 && parsed.code === 'page_conflict') {
       return new HttpError(translate(keys.pagebuilder.errors.page_conflict), 409, parsed.code);
     }
+    if (response.status === 409 && parsed.code === 'layout_conflict') {
+      return new HttpError(translate(keys.pagebuilder.errors.layout_conflict), 409, parsed.code);
+    }
     if (isCsrfRefusal(response.status, parsed.detail)) {
       return new HttpError(translate(keys.pagebuilder.errors.csrf_failed), response.status);
     }

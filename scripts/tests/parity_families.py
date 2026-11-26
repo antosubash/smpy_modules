@@ -165,7 +165,7 @@ FAMILIES: tuple[Family, ...] = (
             ),
         ),
         differ={
-            "errorFrom": "Each translates its own conflict code; news also words typed "
+            "errorFrom": "Each translates its own conflict codes; news also words typed "
             "validation errors. scripts/http-error-parity.test.ts pins their shared messages.",
             "fromValidationErrors": "News delegates each entry to describeError.",
         },

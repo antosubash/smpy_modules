@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from pydantic import AfterValidator, BeforeValidator, StringConstraints
+from pydantic import AfterValidator, BaseModel, BeforeValidator, StringConstraints
 
 ISO_REQUIRED = "Expected an ISO-8601 date-time with a UTC offset, e.g. 2026-01-31T09:00:00Z."
 NOTE_MAX = 2000
@@ -59,3 +59,10 @@ OptionalNote = Annotated[
     Annotated[str, StringConstraints(strip_whitespace=True, max_length=NOTE_MAX)] | None,
     AfterValidator(lambda value: value or None),
 ]
+
+
+class VersionRequest(BaseModel):
+    expected_updated_at: AwareInstant | None = None
+    """Loaded editor's version. Explicit null checks an untouched row;
+    omitting the field preserves tokenless, last-write-wins callers.
+    """

@@ -443,6 +443,12 @@ name the module they affect.
   pages share the server-resolved head values with Inertia, keeping canonical,
   social, language, feed and structured-data tags current without duplicates or
   stale tags after navigation.
+- **pagebuilder: warn before overwriting another editor's site layout** (#466).
+  Header/footer saves and revision restores send `expected_updated_at`; a stale
+  write returns 409 `layout_conflict` without changing the layout or its history.
+  The screen offers Reload (discard local changes) or Overwrite (repeat the refused
+  save or restore deliberately), reusing the page editor's write queue and each response's version. API callers
+  that omit the token keep the existing behaviour.
 
 - **pagebuilder: lazy media gallery** (#455). Image fields, the MediaPicker block
   field and the stats widget now share the lazy gallery used by news, keeping

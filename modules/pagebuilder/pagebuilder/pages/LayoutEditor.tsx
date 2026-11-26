@@ -8,16 +8,13 @@ import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '../ui/components/ConfirmDialog';
 import { BlockOutline } from '../ui/components/editor/BlockOutline';
 import { NO_HEADER_ACTIONS } from '../ui/components/editor/noHeaderActions';
+import { PageConflict } from '../ui/components/editor/PageConflict';
 import { emptyLayoutData, getLayoutPuckConfig } from '../ui/components/layoutPuckConfig';
 import { localizeConfig } from '../ui/components/localizeConfig';
 import { useIsNarrow } from '../ui/hooks/useIsNarrow';
+import { useLayoutWrites } from '../ui/hooks/useLayoutWrites';
 import { usePuckA11y } from '../ui/hooks/usePuckA11y';
-import {
-  type LayoutDetail,
-  type LayoutRevisionRead,
-  restoreLayoutRevision,
-  saveLayout,
-} from '../ui/utils/api';
+import type { LayoutDetail, LayoutRevisionRead } from '../ui/utils/api';
 import { blockLabels, moveBlock, outlineOf } from '../ui/utils/blockOutline';
 import { formatTimestamp } from '../ui/utils/dates';
 import { keys, useT } from '../ui/utils/i18n';
@@ -33,16 +30,18 @@ export default function LayoutEditor() {
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { layout } = props;
   const revisions = props.revisions ?? [];
-
   const [headerData, setHeaderData] = useState<Data>(
     (layout.header_data as unknown as Data) ?? (emptyLayoutData as unknown as Data),
   );
   const [footerData, setFooterData] = useState<Data>(
     (layout.footer_data as unknown as Data) ?? (emptyLayoutData as unknown as Data),
   );
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const writes = useLayoutWrites(layout, headerData, footerData, (restored) => {
+    setHeaderData(restored.header_data as unknown as Data);
+    setFooterData(restored.footer_data as unknown as Data);
+  });
+  const { busy, message } = writes;
   const isNarrow = useIsNarrow();
   // Block labels are written as catalogue keys — see `localizeConfig` for why
   // they cannot resolve them where they are written.
@@ -50,38 +49,6 @@ export default function LayoutEditor() {
   // The layout palette, not the page one: a header holds a different set of
   // blocks and naming them from the wrong config would miss half of them.
   const layoutLabels = blockLabels(config.components);
-
-  const handleSave = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      await saveLayout({
-        header_data: headerData as unknown as Record<string, unknown>,
-        footer_data: footerData as unknown as Record<string, unknown>,
-      });
-      setMessage(t(keys.pagebuilder.layout.saved));
-      router.reload({ only: ['revisions'] });
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.layout.save_failed));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Confirmation and failure both belong to the dialog on the row.
-  const handleRestore = async (revisionId: number) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const restored = await restoreLayoutRevision(revisionId);
-      setHeaderData(restored.header_data as unknown as Data);
-      setFooterData(restored.footer_data as unknown as Data);
-      setMessage(t(keys.pagebuilder.layout.revision_restored));
-      router.reload({ only: ['revisions'] });
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -109,12 +76,22 @@ export default function LayoutEditor() {
           <Button variant="outline" size="sm" onClick={() => setShowHistory((v) => !v)}>
             {t(keys.pagebuilder.layout.history, { count: revisions.length })}
           </Button>
-          <Button size="sm" disabled={busy} onClick={handleSave}>
+          <Button size="sm" disabled={busy || writes.conflict} onClick={() => void writes.save()}>
             {t(keys.pagebuilder.layout.save)}
           </Button>
         </div>
         {message && <span className="mt-1 w-full text-sm text-muted-foreground">{message}</span>}
       </div>
+
+      {writes.conflict && (
+        <PageConflict
+          kind="layout"
+          missing={false}
+          busy={busy}
+          onReload={() => router.visit('/pagebuilder/layout', { preserveState: false })}
+          onOverwrite={writes.overwrite}
+        />
+      )}
 
       {showHistory && (
         <div className="border-b bg-muted px-4 py-3 text-sm">
@@ -142,7 +119,13 @@ export default function LayoutEditor() {
                   </div>
                   <ConfirmDialog
                     trigger={
-                      <Button type="button" variant="link" size="sm" className="h-auto p-0">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0"
+                        disabled={busy || writes.conflict}
+                      >
                         {t(keys.pagebuilder.layout.restore)}
                       </Button>
                     }
@@ -151,7 +134,7 @@ export default function LayoutEditor() {
                       when: formatTimestamp(r.created_at, locale),
                     })}
                     confirmLabel={t(keys.pagebuilder.layout.restore)}
-                    onConfirm={() => handleRestore(r.id)}
+                    onConfirm={() => writes.restore(r.id)}
                   />
                 </li>
               ))}

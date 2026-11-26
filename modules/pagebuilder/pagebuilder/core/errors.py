@@ -9,6 +9,11 @@ class PageConflict(HTTPException):
         super().__init__(status_code=409, detail="This page was changed elsewhere")
 
 
+class LayoutConflict(HTTPException):
+    def __init__(self) -> None:
+        super().__init__(status_code=409, detail="This layout was changed elsewhere")
+
+
 class PageNotFound(HTTPException):
     def __init__(self) -> None:
         super().__init__(status_code=404, detail="Page not found")
@@ -20,6 +25,13 @@ def install_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail, "code": "page_conflict"},
+        )
+
+    @app.exception_handler(LayoutConflict)
+    async def layout_conflict(_request: Request, exc: LayoutConflict) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "code": "layout_conflict"},
         )
 
     @app.exception_handler(PageNotFound)

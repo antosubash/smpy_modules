@@ -12,6 +12,7 @@ from pagebuilder.contracts.schemas._fields import (
     OptionalNote,
     RequiredNote,
     UtcInstant,
+    VersionRequest,
 )
 from pagebuilder.core.locales import MAX_LOCALE_LEN
 from pagebuilder.models import PageStatus
@@ -70,11 +71,8 @@ class PageCreate(BaseModel):
     """
 
 
-class PageVersionRequest(BaseModel):
-    expected_updated_at: AwareInstant | None = None
-    """Loaded page's version. Explicit null checks an untouched page;
-    omitting the field preserves tokenless, last-write-wins callers.
-    """
+class PageVersionRequest(VersionRequest):
+    """Version guard for page draft and workflow writes."""
 
 
 class PageUpdate(PageVersionRequest):

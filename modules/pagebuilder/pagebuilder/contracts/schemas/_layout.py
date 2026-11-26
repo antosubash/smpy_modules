@@ -6,11 +6,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from pagebuilder.contracts.schemas._fields import OptionalNote
+from pagebuilder.contracts.schemas._fields import OptionalNote, UtcInstant, VersionRequest
 from pagebuilder.contracts.schemas._pages import CheckedPuckData, PuckData
 
 
-class LayoutUpdate(BaseModel):
+class LayoutUpdate(VersionRequest):
     """``None`` leaves a slot alone; an empty Puck doc clears it."""
 
     header_data: CheckedPuckData | None = None
@@ -23,7 +23,7 @@ class LayoutRead(BaseModel):
 
     id: int
     created_at: datetime
-    updated_at: datetime | None
+    updated_at: UtcInstant | None
 
 
 class LayoutDetail(LayoutRead):
