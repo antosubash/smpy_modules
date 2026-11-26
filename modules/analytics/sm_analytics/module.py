@@ -21,6 +21,10 @@ from sm_analytics.core.runtime import Runtime
 from sm_analytics.core.settings import AnalyticsSettings
 from sm_analytics.core.tenancy import bind_admin
 
+# Kept beside render so the framework doctor sees a bare constant name rather
+# than c.<name> attribute access, which its page scan cannot resolve (SM003, #482).
+_PAGE_DASHBOARD = "Analytics/Dashboard"
+
 
 class AnalyticsModule(ModuleBase):
     meta = ModuleMeta(
@@ -50,7 +54,7 @@ class AnalyticsModule(ModuleBase):
         async def dashboard(request: Request, inertia: InertiaDep):
             permissions = resolved_permissions_for(request)
             return await inertia.render(
-                c._PAGE_DASHBOARD,
+                _PAGE_DASHBOARD,
                 {
                     "can_manage": "*" in permissions or c.PERM_MANAGE in permissions,
                 },

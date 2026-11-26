@@ -34,7 +34,7 @@ createInertiaApp({
         updateI18n({ locale: block.locale, messages: block.messages });
       }
     });
-    const stopAnalytics = startAnalytics();
+    const stopAnalytics = startAnalytics(props.initialPage);
     const stopTheme = initTheme();
     if (import.meta.hot) {
       import.meta.hot.dispose(stopAnalytics);

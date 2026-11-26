@@ -48,6 +48,8 @@ it.each([
       );
       const cells = Array.from(container.querySelectorAll('td'));
       expect(cells.at(-1)?.textContent).toBe(expected);
+      expect(cells.at(-2)?.textContent).toBe('Pageview');
+      expect(container.textContent).toContain('Pageviews');
     } finally {
       await act(async () => root.unmount());
       container.remove();
@@ -213,4 +215,14 @@ it('connects ranking tabs and panels to existing accessible labels', async () =>
       'tab controls an existing panel',
     ).toBeTruthy();
   }
+});
+
+it('names the five-minute activity window independently of report empty states', async () => {
+  const container = await renderReport();
+  const recent = Array.from(container.querySelectorAll('section')).find(
+    (section) => section.querySelector('h2')?.textContent === 'Recent activity',
+  );
+  expect(recent?.textContent).toContain('No activity in the last five minutes.');
+  expect(recent?.textContent).not.toContain('No activity in this period.');
+  expect(container.textContent).toContain('No activity in this period.');
 });
