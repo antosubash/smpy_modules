@@ -6,10 +6,10 @@ import { expect, it, vi } from 'vitest';
 import type { Filters } from './types';
 import { useAnalytics } from './useAnalytics';
 
-const navigation = vi.hoisted(() => ({ handler: () => {} }));
+const navigation = vi.hoisted(() => ({ handler: (_event: { detail: { type: string } }) => {} }));
 vi.mock('@inertiajs/react', () => ({
   router: {
-    on: (_name: string, handler: () => void) => {
+    on: (_name: string, handler: (event: { detail: { type: string } }) => void) => {
       navigation.handler = handler;
       return () => {};
     },
@@ -213,12 +213,35 @@ it('forgets the previous tenant snapshot on navigation even when the same proper
     await act(async () => root.render(<Probe />));
     expect(container.textContent).toBe('6');
     renders.length = 0;
-    await act(async () => navigation.handler());
+    await act(async () => navigation.handler({ detail: { type: 'visit' } }));
     expect(renders.every((render) => render.pages === null)).toBe(true);
     expect(container.textContent).toBe('loading');
   } finally {
     await act(async () => root.unmount());
     container.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('ignores the initial navigation instead of aborting and repeating the first report', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  let signal: AbortSignal | undefined;
+  const fetcher = vi.fn((url: string, options: RequestInit) => {
+    if (url.endsWith('/properties')) return Promise.resolve(Response.json([{ id: 'a' }]));
+    if (url.endsWith('/status')) return Promise.resolve(Response.json({ geo: { enabled: false } }));
+    signal = options.signal as AbortSignal;
+    return new Promise<Response>(() => {});
+  });
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    await act(async () => root.render(<Probe />));
+    const first = signal;
+    await act(async () => navigation.handler({ detail: { type: 'initial' } }));
+    expect(fetcher.mock.calls.filter(([url]) => url.includes('/report'))).toHaveLength(1);
+    expect(first?.aborted).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
     vi.unstubAllGlobals();
   }
 });

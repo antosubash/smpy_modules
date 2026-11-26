@@ -1,0 +1,36 @@
+- main [ref=e3]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: S
+      - generic [ref=e10]: SimpleModule
+    - generic [ref=e11]:
+      - heading "One admin surface for every module you install." [level=2] [ref=e12]
+      - paragraph [ref=e13]: Users, permissions, settings, files, background tasks and audit history — all wired up on boot.
+      - list [ref=e14]:
+        - listitem [ref=e15]: Sessions, invites and password reset built in
+    - generic [ref=e18]: © 2026 SimpleModule
+  - generic [ref=e21]:
+    - heading "Sign in" [level=1] [ref=e22]
+    - paragraph [ref=e23]: Use your workspace email and password.
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]: Email
+        - textbox "Email" [ref=e28]:
+          - /placeholder: you@example.com
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - generic [ref=e31]: Password
+          - link "Forgot password?" [ref=e32] [cursor=pointer]:
+            - /url: /users/forgot-password
+        - generic [ref=e33]:
+          - textbox "Password" [ref=e34]
+          - button "Show" [ref=e35]
+      - generic [ref=e36]:
+        - checkbox "Keep me signed in for 30 days" [ref=e37]
+        - checkbox [aria-hidden]
+        - generic [ref=e38]: Keep me signed in for 30 days
+      - button "Sign in" [ref=e39]
+    - paragraph [ref=e40]: No account? Ask an admin to invite you.
+    - generic [ref=e41]:
+      - paragraph [ref=e42]: Dev quick-login
+      - button "Admin" [ref=e44]

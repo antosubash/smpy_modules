@@ -16,7 +16,7 @@ export function RecentActivity({ recent }: { recent: Report['recent'] }) {
         <strong>{recent.visitors.toLocaleString(locale)}</strong>
       </p>
       {recent.events.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t(keys.analytics.no_data)}</p>
+        <p className="text-sm text-muted-foreground">{t(keys.analytics.recent_empty)}</p>
       ) : (
         <section
           aria-labelledby={titleId}
@@ -41,7 +41,7 @@ export function RecentActivity({ recent }: { recent: Report['recent'] }) {
                   </td>
                   <td className="break-all py-2 pr-4">{event.path}</td>
                   <td className="break-words py-2 pr-4">
-                    {event.name || t(keys.analytics.pageviews)}
+                    {event.name || t(keys.analytics.pageview)}
                   </td>
                   <td className="break-words py-2 [overflow-wrap:anywhere]">
                     {[

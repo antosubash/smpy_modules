@@ -68,10 +68,12 @@ class PropertyIn(BaseModel):
     @classmethod
     def validate_patterns(cls, values: list[str]) -> list[str]:
         for value in values:
+            if len(value) > 500:
+                raise ValueError("Route patterns must be at most 500 characters")
+            if not value.startswith("/"):
+                raise ValueError("Route patterns must start with /")
             if (
-                len(value) > 500
-                or not value.startswith("/")
-                or value.startswith("//")
+                value.startswith("//")
                 or any(
                     not _SEGMENT.fullmatch(s) or s in {".", ".."}
                     for s in value.strip("/").split("/")
