@@ -229,6 +229,13 @@ footer, plus headings, text, image, button, logo cloud, spacer and divider).
 **History (n)** lists them and **Restore** puts one back. A layout change reaches
 every page at once.
 
+If another editor changed the layout after you opened it, Save or Restore is
+refused with **This layout was changed elsewhere** (#466). Your local header,
+footer and navigation edits stay on screen. **Reload** discards them and loads
+the latest layout; **Overwrite** deliberately saves both local slots over the
+server version. Later saves use the new version automatically, just as in the
+page editor.
+
 ### Navigation flags
 
 **Show in header nav** and **Show in footer** on a page add it to the site

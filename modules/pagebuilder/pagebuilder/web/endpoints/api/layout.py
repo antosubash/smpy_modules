@@ -14,6 +14,7 @@ from pagebuilder.contracts.schemas import (
     LayoutRevisionRead,
     LayoutUpdate,
 )
+from pagebuilder.contracts.schemas._fields import VersionRequest
 from pagebuilder.web.endpoints.api._deps import require_edit
 
 router = APIRouter()
@@ -39,6 +40,7 @@ async def update_layout(
         header_data=body.header_data,
         footer_data=body.footer_data,
         note=body.note,
+        version=body,
     )
     return LayoutDetail.model_validate(layout)
 
@@ -73,6 +75,7 @@ async def get_layout_revision(
 async def restore_layout_revision(
     revision_id: int,
     db: AsyncSession = Depends(get_db),
+    body: VersionRequest | None = None,
 ) -> LayoutDetail:
-    layout = await LayoutService(db).restore(revision_id)
+    layout = await LayoutService(db).restore(revision_id, body)
     return LayoutDetail.model_validate(layout)

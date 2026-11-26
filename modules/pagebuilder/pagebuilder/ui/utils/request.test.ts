@@ -143,3 +143,24 @@ it('does not classify a slug collision as a stale draft', async () => {
     vi.unstubAllGlobals();
   }
 });
+
+it('keeps and translates a layout conflict through the same request helper', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      response('{"detail":"Server wording","code":"layout_conflict"}', {
+        status: 409,
+        statusText: 'Conflict',
+      }),
+    ),
+  );
+  try {
+    await expect(request('/layout', { method: 'PUT' })).rejects.toMatchObject({
+      status: 409,
+      code: 'layout_conflict',
+      message: 'This layout was changed elsewhere',
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

@@ -928,6 +928,7 @@
   },
   "errors": {
     "page_gone": "Diese Seite wurde an anderer Stelle gelöscht und existiert nicht mehr. Laden Sie neu, um den Editor zu verlassen.",
+    "layout_conflict": "Dieses Layout wurde an anderer Stelle geändert",
     "page_conflict": "Diese Seite wurde an anderer Stelle geändert",
     "csrf_failed": "Das Sicherheitstoken dieser Seite ist veraltet. Laden Sie die Seite neu und versuchen Sie es erneut – Ihre Änderungen bleiben auf dieser Seite erhalten, bis Sie sie verlassen.",
     "field_message": "{field}: {message}",

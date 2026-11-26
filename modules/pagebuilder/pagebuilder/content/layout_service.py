@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from pagebuilder.content.service._fresh import ensure_fresh_for_write
 from pagebuilder.models import Layout, LayoutRevision
+
+if TYPE_CHECKING:
+    from pagebuilder.contracts.schemas._fields import VersionRequest
 
 
 def _has_content(data: dict | None) -> bool:
@@ -36,8 +42,11 @@ class LayoutService:
         header_data: dict | None = None,
         footer_data: dict | None = None,
         note: str | None = None,
+        version: VersionRequest | None = None,
     ) -> Layout:
         layout = await self.get()
+        assert layout.id is not None
+        await ensure_fresh_for_write(self.db, layout.id, version, model=Layout)
         header_changed = header_data is not None and header_data != layout.header_data
         footer_changed = footer_data is not None and footer_data != layout.footer_data
         # No-op save: skip the revision row so save-button-spam doesn't
@@ -50,8 +59,6 @@ class LayoutService:
         if footer_changed:
             layout.footer_data = footer_data  # type: ignore[assignment]
         self.db.add(layout)
-
-        assert layout.id is not None
         revision = LayoutRevision(
             layout_id=layout.id,
             header_data=layout.header_data,
@@ -79,12 +86,15 @@ class LayoutService:
             raise HTTPException(status_code=404, detail="Revision not found")
         return revision
 
-    async def restore(self, revision_id: int) -> Layout:
+    async def restore(
+        self, revision_id: int, version: VersionRequest | None = None
+    ) -> Layout:
         revision = await self.get_revision(revision_id)
         return await self.update(
             header_data=revision.header_data,
             footer_data=revision.footer_data,
             note=f"Restored from revision #{revision.id}",
+            version=version,
         )
 
 
