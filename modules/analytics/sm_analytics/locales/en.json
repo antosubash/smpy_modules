@@ -125,9 +125,9 @@
     "origin": "Expected an exact http(s) origin without a path",
     "event_names": "Invalid event or property name (max 50 characters, 20 properties)",
     "utm": "Unsupported UTM parameter",
-    "text_short": "Enter at least {count} characters.",
+    "text_short": "Too short (minimum length: {count}).",
     "text_long": "Enter at most {count} characters.",
     "items_long": "Use at most {count} entries.",
-    "items_short": "Use at least {count} entries."
+    "items_short": "Too few entries (minimum: {count})."
   }
 }
