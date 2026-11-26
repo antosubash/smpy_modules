@@ -78,9 +78,14 @@ def test_every_emitted_tag_is_managed(article):
             Path(__file__).resolve().parents[2]
             / "news/ui/components/PublicHead.tsx"
         ).read_text(encoding="utf-8")
-        literal_keys = set(re.findall(r'head-key="([^"]+)"', source))
-        assert set(re.findall(r'head-key=\{`([^`]+)`\}', source)) == {
-            "hreflang-${a.locale}", "og:locale:alternate-${a.locale}",
+        literal_keys = set(re.findall(r"""head-key\s*=\s*["']([^"']+)["']""", source))
+        # Callback names and attribute formatting do not affect the emitted keys.
+        dynamic_keys = {
+            re.sub(r"\$\{\s*[\w$]+\s*\.\s*locale\s*\}", "${locale}", template)
+            for template in re.findall(r"head-key\s*=\s*\{\s*`([^`]+)`\s*\}", source)
+        }
+        assert dynamic_keys == {
+            "hreflang-${locale}", "og:locale:alternate-${locale}",
         }
         assert set(keyed) == literal_keys | {
             "hreflang-en", "hreflang-de", "hreflang-x-default", "og:locale:alternate-de",
