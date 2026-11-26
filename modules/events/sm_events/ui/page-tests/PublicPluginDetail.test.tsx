@@ -6,6 +6,7 @@ import { resetReported } from '../extensions/PluginBoundary';
 import { clearExtensions, registerEventType } from '../extensions/registry';
 import type { PublicDetailProps } from '../extensions/types';
 import type { PublicEventProps } from '../public/types';
+import { headValues } from './public-support';
 import { flush, NO_REGISTRATION } from './support';
 import { mount } from './test-dom';
 
@@ -46,6 +47,7 @@ function props(overrides: Partial<PublicEventProps> = {}): PublicEventProps {
     alternates: [],
     json_ld: null,
     index_in_search: true,
+    head: headValues('Talk'),
     ...overrides,
   };
 }

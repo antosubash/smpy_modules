@@ -43,6 +43,19 @@ export type PublicCalendar = {
 };
 export type PublicCategory = { id: string; slug: string; name: string; color: string | null };
 export type Alternate = { locale: string; url: string };
+/** What the server wrote into the document head (`HeadOut`); `PublicHead` renders these values
+ *  and computes none of its own, so hydration replaces each keyed tag with an equal one. */
+export type HeadValues = {
+  title: string;
+  description: string | null;
+  canonical: string | null;
+  /** Absolute. */
+  image: string | null;
+  /** The whole directive, or null for no tag. */
+  robots: string | null;
+  /** Absolute; listing pages only. */
+  feed_url: string | null;
+};
 
 export type PublicIndexProps = {
   locale: string;
@@ -60,6 +73,7 @@ export type PublicIndexProps = {
   default_timezone: string;
   api_url: string;
   alternates: Alternate[];
+  head: HeadValues;
 };
 
 export type Status = 'scheduled' | 'cancelled' | 'rescheduled';
@@ -131,6 +145,7 @@ export type PublicEventProps = {
   alternates: Alternate[];
   json_ld: unknown;
   index_in_search: boolean;
+  head: HeadValues;
 };
 
 export type PublicNotFoundProps = {

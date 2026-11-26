@@ -71,6 +71,14 @@ class ArticleRead(BaseModel):
     ``card.HAS_UNPUBLISHED_CHANGES``.
     """
 
+    scheduled_at: datetime | None = None
+    """When this draft goes live by itself, in UTC (#449).
+
+    Only for a caller who may see drafts, and only while the article is a draft
+    with a go-live time: a reader is never told what is queued, and a published
+    article carries none. See ``card.SCHEDULED_AT``.
+    """
+
     url: str
     """Where the article serves publicly — ``NewsSettings.public_route_prefix``
     plus its slug."""

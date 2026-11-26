@@ -48,7 +48,8 @@ export function usePageRevisions({ form, setBusy, setMessage, markSaved }: Param
     setBusy(true);
     setMessage(null);
     try {
-      const restored = await restoreRevision(form.pageId, revisionId);
+      const id = form.pageId;
+      const restored = await form.writes.run((token) => restoreRevision(id, revisionId, token));
       markSaved(form.applyRestored(restored));
       setMessage(t(keys.pagebuilder.history.restored));
     } finally {

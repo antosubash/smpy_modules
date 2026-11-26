@@ -34,6 +34,7 @@ export function NoteDialog({
   submitLabel,
   required = false,
   destructive = false,
+  blockedMessage,
   onSubmit,
 }: {
   trigger: ReactNode;
@@ -45,6 +46,8 @@ export function NoteDialog({
   /** Blocks submit until the note is non-empty. */
   required?: boolean;
   destructive?: boolean;
+  /** A terminal editor refusal needs Reload or Overwrite outside this dialog. */
+  blockedMessage?: string | null;
   /** Rejecting keeps the dialog open and surfaces the message. */
   onSubmit: (note: string) => Promise<unknown>;
 }) {
@@ -60,6 +63,7 @@ export function NoteDialog({
   );
 
   const submit = () => {
+    if (blockedMessage) return;
     const trimmed = note.trim();
     if (required && !trimmed) return;
     void run(() => onSubmit(trimmed));
@@ -79,6 +83,14 @@ export function NoteDialog({
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
+          {blockedMessage && (
+            <p
+              role="alert"
+              className="my-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            >
+              {blockedMessage}
+            </p>
+          )}
           <div className="grid gap-2 py-4">
             <Label htmlFor={fieldId}>
               {label}
@@ -101,7 +113,7 @@ export function NoteDialog({
               placeholder={placeholder}
               onChange={(e) => setNote(e.target.value)}
             />
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && !blockedMessage && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
             <Button
@@ -112,13 +124,15 @@ export function NoteDialog({
             >
               {t(keys.pagebuilder.confirm.cancel)}
             </Button>
-            <Button
-              type="submit"
-              variant={destructive ? 'destructive' : 'default'}
-              disabled={pending || (required && !note.trim())}
-            >
-              {pending ? t(keys.pagebuilder.confirm.working) : submitLabel}
-            </Button>
+            {!blockedMessage && (
+              <Button
+                type="submit"
+                variant={destructive ? 'destructive' : 'default'}
+                disabled={pending || (required && !note.trim())}
+              >
+                {pending ? t(keys.pagebuilder.confirm.working) : submitLabel}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

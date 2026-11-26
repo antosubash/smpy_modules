@@ -31,14 +31,16 @@ Pinning does not reorder this list: it only breaks a tie between two articles
 with the same display date (readers' archives put pinned articles first). Twenty load at a time; **Load more** fetches the next batch.
 
 Each row shows its status: **Published · {date}**, **Published · no date**,
-**Pending review**, **Draft · dated {date}** or **Draft · undated**. A live
-article whose draft has moved on since it was published is also marked
+**Pending review**, **Draft · scheduled for {date and time}**,
+**Draft · dated {date}** or **Draft · undated**. The scheduled status uses
+the **Go live** time, not the display date. A live article whose draft has
+moved on since it was published is also marked
 **Unpublished edits** — readers are still served the older version.
 
 Click the category/date value to edit both inline (**Save** / **Cancel**).
 **Edit** opens the article screen; the **···** menu offers **Publish now**
-(drafts), **View on the site** (published), **Edit the body**, **Edit category
-and date**, and **Move to trash**. Trashed articles can be restored from
+(drafts, with `news.publish`), **View on the site** (published), **Edit the body**,
+**Edit category and date**, and **Move to trash**. Trashed articles can be restored from
 **News → Trash**.
 
 ### Creating an article
@@ -60,7 +62,8 @@ the language:
 
 Everything about an article except its body, saved with one **Save** button.
 The header links **Preview** (the draft rendered exactly as readers will see
-it, marked **Preview**), **View live** when published, and **Publish now**.
+it, marked **Preview**), **View live** when published, and **Publish now**
+for drafts when you have `news.publish`.
 A card, **The body has its own canvas**, links to **Edit the body**.
 
 | Field | What it means |

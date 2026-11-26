@@ -59,6 +59,9 @@ export interface ArticleRead {
    *  for it to diverge from. Sent only to a caller who may see drafts, so it
    *  is `false` for anyone else rather than absent. */
   has_unpublished_changes: boolean;
+  /** When this draft goes live by itself (ISO, UTC). Only for a caller who may
+   *  see drafts, and only while it is a draft with a go-live time. */
+  scheduled_at?: string | null;
   url: string;
   /** Where the body is composed. Sent by the server rather than assembled
    *  here, so this list holds no opinion about how the module routes its own

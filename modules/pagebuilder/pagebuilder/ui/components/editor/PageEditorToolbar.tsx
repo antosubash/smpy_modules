@@ -33,6 +33,8 @@ interface Props {
   revisionCount: number;
   busy: boolean;
   message: string | null;
+  writeError: string | null;
+  missing: boolean;
   onToggleSettings: () => void;
   onToggleHistory: () => void;
   onSave: () => void;
@@ -61,6 +63,8 @@ export function PageEditorToolbar({
   revisionCount,
   busy,
   message,
+  writeError,
+  missing,
   onToggleSettings,
   onToggleHistory,
   onSave,
@@ -102,7 +106,7 @@ export function PageEditorToolbar({
       />
       <StatusBadge status={status} />
       <ScheduledBadge status={status} publishAt={publishAt} unpublishAt={unpublishAt} />
-      {pageId !== null && (
+      {pageId !== null && !writeError && (
         <span
           className={saveStateClass}
           data-testid="autosave-status"
@@ -124,78 +128,93 @@ export function PageEditorToolbar({
         <Button variant="outline" size="sm" disabled={pageId === null} onClick={onToggleHistory}>
           {t(keys.pagebuilder.toolbar.history, { count: revisionCount })}
         </Button>
-        <Button variant="outline" size="sm" disabled={busy} onClick={onSave}>
-          {t(keys.pagebuilder.toolbar.save_draft)}
-        </Button>
-        {status === 'published' && (
-          <Button variant="outline" size="sm" disabled={busy} onClick={onUnpublish}>
-            {t(keys.pagebuilder.toolbar.unpublish)}
-          </Button>
-        )}
-        {status === 'draft' && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-amber-500 text-amber-700 hover:bg-amber-50"
-            disabled={busy || pageId === null}
-            onClick={onSubmitForReview}
-          >
-            {t(keys.pagebuilder.toolbar.submit)}
-          </Button>
-        )}
-        {status === 'submitted_for_review' && (
+        {!missing && (
           <>
-            <NoteDialog
-              trigger={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-destructive text-destructive hover:bg-destructive/10"
-                  disabled={busy}
-                >
-                  {t(keys.pagebuilder.toolbar.reject)}
-                </Button>
-              }
-              title={t(keys.pagebuilder.toolbar.reject_title)}
-              description={t(keys.pagebuilder.toolbar.reject_description)}
-              label={t(keys.pagebuilder.toolbar.reject_label)}
-              placeholder={t(keys.pagebuilder.toolbar.reject_placeholder)}
-              submitLabel={t(keys.pagebuilder.toolbar.reject)}
-              required
-              destructive
-              onSubmit={onReject}
-            />
-            <Button
-              size="sm"
-              className="bg-green-600 text-white hover:bg-green-700"
-              disabled={busy}
-              onClick={onApprove}
-            >
-              {t(keys.pagebuilder.toolbar.approve)}
+            <Button variant="outline" size="sm" disabled={busy || !!writeError} onClick={onSave}>
+              {t(keys.pagebuilder.toolbar.save_draft)}
             </Button>
-          </>
-        )}
-        {/* An unsaved page has nothing to publish yet — "Publish" saves it and
+            {status === 'published' && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || !!writeError}
+                onClick={onUnpublish}
+              >
+                {t(keys.pagebuilder.toolbar.unpublish)}
+              </Button>
+            )}
+            {status === 'draft' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-amber-500 text-amber-700 hover:bg-amber-50"
+                disabled={busy || !!writeError || pageId === null}
+                onClick={onSubmitForReview}
+              >
+                {t(keys.pagebuilder.toolbar.submit)}
+              </Button>
+            )}
+            {status === 'submitted_for_review' && (
+              <>
+                <NoteDialog
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-destructive text-destructive hover:bg-destructive/10"
+                      disabled={busy || !!writeError}
+                    >
+                      {t(keys.pagebuilder.toolbar.reject)}
+                    </Button>
+                  }
+                  title={t(keys.pagebuilder.toolbar.reject_title)}
+                  description={t(keys.pagebuilder.toolbar.reject_description)}
+                  label={t(keys.pagebuilder.toolbar.reject_label)}
+                  placeholder={t(keys.pagebuilder.toolbar.reject_placeholder)}
+                  submitLabel={t(keys.pagebuilder.toolbar.reject)}
+                  required
+                  destructive
+                  blockedMessage={writeError}
+                  onSubmit={onReject}
+                />
+                <Button
+                  size="sm"
+                  className="bg-green-600 text-white hover:bg-green-700"
+                  disabled={busy || !!writeError}
+                  onClick={onApprove}
+                >
+                  {t(keys.pagebuilder.toolbar.approve)}
+                </Button>
+              </>
+            )}
+            {/* An unsaved page has nothing to publish yet — "Publish" saves it and
             navigates into the editor, so asking for a revision note first
             would be asking about a revision that does not exist. */}
-        {pageId === null ? (
-          <Button size="sm" disabled={busy} onClick={() => void onPublish(null)}>
-            {t(keys.pagebuilder.toolbar.publish)}
-          </Button>
-        ) : (
-          <NoteDialog
-            trigger={
-              <Button size="sm" disabled={busy}>
+            {pageId === null ? (
+              <Button
+                size="sm"
+                disabled={busy || !!writeError}
+                onClick={() => void onPublish(null)}
+              >
                 {t(keys.pagebuilder.toolbar.publish)}
               </Button>
-            }
-            title={t(keys.pagebuilder.toolbar.publish_title)}
-            description={t(keys.pagebuilder.toolbar.publish_description)}
-            label={t(keys.pagebuilder.toolbar.publish_label)}
-            placeholder={t(keys.pagebuilder.toolbar.publish_placeholder)}
-            submitLabel={t(keys.pagebuilder.toolbar.publish)}
-            onSubmit={(note) => onPublish(note || null)}
-          />
+            ) : (
+              <NoteDialog
+                trigger={
+                  <Button size="sm" disabled={busy || !!writeError}>
+                    {t(keys.pagebuilder.toolbar.publish)}
+                  </Button>
+                }
+                title={t(keys.pagebuilder.toolbar.publish_title)}
+                description={t(keys.pagebuilder.toolbar.publish_description)}
+                label={t(keys.pagebuilder.toolbar.publish_label)}
+                placeholder={t(keys.pagebuilder.toolbar.publish_placeholder)}
+                submitLabel={t(keys.pagebuilder.toolbar.publish)}
+                blockedMessage={writeError}
+                onSubmit={(note) => onPublish(note || null)}
+              />
+            )}
+          </>
         )}
         {/* Stays an <a>: the e2e selects it with getByRole('link', {name: /^view$/i}). */}
         {status === 'published' && pageId !== null && (
@@ -209,7 +228,9 @@ export function PageEditorToolbar({
           </a>
         )}
       </div>
-      {message && <span className="mt-1 w-full text-sm text-muted-foreground">{message}</span>}
+      {message && !writeError && (
+        <span className="mt-1 w-full text-sm text-muted-foreground">{message}</span>
+      )}
     </div>
   );
 }

@@ -22,13 +22,15 @@ def test_json_ld_script_break_out():
         description=EVIL,
         canonical="https://x.example/e",
         image=None,
-        index_in_search=True,
+        robots=None,
         json_ld={"@type": "Event", "name": EVIL},
         locale="en",
         alternates=[],
     )
     assert head.count("<script") == 1 and head.count("</script>") == 1
-    body = re.search(r'<script type="application/ld\+json">(.*)</script>', head, re.S).group(1)
+    body = re.search(
+        r'<script type="application/ld\+json" data-inertia="json-ld">(.*)</script>', head, re.S
+    ).group(1)
     assert json.loads(body)["name"] == EVIL
     assert "<script>alert" not in head  # the title and description are escaped too
 
@@ -49,12 +51,12 @@ def test_html_comment_escaped():
 def test_noindex():
     head = _head.event_head(
         title="T", description=None, canonical="https://x/e", image=None,
-        index_in_search=False, json_ld=None, locale="en", alternates=[],
+        robots=_head.ROBOTS_NOINDEX, json_ld=None, locale="en", alternates=[],
     )  # fmt: skip
-    assert '<meta name="robots" content="noindex,nofollow">' in head
+    assert '<meta name="robots" data-inertia="robots" content="noindex,nofollow">' in head
     ok = _head.event_head(
         title="T", description=None, canonical="https://x/e", image=None,
-        index_in_search=True, json_ld=None, locale="en", alternates=[],
+        robots=None, json_ld=None, locale="en", alternates=[],
     )  # fmt: skip
     assert "robots" not in ok
 
@@ -65,7 +67,7 @@ def test_canonical_and_hreflang_escaped():
         description='x"y',
         canonical='https://x.example/e?date=1&a="b"',
         image=None,
-        index_in_search=True,
+        robots=None,
         json_ld=None,
         locale="de",
         alternates=[
@@ -73,11 +75,14 @@ def test_canonical_and_hreflang_escaped():
             {"locale": "x-default", "url": 'https://x.example/e"'},
         ],
     )
-    assert '<link rel="canonical" href="https://x.example/e?date=1&amp;a=&quot;b&quot;">' in head
+    assert (
+        '<link rel="canonical" data-inertia="canonical" '
+        'href="https://x.example/e?date=1&amp;a=&quot;b&quot;">'
+    ) in head
     assert 'hreflang="x-default" href="https://x.example/e&quot;"' in head
     assert "<title>A &quot;quoted&quot; &lt;b&gt;</title>" in head
-    assert '<meta property="og:type" content="website">' in head
-    assert '<meta property="og:locale" content="de">' in head
+    assert '<meta property="og:type" data-inertia="og:type" content="website">' in head
+    assert '<meta property="og:locale" data-inertia="og:locale" content="de">' in head
     assert "<b>" not in head
 
 
@@ -122,20 +127,20 @@ def test_set_html_lang_escapes_the_locale():
 def test_no_executable_script():
     head = _head.event_head(
         title="T", description="d", canonical="https://x/e", image="https://x/i.png",
-        index_in_search=True, json_ld={"@type": "Event"}, locale="en", alternates=[],
+        robots=None, json_ld={"@type": "Event"}, locale="en", alternates=[],
     )  # fmt: skip
     scripts = re.findall(r"<script[^>]*>", head)
-    assert scripts == ['<script type="application/ld+json">']
+    assert scripts == ['<script type="application/ld+json" data-inertia="json-ld">']
 
 
 def test_json_ld_carries_the_request_nonce():
     head = _head.event_head(
-        title="T", description=None, canonical=None, image=None, index_in_search=True,
+        title="T", description=None, canonical=None, image=None, robots=None,
         json_ld={"@type": "Event"}, locale="en", alternates=[], nonce='abc"def',
     )  # fmt: skip
-    assert '<script type="application/ld+json" nonce="abc&quot;def">' in head
+    assert '<script type="application/ld+json" data-inertia="json-ld" nonce="abc&quot;def">' in head
     plain = _head.event_head(
-        title="T", description=None, canonical=None, image=None, index_in_search=True,
+        title="T", description=None, canonical=None, image=None, robots=None,
         json_ld={"@type": "Event"}, locale="en", alternates=[],
     )  # fmt: skip
     assert "nonce" not in plain

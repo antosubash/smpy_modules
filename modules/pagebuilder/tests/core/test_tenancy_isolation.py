@@ -41,6 +41,19 @@ async def test_the_other_tenant_cannot_change_or_delete_it(mt: AsyncClient) -> N
     assert kept.json()["title"] == "Mine"
 
 
+async def test_versioned_writes_cannot_probe_or_change_another_tenant(mt: AsyncClient) -> None:
+    page = await create_page(mt, A, slug="private-version", title="Mine")
+    url = f"{API}/{page['id']}"
+    token = {"expected_updated_at": page["updated_at"]}
+    saved = await mt.put(url, json={**token, "title": "Hacked"}, headers=B)
+    assert saved.status_code == 404
+    published = await mt.post(f"{url}/publish", json=token, headers=B)
+    assert published.status_code == 404
+    kept = (await mt.get(url, headers=A)).json()
+    assert kept["title"] == "Mine"
+    assert kept["updated_at"] == page["updated_at"]
+
+
 async def test_same_locale_and_slug_in_both_tenants(mt: AsyncClient) -> None:
     a = await create_page(mt, A, slug="about", title="A about")
     b = await create_page(mt, B, slug="about", title="B about")

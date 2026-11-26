@@ -77,8 +77,10 @@ async def test_both_heads_receive_the_same_safe_absolute_image(
         assert 'property="og:image"' not in head
         assert 'name="twitter:image"' not in head
     else:
-        assert f'<meta property="og:image" content="{escape(expected)}">' in head
-        assert f'<meta name="twitter:image" content="{escape(expected)}">' in head
+        content = escape(expected)
+        assert f'<meta property="og:image" data-inertia="og:image" content="{content}">' in head
+        twitter = f'<meta name="twitter:image" data-inertia="twitter:image" content="{content}">'
+        assert twitter in head
 
     page = await anon_client.get(
         "/news/cover", headers={"X-Inertia": "true", "X-Inertia-Version": "1.0"}
@@ -153,8 +155,11 @@ async def test_article_resolves_one_origin_for_its_validator_and_urls(
     monkeypatch.setattr(_urls, "public_base_url", track_origin)
     response = await anon_client.get("/news/cover")
     assert response.status_code == 200
-    assert '<link rel="canonical" href="http://test/news/cover">' in response.text
-    assert '<meta property="og:image" content="http://test/media/cover.webp">' in response.text
+    text = response.text
+    assert '<link rel="canonical" data-inertia="canonical" href="http://test/news/cover">' in text
+    assert (
+        '<meta property="og:image" data-inertia="og:image" content="http://test/media/cover.webp">'
+    ) in text
     assert 'hreflang="de" href="http://test/de/news/cover-de"' in response.text
     assert origins == ["http://test"]
 
@@ -171,8 +176,11 @@ async def test_configured_origin_ignores_untrusted_hosts_in_urls_and_etag(
     other = await anon_client.get("/news/cover", headers={header: "attacker.example"})
     assert first.status_code == other.status_code == 200
     assert other.headers["etag"] == first.headers["etag"]
-    assert '<link rel="canonical" href="https://news.example/news/cover">' in other.text
     assert (
-        '<meta property="og:image" content="https://news.example/media/cover.webp">' in other.text
-    )
+        '<link rel="canonical" data-inertia="canonical" href="https://news.example/news/cover">'
+    ) in other.text
+    assert (
+        '<meta property="og:image" data-inertia="og:image" '
+        'content="https://news.example/media/cover.webp">'
+    ) in other.text
     assert "attacker.example" not in other.text

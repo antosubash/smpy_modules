@@ -19,7 +19,7 @@ export function ArchiveHead({ heading, query = '' }: ArchiveHeadProps) {
         the links out of it are the real documents. The server writes the
         same tag into the head for the crawler that never runs this script;
         see `endpoints/public/_head.py`. */}
-      {query && <meta name="robots" content="noindex,follow" />}
+      {query && <meta head-key="robots" name="robots" content="noindex,follow" />}
     </Head>
   );
 }

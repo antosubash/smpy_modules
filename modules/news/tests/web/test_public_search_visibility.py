@@ -89,7 +89,7 @@ class TestWhatACrawlerIsTold:
 
         rendered = (await anon_client.get(f"{NEWS}/?q=canopy")).text
 
-        assert '<meta name="robots" content="noindex,follow">' in rendered
+        assert '<meta name="robots" data-inertia="robots" content="noindex,follow">' in rendered
 
     async def test_an_unsearched_archive_is_still_indexable(self, anon_client) -> None:
         await _seed(anon_client, "canopy")
