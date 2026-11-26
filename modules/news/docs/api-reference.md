@@ -256,10 +256,13 @@ article page sends an `ETag`, `Cache-Control` from the settings,
 on a 304), with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflang`,
 `robots` and JSON-LD written into the server-rendered `<head>`.
 
-Tags also rendered by `ArticleHead` or `ArchiveHead` carry matching
-`data-inertia` / `head-key` values, so hydration replaces them instead of
-adding duplicates. Server-only tags (including `hreflang` and feed discovery)
-stay unkeyed so Inertia keeps them.
+The article and every archive variant include a `head` prop containing the exact
+values written into the server HTML. `ArticleHead` and `ArchiveHead` render from
+that prop with matching `data-inertia` / `head-key` values, including `og:locale`,
+`og:locale:alternate`, `hreflang` and RSS feed discovery. Hydration keeps one of
+each, and client-side visits replace or remove the previous page's tags (#462).
+The title uses Inertia's special title handling rather than a key. Search
+archives advertise no alternate languages and keep `noindex,follow`.
 
 The module's public strings use the address's content locale when a matching
 console catalogue is loaded; a regional tag such as `de-at` falls back to
@@ -332,8 +335,9 @@ The same package root exports the stock metadata components and their types:
 
 | Export | Props / behavior |
 |---|---|
-| `ArticleHead`, `ArticleHeadProps` | `title`, nullable `meta_description` and `og_image`; optional `canonical_url`, `og_url`, `site_name`, `twitter_handle`, `published_at`, `author`, `category`, `index_in_search` (defaults to `true`), and `json_ld`. Keeps the stock title, description, article OG/Twitter tags, canonical, robots and escaped JSON-LD. |
-| `ArchiveHead`, `ArchiveHeadProps` | `heading`, optional `query` (defaults to `''`). Keeps the stock title; a search emits `noindex,follow`. |
+| `ArticleHead`, `ArticleHeadProps` | Pass the endpoint's `head` unchanged to keep all server tags, including language and feed links. The original props remain supported: `title`, nullable `meta_description` and `og_image`; optional `canonical_url`, `og_url`, `site_name`, `twitter_handle`, `published_at`, `author`, `category`, `index_in_search` (defaults to `true`), and `json_ld`. |
+| `ArchiveHead`, `ArchiveHeadProps` | `heading`, optional `query` (defaults to `''`) and `head`. Pass `head` unchanged to keep all archive metadata. Without it, retains the original title and search `noindex,follow` behavior. |
+| `PublicHeadValues` | The type of the server-resolved `head` prop, shared by both components. |
 | `safeJsonLd(document)` | Serializes a JSON object and escapes every `<` as `\u003c`, preventing script termination while preserving the original JSON values. `ArticleHead` already uses it. |
 
 For example, a replacement for `News/PublicArticle` keeps its head and frame
@@ -349,18 +353,21 @@ type Props = ArticleHeadProps & PublicLayoutProps;
 
 export default function BrandedArticle(props: Props) {
   return (
-    <PublicLayout {...props}>
+    <>
       <ArticleHead {...props} />
-      <article className="my-reading-column">
-        <h1>{props.title}</h1>
-        {/* Render the server's `data` with your host's article body here. */}
-      </article>
-    </PublicLayout>
+      <PublicLayout {...props}>
+        <article className="my-reading-column">
+          <h1>{props.title}</h1>
+          {/* Render the server's `data` with your host's article body here. */}
+        </article>
+      </PublicLayout>
+    </>
   );
 }
 ```
 
-A replaced index can likewise render `<ArchiveHead heading={heading}
-query={query} />` inside `<PublicLayout {...props}>`. The stock pages use these
-same components; replacing a page no longer requires copying its metadata
-implementation. The server's HTML head remains unchanged.
+A replaced index can likewise render `<ArchiveHead head={head} heading={heading}
+query={query} />` before `<PublicLayout {...props}>`. Keep the head outside the
+layout so loading its language catalogue cannot suspend it and remove the tags.
+The stock pages use these same components; replacing a page no longer requires
+copying its metadata implementation. The server's HTML head remains complete.

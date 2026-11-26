@@ -105,7 +105,10 @@ class TestWhatACrawlerIsTold:
         rendered = (await anon_client.get(f"{NEWS}/?q=canopy&page=2")).text
 
         # `q` before `page`, so one page of one search has one spelling.
-        assert 'rel="canonical" href="http://test/news/?q=canopy&amp;page=2"' in rendered
+        assert (
+            'rel="canonical" data-inertia="canonical" '
+            'href="http://test/news/?q=canopy&amp;page=2"'
+        ) in rendered
 
     async def test_a_search_advertises_no_translations(
         self, bilingual_public_client

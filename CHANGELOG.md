@@ -439,6 +439,10 @@ name the module they affect.
 
 ### Fixed
 
+- **news: public head tags follow client-side visits** (#462). Archive and article
+  pages share the server-resolved head values with Inertia, keeping canonical,
+  social, language, feed and structured-data tags current without duplicates or
+  stale tags after navigation.
 - **pagebuilder: warn before overwriting another editor's site layout** (#466).
   Header/footer saves and revision restores send `expected_updated_at`; a stale
   write returns 409 `layout_conflict` without changing the layout or its history.

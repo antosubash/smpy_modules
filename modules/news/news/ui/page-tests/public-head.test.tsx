@@ -75,6 +75,28 @@ describe.each(['page', 'package export'])('public head output via %s (#446)', (s
       ]
     `);
   });
+  it('uses the exact server head prop rather than rebuilding it from display props', () => {
+    const head = {
+      title: 'Server title',
+      description: 'Server description',
+      canonical: 'https://example.test/de/news/',
+      locale: 'de',
+      feed_url: 'https://example.test/de/news/feed.xml',
+      alternates: [{ locale: 'en', url: 'https://example.test/news/' }],
+    };
+    renderToStaticMarkup(<Archive {...archive} head={head} query="different title" />);
+    renderToStaticMarkup(<Article {...article} head={head} />);
+    expect(heads).toHaveLength(2);
+    for (const markup of heads) {
+      expect(markup).toContain('<title>Server title</title>');
+      expect(markup).toContain(
+        'head-key="canonical" rel="canonical" href="https://example.test/de/news/"',
+      );
+      expect(markup).toContain('head-key="og:locale" property="og:locale" content="de"');
+      expect(markup).toContain('head-key="hreflang-en"');
+      expect(markup).toContain('head-key="feed"');
+    }
+  });
   it('preserves the archive title and search robots tag', () => {
     renderToStaticMarkup(<Archive {...archive} query="trees & soil" />);
     expect(heads).toMatchInlineSnapshot(`

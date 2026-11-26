@@ -24,7 +24,7 @@ from news.content import service
 from news.core import constants, locales
 from news.core.settings import NewsSettings, active, public_feed_path
 from news.integrations.pagebuilder import public_layout_props
-from news.web.endpoints.public import _head
+from news.web.endpoints.public import _head, _head_pages
 from news.web.endpoints.public._lang import set_html_lang
 from news.web.endpoints.public._not_found import NO_SUCH_PAGE, not_found
 from news.web.endpoints.public._paging import MAX_PAGE
@@ -211,9 +211,24 @@ async def render_archive(
 
     canonical = absolute(request, settings, archive_url(path, page=page, q=query))
     feed_path = public_feed_path(locale)
+    head = {
+        "title": (heading if not settings.site_name else f"{heading} — {settings.site_name}"),
+        "description": description,
+        "canonical": canonical,
+        "site_name": settings.site_name or None,
+        "feed_url": absolute(request, settings, feed_path),
+        "locale": locale,
+        # A search page advertises no translations. The others are the same
+        # document in each language; a set of results for an English phrase
+        # is not the German page's content, and pointing a crawler at it as
+        # though it were would be a claim about a page that does not exist.
+        "alternates": (None if query else _archive_alternates(request, settings, path_for)),
+        "robots": SEARCH_ROBOTS if query else None,
+    }
     rendered = await inertia.render(
         constants._PAGE_PUBLIC_INDEX,
         {
+            "head": head,
             "heading": heading,
             "description": description,
             "items": [item.model_dump(mode="json") for item in items],
@@ -235,20 +250,7 @@ async def render_archive(
     )
     response = _head.inject(
         set_html_lang(rendered, locale),
-        _head.listing_head(
-            title=(heading if not settings.site_name else f"{heading} — {settings.site_name}"),
-            description=description,
-            canonical=canonical,
-            site_name=settings.site_name or None,
-            feed_url=absolute(request, settings, feed_path),
-            locale=locale,
-            # A search page advertises no translations. The others are the same
-            # document in each language; a set of results for an English phrase
-            # is not the German page's content, and pointing a crawler at it as
-            # though it were would be a claim about a page that does not exist.
-            alternates=(None if query else _archive_alternates(request, settings, path_for)),
-            robots=SEARCH_ROBOTS if query else None,
-        ),
+        _head_pages.listing_head(**head),
     )
     apply_cache(response, request, settings, listing=True, per_viewer=True)
     response.headers["Content-Language"] = locale
