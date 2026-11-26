@@ -9,6 +9,7 @@ import {
   reminderStatusOnce,
   setFollow,
 } from '../utils/api-reminders';
+import { useT } from '../utils/i18n';
 
 /** `loading`; `unavailable` (reminders cannot be delivered, with the manager-only reason);
  *  `hidden` (the event is gone for this user: nothing to show); `ready`. */
@@ -26,6 +27,8 @@ export function useFollow(eventId: string) {
   const [error, setError] = useState<string | null>(null);
   const [atCap, setAtCap] = useState(false);
   const alive = useRef(true);
+  // The page's translator: this runs on public event pages too (#417).
+  const { t } = useT();
 
   useEffect(() => {
     alive.current = true;
@@ -77,7 +80,7 @@ export function useFollow(eventId: string) {
         setState(before); // put back what the server did not accept
         if (isGone(e)) setState({ kind: 'hidden' });
         else {
-          setError(errorText(e));
+          setError(errorText(e, undefined, t));
           setAtCap(e instanceof ApiError && e.code === 'follow_limit');
         }
         return false;
@@ -85,7 +88,7 @@ export function useFollow(eventId: string) {
         if (alive.current) setSaving(false);
       }
     },
-    [eventId, saving, state],
+    [eventId, saving, state, t],
   );
 
   return {

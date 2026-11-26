@@ -20,6 +20,12 @@ PUBLIC_ENTRIES = {
         "ui/blocks/UpcomingEventsRender.tsx", "ui/blocks/EventsCalendarRender.tsx",
     ),
 }
+# ``translate`` is only the default of an injectable ``t`` parameter in these.
+INJECTED = {"api.ts", "recurrence.ts"}
+# The arguments of a call to one of them (one level of nested parentheses).
+CALL = re.compile(
+    r"\b(?:errorText|searchErrorText|summarise)\(([^()]*(?:\([^()]*\)[^()]*)*)\)"
+)
 IMPORT = re.compile(r'''(?:from\s*|import\s*\(\s*|import\s*)['"](\.[^'"]+)['"]''')
 
 
@@ -62,5 +68,11 @@ def test_public_events_cannot_bypass_their_own_catalogue(entry):
             # PublicLocale.test.tsx verifies this with an empty shared catalogue.
             continue
         assert "@simple-module-py/i18n" not in source, path
-        # Non-hook translation bypasses React's PageLocale context.
-        assert not re.search(r"\btranslate\s*(?:\(|[,}])", source), path
+        # Non-hook translation bypasses React's PageLocale context. Two helpers take
+        # the caller's translator and fall back to it for console callers; anything
+        # an anonymous visitor reaches must pass the page's own ``t``.
+        if path.name in INJECTED:
+            continue
+        assert not re.search(r"\btranslate\b", source), path
+        for call in CALL.findall(source):
+            assert re.search(r",\s*t\s*$", call), f"{path}: pass the page's t: {call!r}"
