@@ -29,6 +29,7 @@ class AnalyticsModule(ModuleBase):
         view_prefix=c.VIEW_PREFIX,
         depends_on=[c._MODULE_SETTINGS],
         version=metadata.version("simple_module_analytics"),
+        i18n_audience="admin",
         requires_framework=">=1.0,<2.0",
     )
 

@@ -318,6 +318,11 @@ name the module they affect.
 
 ### Changed
 
+- Mark ai, analytics, billing, events and newsletter catalogues as admin audience
+  (#417): anonymous Inertia i18n JSON loses 136,045 bytes in English and 154,295
+  in German (uncompressed); events keeps its bundled public translations and
+  newsletter its server-rendered copy. Modules with shared public strings stay public.
+
 - **The demo host runs framework 0.0.47** (was 0.0.44). The host ports the
   one new framework revision, `e480d7dd348f` (`users_oauth_account` profile
   columns), and adds `c7a41e9d2b60` of its own, which retypes
