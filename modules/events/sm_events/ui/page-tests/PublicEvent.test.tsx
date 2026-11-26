@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
-
 import { updateI18n } from '@simple-module-py/i18n';
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import type { PublicEventProps } from '../public/types';
 import { loadCatalogue } from '../utils/PageLocale';
-import { item } from './public-support';
+import { headValues, item } from './public-support';
 import { NO_REGISTRATION } from './support';
 import { mount, ready } from './test-dom';
 
@@ -55,6 +54,7 @@ function props(overrides: Partial<PublicEventProps> = {}): PublicEventProps {
     canonical_url: 'https://x.example/events/concert',
     alternates: [],
     json_ld: null,
+    head: headValues('Concert'),
     index_in_search: true,
     ...overrides,
   };

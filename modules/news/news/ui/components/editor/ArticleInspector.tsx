@@ -11,6 +11,7 @@ import { TagInput } from './TagInput';
 
 const TITLE_ID = 'article-title';
 const SLUG_ID = 'article-slug';
+const SLUG_HINT_ID = 'article-slug-hint';
 const CATEGORY_ID = 'article-category';
 const DATE_ID = 'article-date';
 const TIME_ID = 'article-time';
@@ -99,11 +100,17 @@ export function ArticleInspector({
             id={SLUG_ID}
             value={draft.slug}
             disabled={busy}
+            aria-invalid={!SLUG_PATTERN.test(draft.slug)}
+            aria-describedby={SLUG_PATTERN.test(draft.slug) ? undefined : SLUG_HINT_ID}
             onChange={(e) => onChange({ slug: e.target.value })}
           />
         </div>
-        {draft.slug && !SLUG_PATTERN.test(draft.slug) ? (
-          <p className="text-xs text-destructive">{t(copy.slug_invalid)}</p>
+        {/* An empty slug fails the pattern too and disables Save, so it gets the
+            same sentence; without it Save was disabled with nothing saying why. */}
+        {!SLUG_PATTERN.test(draft.slug) ? (
+          <p id={SLUG_HINT_ID} className="text-xs text-destructive">
+            {t(copy.slug_invalid)}
+          </p>
         ) : (
           <p className="text-xs text-muted-foreground">{t(copy.slug_help)}</p>
         )}

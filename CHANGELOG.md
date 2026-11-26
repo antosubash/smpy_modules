@@ -439,6 +439,34 @@ name the module they affect.
 
 ### Fixed
 
+- **news: small defects on the article screens** (#449). Unpublish refused with the
+  stale-write conflict now shows that message in its dialog instead of a generic
+  one. An empty or invalid URL says why Save is disabled. The German tag input's
+  placeholder is no longer clipped. An article that is not found says so in the
+  header and the tab title instead of "Loading…". A draft with a go-live time is
+  listed as "Draft · scheduled for …" (the list API gains an editorial-only
+  `scheduled_at`). "Publish now" is hidden, on the list and the edit screen,
+  from a user without `news.publish`.
+- **news: public pages use the language of their address** (#450). On
+  `/de/news/` the module's own strings (search box, pager, "Subscribe by RSS")
+  now come from the German catalogue for a visitor whose browser asks for
+  English, as pagebuilder's chrome beside them already did; the default
+  language's address stays English whatever the browser asks for. A content
+  language the console has no catalogue for keeps the reader's language.
+- **news: article head tags no longer double after hydration** (#451). The
+  canonical link, `og:*`, `article:*`, `twitter:*` and JSON-LD the server writes
+  into a public article carry Inertia's `data-inertia` key, and `ArticleHead` and
+  `ArchiveHead` render the same keys, so the browser keeps one of each instead of
+  two.
+- **events: public head tags no longer double after hydration** (#461). The
+  canonical link, `hreflang` alternates, calendar feed link, `og:*`, `twitter:*`,
+  `robots` and JSON-LD the server writes into a public event or listing page carry
+  Inertia's `data-inertia` key. Corresponding `PublicHead` tags use the same keys
+  (it now also renders `twitter:card` and `twitter:image` on an event page), so
+  matching tags share one copy after hydration. The page receives the values the
+  server wrote (`head` prop: title, description, canonical, image, robots, feed
+  link) and `PublicHead` renders only those, so a tag cannot change or vanish when
+  the script runs.
 - **pagebuilder: a page's images no longer count against the visitor's request
   budget by default** (#442). The media prefix is registered with `rate="off"`,
   matching the host limiter's built-in exemption for `/static/`. If a host has set

@@ -29,6 +29,7 @@ from news.core.tenancy import bind_public, bind_public_viewer
 from news.web.endpoints.public._article import article_router, default_locale_alias_router
 from news.web.endpoints.public._feeds import feed_router
 from news.web.endpoints.public._index import index_router
+from news.web.endpoints.public._lang import use_content_locale
 from news.web.endpoints.public._sitemap import sitemap_entries, sitemap_router
 
 
@@ -40,7 +41,7 @@ def public_router(locale: str) -> APIRouter:
     # and each endpoint answers it without a lookup.
     router = APIRouter()
     machine = [Depends(bind_public)]
-    reader = [Depends(bind_public_viewer)]
+    reader = [Depends(use_content_locale(locale)), Depends(bind_public_viewer)]
     # Fixed paths first...
     router.include_router(feed_router(locale), dependencies=machine)
     if locales.is_default(locale):

@@ -33,6 +33,7 @@ from sm_events.web.endpoints.public._occurrence import (
 )
 from sm_events.web.endpoints.public._respond import conditional
 from sm_events.web.endpoints.public._tenant import public_tenant
+from sm_events.web.schemas.public import HeadOut
 
 __all__ = ["event_router"]
 
@@ -94,18 +95,26 @@ def event_router(locale: str) -> APIRouter:
         if (unchanged := conditional(request, settings, kind="page", etag=etag)) is not None:
             return unchanged
         props = build_props(ctx, shown, upcoming, lambda path: _urls.absolute(request, path))
-        response = await inertia.render(constants._PAGE_PUBLIC_EVENT, props.model_dump(mode="json"))
-        head_image = props.image
-        if head_image and head_image.startswith("/"):  # og:image needs an absolute address
-            head_image = _urls.absolute(request, head_image)
-        head = _head.event_head(
+        # One resolution, written into the head here and sent to the page, which renders
+        # these same values (``PublicHead``): the two copies cannot drift.
+        values = HeadOut(
             title=text.seo_title or text.title,
             description=description_for_head(ctx) or fallback_description(props),
             canonical=props.canonical_url,
             image=_urls.absolute(request, props.image)
             if (props.image or "").startswith("/")
             else props.image,
-            index_in_search=props.index_in_search,
+            robots=None if props.index_in_search else _head.ROBOTS_NOINDEX,
+            feed_url=None,
+        )
+        props.head = values
+        response = await inertia.render(constants._PAGE_PUBLIC_EVENT, props.model_dump(mode="json"))
+        head = _head.event_head(
+            title=values.title,
+            description=values.description,
+            canonical=values.canonical,
+            image=values.image,
+            robots=values.robots,
             json_ld=props.json_ld,
             locale=locale,
             alternates=[a.model_dump() for a in props.alternates],

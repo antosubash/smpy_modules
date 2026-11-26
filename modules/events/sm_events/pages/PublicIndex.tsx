@@ -77,50 +77,45 @@ function PublicIndexPage(props: PublicIndexProps) {
     );
   };
   return (
-    <>
-      <PublicHead
-        title={title}
-        description={props.calendar?.description}
-        locale={props.locale}
-        alternates={props.alternates}
-        feedUrl={props.feed_url}
-      />
-      <main className="mx-auto max-w-4xl space-y-6 p-4" aria-label={t(copy.region)}>
-        <header className="space-y-2">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          {props.calendar?.description ? <p>{props.calendar.description}</p> : null}
-          <LanguageSwitch alternates={props.alternates} locale={props.locale} />
-        </header>
-        <nav className="flex gap-4 text-sm" aria-label={t(copy.tabs)}>
-          {tab('list', t(copy.tab_list))}
-          {tab('calendar', t(copy.tab_calendar))}
-        </nav>
-        <CategoryFilter categories={props.categories} active={props.category} base={base} />
-        {props.view === 'calendar' ? (
-          <PublicCalendarGrid
-            apiUrl={props.api_url}
-            calendars={props.calendar ? [props.calendar] : props.calendars}
-            categories={props.categories}
-            defaultTimezone={props.default_timezone}
-            initial={initial}
-            onState={onState}
-          />
-        ) : (
-          <>
-            <UpcomingList groups={props.groups} locale={props.locale} />
-            <Pager props={props} base={base} />
-          </>
-        )}
-        <SubscribeBox feedUrl={props.feed_url} />
-      </main>
-    </>
+    <main className="mx-auto max-w-4xl space-y-6 p-4" aria-label={t(copy.region)}>
+      <header className="space-y-2">
+        <h1 className="text-2xl font-semibold">{title}</h1>
+        {props.calendar?.description ? <p>{props.calendar.description}</p> : null}
+        <LanguageSwitch alternates={props.alternates} locale={props.locale} />
+      </header>
+      <nav className="flex gap-4 text-sm" aria-label={t(copy.tabs)}>
+        {tab('list', t(copy.tab_list))}
+        {tab('calendar', t(copy.tab_calendar))}
+      </nav>
+      <CategoryFilter categories={props.categories} active={props.category} base={base} />
+      {props.view === 'calendar' ? (
+        <PublicCalendarGrid
+          apiUrl={props.api_url}
+          calendars={props.calendar ? [props.calendar] : props.calendars}
+          categories={props.categories}
+          defaultTimezone={props.default_timezone}
+          initial={initial}
+          onState={onState}
+        />
+      ) : (
+        <>
+          <UpcomingList groups={props.groups} locale={props.locale} />
+          <Pager props={props} base={base} />
+        </>
+      )}
+      <SubscribeBox feedUrl={props.feed_url} />
+    </main>
   );
 }
 
 export default function PublicIndex(props: PublicIndexProps) {
+  // Outside `PageLocale`, as in `PublicEvent`: the keyed server tags must not wait on a chunk.
   return (
-    <PageLocale locale={props.locale}>
-      <PublicIndexPage {...props} />
-    </PageLocale>
+    <>
+      <PublicHead head={props.head} locale={props.locale} alternates={props.alternates} />
+      <PageLocale locale={props.locale}>
+        <PublicIndexPage {...props} />
+      </PageLocale>
+    </>
   );
 }

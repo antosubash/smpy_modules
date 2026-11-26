@@ -13,6 +13,7 @@ from sm_events.content.richtext_tree import Node
 from sm_events.web.schemas.public import (
     AlternateOut,
     CategoryRef,
+    HeadOut,
     PublicCalendarRef,
     PublicListItem,
 )
@@ -125,3 +126,5 @@ class PublicEventProps(BaseModel):
     alternates: list[AlternateOut]
     json_ld: Any
     index_in_search: bool
+    head: HeadOut | None = None
+    """Set by the endpoint, which resolves it with the values it writes into the head."""
