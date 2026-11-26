@@ -47,6 +47,8 @@ export default function LayoutEditor() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // The restore a conflict refused: Overwrite then repeats it, not a save of this screen.
+  const [refusedRestore, setRefusedRestore] = useState<number | null>(null);
   const isNarrow = useIsNarrow();
   // Block labels are written as catalogue keys — see `localizeConfig` for why
   // they cannot resolve them where they are written.
@@ -71,7 +73,8 @@ export default function LayoutEditor() {
       setMessage(t(keys.pagebuilder.layout.saved));
       router.reload({ only: ['revisions'] });
     } catch (e) {
-      if (!(e instanceof HttpError && e.code === 'layout_conflict')) {
+      if (e instanceof HttpError && e.code === 'layout_conflict') setRefusedRestore(null);
+      else {
         setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.layout.save_failed));
       }
     } finally {
@@ -80,11 +83,15 @@ export default function LayoutEditor() {
   };
 
   // Confirmation and failure both belong to the dialog on the row.
-  const handleRestore = async (revisionId: number) => {
+  const handleRestore = async (revisionId: number, overwrite = false) => {
     setBusy(true);
     setMessage(null);
     try {
-      const restored = await writes.run((token) => restoreLayoutRevision(revisionId, token));
+      const restored = await writes.run(
+        (token) => restoreLayoutRevision(revisionId, overwrite ? undefined : token),
+        overwrite,
+      );
+      setRefusedRestore(null);
       setHeaderData(restored.header_data as unknown as Data);
       setFooterData(restored.footer_data as unknown as Data);
       setMessage(t(keys.pagebuilder.layout.revision_restored));
@@ -92,6 +99,7 @@ export default function LayoutEditor() {
     } catch (e) {
       // Close the dialog so Reload and Overwrite in the banner are reachable.
       if (!(e instanceof HttpError && e.code === 'layout_conflict')) throw e;
+      setRefusedRestore(revisionId);
     } finally {
       setBusy(false);
     }
@@ -136,7 +144,9 @@ export default function LayoutEditor() {
           missing={false}
           busy={busy}
           onReload={() => router.visit('/pagebuilder/layout', { preserveState: false })}
-          onOverwrite={() => handleSave(true)}
+          onOverwrite={() =>
+            refusedRestore === null ? handleSave(true) : handleRestore(refusedRestore, true)
+          }
         />
       )}
 

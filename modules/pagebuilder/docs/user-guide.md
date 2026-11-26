@@ -232,8 +232,9 @@ every page at once.
 If another editor changed the layout after you opened it, Save or Restore is
 refused with **This layout was changed elsewhere** (#466). Your local header,
 footer and navigation edits stay on screen. **Reload** discards them and loads
-the latest layout; **Overwrite** deliberately saves both local slots over the
-server version. Later saves use the new version automatically, just as in the
+the latest layout; **Overwrite** deliberately repeats what was refused over the
+server version: a Save writes both local slots, a Restore puts that revision
+back. Later saves use the new version automatically, just as in the
 page editor.
 
 ### Navigation flags

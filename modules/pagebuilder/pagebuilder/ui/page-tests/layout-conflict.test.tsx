@@ -188,6 +188,28 @@ it('a stale revision Restore shows the same conflict without claiming success', 
   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 });
 
+it('Overwrite after a refused Restore repeats the restore, not a save of the screen', async () => {
+  externalEdit();
+  await click('History (1)');
+  await click('Restore');
+  const dialog = document.querySelector('[role="alertdialog"]');
+  const confirm = [...(dialog?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent === 'Restore',
+  );
+  await act(async () => confirm?.click());
+  expect(banner()).not.toBeNull();
+  await click('Overwrite');
+  // The retry is the restore without a token (no slots in its body), and the screen adopts it.
+  expect(writes[1]).not.toHaveProperty('expected_updated_at');
+  expect(writes[1]).not.toHaveProperty('header_data');
+  expect(server.header_data).toEqual(doc('Restored header'));
+  expect(banner()).toBeNull();
+  expect(host.textContent).toContain('Revision restored');
+  await click('Save layout');
+  expect(writes[2].expected_updated_at).toBe('2026-01-01T00:00:10Z');
+  expect(writes[2].header_data).toEqual(doc('Restored header'));
+});
+
 it('a successful Restore advances the token used when saving both restored slots', async () => {
   await click('History (1)');
   await click('Restore');
