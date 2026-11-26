@@ -61,7 +61,7 @@ describe.each(['page', 'package export'])('public head output via %s (#446)', (s
     renderToStaticMarkup(<Article {...article} />);
     expect(heads).toMatchInlineSnapshot(`
       [
-        "<title>Canopy &amp; soil</title><meta name="description" content="A &lt;forest&gt; story"/><meta property="og:description" content="A &lt;forest&gt; story"/><meta property="og:title" content="Canopy &amp; soil"/><meta property="og:type" content="article"/><meta property="og:url" content="https://example.test/news/canopy"/><meta property="og:site_name" content="Field Notes"/><meta property="article:published_time" content="2026-11-24T00:00:00Z"/><meta property="article:author" content="Ada"/><meta property="article:section" content="Trees"/><meta property="og:image" content="https://example.test/cover.jpg"/><meta name="twitter:image" content="https://example.test/cover.jpg"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:site" content="@field"/><link rel="canonical" href="https://example.test/news/canopy"/><meta name="robots" content="noindex,nofollow"/><script type="application/ld+json">{"@type":"NewsArticle","headline":"\\u003c/script>\\u003c!--\\u003cSCRIPT>"}</script>",
+        "<title>Canopy &amp; soil</title><meta head-key="description" name="description" content="A &lt;forest&gt; story"/><meta head-key="og:description" property="og:description" content="A &lt;forest&gt; story"/><meta head-key="og:title" property="og:title" content="Canopy &amp; soil"/><meta head-key="og:type" property="og:type" content="article"/><meta head-key="og:url" property="og:url" content="https://example.test/news/canopy"/><meta head-key="og:site_name" property="og:site_name" content="Field Notes"/><meta head-key="article:published_time" property="article:published_time" content="2026-11-24T00:00:00Z"/><meta head-key="article:author" property="article:author" content="Ada"/><meta head-key="article:section" property="article:section" content="Trees"/><meta head-key="og:image" property="og:image" content="https://example.test/cover.jpg"/><meta head-key="twitter:image" name="twitter:image" content="https://example.test/cover.jpg"/><meta head-key="twitter:card" name="twitter:card" content="summary_large_image"/><meta head-key="twitter:site" name="twitter:site" content="@field"/><link head-key="canonical" rel="canonical" href="https://example.test/news/canopy"/><meta head-key="robots" name="robots" content="noindex,nofollow"/><script head-key="json-ld" type="application/ld+json">{"@type":"NewsArticle","headline":"\\u003c/script>\\u003c!--\\u003cSCRIPT>"}</script>",
       ]
     `);
   });
@@ -71,7 +71,7 @@ describe.each(['page', 'package export'])('public head output via %s (#446)', (s
     );
     expect(heads).toMatchInlineSnapshot(`
       [
-        "<title>Plain</title><meta property="og:title" content="Plain"/><meta property="og:type" content="article"/><meta name="twitter:card" content="summary"/>",
+        "<title>Plain</title><meta head-key="og:title" property="og:title" content="Plain"/><meta head-key="og:type" property="og:type" content="article"/><meta head-key="twitter:card" name="twitter:card" content="summary"/>",
       ]
     `);
   });
@@ -79,7 +79,7 @@ describe.each(['page', 'package export'])('public head output via %s (#446)', (s
     renderToStaticMarkup(<Archive {...archive} query="trees & soil" />);
     expect(heads).toMatchInlineSnapshot(`
       [
-        "<title>trees &amp; soil — News</title><meta name="robots" content="noindex,follow"/>",
+        "<title>trees &amp; soil — News</title><meta head-key="robots" name="robots" content="noindex,follow"/>",
       ]
     `);
   });

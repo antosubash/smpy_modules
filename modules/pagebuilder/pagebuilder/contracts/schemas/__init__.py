@@ -35,6 +35,7 @@ from pagebuilder.contracts.schemas._pages import (
     PageTranslationCreate,
     PageTranslationRead,
     PageUpdate,
+    PageVersionRequest,
     PuckData,
     StatusFilter,
 )
@@ -91,6 +92,7 @@ __all__ = [
     "PageTranslationCreate",
     "PageTranslationRead",
     "PageUpdate",
+    "PageVersionRequest",
     "PendingImportRead",
     "PuckData",
     "RestoredSection",

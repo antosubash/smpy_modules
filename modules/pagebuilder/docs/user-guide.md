@@ -54,6 +54,13 @@ Drag blocks from the palette onto the canvas and edit their fields on the right.
 Changes autosave as a draft (the toolbar shows **Saving…**, **Saved at …** or
 **Save failed**); **Save draft** saves now. Saving never changes the live page.
 
+If someone else saves the same page first, the editor says **This page was
+changed elsewhere** and pauses autosave. You can keep editing locally, but
+nothing saves until you choose **Reload** or **Overwrite**. **Reload** discards
+all local changes and loads the latest page, including its settings and SEO.
+**Overwrite** deliberately saves your current draft over the server version;
+autosave then resumes. Check with the other editor before overwriting their work.
+
 The toolbar's buttons follow the page's status:
 
 | Status | Buttons |

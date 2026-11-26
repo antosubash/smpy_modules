@@ -152,17 +152,18 @@ test('German: the prefix, the language and the alternate links', async ({ page }
   // The chrome speaks the page's language although the browser is English and has no cookie.
   await expect(page.getByRole('heading', { name: 'Wann' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Programmpunkte' })).toBeVisible();
-  // The server writes the tags into the document; Inertia's <Head> repeats them (data-inertia).
+  // The server writes the tags into the document and Inertia's <Head> adopts them by key
+  // (data-inertia), so after hydration there is exactly one of each (#461).
   const origin = new URL(page.url()).origin;
   const en = `${origin}/events/${seed.conference.slug}`;
   const de = `${origin}/de/events/${seed.conference.deSlug}`;
-  await expect(page.locator('link[rel=canonical]:not([data-inertia])')).toHaveAttribute('href', de);
-  await expect(page.locator('link[hreflang=en]:not([data-inertia])')).toHaveAttribute('href', en);
-  await expect(page.locator('link[hreflang=de]:not([data-inertia])')).toHaveAttribute('href', de);
-  await expect(page.locator('link[hreflang=x-default]:not([data-inertia])')).toHaveAttribute(
-    'href',
-    en,
-  );
+  await expect(page.locator('link[rel=canonical]')).toHaveCount(1);
+  await expect(page.locator('link[rel=canonical]')).toHaveAttribute('href', de);
+  await expect(page.locator('link[hreflang=en]')).toHaveAttribute('href', en);
+  await expect(page.locator('link[hreflang=de]')).toHaveAttribute('href', de);
+  await expect(page.locator('link[hreflang=x-default]')).toHaveAttribute('href', en);
+  await expect(page.locator('meta[property="og:title"]')).toHaveCount(1);
+  await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
   await shoot(page, '06-event-de', { fullPage: true });
   await page.goto('/de/events/');
   await expect(page.getByRole('link', { name: seed.conference.deTitle })).toBeVisible();

@@ -148,11 +148,7 @@ FAMILIES: tuple[Family, ...] = (
                 f"{NEWS}/ui/utils/http.ts",
                 _AS_MODULE,
                 own={
-                    "HttpError": "News' callers tell a stale write (409) from a vanished "
-                    "article (404); pagebuilder's throw a plain Error.",
-                    "isHttpStatus": "See HttpError.",
-                    "errorFrom": "News' errorMessage, returning an HttpError; "
-                    "scripts/http-error-parity.test.ts holds the two to the same messages.",
+                    "isHttpStatus": "News alone branches on HTTP status for missing articles.",
                     "describeError": "News words the common Pydantic errors itself; pagebuilder "
                     "shows Pydantic's own msg. A wording upgrade pagebuilder can adopt, not drift.",
                     "read": "News splits GET from writes; pagebuilder has one `request`.",
@@ -163,12 +159,14 @@ FAMILIES: tuple[Family, ...] = (
                 f"{PB}/ui/utils/request.ts",
                 _AS_MODULE,
                 own={
-                    "errorMessage": "See news' errorFrom.",
+                    "errorMessage": "Pagebuilder's uploads still need just the readable message.",
                     "request": "See news' read.",
                 },
             ),
         ),
         differ={
+            "errorFrom": "Each translates its own conflict code; news also words typed "
+            "validation errors. scripts/http-error-parity.test.ts pins their shared messages.",
             "fromValidationErrors": "News delegates each entry to describeError.",
         },
     ),

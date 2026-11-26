@@ -49,6 +49,7 @@
     "status_pending": "Pending review",
     "status_draft_dated": "Draft · dated {when}",
     "status_draft_undated": "Draft · undated",
+    "status_draft_scheduled": "Draft · scheduled for {when}",
     "unpublished_edits": "Unpublished edits",
     "edit": "Edit",
     "more_actions": "More actions for {title}",
@@ -81,6 +82,7 @@
   },
   "editor": {
     "fallback_title": "Article",
+    "not_found_title": "Article not found",
     "loading": "Loading…",
     "loading_article": "Loading article",
     "untitled": "Untitled article",

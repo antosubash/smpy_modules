@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from sqlalchemy import Text, and_, cast, func, select
+from sqlalchemy import Text, and_, case, cast, func, select
 
 from news.content import query_filters
 from news.contracts.schemas import ArticleRead
@@ -99,6 +99,25 @@ saying "there are edits" when there are none is a smaller lie than a live
 article quietly hiding that readers see something else.
 """
 
+SCHEDULED_AT: Final = case(
+    (NewsArticle.status == ArticleStatus.DRAFT, NewsArticle.publish_at),
+    else_=None,
+).label("scheduled_at")
+"""When a draft is due to go live by itself, or ``NULL``.
+
+Only a *draft* can be waiting: the scheduler publishes ``DRAFT`` rows whose
+``publish_at`` has passed (``_workflow``), and a published article's
+``publish_at`` is cleared once acted on. The list shows it so a scheduled
+draft does not read as "Draft · dated today" like any other.
+
+Editorial-only, selected beside ``HAS_UNPUBLISHED_CHANGES``: the card is also
+what readers are served, and a reader has no business learning what is queued.
+Only the fact and the instant are sent here, never ``unpublish_at``.
+"""
+
+EDITORIAL_COLUMNS: Final = (HAS_UNPUBLISHED_CHANGES, SCHEDULED_AT)
+"""What a caller who may see drafts adds to ``COLUMNS``, after the count."""
+
 
 def base(include_drafts: bool, category: str | None, trashed_only: bool = False):
     """The ``SELECT`` every card listing starts from.
@@ -145,6 +164,8 @@ def to_read(row, *, editorial: bool = False) -> ArticleRead:
         # error, because a card that is allowed to omit it is a card that must
         # not claim it.
         has_unpublished_changes=bool(getattr(row, "has_unpublished_changes", False)),
+        # Absent for the same reason, and a draft that is not scheduled has none.
+        scheduled_at=as_utc(getattr(row, "scheduled_at", None)),
         # Locale-prefixed, so a German article's card links to the German
         # address rather than to a URL where only the English one answers.
         url=public_article_path(row.slug, row.locale),

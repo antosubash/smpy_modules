@@ -13,7 +13,17 @@ function PublicNotFoundPage({ locale, index_url, suggestions }: PublicNotFoundPr
   useDocumentLang(locale);
   return (
     <>
-      <PublicHead title={t(copy.title)} locale={locale} noindex />
+      <PublicHead
+        head={{
+          title: t(copy.title),
+          description: null,
+          canonical: null,
+          image: null,
+          robots: 'noindex,nofollow',
+          feed_url: null,
+        }}
+        locale={locale}
+      />
       <main className="mx-auto max-w-3xl space-y-4 p-4">
         <h1 className="text-2xl font-semibold">{t(copy.title)}</h1>
         <p>{t(copy.message)}</p>

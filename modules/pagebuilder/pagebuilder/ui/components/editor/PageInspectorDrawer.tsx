@@ -110,6 +110,7 @@ export function PageInspectorDrawer({
           defaultLocale={defaultLocale}
           publicPrefix={publicPrefix}
           onError={onMessage}
+          disabled={form.writes.missing}
         />
       ) : tab === 'page' ? (
         <PageSettingsPanel
@@ -133,6 +134,7 @@ export function PageInspectorDrawer({
           publicPrefix={publicPrefix}
           actions={
             <PageActions
+              writes={form.writes}
               pageId={form.pageId}
               title={form.title}
               slug={form.effectiveSlug}
@@ -164,10 +166,10 @@ export function PageInspectorDrawer({
           onJsonLdChange={form.handleJsonLdChange}
           schedule={
             <SchedulePanel
-              publishAt={form.publishAt}
-              unpublishAt={form.unpublishAt}
-              onPublishAtChange={form.setPublishAt}
-              onUnpublishAtChange={form.setUnpublishAt}
+              publishAt={schedule.publishAt}
+              unpublishAt={schedule.unpublishAt}
+              onPublishAtChange={schedule.setPublishAt}
+              onUnpublishAtChange={schedule.setUnpublishAt}
               onSave={schedule.handleSaveSchedule}
               onClear={schedule.handleClearSchedule}
               saveDisabled={busy || form.pageId === null}
@@ -176,7 +178,7 @@ export function PageInspectorDrawer({
                 form.pageId === null ||
                 (form.publishAt === null && form.unpublishAt === null)
               }
-              error={schedule.scheduleError}
+              error={form.writes.conflict || form.writes.missing ? null : schedule.scheduleError}
             />
           }
         />

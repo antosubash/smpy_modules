@@ -14,6 +14,10 @@ interface Params {
 }
 
 export interface PageSchedule {
+  publishAt: string | null;
+  setPublishAt: (value: string | null) => void;
+  unpublishAt: string | null;
+  setUnpublishAt: (value: string | null) => void;
   scheduleError: string | null;
   handleSaveSchedule: () => Promise<void>;
   handleClearSchedule: () => Promise<void>;
@@ -22,6 +26,16 @@ export interface PageSchedule {
 export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSchedule {
   const { t } = useT();
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  // Inputs are drafts; the form's timestamps describe the accepted schedule.
+  const [publishAt, setPublishAt] = useState(form.publishAt);
+  const [unpublishAt, setUnpublishAt] = useState(form.unpublishAt);
+
+  const acceptSchedule = (updated: { publish_at: string | null; unpublish_at: string | null }) => {
+    form.setPublishAt(updated.publish_at);
+    form.setUnpublishAt(updated.unpublish_at);
+    setPublishAt(updated.publish_at);
+    setUnpublishAt(updated.unpublish_at);
+  };
 
   const handleSaveSchedule = async () => {
     if (form.pageId === null) {
@@ -29,20 +43,23 @@ export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSche
       return;
     }
     setScheduleError(null);
-    const publish = fromLocalInput(form.publishAt);
-    const unpublish = fromLocalInput(form.unpublishAt);
+    const publish = fromLocalInput(publishAt);
+    const unpublish = fromLocalInput(unpublishAt);
     if (publish && unpublish && publish >= unpublish) {
       setScheduleError(t(keys.pagebuilder.schedule.order_error));
       return;
     }
     setBusy(true);
     try {
-      const updated = await schedulePage(form.pageId, {
-        publish_at: publish,
-        unpublish_at: unpublish,
-      });
-      form.setPublishAt(updated.publish_at);
-      form.setUnpublishAt(updated.unpublish_at);
+      const id = form.pageId;
+      const updated = await form.writes.run((token) =>
+        schedulePage(id, {
+          expected_updated_at: token,
+          publish_at: publish,
+          unpublish_at: unpublish,
+        }),
+      );
+      acceptSchedule(updated);
       setMessage(t(keys.pagebuilder.schedule.saved));
     } catch (e) {
       setScheduleError(e instanceof Error ? e.message : t(keys.pagebuilder.schedule.save_failed));
@@ -56,12 +73,15 @@ export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSche
     setBusy(true);
     setScheduleError(null);
     try {
-      const updated = await schedulePage(form.pageId, {
-        publish_at: null,
-        unpublish_at: null,
-      });
-      form.setPublishAt(updated.publish_at);
-      form.setUnpublishAt(updated.unpublish_at);
+      const id = form.pageId;
+      const updated = await form.writes.run((token) =>
+        schedulePage(id, {
+          expected_updated_at: token,
+          publish_at: null,
+          unpublish_at: null,
+        }),
+      );
+      acceptSchedule(updated);
       setMessage(t(keys.pagebuilder.schedule.cleared));
     } catch (e) {
       setScheduleError(e instanceof Error ? e.message : t(keys.pagebuilder.schedule.clear_failed));
@@ -70,5 +90,13 @@ export function usePageSchedule({ form, setBusy, setMessage }: Params): PageSche
     }
   };
 
-  return { scheduleError, handleSaveSchedule, handleClearSchedule };
+  return {
+    publishAt,
+    setPublishAt,
+    unpublishAt,
+    setUnpublishAt,
+    scheduleError,
+    handleSaveSchedule,
+    handleClearSchedule,
+  };
 }

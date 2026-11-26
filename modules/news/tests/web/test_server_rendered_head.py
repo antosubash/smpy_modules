@@ -57,11 +57,14 @@ class TestArticleHead:
 
         body = (await anon_client.get(f"{NEWS}/unfurled")).text
 
-        assert '<meta property="og:title" content="Unfurled">' in body
-        assert '<meta property="og:type" content="article">' in body
+        assert '<meta property="og:title" data-inertia="og:title" content="Unfurled">' in body
+        assert '<meta property="og:type" data-inertia="og:type" content="article">' in body
         assert 'content="Two months ahead of schedule."' in body
         assert 'content="https://example.org/cover.png"' in body
-        assert '<meta name="twitter:card" content="summary_large_image">' in body
+        assert (
+            '<meta name="twitter:card" data-inertia="twitter:card" '
+            'content="summary_large_image">'
+        ) in body
 
     async def test_a_summary_card_without_an_image(self, anon_client) -> None:
         async with anon_client.db_state.session_factory() as db:
@@ -69,7 +72,7 @@ class TestArticleHead:
 
         body = (await anon_client.get(f"{NEWS}/plain")).text
 
-        assert '<meta name="twitter:card" content="summary">' in body
+        assert '<meta name="twitter:card" data-inertia="twitter:card" content="summary">' in body
 
     async def test_it_carries_the_canonical_link(self, anon_client) -> None:
         async with anon_client.db_state.session_factory() as db:
@@ -94,7 +97,7 @@ class TestArticleHead:
 
         body = (await anon_client.get(f"{NEWS}/private")).text
 
-        assert '<meta name="robots" content="noindex,nofollow">' in body
+        assert '<meta name="robots" data-inertia="robots" content="noindex,nofollow">' in body
 
     async def test_a_headline_with_a_quote_does_not_break_the_attribute(
         self, anon_client

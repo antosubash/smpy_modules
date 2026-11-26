@@ -21,6 +21,8 @@ interface Props {
   busy: boolean;
   /** id of a <datalist> of existing category names, offered while typing. */
   suggestionsId?: string;
+  /** `news.publish`: without it "Publish now" would only answer 403. */
+  canPublish?: boolean;
   onSave: (id: number, category: string, publishedAt: string | null) => void;
   onTrash: (id: number) => Promise<unknown>;
   onPublish: (article: ArticleRead) => Promise<unknown>;
@@ -33,7 +35,15 @@ interface Props {
  *  the thing this list exists to avoid — the body is edited in pagebuilder, so
  *  if these two fields also needed a round trip the list would have no job.
  */
-export function ArticleRow({ article, busy, suggestionsId, onSave, onTrash, onPublish }: Props) {
+export function ArticleRow({
+  article,
+  busy,
+  suggestionsId,
+  canPublish = false,
+  onSave,
+  onTrash,
+  onPublish,
+}: Props) {
   const { t, locale } = useT();
   const row = keys.news.row;
   const [editing, setEditing] = useState(false);
@@ -153,7 +163,7 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onTrash, onPu
         )}
 
         <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>{statusLine(article, t)}</span>
+          <span>{statusLine(article, t, locale)}</span>
           {/* A state, not a fault. Publishing snapshots the body, so an author
               who keeps writing leaves the row saying "Published" about a
               document readers have never seen — truthfully, and about the
@@ -190,7 +200,7 @@ export function ArticleRow({ article, busy, suggestionsId, onSave, onTrash, onPu
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {isDraft && (
+            {isDraft && canPublish && (
               <DropdownMenuItem onSelect={() => void onPublish(article).catch(() => {})}>
                 {t(row.publish_now)}
               </DropdownMenuItem>

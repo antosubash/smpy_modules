@@ -13,6 +13,18 @@ import { validationMessage } from './slugRule';
 
 export const BASE = '/api/pagebuilder';
 
+/** A coded refusal, preserving the readable detail and HTTP status. */
+export class HttpError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 /** How many characters of an unrecognised error body are worth showing. */
 const MAX_BODY_SNIPPET = 200;
 
@@ -72,34 +84,50 @@ export function fromValidationErrors(detail: unknown): string | null {
  * assert the same six cases.
  */
 export async function errorMessage(response: Response): Promise<string> {
+  return (await errorFrom(response)).message;
+}
+
+async function errorFrom(response: Response): Promise<HttpError> {
   const fallback = translate(keys.pagebuilder.errors.request_failed, {
     status: response.status,
     statusText: response.statusText,
   }).trim();
   const body = await response.text().catch(() => '');
-  if (!body) return fallback;
+  if (!body) return new HttpError(fallback, response.status);
 
   try {
-    const parsed = JSON.parse(body) as { detail?: unknown };
-    if (isCsrfRefusal(response.status, parsed.detail)) {
-      return translate(keys.pagebuilder.errors.csrf_failed);
+    const parsed = JSON.parse(body) as { detail?: unknown; code?: unknown };
+    if (response.status === 409 && parsed.code === 'page_conflict') {
+      return new HttpError(translate(keys.pagebuilder.errors.page_conflict), 409, parsed.code);
     }
-    if (typeof parsed.detail === 'string' && parsed.detail.trim()) return parsed.detail;
+    if (isCsrfRefusal(response.status, parsed.detail)) {
+      return new HttpError(translate(keys.pagebuilder.errors.csrf_failed), response.status);
+    }
+    if (typeof parsed.detail === 'string' && parsed.detail.trim()) {
+      return new HttpError(
+        parsed.detail,
+        response.status,
+        typeof parsed.code === 'string' ? parsed.code : undefined,
+      );
+    }
     // FastAPI's 422 sends a *list* of Pydantic errors. Without this the author
     // who typed a space into a URL field got "Request failed (422
     // Unprocessable Entity)" and no clue which field or why.
     const validation = fromValidationErrors(parsed.detail);
-    if (validation) return validation;
+    if (validation) return new HttpError(validation, response.status);
   } catch {
     // Not JSON at all. Fall through to the text handling below.
   }
 
   // Anything that looks like a document is structure, not a message.
-  if (/^\s*[<{[]/.test(body)) return fallback;
+  if (/^\s*[<{[]/.test(body)) return new HttpError(fallback, response.status);
   const snippet = body.trim().slice(0, MAX_BODY_SNIPPET);
-  return snippet
-    ? translate(keys.pagebuilder.errors.request_failed_snippet, { message: fallback, snippet })
-    : fallback;
+  return new HttpError(
+    snippet
+      ? translate(keys.pagebuilder.errors.request_failed_snippet, { message: fallback, snippet })
+      : fallback,
+    response.status,
+  );
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -117,7 +145,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     },
   });
   if (!response.ok) {
-    throw new Error(await errorMessage(response));
+    throw await errorFrom(response);
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;

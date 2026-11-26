@@ -129,7 +129,7 @@ async def list_articles(
     if include_drafts:
         # After the count, and only for a caller who may see drafts. Both
         # halves are load-bearing — see ``card.HAS_UNPUBLISHED_CHANGES``.
-        stmt = stmt.add_columns(card.HAS_UNPUBLISHED_CHANGES)
+        stmt = stmt.add_columns(*card.EDITORIAL_COLUMNS)
 
     stmt = (
         query_filters.ordered(stmt, undated_first=undated_first)
@@ -193,7 +193,7 @@ async def get_read(
     """
     stmt = card.base(include_drafts, None).where(NewsArticle.id == article_id)
     if include_drafts:
-        stmt = stmt.add_columns(card.HAS_UNPUBLISHED_CHANGES)
+        stmt = stmt.add_columns(*card.EDITORIAL_COLUMNS)
     row = (await db.execute(stmt)).first()
     return card.to_read(row, editorial=include_drafts) if row is not None else None
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { keys, useT } from '../../utils/i18n';
 import { UploadError } from '../../utils/uploadError';
 import { cn } from '../../utils/widgetUtils';
-import { FileGallery } from './file-gallery';
+import { FileGallery } from './lazy-file-gallery';
 import type { FilePickerAdapter } from './types';
 
 /**

@@ -73,10 +73,14 @@ export default function ArticleEditor() {
   }, [load]);
 
   if (!article || !draft) {
+    // A load that failed is not a load in progress: "Loading…" above "Article
+    // not found" said both, and the tab kept the generic title.
+    const failed = error !== null;
+    const heading = gone ? t(copy.not_found_title) : t(copy.fallback_title);
     return (
-      <PageShell title={t(copy.fallback_title)} description={t(copy.loading)}>
-        <Head title={t(copy.fallback_title)} />
-        {error ? (
+      <PageShell title={heading} description={failed ? undefined : t(copy.loading)}>
+        <Head title={heading} />
+        {failed ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : (
           <div role="status" aria-label={t(copy.loading_article)} className="space-y-2">
@@ -127,7 +131,7 @@ export default function ArticleEditor() {
               </a>
             </Button>
           )}
-          {isDraft && (
+          {isDraft && canPublish && (
             <Button disabled={busy} onClick={() => void publish()}>
               {t(copy.publish_now)}
             </Button>
@@ -201,7 +205,12 @@ export default function ArticleEditor() {
             </Button>
           )}
 
-          <ReviewCard article={article} canPublish={canPublish} writeArticle={writeArticle} />
+          <ReviewCard
+            article={article}
+            canPublish={canPublish}
+            writeArticle={writeArticle}
+            conflict={conflict}
+          />
 
           {/* Only on a multilingual site: a panel listing one language is a
               panel that answers a question nobody asked. */}

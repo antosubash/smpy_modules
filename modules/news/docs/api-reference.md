@@ -58,7 +58,7 @@ tie-break only), then id. Response:
     "tags": ["finance"], "pinned": false, "show_in_feed": true,
     "author": "A. Subash", "published_at": "2026-02-01T00:00:00Z",
     "locale": "en", "translation_group": "3f2c…", "updated_at": "…",
-    "status": "published", "has_unpublished_changes": false,
+    "status": "published", "has_unpublished_changes": false, "scheduled_at": null,
     "url": "/news/budget", "edit_url": "/admin/news/articles/7/body"
   }],
   "total": 1,
@@ -69,8 +69,11 @@ tie-break only), then id. Response:
 `excerpt` is the article's `meta_description` and `cover_image_url` its
 `og_image`. `url` carries the language prefix (`/de/news/…`) for non-default
 languages. `status` is `draft`, `submitted_for_review` or `published`.
-`has_unpublished_changes` is only ever true for an editor. `counts` is scoped
-by `q` and `category` but not by `status`.
+`has_unpublished_changes` is only ever true for an editor. `scheduled_at` is
+the draft's go-live instant in UTC, set through the schedule endpoint; it is
+`null` for an unscheduled draft, a published article or a caller without
+`news.edit`. It is independent of the display date (`published_at`). `counts`
+is scoped by `q` and `category` but not by `status`.
 
 Anonymous responses carry `Cache-Control: public, max-age=60`; an editor's
 `private, no-store`. Both `Vary: Cookie` (plus the tenant header on a
@@ -252,6 +255,16 @@ article page sends an `ETag`, `Cache-Control` from the settings,
 `Content-Language`, and `Content-Security-Policy` when `public_csp` is set (not
 on a 304), with `<title>`, description, `og:*`, `twitter:*`, canonical, `hreflang`,
 `robots` and JSON-LD written into the server-rendered `<head>`.
+
+Tags also rendered by `ArticleHead` or `ArchiveHead` carry matching
+`data-inertia` / `head-key` values, so hydration replaces them instead of
+adding duplicates. Server-only tags (including `hreflang` and feed discovery)
+stay unkeyed so Inertia keeps them.
+
+The module's public strings use the address's content locale when a matching
+console catalogue is loaded; a regional tag such as `de-at` falls back to
+`de`. Otherwise they keep the visitor's UI language (cookie, then browser
+preference). This does not change the console language cookie.
 
 ## Article contract
 
