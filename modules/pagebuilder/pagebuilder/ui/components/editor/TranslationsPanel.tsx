@@ -18,6 +18,8 @@ interface Props {
   /** Where pages serve publicly, for the address preview. */
   publicPrefix: string;
   onError: (message: string | null) => void;
+  /** The page is gone (deleted elsewhere, #448): a translation of it cannot be started. */
+  disabled?: boolean;
 }
 
 // Catalogue keys, resolved where the rows render — a module-scope constant
@@ -48,6 +50,7 @@ export function TranslationsPanel({
   defaultLocale,
   publicPrefix,
   onError,
+  disabled = false,
 }: Props) {
   const { t } = useT();
   const [busyLocale, setBusyLocale] = useState<string | null>(null);
@@ -65,6 +68,7 @@ export function TranslationsPanel({
   }
 
   const handleAdd = async (target: string) => {
+    if (disabled) return;
     setBusyLocale(target);
     onError(null);
     try {
@@ -133,7 +137,7 @@ export function TranslationsPanel({
                 <button
                   type="button"
                   className="shrink-0 rounded-md border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
-                  disabled={busyLocale !== null}
+                  disabled={disabled || busyLocale !== null}
                   onClick={() => void handleAdd(entryLocale)}
                   data-testid={`add-translation-${entryLocale}`}
                 >

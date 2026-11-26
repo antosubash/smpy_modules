@@ -110,6 +110,7 @@ export function PageInspectorDrawer({
           defaultLocale={defaultLocale}
           publicPrefix={publicPrefix}
           onError={onMessage}
+          disabled={form.writes.missing}
         />
       ) : tab === 'page' ? (
         <PageSettingsPanel
