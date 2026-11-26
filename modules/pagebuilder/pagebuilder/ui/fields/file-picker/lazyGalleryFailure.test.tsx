@@ -38,6 +38,12 @@ it('a gallery chunk that will not load stays inside the picker, with Try again a
   // Asked again, failed again: a new notice, not the old one left standing.
   await vi.waitFor(() => expect(failed()).not.toBe(first));
   await vi.waitFor(() => expect(failed()).not.toBeNull());
+  expect(document.activeElement).toBe(buttons()[0]);
+  await act(async () => {
+    failed()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  });
+  expect(onClose).toHaveBeenCalledTimes(1);
+  onClose.mockClear();
   await act(async () => buttons()[0]?.click()); // Close
   expect(onClose).toHaveBeenCalledTimes(1);
 

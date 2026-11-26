@@ -37,11 +37,15 @@ function LoadFailed({ onRetry, onClose }: { onRetry: () => void; onClose: () => 
       aria-label={t(keys.pagebuilder.gallery.title)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       data-testid="gallery-load-failed"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose();
+      }}
     >
       <div className="max-w-sm space-y-4 rounded-lg bg-background p-6 shadow-lg">
         <p className="text-sm">{t(keys.pagebuilder.gallery.chunk_failed)}</p>
         <div className="flex justify-end gap-2">
-          <button type="button" className={button} onClick={onClose}>
+          {/* Focused on arrival, so Escape and Enter reach the notice, as they do the gallery. */}
+          <button type="button" className={button} onClick={onClose} ref={(el) => el?.focus()}>
             {t(keys.pagebuilder.gallery.close)}
           </button>
           <button type="button" className={button} onClick={onRetry}>
