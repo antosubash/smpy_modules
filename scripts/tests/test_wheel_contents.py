@@ -128,3 +128,70 @@ def test_wheels_ship_the_moved_path_aliases(wheels: list[Path]) -> None:
                 missing = sorted(rel for rel in stubs if f"{root}{rel}" not in names)
                 assert not missing, f"{wheel.name} lacks stubs: {missing[:5]}"
     assert packages == 5, f"expected the five moved packages' tables, found {packages}"
+
+
+_ENTRY_KEYS = ("exports", "main", "module", "types")
+
+
+def _entry_paths(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [path for inner in value.values() for path in _entry_paths(inner)]
+    if isinstance(value, list):
+        return [path for inner in value for path in _entry_paths(inner)]
+    return []
+
+
+def test_a_packaged_package_json_points_at_files_in_its_wheel(wheels: list[Path]) -> None:
+    """``package.json`` is written for the source tree and copied into the package
+    (#472): every entry point of the copy must name a file the wheel ships, or a
+    host that installed the wheel cannot import the bare package name."""
+    broken: list[str] = []
+    with_entries = 0
+    for wheel in wheels:
+        with zipfile.ZipFile(wheel) as archive:
+            names = set(archive.namelist())
+            for manifest in (n for n in names if n.count("/") == 1 and n.endswith("/package.json")):
+                package = manifest.split("/")[0]
+                data = json.loads(archive.read(manifest))
+                paths = [p for key in _ENTRY_KEYS for p in _entry_paths(data.get(key))]
+                with_entries += bool(paths)
+                for path in paths:
+                    if not path.startswith("./") or f"{package}/{path[2:]}" not in names:
+                        broken.append(f"{wheel.name}: {manifest} -> {path}")
+    assert not broken, (
+        "entry points that do not resolve in the wheel (add hatch_build.py to the module):\n"
+        + "\n".join(broken)
+    )
+    assert with_entries >= 6, f"expected six modules with an entry point, found {with_entries}"
+
+
+def test_the_build_hook_copies_are_identical() -> None:
+    copies = sorted((REPO / "modules").glob("*/hatch_build.py"))
+    assert len(copies) >= 6
+    assert len({copy.read_bytes() for copy in copies}) == 1, [str(c) for c in copies]
+
+
+def test_the_hook_repoints_only_paths_into_the_package(monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib.util
+    import sys
+    import types
+
+    # hatchling exists only in the isolated build environment; the function under
+    # test does not use it.
+    interface = types.ModuleType("hatchling.builders.hooks.plugin.interface")
+    interface.BuildHookInterface = object  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "hatchling.builders.hooks.plugin.interface", interface)
+    spec = importlib.util.spec_from_file_location(
+        "hatch_build", REPO / "modules/analytics/hatch_build.py"
+    )
+    assert spec and spec.loader
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    exports = {".": "./pkg/index.ts", "./x.css": ["./pkg/static/x.css", "./other/x.css"]}
+    assert hook.repoint(exports, "pkg") == {
+        ".": "./index.ts",
+        "./x.css": ["./static/x.css", "./other/x.css"],
+    }
+    assert hook.repoint("./pkgs/index.ts", "pkg") == "./pkgs/index.ts"
