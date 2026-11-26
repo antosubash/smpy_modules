@@ -98,10 +98,14 @@ export function RankingPanel({
           }}
           className="mt-3 min-w-0 gap-4"
         >
-          <div className="min-w-0 overflow-x-auto pb-1">
-            <TabsList variant="line" aria-label={title}>
+          <div className="min-w-0 pb-1">
+            <TabsList
+              variant="line"
+              aria-label={title}
+              className="w-full flex-wrap justify-start gap-y-2 group-data-[orientation=horizontal]/tabs:h-auto"
+            >
               {groups.map(({ dimension }) => (
-                <TabsTrigger key={dimension} value={dimension}>
+                <TabsTrigger key={dimension} value={dimension} className="flex-none">
                   {label(dimension)}
                 </TabsTrigger>
               ))}

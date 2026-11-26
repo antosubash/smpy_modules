@@ -2,10 +2,20 @@ import { Button } from '@simple-module-py/ui/components/ui/button';
 import { Input } from '@simple-module-py/ui/components/ui/input';
 import { Label } from '@simple-module-py/ui/components/ui/label';
 import { Textarea } from '@simple-module-py/ui/components/ui/textarea';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ApiError } from '../utils/api';
 import { keys, useT } from '../utils/i18n';
 import type { Property, PropertyInput } from '../utils/types';
 
+const FIELDS = [
+  'name',
+  'kind',
+  'origins',
+  'route_patterns',
+  'event_allowlist',
+  'utm_parameters',
+  'enabled',
+];
 const UTM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
 const lines = (text: string) =>
   text
@@ -37,14 +47,35 @@ export function PropertyEditor({
   const [enabled, setEnabled] = useState(property?.enabled ?? false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (!error && !Object.keys(fieldErrors).length) return;
+    const target = form.current?.querySelector<HTMLElement>(
+      '[aria-invalid="true"], [role="alert"]',
+    );
+    target?.focus();
+    target?.scrollIntoView({ block: 'nearest' });
+  }, [error, fieldErrors]);
+  const invalid = (field: string) => ({
+    'aria-invalid': Boolean(fieldErrors[field]) || undefined,
+    'aria-describedby': fieldErrors[field] ? `${id}-${field}-error` : undefined,
+  });
+  const fieldError = (field: string) =>
+    fieldErrors[field] && (
+      <p id={`${id}-${field}-error`} role="alert" className="text-sm text-destructive">
+        {fieldErrors[field]}
+      </p>
+    );
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
+    setFieldErrors({});
     const allowlist: Record<string, string[]> = {};
     for (const line of lines(events)) {
       const [eventName, fields, extra] = line.split(':');
       if (!eventName.trim() || fields === undefined || extra !== undefined) {
-        setError(t(keys.analytics.event_format_error));
+        setFieldErrors({ event_allowlist: t(keys.analytics.event_format_error) });
         return;
       }
       allowlist[eventName.trim()] = fields
@@ -64,7 +95,15 @@ export function PropertyEditor({
         enabled,
       });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t(keys.analytics.error));
+      if (reason instanceof ApiError && Object.keys(reason.fieldErrors).length) {
+        setFieldErrors(
+          Object.fromEntries(
+            Object.entries(reason.fieldErrors).filter(([field]) => FIELDS.includes(field)),
+          ),
+        );
+        if (Object.keys(reason.fieldErrors).some((field) => !FIELDS.includes(field)))
+          setError(reason.message);
+      } else setError(reason instanceof Error ? reason.message : t(keys.analytics.error));
     } finally {
       setBusy(false);
     }
@@ -74,9 +113,9 @@ export function PropertyEditor({
       <h2 id={`${id}-title`} className="mb-4 text-lg font-semibold">
         {t(property ? keys.analytics.edit_property : keys.analytics.new_property)}
       </h2>
-      <form onSubmit={submit} className="space-y-5">
+      <form ref={form} onSubmit={submit} className="space-y-5">
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" tabIndex={-1} className="text-sm text-destructive">
             {error}
           </p>
         )}
@@ -85,16 +124,19 @@ export function PropertyEditor({
             <Label htmlFor={`${id}-name`}>{t(keys.analytics.name)}</Label>
             <Input
               id={`${id}-name`}
+              {...invalid('name')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               maxLength={100}
             />
+            {fieldError('name')}
           </div>
           <div className="space-y-2">
             <Label htmlFor={`${id}-kind`}>{t(keys.analytics.kind)}</Label>
             <select
               id={`${id}-kind`}
+              {...invalid('kind')}
               value={kind}
               onChange={(e) => setKind(e.target.value as typeof kind)}
               className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -102,6 +144,7 @@ export function PropertyEditor({
               <option value="public">{t(keys.analytics.public)}</option>
               <option value="application">{t(keys.analytics.application)}</option>
             </select>
+            {fieldError('kind')}
           </div>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -109,44 +152,50 @@ export function PropertyEditor({
             <Label htmlFor={`${id}-origins`}>{t(keys.analytics.origins)}</Label>
             <Textarea
               id={`${id}-origins`}
+              {...invalid('origins')}
               value={origins}
               onChange={(e) => setOrigins(e.target.value)}
               rows={3}
               required
-              aria-describedby={`${id}-origins-help`}
+              aria-describedby={`${id}-origins-help ${invalid('origins')['aria-describedby'] ?? ''}`}
             />
             <p id={`${id}-origins-help`} className="text-sm text-muted-foreground">
               {t(keys.analytics.origins_help)}
             </p>
+            {fieldError('origins')}
           </div>
           <div className="space-y-2">
             <Label htmlFor={`${id}-routes`}>{t(keys.analytics.routes)}</Label>
             <Textarea
               id={`${id}-routes`}
+              {...invalid('route_patterns')}
               value={routes}
               onChange={(e) => setRoutes(e.target.value)}
               rows={3}
-              aria-describedby={`${id}-routes-help`}
+              aria-describedby={`${id}-routes-help ${invalid('route_patterns')['aria-describedby'] ?? ''}`}
             />
             <p id={`${id}-routes-help`} className="text-sm text-muted-foreground">
               {t(keys.analytics.routes_help)}
             </p>
+            {fieldError('route_patterns')}
           </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${id}-events`}>{t(keys.analytics.events_config)}</Label>
           <Textarea
             id={`${id}-events`}
+            {...invalid('event_allowlist')}
             value={events}
             onChange={(e) => setEvents(e.target.value)}
             rows={3}
-            aria-describedby={`${id}-events-help`}
+            aria-describedby={`${id}-events-help ${invalid('event_allowlist')['aria-describedby'] ?? ''}`}
           />
           <p id={`${id}-events-help`} className="text-sm text-muted-foreground">
             {t(keys.analytics.events_help)}
           </p>
+          {fieldError('event_allowlist')}
         </div>
-        <fieldset className="space-y-2">
+        <fieldset {...invalid('utm_parameters')} tabIndex={-1} className="space-y-2">
           <legend className="mb-2 text-sm font-medium">{t(keys.analytics.utm)}</legend>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {UTM.map((param) => (
@@ -163,17 +212,20 @@ export function PropertyEditor({
             ))}
           </div>
           <p className="text-sm text-muted-foreground">{t(keys.analytics.utm_help)}</p>
+          {fieldError('utm_parameters')}
         </fieldset>
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-medium">
             <input
               type="checkbox"
+              {...invalid('enabled')}
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
             />
             {t(keys.analytics.enabled)}
           </label>
           <p className="text-sm text-muted-foreground">{t(keys.analytics.enabled_help)}</p>
+          {fieldError('enabled')}
         </div>
         <div className="flex gap-2">
           <Button type="submit" disabled={busy}>

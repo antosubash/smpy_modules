@@ -439,6 +439,20 @@ name the module they affect.
 
 ### Fixed
 
+- **analytics: reuse host configuration and support skipped pages** (#483, #477).
+  The adapter caches configuration per origin and tenant for three minutes,
+  shares in-flight requests and backs off for 30 seconds after failures. Its
+  optional `shouldTrack` callback also applies to the initial page, so hosts can
+  exclude error components.
+- **analytics: clearer property setup and reliable admin reports** (#475, #477).
+  Setup copy is host-neutral, activity rows say Pageview and the empty state
+  names its five-minute window. Property validation appears beside its fields
+  with specific route errors; expired sessions return to sign-in. Source tabs
+  wrap within the panel, and the initial Inertia event no longer repeats the
+  first report request.
+- **analytics: the framework doctor no longer reports SM003 for the dashboard
+  page** (#482). The page was rendered correctly; the doctor could not see its
+  name through `constants`, so the name now sits beside the `render` call.
 - **pagebuilder: a leftover `SM_PAGEBUILDER_*` environment variable is reported at
   boot** (#459). Settings are database-backed since 0.0.15, so such a variable does
   nothing; a deployment that still set `SM_PAGEBUILDER_MEDIA_ROOT` booted, served

@@ -64,7 +64,7 @@
   "geo_disabled": "Location reporting is disabled.",
   "geo_age": "Database age: {days} days",
   "setup": "Tracking setup",
-  "setup_help": "The demo host tracks matching routes once this property is enabled. Other hosts can install the analytics host adapter and send approved custom events with track(name, properties).",
+  "setup_help": "Matching routes are tracked once this property is enabled. Custom events must be listed here before they are recorded.",
   "event_format_error": "Use one event per line: event: property, property.",
   "dimensions": {
     "path": "Pages",
@@ -114,5 +114,20 @@
     "export_csv": "Export CSV",
     "export_help": "Download the current report: totals, daily traffic and up to 50 rows per breakdown. Dates and filters are included.",
     "export_failed": "CSV export failed. Try again."
+  },
+  "pageview": "Pageview",
+  "recent_empty": "No activity in the last five minutes.",
+  "session_expired": "Your session has expired. Redirecting to sign in…",
+  "validation": {
+    "route_prefix": "Route patterns must start with /",
+    "route_length": "Route patterns must be at most 500 characters",
+    "route_segments": "Use literal path segments or :name placeholders",
+    "origin": "Expected an exact http(s) origin without a path",
+    "event_names": "Invalid event or property name (max 50 characters, 20 properties)",
+    "utm": "Unsupported UTM parameter",
+    "text_short": "Enter at least {count} characters.",
+    "text_long": "Enter at most {count} characters.",
+    "items_long": "Use at most {count} entries.",
+    "items_short": "Use at least {count} entries."
   }
 }

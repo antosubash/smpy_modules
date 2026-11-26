@@ -1,8 +1,19 @@
 import { currentCsrfToken } from '@simple-module-py/ui/lib/csrf-token';
 import { keys, translate } from './i18n';
 import type { Filters, GeoStatus, Property, PropertyInput, Report } from './types';
+import { validationMessage } from './validationMessage';
 
 const BASE = '/api/analytics';
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly fieldErrors: Record<string, string> = {},
+  ) {
+    super(message);
+  }
+}
+
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** The framework's `csrfToken` shared prop on a write (#342). A raw `fetch`
@@ -19,24 +30,41 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
+      Accept: 'application/json',
       ...csrfHeaders(options.method),
       ...options.headers,
     },
   });
   if (!response.ok) {
+    if (response.status === 401) {
+      const next = `${window.location.pathname}${window.location.search}`;
+      window.location.assign(`/users/login?next=${encodeURIComponent(next)}`);
+      throw new ApiError(401, translate(keys.analytics.session_expired));
+    }
     let detail = '';
+    const fieldErrors: Record<string, string> = {};
     try {
       const data = await response.json();
-      detail =
-        typeof data.detail === 'string'
-          ? data.detail
-          : Array.isArray(data.detail)
-            ? data.detail.map((v: { msg: string }) => v.msg).join('; ')
-            : '';
+      if (typeof data.detail === 'string') detail = data.detail;
+      else if (response.status === 422 && Array.isArray(data.detail)) {
+        const messages: string[] = [];
+        for (const item of data.detail as (Parameters<typeof validationMessage>[0] & {
+          loc?: (string | number)[];
+        })[]) {
+          if (typeof item.msg !== 'string') continue;
+          const message = validationMessage(item);
+          // A nested list error belongs to its editor field, not the list index.
+          const field = item.loc?.[0] === 'body' ? item.loc[1] : item.loc?.[0];
+          if (typeof field === 'string')
+            fieldErrors[field] = [fieldErrors[field], message].filter(Boolean).join('; ');
+          messages.push(typeof field === 'string' ? `${field}: ${message}` : message);
+        }
+        detail = messages.join('; ');
+      }
     } catch {
       /* Never display HTML from an upstream error. */
     }
-    throw new Error(detail || translate(keys.analytics.error));
+    throw new ApiError(response.status, detail || translate(keys.analytics.error), fieldErrors);
   }
   return response.status === 204 ? (undefined as T) : response.json();
 }

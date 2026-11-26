@@ -172,3 +172,24 @@ async def test_property_names_are_trimmed_before_bounds_on_create_and_update(cli
         assert (await client.post("/api/analytics/properties", json=rejected)).status_code == 422
         assert (await client.put(url, json=rejected)).status_code == 422
     assert (await client.get("/api/analytics/properties")).json()[0]["name"] == "Renamed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("pattern", "message"),
+    [
+        ("p/:slug", "Route patterns must start with /"),
+        ("/" + "a" * 500, "Route patterns must be at most 500 characters"),
+        ("//example.com", "Use literal path segments or :name placeholders"),
+        ("/p/../secret", "Use literal path segments or :name placeholders"),
+    ],
+)
+async def test_route_validation_identifies_the_field_and_specific_problem(client, pattern, message):
+    response = await client.post(
+        "/api/analytics/properties",
+        json={"name": "Site", "origins": ["https://example.com"], "route_patterns": [pattern]},
+    )
+    assert response.status_code == 422
+    error = response.json()["detail"][0]
+    assert error["loc"] == ["body", "route_patterns"]
+    assert error["msg"].removeprefix("Value error, ") == message

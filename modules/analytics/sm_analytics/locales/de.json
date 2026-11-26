@@ -64,7 +64,7 @@
   "geo_disabled": "Standortberichte sind deaktiviert.",
   "geo_age": "Alter der Datenbank: {days} Tage",
   "setup": "Erfassung einrichten",
-  "setup_help": "Der Demo-Host erfasst passende Pfade, sobald dieses Projekt aktiviert ist. Andere Hosts können den Analytics-Host-Adapter installieren und freigegebene Ereignisse mit track(name, properties) senden.",
+  "setup_help": "Passende Routen werden erfasst, sobald diese Property aktiviert ist. Benutzerdefinierte Ereignisse müssen hier aufgeführt sein, bevor sie erfasst werden.",
   "event_format_error": "Ein Ereignis pro Zeile verwenden: ereignis: eigenschaft, eigenschaft.",
   "dimensions": {
     "path": "Seiten",
@@ -114,5 +114,20 @@
     "export_csv": "CSV exportieren",
     "export_help": "Aktuellen Bericht herunterladen: Summen, täglicher Traffic und bis zu 50 Zeilen je Aufschlüsselung. Zeitraum und Filter sind enthalten.",
     "export_failed": "CSV-Export fehlgeschlagen. Bitte erneut versuchen."
+  },
+  "pageview": "Seitenaufruf",
+  "recent_empty": "Keine Aktivität in den letzten fünf Minuten.",
+  "session_expired": "Ihre Sitzung ist abgelaufen. Sie werden zur Anmeldung weitergeleitet…",
+  "validation": {
+    "route_prefix": "Routenmuster müssen mit / beginnen.",
+    "route_length": "Routenmuster dürfen höchstens 500 Zeichen lang sein.",
+    "route_segments": "Verwenden Sie feste Pfadsegmente oder :name als Platzhalter.",
+    "origin": "Geben Sie einen vollständigen http(s)-Ursprung ohne Pfad ein.",
+    "event_names": "Ungültiger Ereignis- oder Eigenschaftsname (höchstens 50 Zeichen, 20 Eigenschaften).",
+    "utm": "Nicht unterstützter UTM-Parameter.",
+    "text_short": "Geben Sie mindestens {count} Zeichen ein.",
+    "text_long": "Geben Sie höchstens {count} Zeichen ein.",
+    "items_long": "Verwenden Sie höchstens {count} Einträge.",
+    "items_short": "Verwenden Sie mindestens {count} Einträge."
   }
 }

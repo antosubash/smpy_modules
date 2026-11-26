@@ -5,7 +5,7 @@ import { track } from './tracker';
 
 afterEach(() => vi.unstubAllGlobals());
 it('clears tracking during navigation and discards a stale tenant configuration', async () => {
-  let navigate = (_url: string) => {};
+  let navigate = (_url: string | { url: string; tenantId: string }) => {};
   let resolveFirst = (_response: Response) => {};
   const first = new Promise<Response>((resolve) => {
     resolveFirst = resolve;
@@ -26,11 +26,14 @@ it('clears tracking during navigation and discards a stale tenant configuration'
     .mockReturnValueOnce(first)
     .mockResolvedValueOnce(Response.json({ properties: [] }));
   vi.stubGlobal('fetch', fetcher);
-  const stop = startHostAnalytics((callback) => {
-    navigate = callback;
-    return () => {};
-  }, 'http://localhost:3000/p/one');
-  navigate('http://localhost:3000/p/two');
+  const stop = startHostAnalytics(
+    (callback) => {
+      navigate = callback;
+      return () => {};
+    },
+    { url: 'http://localhost:3000/p/one', tenantId: 'a' },
+  );
+  navigate({ url: 'http://localhost:3000/p/two', tenantId: 'b' });
   await new Promise((resolve) => setTimeout(resolve, 0));
   resolveFirst(Response.json(config));
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -39,7 +42,7 @@ it('clears tracking during navigation and discards a stale tenant configuration'
   stop();
 });
 it('does not request config for a hash-only change and stops cleanly', async () => {
-  let navigate = (_url: string) => {};
+  let navigate = (_url: string | { url: string; tenantId: string }) => {};
   const unsubscribe = vi.fn();
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ properties: [] })));
   const stop = startHostAnalytics((callback) => {
@@ -53,13 +56,16 @@ it('does not request config for a hash-only change and stops cleanly', async () 
 });
 
 it('refreshes configuration when a tenant switch navigates to the same URL', async () => {
-  let navigate = (_url: string) => {};
+  let navigate = (_url: string | { url: string; tenantId: string }) => {};
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ properties: [] })));
-  const stop = startHostAnalytics((callback) => {
-    navigate = callback;
-    return () => {};
-  }, 'http://localhost:3000/p/one');
-  navigate('http://localhost:3000/p/one');
+  const stop = startHostAnalytics(
+    (callback) => {
+      navigate = callback;
+      return () => {};
+    },
+    { url: 'http://localhost:3000/p/one', tenantId: 'a' },
+  );
+  navigate({ url: 'http://localhost:3000/p/one', tenantId: 'b' });
   expect(fetch).toHaveBeenCalledTimes(2);
   stop();
 });

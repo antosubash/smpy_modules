@@ -22,12 +22,63 @@ pattern includes them. Analytics stores no titles, form contents or user IDs.
 Choose public route slugs and allowed event values accordingly: these fields can
 still contain personal information supplied by an application.
 
-The demo host installs the adapter in its Inertia entry point. Other hosts import
-`startHostAnalytics` from `@simple-module-py/analytics`, passing a subscription that
-forwards completed Inertia navigation URLs (skip Inertia's `initial` event; the
-initializer handles initial load). Call its returned cleanup on teardown. The
-module also exports `initAnalytics(config, url)` and `track(name, properties)` for
-explicit integration. Configure allowed event/property names first:
+Install the host adapter once in the Inertia entry point. Import
+`startHostAnalytics` from `@simple-module-py/analytics` and forward completed
+navigation pages. Skip Inertia's `initial` event: the initializer handles the
+first load. Pass the initial page too so the optional `shouldTrack` callback
+can skip a host's 404 component on the first load as well as later visits:
+
+```ts
+import { router } from '@inertiajs/react';
+import { startHostAnalytics, type HostAnalyticsPage } from '@simple-module-py/analytics';
+
+// Call from createInertiaApp's setup, where props.initialPage is available.
+const stop = startHostAnalytics(
+  (navigate) => router.on('navigate', (event) => {
+    if (event.detail.type !== 'initial') navigate(event.detail.page);
+  }),
+  props.initialPage,
+  { shouldTrack: (page) => page.component !== 'Errors/NotFound' },
+);
+```
+
+`shouldTrack` receives the absolute `url`, query-free `path`, and any `component`,
+`status` or `tenantId` supplied by the host. Inertia supplies the component but
+not an HTTP status; a host may add its own status. Returning false disables both
+pageviews and custom events for that page. Without the callback, matching routes
+are tracked as before. URL strings remain supported when metadata is unnecessary.
+Call the returned cleanup on teardown.
+
+Configuration (including an empty property list) is reused for three minutes.
+The next eligible navigation after expiry refreshes it; concurrent navigations
+share a request and only the latest page is recorded when it resolves. A failed,
+invalid or timed-out fetch disables tracking and waits 30 seconds before another
+navigation may retry. No background timer fetches config. A successful refresh
+picks up enabled, changed or paused properties without a reload; changes may take
+up to three minutes of navigation to appear.
+
+The cache key is the origin and the host's resolved tenant ID. Single-tenant and
+subdomain hosts may use URLs or Inertia pages directly. **Hosts that switch tenants
+on the same origin must include `tenantId` on the initial page and every forwarded
+navigation** (including same-URL switches). For the framework tenants provider,
+map its resolved `tenant.active.id` shared prop; never use `auth.user.tenant_id`:
+
+```ts
+const trackingPage = (page: typeof props.initialPage): HostAnalyticsPage => ({
+  url: page.url,
+  component: page.component,
+  tenantId: page.props.tenant?.active?.id ?? null,
+});
+// Use trackingPage(props.initialPage) above, and navigate(trackingPage(event.detail.page)).
+```
+
+Changing this scope discards the previous config and any late response. Other
+origins are ignored. The endpoint retains `Cache-Control: private, no-store`:
+config is tenant-bound and is never shared through a proxy cache. Its existing
+rate-limit registration is unchanged.
+
+The module also exports `initAnalytics(config, url)` and `track(name, properties)`
+for explicit integration. Configure allowed event/property names first:
 
 ```ts
 import { track } from '@simple-module-py/analytics';
@@ -100,7 +151,15 @@ Reports support inclusive start/end dates (default last seven days, maximum 366)
 path/event/geographic filters, top-50 breakdowns and the last five minutes of
 activity. Select an event to see its allowed property breakdowns. Selecting an
 unknown location filters empty values; leaving a selector at All does not filter.
-Recent activity refreshes every 30 seconds while visible. No map or GPS is used.
+Recent activity refreshes every 30 seconds while visible; its empty state refers
+to the last five minutes, independently of the selected report date range.
+No map or GPS is used.
+
+Property validation errors appear beside the field they describe, with focus
+moved to the first invalid field. Route validation distinguishes a missing leading
+slash, the 500-character limit and invalid path segments. An expired dashboard
+session redirects to sign-in with a return link to the report, and stops polling.
+The initial Inertia navigation does not restart an already loading report.
 
 Retention defaults to 90 days. Every minute each web process deletes at most 5000
 expired events per tenant, then removes expired sessions with no remaining events.
