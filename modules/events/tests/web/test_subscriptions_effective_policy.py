@@ -13,7 +13,10 @@ from sqlalchemy import select
 from tests.support.access import principal
 from tests.support.calendars import MANAGER
 from tests.support.calendars import OWNER as OWNER_HTTP
-from tests.support.subscriptions import seed_calendar
+from tests.support.subscriptions import (
+    sealing_secret,  # noqa: F401 - fixture
+    seed_calendar,
+)
 from tests.support.subscriptions_http import add, app_client, calendar, row, stub_launch
 
 MANAGER_WHO = principal("m", "events.view", "events.manage")
@@ -44,7 +47,9 @@ async def test_the_note_needs_the_switch(monkeypatch, switch, shown):
         assert listed[0]["may_use_internal_addresses"] is shown
 
 
-async def test_saved_before_the_switch_is_not_internal_until_a_manager_saves_it_again(db):
+async def test_saved_before_the_switch_is_not_internal_until_a_manager_saves_it_again(
+    db, sealing_secret  # noqa: F811
+):
     cal = await seed_calendar(db, "c")
     body = SubscriptionIn(url="https://a.example.test/a.ics", label="Feed")
     sub = await service.create(

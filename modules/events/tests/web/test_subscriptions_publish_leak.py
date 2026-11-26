@@ -14,7 +14,10 @@ from sqlalchemy import select, update
 from tests.feeds.subscriptions.refresh_support import Fetcher, load, ok, seed, tick
 from tests.support.calendars import OWNER_P, as_user
 from tests.support.occurrences import read
-from tests.support.subscriptions import seed_item
+from tests.support.subscriptions import (
+    sealing_secret,  # noqa: F401 - fixture
+    seed_item,
+)
 from tests.support.subscriptions_http import SUBS, add, app_client, calendar, row, stub_launch
 
 V, E, P, M = "events.view", "events.edit", "events.publish", "events.manage"
@@ -81,7 +84,9 @@ async def test_the_generation_moves_when_the_policy_or_the_address_does(monkeypa
 
 
 @pytest.mark.unbound_tenant
-async def test_a_fetch_that_started_under_another_policy_stores_nothing(db_state):
+async def test_a_fetch_that_started_under_another_policy_stores_nothing(
+    db_state, sealing_secret  # noqa: F811
+):
     """Public, the internal flag or the address changed while the fetch was in flight: each
     bumps ``policy_generation``, and the store step discards a result of another generation."""
     (sid,) = await seed(db_state)

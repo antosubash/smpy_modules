@@ -6,12 +6,22 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+import pytest
+from sm_events.core import crypto
 from sm_events.core.clock import utcnow
 from sm_events.feeds.subscriptions import urls
 from sm_events.models import Calendar, Subscription
 
 CRLF = "\r\n"
 URL = "https://cal.example/feed.ics"
+
+
+@pytest.fixture
+def sealing_secret(monkeypatch) -> str:
+    """A secret for a test that seals an address without building the app. Without it the test
+    passes only if an earlier test in the same worker left a provider installed (#471)."""
+    monkeypatch.setattr(crypto, "_secret_provider", lambda: "sealing-test-secret")
+    return "sealing-test-secret"
 
 
 def vevent(*extra: str, **props: str) -> list[str]:

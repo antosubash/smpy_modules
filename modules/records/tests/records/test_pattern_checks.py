@@ -17,6 +17,10 @@ from tests.support.app_harness import ADMIN, field, roles, seed_type
 API = "/api/records/types"
 EVIL = "^(a|aa)+$"
 SLOW = "a" * 60 + "!"
+# ``EVIL`` on ``SLOW`` backtracks for longer than any test run, so a write that answers at all
+# was cut off by the deadline (0.3 s below). The ceiling only says "it came back"; it is wide
+# because a loaded CI runner took 4.3 s for the whole round trip against an earlier 4 s (#465).
+BOUNDED = 30
 
 
 @pytest.fixture(autouse=True)
@@ -55,7 +59,7 @@ async def test_a_create_cannot_pin_the_loop(client):
     write = client.post(f"{API}/note/records", json={"data": {"name": SLOW}}, headers=roles(ADMIN))
     resp, probed, finished = await _while_probing(client, write)
     _too_slow(resp)
-    assert probed < finished < 4, "the read was answered while the pattern ran"
+    assert probed < finished < BOUNDED, "the read was answered while the pattern ran"
 
 
 async def test_an_update_cannot_pin_the_loop(client):
@@ -82,7 +86,7 @@ async def test_an_import_checks_every_row_in_one_bounded_batch(client):
     )
     resp, probed, finished = await _while_probing(client, write)
     _too_slow(resp)
-    assert probed < finished < 4
+    assert probed < finished < BOUNDED
 
 
 async def test_a_good_import_needs_one_worker_round_trip(client, monkeypatch):
