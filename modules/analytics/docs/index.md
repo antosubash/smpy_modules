@@ -85,6 +85,17 @@ import { track } from '@simple-module-py/analytics';
 await track('download', { format: 'pdf' });
 ```
 
+A host that installs the module from PyPI resolves `@simple-module-py/analytics`
+through the `package.json` shipped inside the wheel (correct there since 0.0.16,
+#472). If the host's `tsconfig.json` maps module packages with `paths`, it needs
+the bare name as well as the `/*` form, or `tsc` reports `TS2307` for the import
+above:
+
+```json
+"@simple-module-py/analytics": ["./.venv/lib/python3.12/site-packages/sm_analytics"],
+"@simple-module-py/analytics/*": ["./.venv/lib/python3.12/site-packages/sm_analytics/*"]
+```
+
 An event named `download` with property `format` must be declared on the property.
 Other properties are discarded. Event names are 1–50 characters; up to 20 scalar
 string/number/boolean values are accepted, with strings limited to 500 characters.

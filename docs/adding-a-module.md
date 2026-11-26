@@ -96,7 +96,11 @@ starts using something newer.
 
 **Entry point and build.** The entry point is how a host discovers the module.
 If the module has a frontend, `package.json` is copied into the package so a
-host can find its JS dependencies after a `pip install`. Frontend tests and
+host can find its JS dependencies after a `pip install`. The copy is made by
+`hatch_build.py`, a build hook copied unchanged from another module (the copies
+are checked for being identical): `package.json` is written for the source tree,
+where `exports` says `./sm_orders/index.ts`, and inside the wheel it sits next
+to `index.ts`, so the hook writes `./index.ts` there (#472). Frontend tests and
 their helpers sit beside the source, so the wheel excludes them; a stray
 `vitest` import in an installed module breaks a host's Vite pre-bundling. A
 module that builds its own bundle into the gitignored `<package>/static/dist/`
@@ -126,8 +130,9 @@ exclude = [
 ]
 artifacts = ["sm_orders/static/dist/**"]   # only with a built bundle
 
-[tool.hatch.build.targets.wheel.force-include]
-"package.json" = "sm_orders/package.json"
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
+package = "sm_orders"
 
 [tool.hatch.build.targets.sdist]
 artifacts = ["sm_orders/static/dist/**"]   # only with a built bundle

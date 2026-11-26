@@ -453,6 +453,15 @@ name the module they affect.
 - **analytics: the framework doctor no longer reports SM003 for the dashboard
   page** (#482). The page was rendered correctly; the doctor could not see its
   name through `constants`, so the name now sits beside the `render` call.
+- **analytics, events, images, news, newsletter, pagebuilder: the package root
+  resolves from an installed wheel** (#472, #473). A wheel carries the module's
+  `package.json` inside the package, but its `exports` (pagebuilder: `main` and
+  `types`) still named the source-tree path, `./<package>/index.ts`, which does
+  not exist there. A host that installed from PyPI got `TS2307` from `tsc` and
+  `UNLOADABLE_DEPENDENCY` from `vite build` for
+  `import … from '@simple-module-py/analytics'`. The wheel's copy now says
+  `./index.ts`. Hosts that worked around it with
+  `@simple-module-py/<module>/index` keep working.
 - **pagebuilder: a leftover `SM_PAGEBUILDER_*` environment variable is reported at
   boot** (#459). Settings are database-backed since 0.0.15, so such a variable does
   nothing; a deployment that still set `SM_PAGEBUILDER_MEDIA_ROOT` booted, served
