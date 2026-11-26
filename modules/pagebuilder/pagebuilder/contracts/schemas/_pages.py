@@ -70,7 +70,14 @@ class PageCreate(BaseModel):
     """
 
 
-class PageUpdate(BaseModel):
+class PageVersionRequest(BaseModel):
+    expected_updated_at: AwareInstant | None = None
+    """Loaded page's version. Explicit null checks an untouched page;
+    omitting the field preserves tokenless, last-write-wins callers.
+    """
+
+
+class PageUpdate(PageVersionRequest):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     slug: str | None = Field(
         default=None, min_length=1, max_length=200, pattern=r"^[a-z0-9][a-z0-9-]*$"
@@ -88,7 +95,7 @@ class PageUpdate(BaseModel):
     is_template: bool | None = None
 
 
-class PageScheduleRequest(BaseModel):
+class PageScheduleRequest(PageVersionRequest):
     """Schedule a future flip into / out of ``published``.
 
     Both fields are optional and independent — set ``publish_at`` to flip
@@ -219,7 +226,7 @@ class PageListResponse(BaseModel):
     total: int = 0
 
 
-class PageRejectRequest(BaseModel):
+class PageRejectRequest(PageVersionRequest):
     """Approver-supplied reason for sending a submission back to draft.
 
     Required and non-empty so the editor history panel always has
@@ -229,7 +236,7 @@ class PageRejectRequest(BaseModel):
     note: RequiredNote
 
 
-class PageNoteRequest(BaseModel):
+class PageNoteRequest(PageVersionRequest):
     """Optional author note attached to a publish / approve / unpublish.
 
     Body is always required by FastAPI when the endpoint declares this

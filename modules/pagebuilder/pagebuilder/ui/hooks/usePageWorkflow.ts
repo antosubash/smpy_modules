@@ -24,7 +24,7 @@ interface Params {
 }
 
 export interface PageWorkflow {
-  handleSave: (newData: Data) => Promise<void>;
+  handleSave: (newData: Data, overwrite?: boolean) => Promise<void>;
   /** *note* is `null` for "publish, no note". Rejects on failure so the
    *  dialog that collected the note can show why. */
   handlePublish: (note: string | null) => Promise<void>;
@@ -47,7 +47,7 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     draft_data: newData as unknown as Record<string, unknown>,
   });
 
-  const handleSave = async (newData: Data) => {
+  const handleSave = async (newData: Data, overwrite = false) => {
     setBusy(true);
     setMessage(null);
     try {
@@ -59,7 +59,7 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
         form.setStatus(created.status);
         router.visit(`/pagebuilder/${created.id}/edit`, { preserveState: false });
       } else {
-        const updated = await savePage(form.pageId, draftPayload(newData));
+        const updated = await form.writes.save(draftPayload(newData), overwrite);
         form.setStatus(updated.status);
         markSaved(snapshotWith(newData));
         setMessage(t(keys.pagebuilder.workflow.draft_saved));
@@ -83,9 +83,16 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     setBusy(true);
     setMessage(null);
     try {
-      await savePage(form.pageId, draftPayload(form.data));
-      markSaved(snapshotWith(form.data));
-      const result = await publishPage(form.pageId, note);
+      const id = form.pageId;
+      const result = await form.writes.run(async (token) => {
+        const saved = await savePage(id, {
+          ...draftPayload(form.data),
+          expected_updated_at: token,
+        });
+        form.writes.acceptWrite(saved);
+        markSaved(snapshotWith(form.data));
+        return publishPage(id, note, saved.updated_at);
+      });
       form.setStatus(result.status);
       setMessage(t(keys.pagebuilder.workflow.published));
       router.reload({ only: ['revisions'] });
@@ -99,7 +106,8 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     setBusy(true);
     setMessage(null);
     try {
-      const result = await unpublishPage(form.pageId);
+      const id = form.pageId;
+      const result = await form.writes.run((token) => unpublishPage(id, null, token));
       form.setStatus(result.status);
       setMessage(t(keys.pagebuilder.workflow.unpublished));
     } catch (e) {
@@ -117,9 +125,16 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     setBusy(true);
     setMessage(null);
     try {
-      await savePage(form.pageId, draftPayload(form.data));
-      markSaved(snapshotWith(form.data));
-      const result = await submitPage(form.pageId);
+      const id = form.pageId;
+      const result = await form.writes.run(async (token) => {
+        const saved = await savePage(id, {
+          ...draftPayload(form.data),
+          expected_updated_at: token,
+        });
+        form.writes.acceptWrite(saved);
+        markSaved(snapshotWith(form.data));
+        return submitPage(id, null, saved.updated_at);
+      });
       form.setStatus(result.status);
       setMessage(t(keys.pagebuilder.workflow.submitted));
       router.reload({ only: ['revisions', 'page'] });
@@ -135,7 +150,8 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     setBusy(true);
     setMessage(null);
     try {
-      const result = await approvePage(form.pageId);
+      const id = form.pageId;
+      const result = await form.writes.run((token) => approvePage(id, null, token));
       form.setStatus(result.status);
       setMessage(t(keys.pagebuilder.workflow.approved));
       router.reload({ only: ['revisions', 'page'] });
@@ -151,7 +167,8 @@ export function usePageWorkflow({ form, setBusy, setMessage, markSaved }: Params
     setBusy(true);
     setMessage(null);
     try {
-      const result = await rejectPage(form.pageId, note);
+      const id = form.pageId;
+      const result = await form.writes.run((token) => rejectPage(id, note, token));
       form.setStatus(result.status);
       setMessage(t(keys.pagebuilder.workflow.rejected));
       router.reload({ only: ['revisions', 'page'] });

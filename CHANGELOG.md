@@ -439,6 +439,17 @@ name the module they affect.
 
 ### Fixed
 
+- **pagebuilder: warn before overwriting another editor's draft** (#448).
+  Draft saves and autosave send `expected_updated_at`; a stale write returns
+  409 `page_conflict`. The editor pauses saves and offers Reload (discard local
+  changes) or Overwrite (save deliberately). Draft and workflow writes share a
+  queue and advance the version from their responses. API consumers and bundles
+  that omit the token retain the existing behaviour. A trashed or deleted page
+  answers editor writes with 404 `page_not_found`; the editor shows a deletion
+  notice and stops all queued saves and Overwrite until Reload or navigation.
+  Refused schedules leave the stored badge unchanged. Publish conflicts are
+  explained inside the dialog with its submit action removed; the banner has
+  spaced, wrapping actions and replaces duplicate toolbar conflict messages.
 - **news: small defects on the article screens** (#449). Unpublish refused with the
   stale-write conflict now shows that message in its dialog instead of a generic
   one. An empty or invalid URL says why Save is disabled. The German tag input's

@@ -2,8 +2,6 @@
 
 import type { Data } from '@puckeditor/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
-import { savePage } from '../utils/api';
 import {
   AUTOSAVE_DEBOUNCE_MS,
   type EditorSnapshot,
@@ -11,8 +9,10 @@ import {
   snapshotKey,
 } from '../utils/editorSnapshot';
 import { keys, translate } from '../utils/i18n';
+import type { PageWrites } from './usePageWrites';
 
 interface Params {
+  writes: PageWrites;
   pageId: number | null;
   busy: boolean;
   data: Data;
@@ -30,6 +30,7 @@ export interface Autosave {
 }
 
 export function useAutosave({
+  writes,
   pageId,
   busy,
   data,
@@ -105,7 +106,7 @@ export function useAutosave({
   useEffect(() => {
     if (pageId === null) return;
     if (!isDirty) return;
-    if (busy) return;
+    if (busy || writes.conflict || writes.missing) return;
     if (autosaveInFlight.current) return;
     const handle = window.setTimeout(async () => {
       autosaveInFlight.current = true;
@@ -116,7 +117,7 @@ export function useAutosave({
       };
       setSaveState('saving');
       try {
-        await savePage(pageId, payload);
+        await writes.save(payload);
         setSavedSnapshot(snapshotAtSave);
         setLastSavedAt(new Date());
         setAutosaveError(null);
@@ -131,7 +132,7 @@ export function useAutosave({
       }
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
-  }, [pageId, isDirty, busy, currentSnapshot, saveState]);
+  }, [pageId, isDirty, busy, currentSnapshot, saveState, writes.conflict, writes.missing]);
 
   // beforeunload: only attached while dirty, so the browser confirm
   // doesn't fire on a clean exit.

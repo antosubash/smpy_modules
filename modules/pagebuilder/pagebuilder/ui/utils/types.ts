@@ -198,6 +198,7 @@ export interface PageTranslationPayload {
 }
 
 export interface PageWritePayload {
+  expected_updated_at?: string | null;
   title?: string;
   slug?: string;
   meta_description?: string | null;
@@ -227,6 +228,7 @@ export interface PageWritePayload {
  * without touching ``unpublish_at``.
  */
 export interface ScheduleRequest {
+  expected_updated_at?: string | null;
   publish_at?: string | null;
   unpublish_at?: string | null;
 }

@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends
 from simple_module_db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pagebuilder.content.service._fresh import ensure_fresh_for_write
 from pagebuilder.content.service.pages import PagesService
 from pagebuilder.contracts.schemas import (
     PageDetail,
     PageRevisionDetail,
     PageRevisionListResponse,
+    PageVersionRequest,
     RevisionDiffResponse,
 )
 from pagebuilder.web.endpoints.api._deps import require_edit
@@ -70,6 +72,8 @@ async def restore_revision(
     page_id: int,
     revision_id: int,
     db: AsyncSession = Depends(get_db),
+    body: PageVersionRequest | None = None,
 ) -> PageDetail:
+    await ensure_fresh_for_write(db, page_id, body)
     page = await PagesService(db).restore_revision(page_id, revision_id)
     return PageDetail.model_validate(page)

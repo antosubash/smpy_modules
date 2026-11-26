@@ -65,38 +65,41 @@ export const savePage = (id: number, data: PageWritePayload) =>
 
 export const deletePage = (id: number) => request<void>(`/pages/${id}`, { method: 'DELETE' });
 
-function noteBody(note?: string | null): BodyInit | undefined {
-  return note ? JSON.stringify({ note }) : undefined;
+function noteBody(note?: string | null, expected_updated_at?: string | null): BodyInit {
+  return JSON.stringify({
+    ...(note ? { note } : {}),
+    ...(expected_updated_at === undefined ? {} : { expected_updated_at }),
+  });
 }
 
-export const publishPage = (id: number, note?: string | null) =>
+export const publishPage = (id: number, note?: string | null, token?: string | null) =>
   request<PageRead>(`/pages/${id}/publish`, {
     method: 'POST',
-    body: noteBody(note),
+    body: noteBody(note, token),
   });
 
-export const unpublishPage = (id: number, note?: string | null) =>
+export const unpublishPage = (id: number, note?: string | null, token?: string | null) =>
   request<PageRead>(`/pages/${id}/unpublish`, {
     method: 'POST',
-    body: noteBody(note),
+    body: noteBody(note, token),
   });
 
-export const submitPage = (id: number, note?: string | null) =>
+export const submitPage = (id: number, note?: string | null, token?: string | null) =>
   request<PageRead>(`/pages/${id}/submit`, {
     method: 'POST',
-    body: noteBody(note),
+    body: noteBody(note, token),
   });
 
-export const approvePage = (id: number, note?: string | null) =>
+export const approvePage = (id: number, note?: string | null, token?: string | null) =>
   request<PageRead>(`/pages/${id}/approve`, {
     method: 'POST',
-    body: noteBody(note),
+    body: noteBody(note, token),
   });
 
-export const rejectPage = (id: number, note: string) =>
+export const rejectPage = (id: number, note: string, token?: string | null) =>
   request<PageRead>(`/pages/${id}/reject`, {
     method: 'POST',
-    body: JSON.stringify({ note }),
+    body: noteBody(note, token),
   });
 
 export const listPendingPages = () => request<{ items: PageRead[] }>('/pages/pending');
@@ -110,9 +113,10 @@ export const schedulePage = (id: number, body: ScheduleRequest) =>
 export const listRevisions = (id: number) =>
   request<{ items: PageRevisionRead[] }>(`/pages/${id}/revisions`);
 
-export const restoreRevision = (pageId: number, revisionId: number) =>
+export const restoreRevision = (pageId: number, revisionId: number, token?: string | null) =>
   request<PageDetail>(`/pages/${pageId}/revisions/${revisionId}/restore`, {
     method: 'POST',
+    body: noteBody(null, token),
   });
 
 export const diffRevisions = (pageId: number, beforeId: number, afterId: number) =>
