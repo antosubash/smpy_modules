@@ -444,7 +444,12 @@ name the module they affect.
   409 `page_conflict`. The editor pauses saves and offers Reload (discard local
   changes) or Overwrite (save deliberately). Draft and workflow writes share a
   queue and advance the version from their responses. API consumers and bundles
-  that omit the token retain the existing behaviour.
+  that omit the token retain the existing behaviour. A trashed or deleted page
+  answers editor writes with 404 `page_not_found`; the editor shows a deletion
+  notice and stops all queued saves and Overwrite until Reload or navigation.
+  Refused schedules leave the stored badge unchanged. Publish conflicts are
+  explained inside the dialog with its submit action removed; the banner has
+  spaced, wrapping actions and replaces duplicate toolbar conflict messages.
 - **news: Reload after a stale-write conflict resets the whole edit screen** (#444).
   Main fields, search settings, schedule, review notes and history show the
   server's current state; rejected values are discarded before another save.

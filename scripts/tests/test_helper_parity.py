@@ -43,11 +43,16 @@ def test_use_mounted_ref_is_byte_identical() -> None:
 
 
 @pytest.mark.parametrize(
-    ("package", "error_name", "code"),
-    [(NEWS, "ArticleConflict", "article_conflict"), (PB, "PageConflict", "page_conflict")],
+    ("package", "error_name", "code", "status"),
+    [
+        (NEWS, "ArticleConflict", "article_conflict", 409),
+        (PB, "PageConflict", "page_conflict", 409),
+        (NEWS, "ArticleNotFound", "article_not_found", 404),
+        (PB, "PageNotFound", "page_not_found", 404),
+    ],
 )
-def test_draft_conflicts_keep_the_same_error_envelope(package, error_name, code) -> None:
-    """Wording and extra news handlers differ; stale-write responses must not."""
+def test_editor_refusals_keep_the_same_error_envelope(package, error_name, code, status) -> None:
+    """Wording differs; stale-write and missing-page envelopes must not."""
     from fastapi import FastAPI
 
     # Load the standalone helper without importing either optional module's models.
@@ -61,7 +66,7 @@ def test_draft_conflicts_keep_the_same_error_envelope(package, error_name, code)
     errors.install_exception_handlers(app)
     error = getattr(errors, error_name)()
     response = asyncio.run(app.exception_handlers[type(error)](None, error))
-    assert response.status_code == 409
+    assert response.status_code == status
     assert isinstance(error.detail, str) and error.detail
     assert json.loads(response.body) == {"detail": error.detail, "code": code}
 

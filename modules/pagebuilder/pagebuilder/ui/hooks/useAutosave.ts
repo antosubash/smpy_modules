@@ -106,7 +106,7 @@ export function useAutosave({
   useEffect(() => {
     if (pageId === null) return;
     if (!isDirty) return;
-    if (busy || writes.conflict) return;
+    if (busy || writes.conflict || writes.missing) return;
     if (autosaveInFlight.current) return;
     const handle = window.setTimeout(async () => {
       autosaveInFlight.current = true;
@@ -132,7 +132,7 @@ export function useAutosave({
       }
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(handle);
-  }, [pageId, isDirty, busy, currentSnapshot, saveState, writes.conflict]);
+  }, [pageId, isDirty, busy, currentSnapshot, saveState, writes.conflict, writes.missing]);
 
   // beforeunload: only attached while dirty, so the browser confirm
   // doesn't fire on a clean exit.

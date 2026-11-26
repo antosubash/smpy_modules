@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { PageRead, PageWritePayload } from '../utils/api';
 import { keys, translate } from '../utils/i18n';
@@ -8,23 +8,46 @@ import { useMountedRef } from './useMountedRef';
 
 /** One queue and send-time version for draft and workflow writes. */
 export function usePageWrites(pageId: number | null, initialVersion: string | null) {
-  const version = useRef(initialVersion);
-  const tail = useRef<Promise<unknown>>(Promise.resolve());
-  const blocked = useRef(false);
   const mounted = useMountedRef(pageId ?? undefined);
+  // Capture each identity's queue so an old response cannot block a new page.
+  const [queue, setQueue] = useState({
+    pageId,
+    version: initialVersion,
+    tail: Promise.resolve<unknown>(undefined),
+    blocked: false,
+    missing: false,
+  });
   const [conflict, setConflict] = useState(false);
-  const acceptWrite = useCallback((page: Pick<PageRead, 'updated_at'>) => {
-    version.current = page.updated_at;
-  }, []);
+  const [missing, setMissing] = useState(false);
+  if (queue.pageId !== pageId) {
+    setQueue({
+      pageId,
+      version: initialVersion,
+      tail: Promise.resolve(undefined),
+      blocked: false,
+      missing: false,
+    });
+    setConflict(false);
+    setMissing(false);
+  }
+  const acceptWrite = useCallback(
+    (page: Pick<PageRead, 'updated_at'>) => {
+      queue.version = page.updated_at;
+    },
+    [queue],
+  );
 
   const run = useCallback(
     <T extends Pick<PageRead, 'updated_at'>>(
       action: (token: string | null) => Promise<T>,
       overwrite = false,
     ): Promise<T> => {
-      const next = tail.current.then(async () => {
+      const next = queue.tail.then(async () => {
         if (!mounted.current) throw new Error(translate(keys.pagebuilder.workflow.save_failed));
-        if (blocked.current && !overwrite) {
+        if (queue.missing) {
+          throw new HttpError(translate(keys.pagebuilder.errors.page_gone), 404, 'page_not_found');
+        }
+        if (queue.blocked && !overwrite) {
           throw new HttpError(
             translate(keys.pagebuilder.errors.page_conflict),
             409,
@@ -32,25 +55,32 @@ export function usePageWrites(pageId: number | null, initialVersion: string | nu
           );
         }
         try {
-          const result = await action(version.current);
+          const result = await action(queue.version);
           acceptWrite(result);
           if (overwrite) {
-            blocked.current = false;
+            queue.blocked = false;
             if (mounted.current) setConflict(false);
           }
           return result;
         } catch (e) {
-          if (e instanceof HttpError && e.code === 'page_conflict') {
-            blocked.current = true;
+          if (e instanceof HttpError && e.status === 404 && e.code === 'page_not_found') {
+            queue.missing = true;
+            queue.blocked = false;
+            if (mounted.current) {
+              setMissing(true);
+              setConflict(false);
+            }
+          } else if (e instanceof HttpError && e.code === 'page_conflict') {
+            queue.blocked = true;
             if (mounted.current) setConflict(true);
           }
           throw e;
         }
       });
-      tail.current = next.catch(() => undefined);
+      queue.tail = next.catch(() => undefined);
       return next;
     },
-    [acceptWrite, mounted],
+    [acceptWrite, mounted, queue],
   );
 
   const save = (payload: PageWritePayload, overwrite = false) =>
@@ -62,7 +92,7 @@ export function usePageWrites(pageId: number | null, initialVersion: string | nu
       });
     }, overwrite);
 
-  return { conflict, run, save, acceptWrite };
+  return { conflict, missing, run, save, acceptWrite };
 }
 
 export type PageWrites = ReturnType<typeof usePageWrites>;

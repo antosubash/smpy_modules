@@ -35,7 +35,7 @@ export function PageActions({
   onNotice,
 }: Props) {
   const { t } = useT();
-  if (pageId === null) return null;
+  if (pageId === null || writes.missing) return null;
 
   const published = status === 'published';
 

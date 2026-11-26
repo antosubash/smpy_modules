@@ -121,6 +121,11 @@ export default function PageEditor() {
   const workflow = usePageWorkflow({ form, setBusy, setMessage, markSaved });
   const schedule = usePageSchedule({ form, setBusy, setMessage });
   const revisionActions = usePageRevisions({ form, setBusy, setMessage, markSaved });
+  const writeError = form.writes.missing
+    ? t(keys.pagebuilder.errors.page_gone)
+    : form.writes.conflict
+      ? t(keys.pagebuilder.errors.page_conflict)
+      : null;
 
   return (
     <div className="h-screen flex flex-col">
@@ -150,6 +155,8 @@ export default function PageEditor() {
         revisionCount={revisions.length + (props.restores?.length ?? 0)}
         busy={busy}
         message={message}
+        writeError={writeError}
+        missing={form.writes.missing}
         onToggleSettings={() => setShowSettings((v) => !v)}
         onToggleHistory={() => setShowHistory((v) => !v)}
         onSave={() => workflow.handleSave(form.data)}
@@ -160,8 +167,9 @@ export default function PageEditor() {
         onReject={workflow.handleReject}
       />
 
-      {form.writes.conflict && (
+      {(form.writes.conflict || form.writes.missing) && (
         <PageConflict
+          missing={form.writes.missing}
           busy={busy}
           onReload={() =>
             router.visit(`/pagebuilder/${form.pageId}/edit`, { preserveState: false })
@@ -180,7 +188,7 @@ export default function PageEditor() {
         <PageInspectorDrawer
           form={form}
           schedule={schedule}
-          busy={busy}
+          busy={busy || !!writeError}
           publicPrefix={PUBLIC_PREFIX}
           locales={locales}
           defaultLocale={defaultLocale}
@@ -195,7 +203,7 @@ export default function PageEditor() {
           restores={props.restores ?? []}
           activeDiff={revisionActions.activeDiff}
           diffError={revisionActions.diffError}
-          busy={busy}
+          busy={busy || !!writeError}
           onCompare={revisionActions.handleCompare}
           onRestore={revisionActions.handleRestore}
         />

@@ -23,7 +23,7 @@ router-level dependencies, in this order:
    `/pagebuilder/` (the draft preview included) run the same gate.
 
 "Permission" below is the extra `RequiresPermission` check on top; **read** means
-any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; draft conflicts also carry `"code": "page_conflict"`. The table is at the end.
+any one of the three pagebuilder permissions (step 4) and nothing more. Errors are `{"detail": "<message>"}`; editor writes also carry `"code": "page_conflict"` for stale versions or `"code": "page_not_found"` for missing pages. The table is at the end.
 
 ## Pages
 
@@ -141,6 +141,18 @@ chooses **Overwrite**. On conflict, draft and workflow writes pause until
 **Reload** loads the server's page and discards local edits, or **Overwrite**
 saves the current local draft deliberately. The overwrite response supplies
 the version for subsequent guarded saves.
+
+If the page was trashed or deleted, these editor-write endpoints instead return
+HTTP 404 with `{"detail": "Page not found", "code": "page_not_found"}`, including
+an Overwrite without a version token. The editor replaces the conflict banner
+with a deletion notice and stops autosave and queued writes, including Overwrite,
+until Reload or navigation to another page. A missing revision remains an ordinary
+404 `Revision not found` and does not mark the page missing. HTML page navigation
+keeps the host's usual not-found response.
+
+Schedule inputs keep unsaved dates after a refused save; the header's schedule
+badge changes only when the server accepts the schedule. A refused Publish shows
+the conflict inside its dialog and removes its submit action until resolved.
 
 ### `POST /api/pagebuilder/pages/{id}/translations` — `pagebuilder.edit` → 201
 
