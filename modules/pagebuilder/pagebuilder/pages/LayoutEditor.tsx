@@ -82,7 +82,7 @@ export default function LayoutEditor() {
     }
   };
 
-  // Confirmation and failure both belong to the dialog on the row.
+  // History failures belong to the row dialog; banner overwrite failures appear on screen.
   const handleRestore = async (revisionId: number, overwrite = false) => {
     setBusy(true);
     setMessage(null);
@@ -98,8 +98,15 @@ export default function LayoutEditor() {
       router.reload({ only: ['revisions'] });
     } catch (e) {
       // Close the dialog so Reload and Overwrite in the banner are reachable.
-      if (!(e instanceof HttpError && e.code === 'layout_conflict')) throw e;
-      setRefusedRestore(revisionId);
+      if (e instanceof HttpError && e.code === 'layout_conflict') setRefusedRestore(revisionId);
+      else {
+        if (!overwrite) throw e;
+        setMessage(
+          e instanceof Error
+            ? e.message
+            : t(keys.pagebuilder.confirm.failed, { action: t(keys.pagebuilder.layout.restore) }),
+        );
+      }
     } finally {
       setBusy(false);
     }

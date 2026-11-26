@@ -55,6 +55,17 @@ async function click(text: string) {
   expect(button, text).toBeDefined();
   await act(async () => button?.click());
 }
+async function restore() {
+  await click('History (1)');
+  await click('Restore');
+  const dialog = document.querySelector('[role="alertdialog"]');
+  expect(dialog).not.toBeNull();
+  const confirm = [...(dialog?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent === 'Restore',
+  );
+  expect(confirm).toBeDefined();
+  await act(async () => confirm?.click());
+}
 async function editSlots() {
   await act(async () => {
     for (const canvas of host.querySelectorAll<HTMLButtonElement>('[data-testid="canvas"]')) {
@@ -173,31 +184,23 @@ it('each successful ordinary save advances the screen token', async () => {
 
 it('a stale revision Restore shows the same conflict without claiming success', async () => {
   externalEdit();
-  await click('History (1)');
-  await click('Restore');
-  const dialog = document.querySelector('[role="alertdialog"]');
-  expect(dialog).not.toBeNull();
-  const confirm = [...(dialog?.querySelectorAll('button') ?? [])].find(
-    (button) => button.textContent === 'Restore',
-  );
-  await act(async () => confirm?.click());
+  await restore();
   expect(writes[0].expected_updated_at).toBeNull();
   expect(banner()?.textContent).toContain('This layout was changed elsewhere');
   expect(host.textContent).not.toContain('Revision restored');
   expect(server.header_data).toEqual(doc('Server header'));
   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  await click('Save layout');
+  await click('Restore');
+  expect(writes).toHaveLength(1);
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 });
 
 it('Overwrite after a refused Restore repeats the restore, not a save of the screen', async () => {
   externalEdit();
-  await click('History (1)');
-  await click('Restore');
-  const dialog = document.querySelector('[role="alertdialog"]');
-  const confirm = [...(dialog?.querySelectorAll('button') ?? [])].find(
-    (button) => button.textContent === 'Restore',
-  );
-  await act(async () => confirm?.click());
+  await restore();
   expect(banner()).not.toBeNull();
+  await editSlots();
   await click('Overwrite');
   // The retry is the restore without a token (no slots in its body), and the screen adopts it.
   expect(writes[1]).not.toHaveProperty('expected_updated_at');
@@ -208,22 +211,66 @@ it('Overwrite after a refused Restore repeats the restore, not a save of the scr
   await click('Save layout');
   expect(writes[2].expected_updated_at).toBe('2026-01-01T00:00:10Z');
   expect(writes[2].header_data).toEqual(doc('Restored header'));
+  expect(writes[2].footer_data).toEqual(doc('Restored footer'));
 });
 
 it('a successful Restore advances the token used when saving both restored slots', async () => {
-  await click('History (1)');
-  await click('Restore');
-  const dialog = document.querySelector('[role="alertdialog"]');
-  const confirm = [...(dialog?.querySelectorAll('button') ?? [])].find(
-    (button) => button.textContent === 'Restore',
-  );
-  expect(confirm).toBeDefined();
-  await act(async () => confirm?.click());
+  await restore();
   expect(writes[0].expected_updated_at).toBeNull();
   await click('Save layout');
   expect(writes[1].expected_updated_at).toBe('2026-01-01T00:00:10Z');
   expect(writes[1].header_data).toEqual(doc('Restored header'));
   expect(writes[1].footer_data).toEqual(doc('Restored footer'));
+  expect(banner()).toBeNull();
+});
+
+it.each([500, 'network', 404])(
+  'a restore Overwrite reports %s failures and retains its intent',
+  async (failure) => {
+    externalEdit();
+    await restore();
+    vi.mocked(fetch).mockImplementationOnce(async () => {
+      if (failure === 'network') throw new Error('Offline');
+      return json({ detail: 'Restore unavailable' }, Number(failure));
+    });
+    await click('Overwrite');
+    expect(host.textContent).toContain(failure === 'network' ? 'Offline' : 'Restore unavailable');
+    expect(host.textContent).not.toContain('Revision restored');
+    expect(banner()).not.toBeNull();
+    expect(server.header_data).toEqual(doc('Server header'));
+    if (failure === 404) {
+      await click('Reload');
+      await click('Save layout');
+      expect(writes.at(-1)?.header_data).toEqual(doc('Server header'));
+      expect(writes.at(-1)?.expected_updated_at).toBe('2026-01-01T00:00:05Z');
+    } else {
+      await click('Overwrite');
+      expect(writes.at(-1)).not.toHaveProperty('expected_updated_at');
+      expect(writes.at(-1)).not.toHaveProperty('header_data');
+      expect(server.header_data).toEqual(doc('Restored header'));
+    }
+    expect(banner()).toBeNull();
+  },
+);
+
+it('Reload after a refused Restore forgets the restore before a later save conflict', async () => {
+  externalEdit();
+  await restore();
+  await click('Reload');
+  await editSlots();
+  server = { ...server, updated_at: '2026-01-01T00:00:06Z' };
+  await click('Save layout');
+  await click('Overwrite');
+  expect(server.header_data).toEqual(doc('Local edit'));
+  expect(server.footer_data).toEqual(doc('Local edit'));
+  expect(banner()).toBeNull();
+});
+
+it('an ordinary Restore still reports failures in its confirmation dialog', async () => {
+  vi.mocked(fetch).mockImplementationOnce(async () => json({ detail: 'Unavailable' }, 500));
+  await restore();
+  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('Unavailable');
+  expect(host.textContent).not.toContain('Revision restored');
   expect(banner()).toBeNull();
 });
 
