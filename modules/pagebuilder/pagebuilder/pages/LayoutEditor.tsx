@@ -12,18 +12,12 @@ import { PageConflict } from '../ui/components/editor/PageConflict';
 import { emptyLayoutData, getLayoutPuckConfig } from '../ui/components/layoutPuckConfig';
 import { localizeConfig } from '../ui/components/localizeConfig';
 import { useIsNarrow } from '../ui/hooks/useIsNarrow';
+import { useLayoutWrites } from '../ui/hooks/useLayoutWrites';
 import { usePuckA11y } from '../ui/hooks/usePuckA11y';
-import { useVersionedWrites } from '../ui/hooks/useVersionedWrites';
-import {
-  type LayoutDetail,
-  type LayoutRevisionRead,
-  restoreLayoutRevision,
-  saveLayout,
-} from '../ui/utils/api';
+import type { LayoutDetail, LayoutRevisionRead } from '../ui/utils/api';
 import { blockLabels, moveBlock, outlineOf } from '../ui/utils/blockOutline';
 import { formatTimestamp } from '../ui/utils/dates';
 import { keys, useT } from '../ui/utils/i18n';
-import { HttpError } from '../ui/utils/request';
 
 interface Props {
   layout: LayoutDetail;
@@ -36,19 +30,18 @@ export default function LayoutEditor() {
   const props = usePage<{ props: Props }>().props as unknown as Props;
   const { layout } = props;
   const revisions = props.revisions ?? [];
-  const writes = useVersionedWrites(layout.id, layout.updated_at, 'layout');
-
   const [headerData, setHeaderData] = useState<Data>(
     (layout.header_data as unknown as Data) ?? (emptyLayoutData as unknown as Data),
   );
   const [footerData, setFooterData] = useState<Data>(
     (layout.footer_data as unknown as Data) ?? (emptyLayoutData as unknown as Data),
   );
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  // The restore a conflict refused: Overwrite then repeats it, not a save of this screen.
-  const [refusedRestore, setRefusedRestore] = useState<number | null>(null);
+  const writes = useLayoutWrites(layout, headerData, footerData, (restored) => {
+    setHeaderData(restored.header_data as unknown as Data);
+    setFooterData(restored.footer_data as unknown as Data);
+  });
+  const { busy, message } = writes;
   const isNarrow = useIsNarrow();
   // Block labels are written as catalogue keys — see `localizeConfig` for why
   // they cannot resolve them where they are written.
@@ -56,61 +49,6 @@ export default function LayoutEditor() {
   // The layout palette, not the page one: a header holds a different set of
   // blocks and naming them from the wrong config would miss half of them.
   const layoutLabels = blockLabels(config.components);
-
-  const handleSave = async (overwrite = false) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      await writes.run(
-        (token) =>
-          saveLayout({
-            header_data: headerData as unknown as Record<string, unknown>,
-            footer_data: footerData as unknown as Record<string, unknown>,
-            ...(overwrite ? {} : { expected_updated_at: token }),
-          }),
-        overwrite,
-      );
-      setMessage(t(keys.pagebuilder.layout.saved));
-      router.reload({ only: ['revisions'] });
-    } catch (e) {
-      if (e instanceof HttpError && e.code === 'layout_conflict') setRefusedRestore(null);
-      else {
-        setMessage(e instanceof Error ? e.message : t(keys.pagebuilder.layout.save_failed));
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // History failures belong to the row dialog; banner overwrite failures appear on screen.
-  const handleRestore = async (revisionId: number, overwrite = false) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const restored = await writes.run(
-        (token) => restoreLayoutRevision(revisionId, overwrite ? undefined : token),
-        overwrite,
-      );
-      setRefusedRestore(null);
-      setHeaderData(restored.header_data as unknown as Data);
-      setFooterData(restored.footer_data as unknown as Data);
-      setMessage(t(keys.pagebuilder.layout.revision_restored));
-      router.reload({ only: ['revisions'] });
-    } catch (e) {
-      // Close the dialog so Reload and Overwrite in the banner are reachable.
-      if (e instanceof HttpError && e.code === 'layout_conflict') setRefusedRestore(revisionId);
-      else {
-        if (!overwrite) throw e;
-        setMessage(
-          e instanceof Error
-            ? e.message
-            : t(keys.pagebuilder.confirm.failed, { action: t(keys.pagebuilder.layout.restore) }),
-        );
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -138,7 +76,7 @@ export default function LayoutEditor() {
           <Button variant="outline" size="sm" onClick={() => setShowHistory((v) => !v)}>
             {t(keys.pagebuilder.layout.history, { count: revisions.length })}
           </Button>
-          <Button size="sm" disabled={busy || writes.conflict} onClick={() => void handleSave()}>
+          <Button size="sm" disabled={busy || writes.conflict} onClick={() => void writes.save()}>
             {t(keys.pagebuilder.layout.save)}
           </Button>
         </div>
@@ -151,9 +89,7 @@ export default function LayoutEditor() {
           missing={false}
           busy={busy}
           onReload={() => router.visit('/pagebuilder/layout', { preserveState: false })}
-          onOverwrite={() =>
-            refusedRestore === null ? handleSave(true) : handleRestore(refusedRestore, true)
-          }
+          onOverwrite={writes.overwrite}
         />
       )}
 
@@ -198,7 +134,7 @@ export default function LayoutEditor() {
                       when: formatTimestamp(r.created_at, locale),
                     })}
                     confirmLabel={t(keys.pagebuilder.layout.restore)}
-                    onConfirm={() => handleRestore(r.id)}
+                    onConfirm={() => writes.restore(r.id)}
                   />
                 </li>
               ))}
