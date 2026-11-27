@@ -89,7 +89,7 @@ and [test setup](subscriptions.md#tests-make-no-real-network-connection).
 
 - Nothing that leaves `fetch_feed` carries the URL (a failure is a code with no cause).
   API output uses `url_display`; [secret rotation](subscriptions.md#secrets-and-rotation)
-  and [AGENTS.md](../../../AGENTS.md#stored-secrets-351) cover storage.
+  and [cross-module rules](../../../.agents/rules/cross-module-rules.md#stored-secrets-351) cover storage.
 - Build a fetch `Policy` only through
   `policy.effective(setting, may_use_private=sub.may_use_private and not sub.public)`.
   The flag is set only from the saver's `events.manage` (`flag_after_save`), never from a
