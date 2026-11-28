@@ -1,6 +1,6 @@
 {
   "name": "@simple-module-py/events",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "private": true,
   "exports": {
     ".": "./sm_events/index.ts"
