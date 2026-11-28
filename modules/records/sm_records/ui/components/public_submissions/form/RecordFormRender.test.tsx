@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { updateI18n } from '@simple-module-py/i18n';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { mount, settle, setValue } from '../../../page-tests/test-dom';
+import { loadCatalogue } from '../../../utils/PageLocale';
 import { definition, field, input, send, server } from './record-form-test-support';
 
 vi.mock('@simple-module-py/pagebuilder', async (importOriginal) => ({
@@ -43,13 +45,16 @@ function block(extra: Record<string, unknown> = {}) {
   );
 }
 
+beforeAll(() => loadCatalogue('de'));
+
 beforeEach(() => {
-  document.documentElement.lang = 'de';
+  document.documentElement.lang = 'en';
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
   document.documentElement.lang = '';
+  updateI18n({ locale: 'en', messages: {} });
 });
 
 describe('RecordFormRender', () => {
@@ -57,7 +62,7 @@ describe('RecordFormRender', () => {
     const calls = server({ status: 200, body: definition() });
     const view = await mount(block());
     await settle();
-    expect(calls[0].url).toBe('/api/records/submissions/contact?locale=de');
+    expect(calls[0].url).toBe('/api/records/submissions/contact?locale=en');
     for (const key of ['name', 'email', 'age', 'message', 'topic', 'news']) {
       const el = input(view, key);
       expect(el, key).not.toBeNull();
@@ -193,5 +198,35 @@ describe('RecordFormRender', () => {
     } finally {
       widget.token = 'cap-token';
     }
+  });
+
+  it('speaks the page language rather than the visitor console language on public pages (#488)', async () => {
+    // Console is German, page is English -> English form strings.
+    document.documentElement.lang = 'en';
+    updateI18n({
+      locale: 'de',
+      messages: {
+        'records.public_submissions.form.submit': 'Senden',
+        'records.public_submissions.form.honeypot': 'Dieses Feld leer lassen',
+      },
+    });
+    const enCalls = server({ status: 200, body: definition() });
+    const enView = await mount(block());
+    await settle();
+    expect(enCalls[0].url).toBe('/api/records/submissions/contact?locale=en');
+    expect(enView.host.textContent).toContain('Leave this field empty');
+    expect(enView.find('button[type="submit"]')?.textContent).toBe('Send');
+    await enView.unmount();
+
+    // Console is English, page is German -> German form strings.
+    document.documentElement.lang = 'de';
+    updateI18n({ locale: 'en', messages: {} });
+    const deCalls = server({ status: 200, body: definition() });
+    const deView = await mount(block());
+    await settle();
+    expect(deCalls[0].url).toBe('/api/records/submissions/contact?locale=de');
+    expect(deView.host.textContent).toContain('Dieses Feld leer lassen');
+    expect(deView.find('button[type="submit"]')?.textContent).toBe('Senden');
+    await deView.unmount();
   });
 });

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { FormBody } from '../components/public_submissions/form/RecordFormFields';
 import { type FocusTarget, useSubmissionForm } from '../hooks/useSubmissionForm';
 import { keys, useT } from '../utils/i18n';
+import { PageLocale } from '../utils/PageLocale';
 import { fetchRegistration, type RegistrationView } from '../utils/registration-api';
 
 const copy = keys.records.public_submissions.registration.panel;
@@ -43,7 +44,7 @@ function when(iso: string | null, locale: string): string {
     : new Intl.DateTimeFormat(locale, { dateStyle: 'long', timeStyle: 'short' }).format(date);
 }
 
-export default function RegistrationPanel({
+function RegistrationPanelInner({
   typeKey,
   eventId,
   occurrenceKey,
@@ -173,5 +174,13 @@ export default function RegistrationPanel({
       {header}
       {body}
     </section>
+  );
+}
+
+export default function RegistrationPanel(props: RegistrationPanelProps) {
+  return (
+    <PageLocale locale={props.locale}>
+      <RegistrationPanelInner {...props} />
+    </PageLocale>
   );
 }

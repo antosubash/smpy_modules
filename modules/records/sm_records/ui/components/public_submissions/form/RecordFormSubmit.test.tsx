@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, mount, settle, setValue } from '../../../page-tests/test-dom';
+import { loadCatalogue } from '../../../utils/PageLocale';
 import { definition, field, fill, input, send, server } from './record-form-test-support';
 
 vi.mock('@simple-module-py/pagebuilder', async (importOriginal) => ({
@@ -43,8 +44,10 @@ function block(extra: Record<string, unknown> = {}) {
   );
 }
 
+beforeAll(() => loadCatalogue('de'));
+
 beforeEach(() => {
-  document.documentElement.lang = 'de';
+  document.documentElement.lang = 'en';
 });
 
 afterEach(() => {
@@ -54,6 +57,7 @@ afterEach(() => {
 
 describe('RecordFormRender — sending', () => {
   it('sends the values with the token and shows the thank-you', async () => {
+    document.documentElement.lang = 'de';
     const calls = server({ status: 200, body: definition() }, { status: 202, body: { ok: true } });
     const view = await mount(block());
     await settle();
@@ -72,7 +76,7 @@ describe('RecordFormRender — sending', () => {
     });
     const success = view.find('[data-testid="records-form-success"]');
     expect(success?.getAttribute('role')).toBe('status');
-    expect(success?.textContent).toContain('Thank you');
+    expect(success?.textContent).toContain('Vielen Dank');
     await view.unmount();
   });
 

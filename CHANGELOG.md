@@ -444,6 +444,8 @@ name the module they affect.
 
 ### Fixed
 
+- **events: German public pages no longer log a React `use()` error** (#489). `PageLocale` keeps a stable `<Suspense>`/`use()` path across cold and cached renders and starts preloading the document's language chunk earlier at module load.
+- **records, events: public registration and website submission forms speak the page's language** (#488). `RegistrationPanel` and `RecordFormRender` wrap their public form tree in records' `<PageLocale>` provider so form labels, validation errors, and confirmation text follow the page's content locale instead of the visitor's console language cookie.
 - **analytics: reuse host configuration and support skipped pages** (#483, #477).
   The adapter caches configuration per origin and tenant for three minutes,
   shares in-flight requests and backs off for 30 seconds after failures. Its
