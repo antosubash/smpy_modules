@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { updateI18n } from '@simple-module-py/i18n';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import {
   definition,
   field,
-  fill,
   input,
   send,
   server,
 } from '../components/public_submissions/form/record-form-test-support';
 import { click, mount, settle, setValue } from '../page-tests/test-dom';
+import { loadCatalogue } from '../utils/PageLocale';
 
 vi.mock('../components/public_submissions/form/CaptchaWidget', () => ({
   CaptchaWidget: () => null,
@@ -16,7 +17,7 @@ vi.mock('../components/public_submissions/form/CaptchaWidget', () => ({
 const { default: RegistrationPanel } = await import('./RegistrationPanel');
 
 const EID = '3f1c2a52-0000-4000-8000-000000000001';
-const props = { typeKey: 'regs', eventId: EID, occurrenceKey: EID, locale: 'de' };
+const props = { typeKey: 'regs', eventId: EID, occurrenceKey: EID, locale: 'en' };
 const info = {
   title: 'Open day',
   when_text: 'Wed 1 Jul, 10:00',
@@ -56,13 +57,15 @@ const view = (state: string, extra: Record<string, unknown> = {}) => ({
 });
 const text = () => document.body.textContent ?? '';
 
+beforeAll(() => loadCatalogue('de'));
 beforeEach(() => {
-  document.documentElement.lang = 'de';
+  document.documentElement.lang = 'en';
 });
 afterEach(() => {
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
   document.documentElement.lang = '';
+  updateI18n({ locale: 'en', messages: {} });
 });
 
 async function fillIn(v: Awaited<ReturnType<typeof mount>>) {
@@ -75,7 +78,7 @@ it('asks the provider route for the event and occurrence, and posts the token wi
   const v = await mount(<RegistrationPanel {...props} />);
   await settle();
   expect(calls[0]?.url).toBe(
-    `/api/records/submissions/regs/registration?event=${EID}&occurrence=${EID}&locale=de`,
+    `/api/records/submissions/regs/registration?event=${EID}&occurrence=${EID}&locale=en`,
   );
   expect(text()).toContain('Open day');
   expect(text()).toContain('Wed 1 Jul, 10:00');

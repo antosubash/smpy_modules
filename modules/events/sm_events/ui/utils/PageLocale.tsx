@@ -20,18 +20,40 @@ type Flat = Record<string, string>;
 const loaded = new Map<string, Flat>();
 const pending = new Map<string, Promise<Flat>>();
 
+function resolveLoaderKey(locale: string): string | undefined {
+  if (locale in loaders) return locale;
+  const lower = locale.toLowerCase();
+  if (lower in loaders) return lower;
+  const base = lower.split('-')[0];
+  return base in loaders ? base : undefined;
+}
+
 /** Start loading a language's catalogue (the pages do it on first render; tests do it up front). */
 export function loadCatalogue(locale: string): Promise<Flat> {
-  const hit = pending.get(locale);
+  const key = resolveLoaderKey(locale);
+  const cacheKey = key ?? locale;
+  const hit = pending.get(cacheKey);
   if (hit) return hit;
-  const loader = loaders[locale];
-  const promise = (loader ? loader() : Promise.resolve({ default: {} })).then((m) => {
-    const flat = flatten(m.default as Record<string, unknown>, 'events', {});
-    loaded.set(locale, flat);
-    return flat;
-  });
-  pending.set(locale, promise);
+  const loader = key ? loaders[key] : undefined;
+  const promise = (loader ? loader() : Promise.resolve({ default: {} }))
+    .then((m) => {
+      const flat = flatten(m.default as Record<string, unknown>, 'events', {});
+      loaded.set(cacheKey, flat);
+      return flat;
+    })
+    .catch((err) => {
+      pending.delete(cacheKey);
+      throw err;
+    });
+  pending.set(cacheKey, promise);
   return promise;
+}
+
+// Preload the page's catalogue as soon as this module runs so the chunk starts fetching before
+// React mounts (the server writes `<html lang>` on public pages).
+if (typeof document !== 'undefined') {
+  const docKey = resolveLoaderKey(document.documentElement.lang);
+  if (docKey) void loadCatalogue(docKey);
 }
 
 /** The text for ``key``: the page's language, else English, else the key; a ``count`` picks the
@@ -70,8 +92,18 @@ function Provide({
   return <PageCatalogueContext.Provider value={value}>{children}</PageCatalogueContext.Provider>;
 }
 
-function Lazy({ locale, children }: { locale: string; children: ReactNode }) {
-  const messages = loaded.get(locale) ?? use(loadCatalogue(locale));
+function Lazy({
+  locale,
+  loaderKey,
+  children,
+}: {
+  locale: string;
+  loaderKey: string;
+  children: ReactNode;
+}) {
+  // Always invoke `use` on the cached promise instance so React 19 never sees a conditional `use()`
+  // between the suspended render and the resumed render.
+  const messages = use(loadCatalogue(loaderKey));
   return (
     <Provide locale={locale} messages={messages}>
       {children}
@@ -80,17 +112,28 @@ function Lazy({ locale, children }: { locale: string; children: ReactNode }) {
 }
 
 export function PageLocale({ locale, children }: { locale: string; children: ReactNode }) {
+  const key = resolveLoaderKey(locale);
   // No chunk to wait for: English and a language without a catalogue render at once.
-  if (!loaders[locale]) {
+  if (!key) {
     return (
       <Provide locale={locale} messages={{}}>
         {children}
       </Provide>
     );
   }
+  const cached = loaded.get(key);
+  if (cached) {
+    return (
+      <Provide locale={locale} messages={cached}>
+        {children}
+      </Provide>
+    );
+  }
   return (
     <Suspense fallback={null}>
-      <Lazy locale={locale}>{children}</Lazy>
+      <Lazy locale={locale} loaderKey={key}>
+        {children}
+      </Lazy>
     </Suspense>
   );
 }

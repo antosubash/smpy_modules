@@ -17,9 +17,16 @@
  */
 
 import { Section } from '@simple-module-py/pagebuilder';
-import { type CSSProperties, type ReactNode, useCallback, useId, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useId,
+  useSyncExternalStore,
+} from 'react';
 import { type FocusTarget, useSubmissionForm } from '../../../hooks/useSubmissionForm';
 import { keys, useT } from '../../../utils/i18n';
+import { PageLocale } from '../../../utils/PageLocale';
 import { FormBody } from './RecordFormFields';
 import { HELP_STYLE, LABEL_STYLE } from './SubmissionInput';
 import type { RecordFormProps } from './types';
@@ -44,11 +51,25 @@ function pageLang(): string | undefined {
   return document.documentElement.lang || undefined;
 }
 
-export function RecordFormRender(props: RecordFormRenderProps) {
+function subscribeLang(onStoreChange: () => void): () => void {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
+    return () => {};
+  }
+  const observer = new MutationObserver(onStoreChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+  return () => observer.disconnect();
+}
+
+function useDocumentLocale(): string | undefined {
+  return useSyncExternalStore(subscribeLang, pageLang, () => undefined);
+}
+
+function RecordFormInner(
+  props: RecordFormRenderProps & { editing: boolean; locale: string | undefined },
+) {
   const { t } = useT();
-  const editing = Boolean(props.puck?.isEditing);
+  const { editing, locale } = props;
   const base = useId();
-  const [locale] = useState(pageLang);
   const summaryId = `${base}-summary`;
   const successId = `${base}-success`;
   const fieldId = (key: string) => `${base}-${key}`;
@@ -134,4 +155,12 @@ export function RecordFormRender(props: RecordFormRenderProps) {
       </div>
     </Section>
   );
+}
+
+export function RecordFormRender(props: RecordFormRenderProps) {
+  const editing = Boolean(props.puck?.isEditing);
+  const locale = useDocumentLocale();
+  const inner = <RecordFormInner {...props} editing={editing} locale={locale} />;
+  // In the Puck editor keep the admin console language; on public pages speak the page's language.
+  return !editing && locale ? <PageLocale locale={locale}>{inner}</PageLocale> : inner;
 }

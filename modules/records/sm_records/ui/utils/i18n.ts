@@ -26,9 +26,10 @@
  */
 
 import { t as frameworkT, useT as useFrameworkT } from '@simple-module-py/i18n';
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 
 import en from '../../locales/en.json';
+import { PageCatalogueContext } from './pageLocale';
 
 /** The namespace `RecordsModule.locale_dirs()` registers `locales/` under. */
 const NAMESPACE = 'records';
@@ -83,7 +84,11 @@ export const keys: Record<typeof NAMESPACE, KeyTree<typeof en>> = {
   [NAMESPACE]: build(en, NAMESPACE) as KeyTree<typeof en>,
 };
 
-function flatten(node: Record<string, unknown>, prefix: string, out: Record<string, string>) {
+export function flatten(
+  node: Record<string, unknown>,
+  prefix: string,
+  out: Record<string, string>,
+) {
   for (const [name, value] of Object.entries(node)) {
     const path = `${prefix}.${name}`;
     if (typeof value !== 'string') {
@@ -136,7 +141,7 @@ function flatten(node: Record<string, unknown>, prefix: string, out: Record<stri
  * is already in memory for `keys`; this is the same data read the other way.
  * It is also why call sites carry no `defaultValue` of their own.
  */
-const english: Record<string, string> = flatten(en, NAMESPACE, {});
+export const english: Record<string, string> = flatten(en, NAMESPACE, {});
 
 /** Interpolation values — `{name}` placeholders, and `count` for plurals. */
 export type TranslateParams = Record<string, unknown>;
@@ -166,16 +171,19 @@ export function translate(key: string, params?: TranslateParams): string {
  */
 export function useT(): { t: Translate; locale: string | undefined } {
   const { t, i18n } = useFrameworkT();
+  const page = useContext(PageCatalogueContext);
   // The console's language, for `Intl` date and number formatting: the
   // browser's own locale is not the one the console speaks (#189).
   const locale = i18n?.language || undefined;
   return useMemo(
-    () => ({
-      t: (key: string, params?: TranslateParams) =>
-        t(key, { defaultValue: english[key] ?? key, ...params }),
-      locale,
-    }),
-    [t, locale],
+    () =>
+      // Inside a public page or form (`<PageLocale>`) both come from the page's own language.
+      page ?? {
+        t: (key: string, params?: TranslateParams) =>
+          t(key, { defaultValue: english[key] ?? key, ...params }),
+        locale,
+      },
+    [t, locale, page],
   );
 }
 
