@@ -1,4 +1,4 @@
-import { type ReactNode, Suspense, use, useMemo } from 'react';
+import { type ReactNode, Suspense, use, useMemo, useRef } from 'react';
 import { english, flatten } from './i18n';
 import { type PageCatalogue, PageCatalogueContext } from './pageLocale';
 
@@ -14,6 +14,7 @@ const loaders: Record<string, () => Promise<{ default: unknown }>> = {
 };
 
 type Flat = Record<string, string>;
+const EMPTY: Flat = {};
 const loaded = new Map<string, Flat>();
 const pending = new Map<string, Promise<Flat>>();
 
@@ -38,9 +39,10 @@ export function loadCatalogue(locale: string): Promise<Flat> {
       loaded.set(cacheKey, flat);
       return flat;
     })
-    .catch((err) => {
-      pending.delete(cacheKey);
-      throw err;
+    .catch(() => {
+      // Fall back to English rather than rejecting into Suspense (no enclosing error boundary).
+      loaded.set(cacheKey, EMPTY);
+      return EMPTY;
     });
   pending.set(cacheKey, promise);
   return promise;
@@ -95,8 +97,14 @@ function Lazy({
   loaderKey: string;
   children: ReactNode;
 }) {
-  // Always invoke `use` on the cached promise instance so React 19 never sees a conditional `use()`.
-  const messages = use(loadCatalogue(loaderKey));
+  // Latch once per mount whether `loaderKey` was already cached before the first render.
+  // Cold mounts stay on `use()` for their lifetime (avoiding React 19's conditional `use()` error),
+  // while keeping the `<Suspense><Lazy><Provide>` tree shape identical so descendants never remount.
+  const initialCachedKey = useRef<string | null>(loaded.has(loaderKey) ? loaderKey : null);
+  const messages =
+    initialCachedKey.current === loaderKey
+      ? (loaded.get(loaderKey) as Flat)
+      : use(loadCatalogue(loaderKey));
   return (
     <Provide locale={locale} messages={messages}>
       {children}
@@ -108,15 +116,7 @@ export function PageLocale({ locale, children }: { locale: string; children: Rea
   const key = resolveLoaderKey(locale);
   if (!key) {
     return (
-      <Provide locale={locale} messages={{}}>
-        {children}
-      </Provide>
-    );
-  }
-  const cached = loaded.get(key);
-  if (cached) {
-    return (
-      <Provide locale={locale} messages={cached}>
+      <Provide locale={locale} messages={EMPTY}>
         {children}
       </Provide>
     );
